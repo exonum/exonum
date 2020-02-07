@@ -1,6 +1,6 @@
 [package]
 name = "exonum-explorer-service"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -16,11 +16,11 @@ description = "Exonum blockchain explorer, packaged as a service"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-api = { version = "0.13.0-rc.2", path = "../../components/api" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-explorer = { version = "0.13.0-rc.2", path = "../../components/explorer" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-api = { version = "1.0.0-rc.1", path = "../../components/api" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-explorer = { version = "1.0.0-rc.1", path = "../../components/explorer" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }
@@ -34,9 +34,9 @@ serde_derive = "1.0"
 serde_json = "1.0.42"
 
 [dev-dependencies]
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-supervisor = { version = "0.13.0-rc.2", path = "../supervisor" }
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-supervisor = { version = "1.0.0-rc.1", path = "../supervisor" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
 assert_matches = "1.3.0"
 reqwest = "0.9"

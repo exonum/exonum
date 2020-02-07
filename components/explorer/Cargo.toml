@@ -1,6 +1,6 @@
 [package]
 name = "exonum-explorer"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -16,7 +16,7 @@ description = "Blockchain explorer utils for the Exonum framework"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
 hex = "0.4.0"
@@ -24,9 +24,9 @@ serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
-exonum-derive = { version = "0.13.0-rc.2", path = "../derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../merkledb" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../merkledb" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 bincode = "1.2.1"
 failure = "0.1.5"

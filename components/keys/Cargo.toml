@@ -1,6 +1,6 @@
 [package]
 name = "exonum-keys"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -21,7 +21,7 @@ serde = "1.0.10"
 serde_derive = "1.0.64"
 toml = "0.5.0"
 
-exonum-crypto = { version = "0.13.0-rc.2", path = "../crypto" }
+exonum-crypto = { version = "1.0.0-rc.1", path = "../crypto" }
 
 [dev-dependencies]
 tempdir = "0.3.7"

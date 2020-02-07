@@ -23,7 +23,7 @@ artifacts:
   cryptocurrency:
     runtime: rust
     name: "exonum-cryptocurrency-advanced"
-    version: "0.13.0-rc.2"
+    version: "1.0.0-rc.1"
 instances:
   crypto:
     artifact: cryptocurrency

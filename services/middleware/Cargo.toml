@@ -1,6 +1,6 @@
 [package]
 name = "exonum-middleware-service"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <exonum@bitfury.com>"]
 homepage = "https://exonum.com/"
@@ -16,11 +16,11 @@ description = "Composability utilities for Exonum, packaged as a service"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 failure = "0.1.5"
 protobuf = "2.8.0"
@@ -29,8 +29,8 @@ serde = "1.0.101"
 serde_derive = "1.0.101"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 serde_json = "1.0.42"
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../../components/build" }

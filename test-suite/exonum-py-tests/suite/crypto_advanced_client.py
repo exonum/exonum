@@ -10,14 +10,14 @@ class ExonumCryptoAdvancedClient:
     def __init__(self, client: ExonumClient):
         self.client = client
         cryptocurrency_service_name = "exonum-cryptocurrency-advanced"
-        cryptocurrency_service_version = "0.13.0-rc.2"
+        cryptocurrency_service_version = "1.0.0-rc.1"
         self.loader = client.protobuf_loader()
         self.loader.initialize()
         self.loader.load_main_proto_files()
         self.loader.load_service_proto_files(
             runtime_id=0,
             artifact_name="exonum-supervisor",
-            artifact_version="0.13.0-rc.2",
+            artifact_version="1.0.0-rc.1",
         )
         self.loader.load_service_proto_files(
             runtime_id=0,

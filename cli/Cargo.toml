@@ -1,6 +1,6 @@
 [package]
 name = "exonum-cli"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 authors = ["The Exonum Team <contact@exonum.com>"]
 edition = "2018"
 homepage = "https://exonum.com/"
@@ -12,12 +12,12 @@ categories = ["command-line-interface", "configuration"]
 description = "Helper crate for secure and convenient configuration of the Exonum nodes."
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../exonum" }
-exonum-node = { version = "0.13.0-rc.2", path = "../exonum-node" }
-exonum-explorer-service = { version = "0.13.0-rc.2", path = "../services/explorer" }
-exonum-supervisor = { version = "0.13.0-rc.2", path = "../services/supervisor" }
-exonum-system-api = { version = "0.13.0-rc.2", path = "../components/system-api" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../exonum" }
+exonum-node = { version = "1.0.0-rc.1", path = "../exonum-node" }
+exonum-explorer-service = { version = "1.0.0-rc.1", path = "../services/explorer" }
+exonum-supervisor = { version = "1.0.0-rc.1", path = "../services/supervisor" }
+exonum-system-api = { version = "1.0.0-rc.1", path = "../components/system-api" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../runtimes/rust" }
 
 failure = "0.1"
 log = "0.4"
@@ -30,7 +30,7 @@ toml = "0.5"
 zeroize = "0.9"
 
 [dev-dependencies]
-exonum-derive = { version = "0.13.0-rc.2", path = "../components/derive" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../components/derive" }
 
 futures = "0.1.29"
 lazy_static = "1.4.0"

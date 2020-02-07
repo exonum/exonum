@@ -25,7 +25,7 @@ Include `exonum-system-api` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-system-api = "0.13.0-rc.2"
+exonum-system-api = "1.0.0-rc.1"
 ```
 
 `SystemApiPlugin` type, located at the root of the crate, should be used

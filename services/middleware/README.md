@@ -35,8 +35,8 @@ Include `exonum-middleware-service` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.13.0-rc.2"
-exonum-middleware-service = "0.13.0-rc.2"
+exonum = "1.0.0-rc.1"
+exonum-middleware-service = "1.0.0-rc.1"
 ```
 
 ## License
