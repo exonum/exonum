@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Shows how to provide database data migration with the `MigrationHelper::iter_loop`.
-//! `MigrationHelper` provides methods to get access to the old
-//! and new versions of the data, and to merge changes, so we don't need to do it manually.
+//! This example shows how to use `MigrationHelper::iter_loop` within migration logic.
+//! `MigrationHelper` allows to access the old and new versions of the data, and to merge changes,
+//! so we don't need to do it manually.
 //!
-//! The main logic of this example is described in the `migration_with_iter_loop`
-//! and `migrate_wallets` functions.
+//! The main logic is described in the `migration_with_iter_loop` and `migrate_wallets` functions.
 //!
 //! The main points of this example are:
-//! - We are creating `MigrationHelper` for the DB
-//!  that allows us to get access to the old and new data.
-//! - We are using `MigrationHelper::finish` to merge the changes to the database.
-//! - `MigrationHelper::iter_loop` allows us to perform data migration in chunks.
-//!  After each iteration changes are merged to the DB.
-//! - Data migration is performed by direct access to old and new schemas.
+//!
+//! - We create `MigrationHelper` for the DB that allows us to get access to the old and new data.
+//! - We use `MigrationHelper::finish()` to merge the changes to the database.
+//! - `MigrationHelper::iter_loop()` allows us to perform data migration in chunks.
+//!   After each iteration changes are merged to the DB.
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
@@ -90,10 +88,9 @@ fn migration_with_iter_loop(db: Arc<dyn Database>) {
     let mut helper = MigrationHelper::new(db.clone(), "test");
 
     {
-        let new_data = helper.new_data();
         let old_data = helper.old_data();
-
         let old_schema = v1::Schema::new(old_data);
+        let new_data = helper.new_data();
         let mut new_schema = v2::Schema::new(new_data.clone());
 
         // Move `ticker` and `divisibility` to `config`.

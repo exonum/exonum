@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Shows how to provide database data migration manually.
+//! This example shows how to provide database data migration manually.
 //!
-//! The main logic of this example is described in the `manual_migration`
-//! and `migrate_wallets` functions.
+//! The main logic is described in the `manual_migration` and `migrate_wallets` functions.
 //!
 //! The main points of this example are:
 //!
-//! - We have to create `Fork` from the DB manually, as well as `Migration` and `Prefixed` access
+//! - We manually create a `Fork` from the DB, as well as `Migration` and `Prefixed` access
 //!   to the data.
-//! - We have to apply `Patch` to the DB manually.
-//! - Data migration is performed by direct access to old and new schemas.
+//! - We manually apply the resulting `Patch` to the DB.
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
@@ -37,9 +35,9 @@ use crate::migration::{perform_migration, v1, v2};
 
 /// Provides migration of wallets with schema.
 ///
-/// `Wallet::public_key` field will be removed.
-/// `Wallet::history_hash` field will be added.
-/// Wallets and history from username Eve will be removed.
+/// - `Wallet.public_key` field is removed.
+/// - `Wallet.history_hash` field is added.
+/// - Wallets and wallet history belonging to the users named "Eve' are dropped.
 fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data.clone());
@@ -75,10 +73,9 @@ fn manual_migration(db: Arc<dyn Database>) {
 
     {
         let new_data = Migration::new("test", &fork);
-        let old_data = Prefixed::new("test", fork.readonly());
-
-        let old_schema = v1::Schema::new(old_data);
         let mut new_schema = v2::Schema::new(new_data.clone());
+        let old_data = Prefixed::new("test", fork.readonly());
+        let old_schema = v1::Schema::new(old_data);
 
         // Move `ticker` and `divisibility` to `config`.
         let config = v2::Config {
@@ -91,10 +88,6 @@ fn manual_migration(db: Arc<dyn Database>) {
         new_data.create_tombstone("divisibility");
     }
 
-    // Migrate wallets using schema:
-    // `Wallet::public_key` field will be removed.
-    // `Wallet::history_hash` field will be added.
-    // Wallets and history from username Eve will be removed.
     let new_data = Migration::new("test", &fork);
     let old_data = Prefixed::new("test", fork.readonly());
     migrate_wallets(new_data, old_data);
