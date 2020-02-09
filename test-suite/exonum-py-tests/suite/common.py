@@ -11,7 +11,7 @@ from requests.exceptions import ConnectionError
 
 RETRIES_AMOUNT = 20
 ARTIFACT_NAME = "exonum-cryptocurrency-advanced"
-ARTIFACT_VERSION = "0.13.0-rc.2"
+ARTIFACT_VERSION = "1.0.0-rc.1"
 
 
 def run_dev_node(application: str) -> ExonumNetwork:

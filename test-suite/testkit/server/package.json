@@ -8,7 +8,7 @@
   },
   "private": true,
   "scripts": {
-    "proto": "pbjs -t static-module -r test ../../../examples/cryptocurrency/src/proto/service.proto ../../../components/crypto/src/proto/schema/exonum/crypto/types.proto -o ./test/stubs.js",
+    "proto": "pbjs -t static-module -r test -p node_modules/exonum-client/proto ../../../examples/cryptocurrency/src/proto/service.proto -o ./test/stubs.js",
     "prepare": "npm run proto",
     "lint": "standard",
     "pretest:unix": "npm run posttest:unix && cargo build; (cargo run > /dev/null 2>&1) & sleep 5",

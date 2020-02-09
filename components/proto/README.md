@@ -55,7 +55,7 @@ Include `exonum-proto` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-proto = "0.13.0-rc.2"
+exonum-proto = "1.0.0-rc.1"
 ```
 
 ## License

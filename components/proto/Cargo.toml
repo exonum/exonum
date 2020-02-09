@@ -1,6 +1,6 @@
 [package]
 name = "exonum-proto"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -19,7 +19,7 @@ protobuf = { version = "2.8.1", features = ["with-serde"] }
 bit-vec = "0.6.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"
-exonum-derive = { path = "../derive", version = "0.13.0-rc.2"}
+exonum-derive = { path = "../derive", version = "1.0.0-rc.1"}
 protobuf-convert = "0.3.0"
 
 [features]
@@ -27,4 +27,4 @@ default = ["with-serde"]
 with-serde = []
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../build" }

@@ -17,7 +17,7 @@ Include `exonum-keys` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-keys = "0.13.0-rc.2"
+exonum-keys = "1.0.0-rc.1"
 ```
 
 ## License

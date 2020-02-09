@@ -1,6 +1,6 @@
 [package]
 name = "exonum-time"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -16,12 +16,12 @@ description = "The time oracle service for Exonum."
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-api = { version = "0.13.0-rc.2", path = "../../components/api" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-api = { version = "1.0.0-rc.1", path = "../../components/api" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
 failure = "0.1.5"
@@ -31,12 +31,12 @@ serde_derive = "1.0"
 serde_json = "1.0"
 
 [dev-dependencies]
-exonum-cli = { version = "0.13.0-rc.2", path = "../../cli" }
-exonum-supervisor = { version = "0.13.0-rc.2", path = "../supervisor" }
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum-cli = { version = "1.0.0-rc.1", path = "../../cli" }
+exonum-supervisor = { version = "1.0.0-rc.1", path = "../supervisor" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
 bincode = "1.2.1"
 pretty_assertions = "0.6.1"
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../../components/build" }

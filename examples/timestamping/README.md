@@ -22,7 +22,7 @@ Simply run the following command to start the timestamping service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 exonumhub/exonum-timestamping:v0.13.0-rc.2
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-timestamping:v1.0.0-rc.1
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).

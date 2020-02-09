@@ -10,12 +10,12 @@ description = "The test crate for testing rust runtime API endpoints."
 publish = false
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
 bit-vec = "0.6.1"
 chrono = { version = "0.4.6", features = ["serde"] }
@@ -26,4 +26,4 @@ pretty_assertions = "0.6.1"
 failure = "0.1.5"
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../../components/build" }
