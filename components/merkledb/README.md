@@ -7,7 +7,7 @@
 
 **MerkleDB** is a document-oriented persistent storage
 which provides APIs to work with merkelized data structures.
-Under the hood, MerkleDB uses RocksDB.
+Under the hood, MerkleDB uses RocksDB as a key-value storage.
 
 ## Features
 
