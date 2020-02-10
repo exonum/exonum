@@ -26,14 +26,18 @@ use exonum::{
         InstanceStatus, SnapshotExt,
     },
 };
+use exonum_api::UpdateEndpoints;
 use exonum_derive::*;
-use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
+use futures::{sync::mpsc, Future, Stream};
 use pretty_assertions::assert_eq;
+
+use std::collections::HashSet;
 
 use self::inspected::{
     create_genesis_config_builder, execute_transaction, EventsHandle, Inspected, MigrateService,
     ResumeService, RuntimeEvent, ToySupervisor, ToySupervisorService,
 };
+use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
 mod inspected;
 
@@ -171,7 +175,7 @@ impl MigrateData for WithdrawalServiceV2 {
     }
 }
 
-fn create_runtime() -> (BlockchainMut, EventsHandle) {
+fn create_runtime() -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoints>) {
     let blockchain = Blockchain::build_for_tests();
     let genesis_config = create_genesis_config_builder()
         .with_artifact(ToySupervisorService.artifact_id())
@@ -181,12 +185,13 @@ fn create_runtime() -> (BlockchainMut, EventsHandle) {
         .with_instance(WithdrawalServiceV1.default_instance())
         .build();
 
+    let (endpoints_tx, endpoints_rx) = mpsc::channel(16);
     let inspected = Inspected::new(
         RustRuntimeBuilder::new()
             .with_factory(WithdrawalServiceV1)
             .with_migrating_factory(WithdrawalServiceV2)
             .with_factory(ToySupervisorService)
-            .build_for_tests(),
+            .build(endpoints_tx),
     );
     let events_handle = inspected.events.clone();
 
@@ -194,15 +199,28 @@ fn create_runtime() -> (BlockchainMut, EventsHandle) {
         .with_genesis_config(genesis_config)
         .with_runtime(inspected)
         .build();
-    (blockchain, events_handle)
+    (blockchain, events_handle, endpoints_rx)
 }
 
-#[test]
-fn resume_without_migration() {
-    let (mut blockchain, events_handle) = create_runtime();
+fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) -> HashSet<String> {
+    let (received, _) = endpoints_rx.by_ref().into_future().wait().unwrap();
+    received
+        .unwrap()
+        .endpoints
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect()
+}
+
+fn test_resume_without_migration(freeze_service: bool) {
+    let (mut blockchain, events_handle, mut endpoints_rx) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
     // We are not interested in blockchain initialization events.
     drop(events_handle.take());
+    // Get initial set of endpoints.
+    let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+    assert!(endpoint_paths.contains("services/supervisor"));
+    assert!(endpoint_paths.contains("services/withdrawal"));
 
     // Make withdrawal.
     let amount = 10_000;
@@ -214,17 +232,28 @@ fn resume_without_migration() {
     // We not interested in events in this case.
     drop(events_handle.take());
 
-    // Stop running service instance.
-    execute_transaction(
-        &mut blockchain,
+    // Stop / freeze the running service instance.
+    let tx = if freeze_service {
+        keypair.freeze_service(
+            ToySupervisorService::INSTANCE_ID,
+            WithdrawalServiceV1::INSTANCE_ID,
+        )
+    } else {
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
             WithdrawalServiceV1::INSTANCE_ID,
-        ),
-    )
-    .unwrap();
+        )
+    };
+    execute_transaction(&mut blockchain, tx).unwrap();
     // We not interested in events in this case.
     drop(events_handle.take());
+
+    if !freeze_service {
+        // Check that endpoints have been updated and no longer contain the stopped service.
+        let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+        assert!(endpoint_paths.contains("services/supervisor"));
+        assert!(!endpoint_paths.contains("services/withdrawal"));
+    }
 
     // Resume stopped service instance.
     execute_transaction(
@@ -256,6 +285,13 @@ fn resume_without_migration() {
         ]
     );
 
+    if !freeze_service {
+        // Check that endpoints have been updated again.
+        let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+        assert!(endpoint_paths.contains("services/supervisor"));
+        assert!(endpoint_paths.contains("services/withdrawal"));
+    }
+
     // Make another withdrawal.
     let amount_2 = 20_000;
     execute_transaction(
@@ -283,8 +319,44 @@ fn resume_without_migration() {
     );
 }
 
+#[test]
+fn resume_without_migration() {
+    test_resume_without_migration(false);
+}
+
+#[test]
+fn resume_without_migration_and_frozen_service() {
+    test_resume_without_migration(true);
+}
+
+#[test]
+fn frozen_to_stopped_transition() {
+    let (mut blockchain, _, mut endpoints_rx) = create_runtime();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+
+    let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+    assert!(endpoint_paths.contains("services/supervisor"));
+    assert!(endpoint_paths.contains("services/withdrawal"));
+
+    // Freeze and then stop the service.
+    let tx = keypair.freeze_service(
+        ToySupervisorService::INSTANCE_ID,
+        WithdrawalServiceV1::INSTANCE_ID,
+    );
+    execute_transaction(&mut blockchain, tx).unwrap();
+    let tx = keypair.stop_service(
+        ToySupervisorService::INSTANCE_ID,
+        WithdrawalServiceV1::INSTANCE_ID,
+    );
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+    assert!(endpoint_paths.contains("services/supervisor"));
+    assert!(!endpoint_paths.contains("services/withdrawal"));
+}
+
 fn test_resume_with_fast_forward_migration(freeze_service: bool) {
-    let (mut blockchain, events_handle) = create_runtime();
+    let (mut blockchain, events_handle, _) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
     // We are not interested in blockchain initialization events.
     drop(events_handle.take());
@@ -428,7 +500,7 @@ fn resume_with_fast_forward_migration_and_freeze() {
 
 #[test]
 fn test_resume_incorrect_artifact_version() {
-    let (mut blockchain, _) = create_runtime();
+    let (mut blockchain, ..) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     execute_transaction(
@@ -460,7 +532,7 @@ fn test_resume_incorrect_artifact_version() {
 
 #[test]
 fn test_resume_incorrect_artifact_name() {
-    let (mut blockchain, _) = create_runtime();
+    let (mut blockchain, ..) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     execute_transaction(
@@ -495,7 +567,7 @@ fn test_resume_incorrect_artifact_name() {
 
 #[test]
 fn test_resume_service_error() {
-    let (mut blockchain, _) = create_runtime();
+    let (mut blockchain, ..) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     // Make withdrawal.
@@ -568,7 +640,7 @@ fn test_resume_service_error() {
 
 #[test]
 fn resume_non_existent_service_error() {
-    let (mut blockchain, _) = create_runtime();
+    let (mut blockchain, ..) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     let actual_err = execute_transaction(
@@ -591,7 +663,7 @@ fn resume_non_existent_service_error() {
 
 #[test]
 fn resume_active_service_error() {
-    let (mut blockchain, _) = create_runtime();
+    let (mut blockchain, ..) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
 
     let actual_err = execute_transaction(
