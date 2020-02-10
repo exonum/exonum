@@ -155,7 +155,7 @@ impl SampleRuntime {
         runtime_type: u32,
         instance_id: InstanceId,
         method_id: MethodId,
-        api_changes_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
+        changes_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
     ) -> Self {
         Self {
             runtime_type,
@@ -163,7 +163,7 @@ impl SampleRuntime {
             method_id,
             services: BTreeMap::new(),
             new_services: BTreeMap::new(),
-            new_service_sender: api_changes_sender,
+            new_service_sender: changes_sender,
         }
     }
 }
@@ -225,19 +225,16 @@ impl Runtime for SampleRuntime {
         spec: &InstanceSpec,
         new_status: &InstanceStatus,
     ) {
-        if spec.artifact.runtime_id == self.runtime_type {
-            let status_changed = if let Some(status) = self.services.get(&spec.id) {
-                status != new_status
-            } else {
-                true
-            };
-
-            if status_changed {
-                self.services.insert(spec.id, new_status.to_owned());
-                self.new_services.insert(spec.id, new_status.to_owned());
-            }
+        assert_eq!(spec.artifact.runtime_id, self.runtime_type);
+        let status_changed = if let Some(status) = self.services.get(&spec.id) {
+            status != new_status
         } else {
-            panic!("Incorrect runtime")
+            true
+        };
+
+        if status_changed {
+            self.services.insert(spec.id, new_status.to_owned());
+            self.new_services.insert(spec.id, new_status.to_owned());
         }
     }
 
@@ -444,7 +441,7 @@ fn test_dispatcher_simple() {
         )
         .expect_err("Incorrect tx java");
 
-    // Check that API changes in the dispatcher contain the started services.
+    // Check that changes in the dispatcher contain the started services.
     let expected_new_services = vec![
         (
             SampleRuntimes::First as u32,
@@ -474,6 +471,119 @@ fn test_dispatcher_simple() {
     );
 
     assert!(!should_rollback);
+}
+
+#[test]
+fn test_service_freezing() {
+    const SERVICE_ID: InstanceId = 0;
+    const METHOD_ID: MethodId = 0;
+
+    // Create dispatcher and test data.
+    let db = Arc::new(TemporaryDB::new());
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender::closed(),
+    );
+
+    let (changes_tx, changes_rx) = channel();
+    let runtime = SampleRuntime::new(
+        SampleRuntimes::First as u32,
+        SERVICE_ID,
+        METHOD_ID,
+        changes_tx,
+    );
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(runtime.runtime_type, runtime.clone())
+        .finalize(&blockchain);
+
+    let artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::First as _,
+        "first".to_owned(),
+        "0.5.0".parse().unwrap(),
+    );
+
+    // Deploy the artifact and instantiate the service.
+    let mut fork = db.fork();
+    dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
+    let service =
+        InstanceSpec::from_raw_parts(SERVICE_ID, "some-service".to_owned(), artifact.clone());
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .initiate_adding_service(service.clone(), vec![])
+        .expect("`initiate_adding_service` failed");
+
+    let patch = create_genesis_block(&mut dispatcher, fork);
+    db.merge(patch).unwrap();
+
+    let expected_change = (
+        SampleRuntimes::First as u32,
+        vec![(SERVICE_ID, InstanceStatus::Active)],
+    );
+    assert_eq!(expected_change, changes_rx.iter().next().unwrap());
+
+    // Command service freeze.
+    let mut fork = db.fork();
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .supervisor_extensions()
+        .initiate_freezing_service(SERVICE_ID)
+        .expect("Cannot freeze service");
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge(patch).unwrap();
+
+    let expected_change = (
+        SampleRuntimes::First as u32,
+        vec![(SERVICE_ID, InstanceStatus::Frozen)],
+    );
+    assert_eq!(expected_change, changes_rx.iter().next().unwrap());
+
+    // Check that the service no longer processes transactions.
+    let mut fork = db.fork();
+    let err = dispatcher
+        .call(&mut fork, &CallInfo::new(SERVICE_ID, METHOD_ID), &[])
+        .expect_err("Transaction was dispatched to frozen service");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+
+    // Change service status to stopped.
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .supervisor_extensions()
+        .initiate_stopping_service(SERVICE_ID)
+        .expect("Cannot stop service");
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge(patch).unwrap();
+
+    // Change service status to frozen again.
+    let mut fork = db.fork();
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .supervisor_extensions()
+        .initiate_freezing_service(SERVICE_ID)
+        .expect("Cannot freeze service");
 }
 
 #[derive(Debug, Clone)]

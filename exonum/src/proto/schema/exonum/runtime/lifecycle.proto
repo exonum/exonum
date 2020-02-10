@@ -71,6 +71,9 @@ message InstanceStatus {
     ACTIVE = 1;
     // The service instance is stopped.
     STOPPED = 2;
+    // The service instance is frozen; it can process read-only requests,
+    // but not transactions or `before_transactions` / `after_transactions` hooks.
+    FROZEN = 3;
   }
 
   oneof status {

@@ -460,7 +460,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Initiates stopping of an existing service instance in the blockchain. The stopping
+    /// Initiates stopping an existing service instance in the blockchain. The stopping
     /// service is active (i.e., processes transactions and the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     pub(crate) fn initiate_stopping_service(
@@ -468,7 +468,16 @@ impl Dispatcher {
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Schema::new(fork)
-            .initiate_stopping_service(instance_id)
+            .initiate_simple_service_transition(instance_id, InstanceStatus::Stopped)
+            .map_err(From::from)
+    }
+
+    pub(crate) fn initiate_freezing_service(
+        fork: &Fork,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .initiate_simple_service_transition(instance_id, InstanceStatus::Frozen)
             .map_err(From::from)
     }
 

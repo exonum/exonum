@@ -373,12 +373,20 @@ impl<'a> SupervisorExtensions<'a> {
             .initiate_adding_service(instance_spec, constructor)
     }
 
-    /// Initiates stopping an active service instance in the blockchain.
+    /// Initiates stopping an active or frozen service instance.
     ///
     /// The service is not immediately stopped; it stops if / when the block containing
     /// the stopping transaction is committed.
     pub fn initiate_stopping_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
+    }
+
+    /// Initiates freezing an active or stopped service instance.
+    ///
+    /// The service is not immediately frozen; it freezes if / when the block containing
+    /// the stopping transaction is committed.
+    pub fn initiate_freezing_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
+        Dispatcher::initiate_freezing_service(self.0.fork, instance_id)
     }
 
     /// Initiates resuming previously stopped service instance in the blockchain.
@@ -402,7 +410,11 @@ impl<'a> SupervisorExtensions<'a> {
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        if state.status != Some(InstanceStatus::Stopped) {
+        if !state
+            .status
+            .as_ref()
+            .map_or(false, InstanceStatus::can_be_resumed)
+        {
             return Err(CoreError::ServiceNotStopped.into());
         }
 

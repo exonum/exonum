@@ -372,9 +372,10 @@ impl Schema<&Fork> {
     }
 
     /// Adds information about stopping service instance to the schema.
-    pub(crate) fn initiate_stopping_service(
+    pub(crate) fn initiate_simple_service_transition(
         &mut self,
         instance_id: InstanceId,
+        new_status: InstanceStatus,
     ) -> Result<(), CoreError> {
         let instance_name = self
             .instance_ids()
@@ -386,8 +387,14 @@ impl Schema<&Fork> {
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
 
-        if state.status == Some(InstanceStatus::Active) {
-            self.add_pending_status(state, InstanceStatus::Stopped, None)
+        let check = match new_status {
+            InstanceStatus::Stopped => InstanceStatus::can_be_stopped,
+            InstanceStatus::Frozen => InstanceStatus::can_be_frozen,
+            _ => unreachable!(),
+        };
+
+        if state.status.as_ref().map_or(false, check) {
+            self.add_pending_status(state, new_status, None)
         } else {
             Err(CoreError::ServiceNotActive)
         }

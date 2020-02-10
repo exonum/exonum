@@ -553,6 +553,9 @@ pub enum InstanceStatus {
     Active,
     /// The service instance is stopped.
     Stopped,
+    /// The service instance is frozen; it can process read-only requests,
+    /// but not transactions and `before_transactions` / `after_transactions` hooks.
+    Frozen,
     /// The service instance is migrating to the specified artifact.
     Migrating(Box<InstanceMigration>),
 
@@ -569,6 +572,30 @@ impl InstanceStatus {
     /// Indicates whether the service instance status is active.
     pub fn is_active(&self) -> bool {
         *self == InstanceStatus::Active
+    }
+
+    /// Returns `true` if the service instance with this status can be resumed.
+    pub(super) fn can_be_resumed(&self) -> bool {
+        match self {
+            InstanceStatus::Stopped | InstanceStatus::Frozen => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be stopped.
+    pub(super) fn can_be_stopped(&self) -> bool {
+        match self {
+            InstanceStatus::Active | InstanceStatus::Frozen => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be frozen.
+    pub(super) fn can_be_frozen(&self) -> bool {
+        match self {
+            InstanceStatus::Active | InstanceStatus::Stopped => true,
+            _ => false,
+        }
     }
 
     pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
@@ -593,6 +620,7 @@ impl Display for InstanceStatus {
         formatter.write_str(match self {
             InstanceStatus::Active => "active",
             InstanceStatus::Stopped => "stopped",
+            InstanceStatus::Frozen => "frozen",
             InstanceStatus::Migrating(..) => "migrating",
             InstanceStatus::__NonExhaustive => unreachable!("Never actually constructed"),
         })
@@ -614,6 +642,7 @@ impl InstanceStatus {
             None => pb.set_simple(NONE),
             Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
             Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
+            Some(InstanceStatus::Frozen) => pb.set_simple(FROZEN),
             Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
             Some(InstanceStatus::__NonExhaustive) => unreachable!("Never actually constructed"),
         }
@@ -630,6 +659,7 @@ impl InstanceStatus {
                 NONE => None,
                 ACTIVE => Some(InstanceStatus::Active),
                 STOPPED => Some(InstanceStatus::Stopped),
+                FROZEN => Some(InstanceStatus::Frozen),
             })
         } else if pb.has_migration() {
             InstanceMigration::from_pb(pb.take_migration())
