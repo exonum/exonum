@@ -38,7 +38,7 @@ use crate::{
         migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, MethodId, Runtime, RuntimeInstance,
+        InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
     },
 };
 
@@ -549,6 +549,10 @@ fn test_service_freezing() {
         vec![(SERVICE_ID, InstanceStatus::Frozen)],
     );
     assert_eq!(expected_change, changes_rx.iter().next().unwrap());
+
+    // The service schema should be available.
+    let snapshot = db.snapshot();
+    assert!(snapshot.for_service(SERVICE_ID).is_some());
 
     // Check that the service no longer processes transactions.
     let mut fork = db.fork();

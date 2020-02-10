@@ -20,7 +20,7 @@ use crate::{
     runtime::{
         ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
         DispatcherSchema, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, InstanceStatus, MethodId, SUPERVISOR_INSTANCE_ID,
+        InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -410,16 +410,10 @@ impl<'a> SupervisorExtensions<'a> {
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        if !state
-            .status
-            .as_ref()
-            .map_or(false, InstanceStatus::can_be_resumed)
-        {
-            return Err(CoreError::ServiceNotStopped.into());
-        }
-
         let mut spec = state.spec;
         spec.artifact = artifact;
+        DispatcherSchema::new(&*self.0.fork)
+            .initiate_resuming_service(instance_id, spec.artifact.clone())?;
 
         let runtime = self
             .0
@@ -438,11 +432,7 @@ impl<'a> SupervisorExtensions<'a> {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
                 err
-            })?;
-
-        DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact)
-            .map_err(From::from)
+            })
     }
 
     /// Provides writeable access to core schema.

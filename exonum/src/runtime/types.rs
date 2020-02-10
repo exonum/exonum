@@ -808,12 +808,25 @@ impl InstanceState {
             .unwrap_or(&self.spec.artifact.version)
     }
 
+    /// Returns true if a service with this state can have its data read.
+    pub(super) fn is_readable(&self) -> bool {
+        let status = self.status.as_ref().or(self.pending_status.as_ref());
+        if let Some(status) = status {
+            match status {
+                InstanceStatus::Active | InstanceStatus::Frozen => true,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
     /// Sets next status as current and changes next status to `None`
     ///
     /// # Panics
     ///
     /// - If next status is already `None`.
-    pub(crate) fn commit_pending_status(&mut self) {
+    pub(super) fn commit_pending_status(&mut self) {
         assert!(
             self.pending_status.is_some(),
             "Next instance status should not be `None`"

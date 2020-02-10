@@ -423,7 +423,11 @@ impl Schema<&Fork> {
             return Err(CoreError::CannotResumeService);
         }
 
-        if state.status == Some(InstanceStatus::Stopped) {
+        if state
+            .status
+            .as_ref()
+            .map_or(false, InstanceStatus::can_be_resumed)
+        {
             state.spec.artifact = artifact;
             self.add_pending_status(state, InstanceStatus::Active, None)
         } else {
