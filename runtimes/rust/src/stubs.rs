@@ -92,6 +92,26 @@ pub trait GenericCallMut<Ctx> {
 }
 
 /// Stub that creates unsigned transactions.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_derive::*;
+/// use exonum::runtime::{AnyTx, InstanceId};
+/// use exonum_rust_runtime::TxStub;
+///
+/// #[exonum_interface]
+/// trait MyInterface<Ctx> {
+///     type Output;
+///     #[interface_method(id = 0)]
+///     fn publish_string(&self, ctx: Ctx, value: String) -> Self::Output;
+/// }
+///
+/// // ID of the service we will call.
+/// const SERVICE_ID: InstanceId = 100;
+/// // Produce an unsigned transaction.
+/// let tx: AnyTx = TxStub.publish_string(SERVICE_ID, "!".into());
+/// ```
 #[derive(Debug, Clone, Copy)]
 pub struct TxStub;
 
