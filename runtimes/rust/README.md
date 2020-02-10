@@ -24,11 +24,20 @@ is up to the node administrators.
 
 You might look at one of these examples:
 
-- [Cryptocurrency Service](../../examples/cryptocurrency/README.md)
-- [Advanced Cryptocurrency Service](../../examples/cryptocurrency-advanced/backend/README.md)
-- [Time Oracle](../../services/time/README.md)
+- [Cryptocurrency service][cryptocurrency]
+- [Advanced cryptocurrency service][cryptocurrency-advanced]
+
+...or these services developed along with the Exonum framework:
+
+- [Supervisor](https://crates.io/crates/exonum-supervisor)
+- [Time oracle](https://crates.io/crates/exonum-time)
+- [Explorer](https://crates.io/crates/exonum-explorer-service)
+- [Middleware](https://crates.io/crates/exonum-middleware-service)
 
 ## License
 
 `exonum-rust-runtime` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
+
+[cryptocurrency]: https://github.com/exonum/exonum/blob/master/examples/cryptocurrency#readme
+[cryptocurrency-advanced]: https://github.com/exonum/exonum/blob/master/examples/cryptocurrency-advanced#readme
