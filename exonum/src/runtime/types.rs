@@ -590,10 +590,13 @@ impl InstanceStatus {
         }
     }
 
-    /// Returns `true` if the service instance with this status can be frozen.
+    /// Returns `true` if the service instance with this status can be frozen in all cases.
     pub(super) fn can_be_frozen(&self) -> bool {
         match self {
-            InstanceStatus::Active | InstanceStatus::Stopped => true,
+            InstanceStatus::Active => true,
+            // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service
+            // may have a data version differing from the artifact recorded in service spec,
+            // or, more generally, from any of deployed artifacts.
             _ => false,
         }
     }

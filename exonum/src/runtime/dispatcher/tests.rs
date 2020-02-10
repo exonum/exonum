@@ -604,7 +604,7 @@ fn test_service_freezing() {
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge(patch).unwrap();
 
-    // Change service status to frozen again.
+    // Check that the service cannot be easily changed to frozen.
     let mut fork = db.fork();
     let mut context = ExecutionContext::for_block_call(
         &dispatcher,
@@ -612,10 +612,13 @@ fn test_service_freezing() {
         &mut should_rollback,
         service.as_descriptor(),
     );
-    context
+    let err = context
         .supervisor_extensions()
         .initiate_freezing_service(SERVICE_ID)
-        .expect("Cannot freeze service");
+        .expect_err("Service cannot be frozen from `Stopped` status");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotActive));
+
+    // Use
 }
 
 #[test]

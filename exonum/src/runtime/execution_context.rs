@@ -381,10 +381,13 @@ impl<'a> SupervisorExtensions<'a> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
     }
 
-    /// Initiates freezing an active or stopped service instance.
+    /// Initiates freezing an active service instance.
     ///
     /// The service is not immediately frozen; it freezes if / when the block containing
     /// the stopping transaction is committed.
+    ///
+    /// Note that this method **cannot** be used to transition service to frozen
+    /// from the stopped state; this transition is not supported as of now.
     pub fn initiate_freezing_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
         Dispatcher::initiate_freezing_service(self.0.fork, instance_id)
     }
