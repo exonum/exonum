@@ -34,7 +34,7 @@ use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceF
 
 use self::inspected::{
     create_block_with_transactions, create_genesis_config_builder, execute_transaction,
-    DeployArtifact, EventsHandle, Inspected, RuntimeEvent, StartService, StopService,
+    DeployArtifact, EventsHandle, Inspected, ResumeService, RuntimeEvent, StartService,
     ToySupervisor, ToySupervisorService,
 };
 
@@ -257,10 +257,10 @@ fn basic_runtime_workflow() {
             RuntimeEvent::CommitService(
                 Height(0),
                 supervisor.instance_spec.clone(),
-                InstanceStatus::Active
+                InstanceStatus::Active,
             ),
             RuntimeEvent::AfterTransactions(Height(0), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(1))
+            RuntimeEvent::AfterCommit(Height(1)),
         ]
     );
 
@@ -390,9 +390,7 @@ fn basic_runtime_workflow() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: TestServiceImpl::INSTANCE_ID,
-            },
+            TestServiceImpl::INSTANCE_ID,
         ),
     )
     .unwrap();
@@ -947,5 +945,95 @@ fn dependent_service_in_successive_block() {
             .status
             .unwrap(),
         InstanceStatus::Active
+    );
+}
+
+#[test]
+fn service_freezing() {
+    let (mut blockchain, events) = create_runtime(
+        Blockchain::build_for_tests(),
+        create_genesis_config_builder()
+            .with_artifact(ToySupervisorService.artifact_id())
+            .with_instance(ToySupervisorService.default_instance())
+            .with_artifact(TestServiceImpl.artifact_id())
+            .with_instance(TestServiceImpl.default_instance())
+            .build(),
+    );
+    let keypair = blockchain.as_ref().service_keypair().clone();
+    drop(events.take());
+
+    execute_transaction(
+        &mut blockchain,
+        keypair.freeze_service(
+            ToySupervisorService::INSTANCE_ID,
+            TestServiceImpl::INSTANCE_ID,
+        ),
+    )
+    .unwrap();
+    let test_service = TestServiceImpl.default_instance().instance_spec;
+    assert_eq!(
+        events.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(1), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(1), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(1), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(1), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::CommitService(Height(2), test_service.clone(), InstanceStatus::Frozen),
+            RuntimeEvent::AfterCommit(Height(2)),
+        ]
+    );
+
+    let snapshot = blockchain.snapshot();
+    let schema = snapshot.for_dispatcher();
+    assert_eq!(
+        schema
+            .get_instance(TestServiceImpl::INSTANCE_NAME)
+            .unwrap()
+            .status
+            .unwrap(),
+        InstanceStatus::Frozen
+    );
+
+    execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: test_service.id,
+                artifact: test_service.artifact.clone(),
+                params: vec![],
+            },
+        ),
+    )
+    .unwrap();
+
+    // Check that the service does not receive hooks in this block.
+    assert_eq!(
+        events.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::StartResumingService(test_service.clone(), vec![]),
+            RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::CommitService(Height(3), test_service.clone(), InstanceStatus::Active),
+            RuntimeEvent::AfterCommit(Height(3)),
+        ]
+    );
+
+    // ...but receives them again once it is resumed.
+    execute_transaction(
+        &mut blockchain,
+        keypair.method_b(TestServiceImpl::INSTANCE_ID, 42),
+    )
+    .expect("Cannot process transaction in resumed service");
+
+    assert_eq!(
+        events.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(3), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(3), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(4)),
+        ]
     );
 }

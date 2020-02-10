@@ -302,12 +302,6 @@ pub struct StartService {
 
 #[derive(Debug, Serialize, Deserialize, BinaryValue)]
 #[binary_value(codec = "bincode")]
-pub struct StopService {
-    pub instance_id: InstanceId,
-}
-
-#[derive(Debug, Serialize, Deserialize, BinaryValue)]
-#[binary_value(codec = "bincode")]
 pub struct ResumeService {
     pub artifact: ArtifactId,
     pub instance_id: InstanceId,
@@ -327,7 +321,8 @@ pub trait ToySupervisor<Ctx> {
 
     fn deploy_artifact(&self, context: Ctx, request: DeployArtifact) -> Self::Output;
     fn start_service(&self, context: Ctx, request: StartService) -> Self::Output;
-    fn stop_service(&self, context: Ctx, request: StopService) -> Self::Output;
+    fn stop_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
+    fn freeze_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
     fn resume_service(&self, context: Ctx, request: ResumeService) -> Self::Output;
     fn migrate_service(&self, context: Ctx, request: MigrateService) -> Self::Output;
 }
@@ -364,11 +359,21 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
     fn stop_service(
         &self,
         mut context: ExecutionContext<'_>,
-        request: StopService,
+        instance_id: InstanceId,
     ) -> Self::Output {
         context
             .supervisor_extensions()
-            .initiate_stopping_service(request.instance_id)
+            .initiate_stopping_service(instance_id)
+    }
+
+    fn freeze_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .initiate_freezing_service(instance_id)
     }
 
     fn resume_service(

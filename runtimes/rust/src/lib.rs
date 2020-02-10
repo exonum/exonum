@@ -407,13 +407,10 @@ struct Instance {
     id: InstanceId,
     name: String,
     service: Box<dyn Service>,
+    artifact_id: ArtifactId,
 }
 
 impl Instance {
-    fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
-        Self { id, name, service }
-    }
-
     fn descriptor(&self) -> InstanceDescriptor {
         InstanceDescriptor::new(self.id, &self.name)
     }
@@ -562,11 +559,46 @@ impl RustRuntime {
         }
 
         let service = self.available_artifacts[artifact].create_instance();
-        Ok(Instance::new(
-            instance.id,
-            instance.name.to_owned(),
+        Ok(Instance {
+            id: instance.id,
+            name: instance.name.to_owned(),
             service,
-        ))
+            artifact_id: artifact.to_owned(),
+        })
+    }
+
+    /// Instantiates a service after checking that a matching service is not instantiated
+    /// already.
+    ///
+    /// # Return value
+    ///
+    /// - `Some(_)` if a new service was instantiated.
+    /// - `None` if a matching service is already stored in `self.services`.
+    ///
+    /// # Panics
+    ///
+    /// If the stored service does not match the provided `artifact` / `descriptor`,
+    /// this method will panic.
+    fn new_service_if_needed(
+        &self,
+        artifact: &ArtifactId,
+        descriptor: &InstanceDescriptor,
+    ) -> Result<Option<Instance>, ExecutionError> {
+        if let Some(instance) = self.started_services.get(&descriptor.id) {
+            assert_eq!(
+                instance.artifact_id, *artifact,
+                "Mismatch between the requested artifact and the artifact associated \
+                 with the running service {}. This is either a bug in the lifecycle \
+                 workflow in the core, or this version of the Rust runtime is outdated \
+                 compared to the core.",
+                descriptor
+            );
+            // We just continue running the existing service since we've just checked
+            // that it corresponds to the same artifact.
+            Ok(None)
+        } else {
+            Some(self.new_service(artifact, descriptor)).transpose()
+        }
     }
 
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
@@ -665,8 +697,13 @@ impl Runtime for RustRuntime {
         artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(artifact, context.instance())?;
-        let service = instance.as_ref();
+        let maybe_instance = self.new_service_if_needed(artifact, context.instance())?;
+        let service = if let Some(ref instance) = maybe_instance {
+            instance.as_ref()
+        } else {
+            // Indexing is safe due to how `new_service_if_needed` is implemented.
+            self.started_services[&context.instance().id].as_ref()
+        };
         catch_panic(|| service.resume(context, parameters))
     }
 
@@ -676,19 +713,25 @@ impl Runtime for RustRuntime {
         spec: &InstanceSpec,
         status: &InstanceStatus,
     ) {
+        const CANNOT_INSTANTIATE_SERVICE: &str =
+            "BUG: Attempt to create a new service instance failed; \
+             within `instantiate_adding_service` we were able to create a new instance, \
+             but now we are not.";
+
         match status {
             InstanceStatus::Active => {
-                let instance = self
-                    .new_service(&spec.artifact, &spec.as_descriptor())
-                    .expect(
-                    "BUG: Attempt to create a new service instance failed; \
-                     within `instantiate_adding_service` we were able to create a new instance, \
-                     but now we are not.",
-                );
-                self.add_started_service(instance);
+                let maybe_instance = self
+                    .new_service_if_needed(&spec.artifact, &spec.as_descriptor())
+                    .expect(CANNOT_INSTANTIATE_SERVICE);
+                if let Some(instance) = maybe_instance {
+                    self.add_started_service(instance);
+                }
             }
             InstanceStatus::Stopped => {
                 self.remove_started_service(spec);
+            }
+            InstanceStatus::Frozen => {
+                // FIXME: implement
             }
             InstanceStatus::Migrating(_) => { /* Do nothing. */ }
             other => {

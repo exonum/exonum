@@ -32,7 +32,7 @@ use pretty_assertions::assert_eq;
 
 use self::inspected::{
     create_genesis_config_builder, execute_transaction, EventsHandle, Inspected, MigrateService,
-    ResumeService, RuntimeEvent, StopService, ToySupervisor, ToySupervisorService,
+    ResumeService, RuntimeEvent, ToySupervisor, ToySupervisorService,
 };
 
 mod inspected;
@@ -219,9 +219,7 @@ fn resume_without_migration() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
+            WithdrawalServiceV1::INSTANCE_ID,
         ),
     )
     .unwrap();
@@ -307,9 +305,7 @@ fn resume_with_fast_forward_migration() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
+            WithdrawalServiceV1::INSTANCE_ID,
         ),
     )
     .unwrap();
@@ -426,9 +422,7 @@ fn test_resume_incorrect_artifact_version() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
+            WithdrawalServiceV1::INSTANCE_ID,
         ),
     )
     .unwrap();
@@ -460,9 +454,7 @@ fn test_resume_incorrect_artifact_name() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
+            WithdrawalServiceV1::INSTANCE_ID,
         ),
     )
     .unwrap();
@@ -506,9 +498,7 @@ fn test_resume_service_error() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-            },
+            WithdrawalServiceV1::INSTANCE_ID,
         ),
     )
     .unwrap();
