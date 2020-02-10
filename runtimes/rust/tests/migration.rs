@@ -283,8 +283,7 @@ fn resume_without_migration() {
     );
 }
 
-#[test]
-fn resume_with_fast_forward_migration() {
+fn test_resume_with_fast_forward_migration(freeze_service: bool) {
     let (mut blockchain, events_handle) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
     // We are not interested in blockchain initialization events.
@@ -300,15 +299,19 @@ fn resume_with_fast_forward_migration() {
     // We not interested in events in this case.
     drop(events_handle.take());
 
-    // Stop running service instance.
-    execute_transaction(
-        &mut blockchain,
+    // Stop or freeze the running service instance.
+    let tx = if freeze_service {
+        keypair.freeze_service(
+            ToySupervisorService::INSTANCE_ID,
+            WithdrawalServiceV1::INSTANCE_ID,
+        )
+    } else {
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
             WithdrawalServiceV1::INSTANCE_ID,
-        ),
-    )
-    .unwrap();
+        )
+    };
+    execute_transaction(&mut blockchain, tx).unwrap();
     // We not interested in events in this case.
     drop(events_handle.take());
 
@@ -411,6 +414,16 @@ fn resume_with_fast_forward_migration() {
         schema.balance.get(),
         Some(INITIAL_BALANCE - amount - amount_2)
     );
+}
+
+#[test]
+fn resume_with_fast_forward_migration() {
+    test_resume_with_fast_forward_migration(false);
+}
+
+#[test]
+fn resume_with_fast_forward_migration_and_freeze() {
+    test_resume_with_fast_forward_migration(true);
 }
 
 #[test]

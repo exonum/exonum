@@ -810,7 +810,10 @@ impl InstanceState {
 
     /// Returns true if a service with this state can have its data read.
     pub(super) fn is_readable(&self) -> bool {
-        let status = self.status.as_ref().or(self.pending_status.as_ref());
+        let status = self
+            .status
+            .as_ref()
+            .or_else(|| self.pending_status.as_ref());
         if let Some(status) = status {
             match status {
                 InstanceStatus::Active | InstanceStatus::Frozen => true,

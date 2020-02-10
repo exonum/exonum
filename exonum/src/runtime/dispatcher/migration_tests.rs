@@ -330,11 +330,15 @@ impl Rig {
         Dispatcher::initiate_stopping_service(&fork, spec.id).unwrap();
         self.create_block(fork);
     }
+
+    fn freeze_service(&mut self, spec: &InstanceSpec) {
+        let fork = self.blockchain.fork();
+        Dispatcher::initiate_freezing_service(&fork, spec.id).unwrap();
+        self.create_block(fork);
+    }
 }
 
-/// Tests basic workflow of migration initiation.
-#[test]
-fn migration_workflow() {
+fn test_migration_workflow(freeze_service: bool) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
@@ -348,8 +352,12 @@ fn migration_workflow() {
         .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotStopped));
 
-    // Stop the service.
-    rig.stop_service(&service);
+    // Stop or freeze the service.
+    if freeze_service {
+        rig.freeze_service(&service);
+    } else {
+        rig.stop_service(&service);
+    }
 
     // Now, the migration start should succeed.
     let fork = rig.blockchain.fork();
@@ -409,14 +417,27 @@ fn migration_workflow() {
         .contains_key(&service.name));
 }
 
-/// Tests fast-forwarding a migration.
+/// Tests basic workflow of migration initiation.
 #[test]
-fn fast_forward_migration() {
+fn migration_workflow() {
+    test_migration_workflow(false);
+}
+
+#[test]
+fn migration_workflow_with_frozen_service() {
+    test_migration_workflow(true);
+}
+
+fn test_fast_forward_migration(freeze_service: bool) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("none", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("none", "0.5.2".parse().unwrap());
     let service = rig.initialize_service(old_artifact, "service");
-    rig.stop_service(&service);
+    if freeze_service {
+        rig.freeze_service(&service);
+    } else {
+        rig.stop_service(&service);
+    }
 
     let fork = rig.blockchain.fork();
     rig.dispatcher()
@@ -428,9 +449,26 @@ fn fast_forward_migration() {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     let state = schema.get_instance(service.id).unwrap();
-    assert_eq!(state.status, Some(InstanceStatus::Stopped));
+    let expected_status = if freeze_service {
+        InstanceStatus::Frozen
+    } else {
+        InstanceStatus::Stopped
+    };
+
+    assert_eq!(state.status, Some(expected_status));
     assert_eq!(state.pending_status, None);
     assert_eq!(state.data_version, Some(Version::new(0, 5, 2)));
+}
+
+/// Tests fast-forwarding a migration.
+#[test]
+fn fast_forward_migration() {
+    test_fast_forward_migration(false);
+}
+
+#[test]
+fn fast_forward_migration_with_service_freezing() {
+    test_fast_forward_migration(true);
 }
 
 /// Tests checks performed by the dispatcher during migration initiation.

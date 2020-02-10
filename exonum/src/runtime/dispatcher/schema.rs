@@ -215,9 +215,11 @@ impl Schema<&Fork> {
             .get(old_service)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        // The service should be stopped. Note that this also checks that
-        // the service is not being migrated.
-        if instance_state.status != Some(InstanceStatus::Stopped) {
+        // The service should be stopped or frozen. Note that this also checks that
+        // the service is not being currently migrated.
+        if instance_state.status != Some(InstanceStatus::Stopped)
+            && instance_state.status != Some(InstanceStatus::Frozen)
+        {
             return Err(CoreError::ServiceNotStopped);
         }
         // There should be no pending status for the service.

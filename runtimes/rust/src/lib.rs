@@ -539,26 +539,14 @@ impl RustRuntime {
         artifact: &ArtifactId,
         instance: &InstanceDescriptor,
     ) -> Result<Instance, ExecutionError> {
-        if !self.deployed_artifacts.contains(artifact) {
+        let factory = self.available_artifacts.get(artifact).unwrap_or_else(|| {
             panic!(
                 "BUG: Core requested service instance start ({}) of not deployed artifact {}",
                 instance.name, artifact
             );
-        }
-        if self.started_services.contains_key(&instance.id) {
-            panic!(
-                "BUG: Core requested service service instance start ({}) with already taken ID",
-                instance
-            );
-        }
-        if self.started_services_by_name.contains_key(&instance.name) {
-            panic!(
-                "BUG: Core requested service service instance start ({}) with already taken name",
-                instance
-            );
-        }
+        });
 
-        let service = self.available_artifacts[artifact].create_instance();
+        let service = factory.create_instance();
         Ok(Instance {
             id: instance.id,
             name: instance.name.to_owned(),
@@ -585,20 +573,22 @@ impl RustRuntime {
         descriptor: &InstanceDescriptor,
     ) -> Result<Option<Instance>, ExecutionError> {
         if let Some(instance) = self.started_services.get(&descriptor.id) {
-            assert_eq!(
-                instance.artifact_id, *artifact,
+            assert!(
+                instance.artifact_id == *artifact || artifact.is_upgrade_of(&instance.artifact_id),
                 "Mismatch between the requested artifact and the artifact associated \
                  with the running service {}. This is either a bug in the lifecycle \
                  workflow in the core, or this version of the Rust runtime is outdated \
                  compared to the core.",
                 descriptor
             );
-            // We just continue running the existing service since we've just checked
-            // that it corresponds to the same artifact.
-            Ok(None)
-        } else {
-            Some(self.new_service(artifact, descriptor)).transpose()
+
+            if instance.artifact_id == *artifact {
+                // We just continue running the existing service since we've just checked
+                // that it corresponds to the same artifact.
+                return Ok(None);
+            }
         }
+        Some(self.new_service(artifact, descriptor)).transpose()
     }
 
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
@@ -718,20 +708,22 @@ impl Runtime for RustRuntime {
              within `instantiate_adding_service` we were able to create a new instance, \
              but now we are not.";
 
+        let mut service_api_changed = false;
         match status {
-            InstanceStatus::Active => {
+            InstanceStatus::Active | InstanceStatus::Frozen => {
                 let maybe_instance = self
                     .new_service_if_needed(&spec.artifact, &spec.as_descriptor())
                     .expect(CANNOT_INSTANTIATE_SERVICE);
                 if let Some(instance) = maybe_instance {
                     self.add_started_service(instance);
+                    // The service API has changed even if it was previously instantiated
+                    // (in the latter case, the instantiated version is outdated).
+                    service_api_changed = true;
                 }
             }
             InstanceStatus::Stopped => {
+                service_api_changed = self.started_services.contains_key(&spec.id);
                 self.remove_started_service(spec);
-            }
-            InstanceStatus::Frozen => {
-                // FIXME: implement
             }
             InstanceStatus::Migrating(_) => { /* Do nothing. */ }
             other => {
@@ -743,7 +735,8 @@ impl Runtime for RustRuntime {
                 );
             }
         }
-        self.changed_services_since_last_block = true;
+        self.changed_services_since_last_block =
+            self.changed_services_since_last_block || service_api_changed;
     }
 
     fn migrate(
