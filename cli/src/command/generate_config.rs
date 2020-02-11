@@ -95,7 +95,7 @@ impl GenerateConfig {
     }
 
     /// If no port is provided by user, uses `DEFAULT_EXONUM_LISTEN_PORT`.
-    pub fn parse_external_address(input: &str) -> Result<SocketAddr, Error> {
+    fn parse_external_address(input: &str) -> Result<SocketAddr, Error> {
         if let Ok(address) = input.parse() {
             Ok(address)
         } else {
