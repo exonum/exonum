@@ -99,7 +99,7 @@
 
         try {
           const data = await this.$blockchain.getTransaction(this.hash)
-          this.content = data.content
+          this.content = data
           this.location = data.location
           this.status = data.status
           this.type = data.type
