@@ -290,7 +290,7 @@ pub fn split_buffer_into_sized_parts<'a>(
         );
         let len = u32::from_bytes(bytes[pos..pos + size_of::<u32>()].into())? as usize;
         pos += size_of::<u32>();
-        ensure!(bytes.len() >= pos + len, "Unexpected end of buffer");
+        ensure!(bytes.len() >= pos + len, "Unexpected end of the buffer");
         result.push(bytes[pos..pos + len].into());
         pos += len;
     }
