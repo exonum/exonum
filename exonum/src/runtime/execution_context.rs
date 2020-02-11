@@ -454,6 +454,22 @@ impl<'a> SupervisorExtensions<'a> {
             .initiate_migration(self.0.fork, new_artifact, old_service)
     }
 
+    /// Initiates non-destructive data migration.
+    ///
+    /// Non-destructive migration guarantees to keep the old service data available
+    /// during the migration; thus, it can be read by the internal and external readers
+    /// (e.g., other services on the blockchain or HTTP API handlers of the service if its runtime
+    /// provides ones).
+    pub fn initiate_non_destructive_migration(
+        &self,
+        new_artifact: ArtifactId,
+        old_service: &str,
+    ) -> Result<(), ExecutionError> {
+        self.0
+            .dispatcher
+            .initiate_non_destructive_migration(self.0.fork, new_artifact, old_service)
+    }
+
     /// Rolls back previously initiated migration.
     pub fn rollback_migration(&self, service_name: &str) -> Result<(), ExecutionError> {
         Dispatcher::rollback_migration(self.0.fork, service_name)

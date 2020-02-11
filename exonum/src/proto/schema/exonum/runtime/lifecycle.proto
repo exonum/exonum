@@ -96,8 +96,14 @@ message InstanceMigration {
   // the aggregation hash of the migrated data.
   // The lack of value signifies that the migration is not finished yet.
   exonum.crypto.Hash completed_hash = 3;
+  // Whether it is possible to read the old service data during migration.
+  //
+  // Non-destructive migration guarantees to keep the old service data available
+  // during the migration; thus, it can be read by the internal and external readers
+  // (e.g., other services on the blockchain or HTTP API handlers of the service
+  // if its runtime provides ones).
+  bool non_destructive = 4;
 }
-
 
 // Current state of service instance in dispatcher.
 message InstanceState {

@@ -412,17 +412,42 @@ impl Dispatcher {
         new_artifact: ArtifactId,
         service_name: &str,
     ) -> Result<(), ExecutionError> {
+        self.do_initiate_migration(fork, new_artifact, service_name, false)
+    }
+
+    /// Initiates migration of an existing stopped service to a newer artifact.
+    /// The migration script is started once the block corresponding to `fork`
+    /// is committed.
+    pub(crate) fn initiate_non_destructive_migration(
+        &self,
+        fork: &Fork,
+        new_artifact: ArtifactId,
+        service_name: &str,
+    ) -> Result<(), ExecutionError> {
+        self.do_initiate_migration(fork, new_artifact, service_name, true)
+    }
+
+    pub(crate) fn do_initiate_migration(
+        &self,
+        fork: &Fork,
+        new_artifact: ArtifactId,
+        service_name: &str,
+        can_access_old_data: bool,
+    ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(fork);
-        let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
+        let instance_state =
+            schema.check_migration_initiation(&new_artifact, service_name, can_access_old_data)?;
         let maybe_script =
             self.get_migration_script(&new_artifact, instance_state.data_version())?;
         if let Some(script) = maybe_script {
-            let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
+            let mut migration =
+                InstanceMigration::new(new_artifact, script.end_version().to_owned());
+            migration.non_destructive = can_access_old_data;
             schema.add_pending_migration(instance_state, migration);
         } else {
             // No migration script means that the service instance may be immediately updated to
             // the new artifact version.
-            schema.fast_forward_migration(instance_state, new_artifact.version);
+            schema.fast_forward_migration(instance_state, new_artifact);
         }
         Ok(())
     }

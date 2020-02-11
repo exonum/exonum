@@ -510,6 +510,14 @@ pub struct InstanceMigration {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
 
+    /// Whether it is possible to read the old service data during migration.
+    ///
+    /// Non-destructive migration guarantees to keep the old service data available
+    /// during the migration; thus, it can be read by the internal and external readers
+    /// (e.g., other services on the blockchain or HTTP API handlers of the service
+    /// if its runtime provides ones).
+    pub non_destructive: bool,
+
     /// No-op field for forward compatibility.
     #[protobuf_convert(skip)]
     #[serde(default, skip)]
@@ -530,6 +538,7 @@ impl InstanceMigration {
             target,
             end_version,
             completed_hash,
+            non_destructive: false,
             non_exhaustive: (),
         }
     }
@@ -572,6 +581,15 @@ impl InstanceStatus {
     /// Indicates whether the service instance status is active.
     pub fn is_active(&self) -> bool {
         *self == InstanceStatus::Active
+    }
+
+    /// Returns `true` if a service with this status provides at least read access to its data.
+    pub fn provides_read_access(&self) -> bool {
+        match self {
+            InstanceStatus::Active | InstanceStatus::Frozen => true,
+            InstanceStatus::Migrating(migration) => migration.non_destructive,
+            _ => false,
+        }
     }
 
     /// Returns `true` if the service instance with this status can be resumed.

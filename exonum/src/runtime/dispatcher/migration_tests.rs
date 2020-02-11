@@ -350,7 +350,11 @@ fn test_migration_workflow(freeze_service: bool) {
         .dispatcher()
         .initiate_migration(&fork, new_artifact.clone(), &service.name)
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotStopped));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ServiceNotStopped)
+            .with_description_containing("Data migration cannot be initiated")
+    );
 
     // Stop or freeze the service.
     if freeze_service {
@@ -365,19 +369,11 @@ fn test_migration_workflow(freeze_service: bool) {
         .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     // Migration scripts should not start executing immediately, but only on block commit.
-    assert!(!rig
-        .dispatcher()
-        .migrations
-        .threads
-        .contains_key(&service.name));
+    assert!(!rig.migration_threads().contains_key(&service.name));
     rig.create_block(fork);
 
     // Check that the migration was initiated.
-    assert!(rig
-        .dispatcher()
-        .migrations
-        .threads
-        .contains_key(&service.name));
+    assert!(rig.migration_threads().contains_key(&service.name));
 
     // Create several more blocks before the migration is complete and check that
     // we don't spawn multiple migration scripts at once (this check is performed in `Migrations`).
@@ -399,22 +395,15 @@ fn test_migration_workflow(freeze_service: bool) {
     assert_eq!(end_version, Version::new(0, 5, 0));
     let res = schema.local_migration_result(&service.name).unwrap();
     assert_eq!(res.0, Ok(HashTag::empty_map_hash()));
-    assert!(!rig
-        .dispatcher()
-        .migrations
-        .threads
-        .contains_key(&service.name));
+    assert!(!rig.migration_threads().contains_key(&service.name));
 
     // Create couple more blocks to check that the migration script is not launched again,
-    // and the migration result is not overridden (these checks are `debug_assert`s).
+    // and the migration result is not overridden (these checks are `debug_assert`s
+    // in the `Dispatcher` code).
     for _ in 0..3 {
         rig.create_block(rig.blockchain.fork());
     }
-    assert!(!rig
-        .dispatcher()
-        .migrations
-        .threads
-        .contains_key(&service.name));
+    assert!(!rig.migration_threads().contains_key(&service.name));
 }
 
 /// Tests basic workflow of migration initiation.
@@ -441,7 +430,7 @@ fn test_fast_forward_migration(freeze_service: bool) {
 
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, &service.name)
+        .initiate_migration(&fork, new_artifact.clone(), &service.name)
         .unwrap();
     rig.create_block(fork);
 
@@ -457,7 +446,8 @@ fn test_fast_forward_migration(freeze_service: bool) {
 
     assert_eq!(state.status, Some(expected_status));
     assert_eq!(state.pending_status, None);
-    assert_eq!(state.data_version, Some(Version::new(0, 5, 2)));
+    assert_eq!(state.spec.artifact, new_artifact);
+    assert_eq!(state.data_version, None);
 }
 
 /// Tests fast-forwarding a migration.
@@ -490,21 +480,30 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, unrelated_artifact, &old_service.name)
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUpgradeService).with_any_description()
+    );
 
     // Attempt to downgrade service.
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, old_artifact, &new_service.name)
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUpgradeService).with_any_description()
+    );
 
     // Attempt to migrate to the same version.
     let err = rig
         .dispatcher()
         .initiate_migration(&fork, new_artifact.clone(), &new_service.name)
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::CannotUpgradeService));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUpgradeService).with_any_description()
+    );
 
     // Attempt to migrate unknown service.
     let err = rig
@@ -531,7 +530,10 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact, &old_service.name)
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed).with_any_description()
+    );
 }
 
 /// Tests that an unfinished migration script is restarted on node restart.
