@@ -207,7 +207,6 @@ impl Schema<&Fork> {
         &self,
         new_artifact: &ArtifactId,
         old_service: &str,
-        can_access_old_data: bool,
     ) -> Result<InstanceState, ExecutionError> {
         // The service should exist.
         let instance_state = self
@@ -259,38 +258,6 @@ impl Schema<&Fork> {
                 instance_state.spec.artifact
             );
             return Err(CoreError::CannotUpgradeService.with_description(msg));
-        }
-
-        // If we keep access to old service data during migration, the artifact
-        // corresponding to the *current* data version of the service must be deployed.
-        if can_access_old_data {
-            // This is an easy way to check that the service associated with the service
-            // is deployed on the blockchain.
-            if let Some(version) = instance_state.data_version {
-                let msg = format!(
-                    "Cannot provide access to old service data for service `{}` during migration \
-                     because the version of its data ({}) differs from the version \
-                     of the associated artifact `{}`",
-                    instance_state.spec.as_descriptor(),
-                    version,
-                    instance_state.spec.artifact
-                );
-                return Err(CoreError::CannotResumeService.with_description(msg));
-            } else {
-                let current_artifact_is_active = self
-                    .artifacts()
-                    .get(&instance_state.spec.artifact)
-                    .map_or(false, |state| state.status == ArtifactStatus::Active);
-                if !current_artifact_is_active {
-                    let msg = format!(
-                        "Artifact `{}` associated with service `{}` is absent or not active; \
-                         thus, access to its old data cannot be provided during migration",
-                        instance_state.spec.artifact,
-                        instance_state.spec.as_descriptor()
-                    );
-                    return Err(CoreError::ArtifactNotDeployed.with_description(msg));
-                }
-            }
         }
 
         Ok(instance_state)

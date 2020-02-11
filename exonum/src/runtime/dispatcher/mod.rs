@@ -283,12 +283,12 @@ impl Dispatcher {
         // Restart active service instances.
         for state in schema.instances().values() {
             let data_version = state.data_version().to_owned();
+            self.update_service_status(snapshot, &state);
+
+            // Restart a migration script if it is not finished locally.
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined status.");
-            self.update_service_status(snapshot, &state.spec, status.clone());
-
-            // Restart a migration script if it is not finished locally.
             if let Some(target) = status.ongoing_migration_target() {
                 if schema.local_migration_result(&state.spec.name).is_none() {
                     self.start_migration_script(target, state.spec, data_version);
@@ -345,13 +345,12 @@ impl Dispatcher {
         let pending_instances = schema.take_modified_instances();
         let patch = fork.into_patch();
         for (state, _) in pending_instances {
-            let status = state.status;
             debug_assert_eq!(
-                status,
+                state.status,
                 Some(InstanceStatus::Active),
                 "BUG: The built-in service instance must have an active status at startup"
             );
-            self.update_service_status(&patch, &state.spec, status.unwrap());
+            self.update_service_status(&patch, &state);
         }
         patch
     }
@@ -412,37 +411,12 @@ impl Dispatcher {
         new_artifact: ArtifactId,
         service_name: &str,
     ) -> Result<(), ExecutionError> {
-        self.do_initiate_migration(fork, new_artifact, service_name, false)
-    }
-
-    /// Initiates migration of an existing stopped service to a newer artifact.
-    /// The migration script is started once the block corresponding to `fork`
-    /// is committed.
-    pub(crate) fn initiate_non_destructive_migration(
-        &self,
-        fork: &Fork,
-        new_artifact: ArtifactId,
-        service_name: &str,
-    ) -> Result<(), ExecutionError> {
-        self.do_initiate_migration(fork, new_artifact, service_name, true)
-    }
-
-    pub(crate) fn do_initiate_migration(
-        &self,
-        fork: &Fork,
-        new_artifact: ArtifactId,
-        service_name: &str,
-        can_access_old_data: bool,
-    ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(fork);
-        let instance_state =
-            schema.check_migration_initiation(&new_artifact, service_name, can_access_old_data)?;
+        let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
         let maybe_script =
             self.get_migration_script(&new_artifact, instance_state.data_version())?;
         if let Some(script) = maybe_script {
-            let mut migration =
-                InstanceMigration::new(new_artifact, script.end_version().to_owned());
-            migration.non_destructive = can_access_old_data;
+            let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
             schema.add_pending_migration(instance_state, migration);
         } else {
             // No migration script means that the service instance may be immediately updated to
@@ -695,9 +669,10 @@ impl Dispatcher {
             let data_version = state.data_version().to_owned();
             let status = state
                 .status
+                .as_ref()
                 .expect("BUG: Service status cannot be changed to `None`");
 
-            self.update_service_status(&patch, &state.spec, status.clone());
+            self.update_service_status(&patch, &state);
             if modified_info.migration_transition == Some(MigrationTransition::Start) {
                 let target = status
                     .ongoing_migration_target()
@@ -913,29 +888,29 @@ impl Dispatcher {
     ///
     /// This method assumes that it was previously checked if runtime can change the state
     /// of the service, and will panic if it cannot be done.
-    fn update_service_status(
-        &mut self,
-        snapshot: &dyn Snapshot,
-        instance: &InstanceSpec,
-        status: InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, snapshot: &dyn Snapshot, instance: &InstanceState) {
+        let runtime_id = instance.spec.artifact.runtime_id;
         // Notify the runtime that the service has been committed.
-        let runtime = self.runtimes.get_mut(&instance.artifact.runtime_id).expect(
+        let runtime = self.runtimes.get_mut(&runtime_id).expect(
             "BUG: `update_service_status` was invoked for incorrect runtime, \
              this should never happen because of preemptive checks.",
         );
-        runtime.update_service_status(snapshot, instance, &status);
+        runtime.update_service_status(snapshot, instance);
 
+        let status = instance
+            .status
+            .clone()
+            .expect("BUG: instance status cannot change to `None`");
         info!(
             "Committing service instance {:?} with status {}",
-            instance, status
+            instance.spec, status
         );
 
         self.service_infos.insert(
-            instance.id,
+            instance.spec.id,
             ServiceInfo {
-                runtime_id: instance.artifact.runtime_id,
-                name: instance.name.to_owned(),
+                runtime_id,
+                name: instance.spec.name.clone(),
                 status,
             },
         );

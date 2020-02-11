@@ -510,14 +510,6 @@ pub struct InstanceMigration {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
 
-    /// Whether it is possible to read the old service data during migration.
-    ///
-    /// Non-destructive migration guarantees to keep the old service data available
-    /// during the migration; thus, it can be read by the internal and external readers
-    /// (e.g., other services on the blockchain or HTTP API handlers of the service
-    /// if its runtime provides ones).
-    pub non_destructive: bool,
-
     /// No-op field for forward compatibility.
     #[protobuf_convert(skip)]
     #[serde(default, skip)]
@@ -538,7 +530,6 @@ impl InstanceMigration {
             target,
             end_version,
             completed_hash,
-            non_destructive: false,
             non_exhaustive: (),
         }
     }
@@ -586,8 +577,9 @@ impl InstanceStatus {
     /// Returns `true` if a service with this status provides at least read access to its data.
     pub fn provides_read_access(&self) -> bool {
         match self {
-            InstanceStatus::Active | InstanceStatus::Frozen => true,
-            InstanceStatus::Migrating(migration) => migration.non_destructive,
+            // Migrations are non-destructive currently; i.e., the old service data is consistent
+            // during migration.
+            InstanceStatus::Active | InstanceStatus::Frozen | InstanceStatus::Migrating(_) => true,
             _ => false,
         }
     }
@@ -829,20 +821,32 @@ impl InstanceState {
             .unwrap_or(&self.spec.artifact.version)
     }
 
+    /// Returns the artifact currently associated with the service; that is, one that understands
+    /// its data and is deployed on the blockchain.
+    ///
+    /// This method will return `None` if a service has been [migrated] because the migration
+    /// workflow does not guarantee that the resulting data version corresponds to a deployed
+    /// artifact.
+    ///
+    /// A [runtime] may use this method to determine how to treat service state updates.
+    ///
+    /// [migrated]: migrations/index.html
+    /// [runtime]: trait.Runtime.html
+    pub fn associated_artifact(&self) -> Option<&ArtifactId> {
+        if self.data_version.is_some() {
+            None
+        } else {
+            Some(&self.spec.artifact)
+        }
+    }
+
     /// Returns true if a service with this state can have its data read.
     pub(super) fn is_readable(&self) -> bool {
         let status = self
             .status
             .as_ref()
             .or_else(|| self.pending_status.as_ref());
-        if let Some(status) = status {
-            match status {
-                InstanceStatus::Active | InstanceStatus::Frozen => true,
-                _ => false,
-            }
-        } else {
-            false
-        }
+        status.map_or(false, InstanceStatus::provides_read_access)
     }
 
     /// Sets next status as current and changes next status to `None`

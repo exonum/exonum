@@ -484,12 +484,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// It is assumed that if `initiate_adding_service` didn't return an error previously,
     /// the runtime is able to update service status and within normal conditions no error is
     /// expected to happen.
-    fn update_service_status(
-        &mut self,
-        snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: &InstanceStatus,
-    );
+    fn update_service_status(&mut self, snapshot: &dyn Snapshot, state: &InstanceState);
 
     /// Gets the migration script to migrate the data of the service to the state usable
     /// by a newer version of the artifact.

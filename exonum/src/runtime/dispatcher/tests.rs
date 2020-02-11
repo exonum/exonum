@@ -37,7 +37,7 @@ use crate::{
         migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
+        InstanceState, InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
     },
 };
 
@@ -218,12 +218,10 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        new_status: &InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, new_state: &InstanceState) {
+        let spec = &new_state.spec;
+        let new_status = new_state.status.as_ref().unwrap();
+
         assert_eq!(spec.artifact.runtime_id, self.runtime_type);
         let status_changed = if let Some(status) = self.services.get(&spec.id) {
             status != new_status
@@ -719,13 +717,7 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,
@@ -908,13 +900,7 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,
