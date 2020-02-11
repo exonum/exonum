@@ -31,12 +31,13 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_api::UpdateEndpoints;
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
-use futures::Future;
+use futures::{future, sync::mpsc, Async, Future, Stream};
 use serde_derive::*;
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -99,6 +100,34 @@ fn add_transactions_into_pool(
         .unwrap();
 
     txs.into_iter().map(|x| x.object_hash()).collect()
+}
+
+pub fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) -> HashSet<String> {
+    let (received, _) = endpoints_rx.by_ref().into_future().wait().unwrap();
+    received
+        .unwrap()
+        .endpoints
+        .into_iter()
+        .map(|(path, _)| path)
+        .collect()
+}
+
+pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) {
+    let task = future::poll_fn(|| match endpoints_rx.poll() {
+        Ok(Async::NotReady) => Ok(Async::Ready(None)),
+        other => other,
+    });
+    let maybe_update = task.wait().unwrap();
+    if let Some(update) = maybe_update {
+        panic!(
+            "Unexpected endpoints update: {:?}",
+            update
+                .endpoints
+                .into_iter()
+                .map(|(path, _)| path)
+                .collect::<Vec<_>>()
+        );
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -311,6 +340,13 @@ pub struct MigrateService {
     pub artifact: ArtifactId,
 }
 
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct CommitMigration {
+    pub instance_name: String,
+    pub migration_hash: Hash,
+}
+
 #[exonum_interface(auto_ids)]
 pub trait ToySupervisor<Ctx> {
     type Output;
@@ -321,6 +357,8 @@ pub trait ToySupervisor<Ctx> {
     fn freeze_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
     fn resume_service(&self, context: Ctx, request: ResumeService) -> Self::Output;
     fn migrate_service(&self, context: Ctx, request: MigrateService) -> Self::Output;
+    fn commit_migration(&self, context: Ctx, request: CommitMigration) -> Self::Output;
+    fn flush_migration(&self, context: Ctx, instance_name: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -392,6 +430,26 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         context
             .supervisor_extensions()
             .initiate_migration(request.artifact, &request.instance_name)
+    }
+
+    fn commit_migration(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: CommitMigration,
+    ) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .commit_migration(&request.instance_name, request.migration_hash)
+    }
+
+    fn flush_migration(
+        &self,
+        mut context: ExecutionContext<'_>,
+        instance_name: String,
+    ) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .flush_migration(&instance_name)
     }
 }
 

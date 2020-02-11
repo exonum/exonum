@@ -38,7 +38,7 @@ use self::inspected::{
     ToySupervisor, ToySupervisorService,
 };
 
-mod inspected;
+pub mod inspected;
 
 #[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
 #[binary_value(codec = "bincode")]

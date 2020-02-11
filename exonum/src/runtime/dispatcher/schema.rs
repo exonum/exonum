@@ -290,7 +290,7 @@ impl Schema<&Fork> {
         mut instance_state: InstanceState,
         new_artifact: ArtifactId,
     ) {
-        debug_assert!(*instance_state.data_version() < new_artifact.version);
+        debug_assert!(*instance_state.data_version() <= new_artifact.version);
         instance_state.data_version = None;
         instance_state.spec.artifact = new_artifact;
         let instance_name = instance_state.spec.name.clone();

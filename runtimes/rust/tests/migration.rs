@@ -28,14 +28,13 @@ use exonum::{
 };
 use exonum_api::UpdateEndpoints;
 use exonum_derive::*;
-use futures::{future, sync::mpsc, Async, Future, Stream};
+use futures::sync::mpsc;
 use pretty_assertions::assert_eq;
 
-use std::collections::HashSet;
-
 use self::inspected::{
-    create_genesis_config_builder, execute_transaction, EventsHandle, Inspected, MigrateService,
-    ResumeService, RuntimeEvent, ToySupervisor, ToySupervisorService,
+    assert_no_endpoint_update, create_genesis_config_builder, execute_transaction,
+    get_endpoint_paths, EventsHandle, Inspected, MigrateService, ResumeService, RuntimeEvent,
+    ToySupervisor, ToySupervisorService,
 };
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
@@ -200,34 +199,6 @@ fn create_runtime() -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoi
         .with_runtime(inspected)
         .build();
     (blockchain, events_handle, endpoints_rx)
-}
-
-fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) -> HashSet<String> {
-    let (received, _) = endpoints_rx.by_ref().into_future().wait().unwrap();
-    received
-        .unwrap()
-        .endpoints
-        .into_iter()
-        .map(|(path, _)| path)
-        .collect()
-}
-
-fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) {
-    let task = future::poll_fn(|| match endpoints_rx.poll() {
-        Ok(Async::NotReady) => Ok(Async::Ready(None)),
-        other => other,
-    });
-    let maybe_update = task.wait().unwrap();
-    if let Some(update) = maybe_update {
-        panic!(
-            "Unexpected endpoints update: {:?}",
-            update
-                .endpoints
-                .into_iter()
-                .map(|(path, _)| path)
-                .collect::<Vec<_>>()
-        );
-    }
 }
 
 fn test_resume_without_migration(freeze_service: bool) {
