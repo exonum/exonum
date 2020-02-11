@@ -28,7 +28,7 @@ use exonum::{
 };
 use exonum_api::UpdateEndpoints;
 use exonum_derive::*;
-use futures::{sync::mpsc, Future, Stream};
+use futures::{future, sync::mpsc, Async, Future, Stream};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
@@ -212,6 +212,24 @@ fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) -> Has
         .collect()
 }
 
+fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) {
+    let task = future::poll_fn(|| match endpoints_rx.poll() {
+        Ok(Async::NotReady) => Ok(Async::Ready(None)),
+        other => other,
+    });
+    let maybe_update = task.wait().unwrap();
+    if let Some(update) = maybe_update {
+        panic!(
+            "Unexpected endpoints update: {:?}",
+            update
+                .endpoints
+                .into_iter()
+                .map(|(path, _)| path)
+                .collect::<Vec<_>>()
+        );
+    }
+}
+
 fn test_resume_without_migration(freeze_service: bool) {
     let (mut blockchain, events_handle, mut endpoints_rx) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
@@ -253,6 +271,8 @@ fn test_resume_without_migration(freeze_service: bool) {
         let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
         assert!(endpoint_paths.contains("services/supervisor"));
         assert!(!endpoint_paths.contains("services/withdrawal"));
+    } else {
+        assert_no_endpoint_update(&mut endpoints_rx);
     }
 
     // Resume stopped service instance.
@@ -290,6 +310,8 @@ fn test_resume_without_migration(freeze_service: bool) {
         let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
         assert!(endpoint_paths.contains("services/supervisor"));
         assert!(endpoint_paths.contains("services/withdrawal"));
+    } else {
+        assert_no_endpoint_update(&mut endpoints_rx);
     }
 
     // Make another withdrawal.
@@ -356,10 +378,12 @@ fn frozen_to_stopped_transition() {
 }
 
 fn test_resume_with_fast_forward_migration(freeze_service: bool) {
-    let (mut blockchain, events_handle, _) = create_runtime();
+    let (mut blockchain, events_handle, mut endpoints_rx) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
     // We are not interested in blockchain initialization events.
     drop(events_handle.take());
+    // Take initial set of endpoints.
+    get_endpoint_paths(&mut endpoints_rx);
 
     // Make withdrawal.
     let amount = 10_000;
@@ -387,6 +411,14 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
     // We not interested in events in this case.
     drop(events_handle.take());
 
+    if !freeze_service {
+        let paths = get_endpoint_paths(&mut endpoints_rx);
+        assert!(paths.contains("services/supervisor"));
+        assert!(!paths.contains("services/withdrawal"));
+    } else {
+        assert_no_endpoint_update(&mut endpoints_rx);
+    }
+
     // Make fast-forward migration to the WithdrawalServiceV2.
     execute_transaction(
         &mut blockchain,
@@ -401,18 +433,30 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
     .unwrap();
 
     let withdrawal_service = WithdrawalServiceV2.default_instance().instance_spec;
-    assert_eq!(
-        events_handle.take(),
-        vec![
-            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::MigrateService(
-                withdrawal_service.artifact.clone(),
-                WithdrawalServiceV1.artifact_id().version
-            ),
-            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(4)),
-        ]
-    );
+    let service_status = if freeze_service {
+        InstanceStatus::Frozen
+    } else {
+        InstanceStatus::Stopped
+    };
+    let expected_events = vec![
+        RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+        RuntimeEvent::MigrateService(
+            withdrawal_service.artifact.clone(),
+            WithdrawalServiceV1.artifact_id().version,
+        ),
+        RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+        RuntimeEvent::CommitService(Height(4), withdrawal_service.clone(), service_status),
+        RuntimeEvent::AfterCommit(Height(4)),
+    ];
+    assert_eq!(events_handle.take(), expected_events);
+
+    if freeze_service {
+        let paths = get_endpoint_paths(&mut endpoints_rx);
+        assert!(paths.contains("services/supervisor"));
+        assert!(paths.contains("services/withdrawal"));
+    } else {
+        assert_no_endpoint_update(&mut endpoints_rx);
+    }
 
     // Resume stopped service instance.
     execute_transaction(
@@ -455,6 +499,14 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
         instance_state.data_version(),
         &withdrawal_service.artifact.version
     );
+
+    if !freeze_service {
+        let paths = get_endpoint_paths(&mut endpoints_rx);
+        assert!(paths.contains("services/supervisor"));
+        assert!(paths.contains("services/withdrawal"));
+    } else {
+        assert_no_endpoint_update(&mut endpoints_rx);
+    }
 
     // Make another withdrawal.
     let amount_2 = 20_000;
@@ -627,14 +679,13 @@ fn test_resume_service_error() {
         .get_instance(WithdrawalServiceV1::INSTANCE_ID)
         .unwrap();
 
-    assert_eq!(
-        instance_state.spec,
-        WithdrawalServiceV1.default_instance().instance_spec
-    );
+    let mut expected_spec = WithdrawalServiceV1.default_instance().instance_spec;
+    expected_spec.artifact = WithdrawalServiceV2.artifact_id();
+    assert_eq!(instance_state.spec, expected_spec);
     assert_eq!(instance_state.status, Some(InstanceStatus::Stopped));
     assert_eq!(
-        instance_state.data_version(),
-        &WithdrawalServiceV2.artifact_id().version
+        *instance_state.data_version(),
+        WithdrawalServiceV2.artifact_id().version
     );
 }
 

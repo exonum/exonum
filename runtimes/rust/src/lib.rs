@@ -326,7 +326,8 @@ use exonum::{
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier, WellKnownRuntime,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier,
+        WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -493,6 +494,24 @@ impl RustRuntime {
     /// Returns a new builder for the runtime.
     pub fn builder() -> RustRuntimeBuilder {
         RustRuntimeBuilder::new()
+    }
+
+    fn assert_known_status(status: &InstanceStatus) {
+        match status {
+            InstanceStatus::Active
+            | InstanceStatus::Stopped
+            | InstanceStatus::Frozen
+            | InstanceStatus::Migrating(_) => (),
+
+            other => {
+                panic!(
+                    "Received non-expected service status: {}; \
+                     Rust runtime isn't prepared to process this action, \
+                     probably Rust runtime is outdated relative to the core library",
+                    other
+                );
+            }
+        }
     }
 
     fn blockchain(&self) -> &Blockchain {
@@ -697,22 +716,24 @@ impl Runtime for RustRuntime {
         catch_panic(|| service.resume(context, parameters))
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: &InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
         const CANNOT_INSTANTIATE_SERVICE: &str =
             "BUG: Attempt to create a new service instance failed; \
              within `instantiate_adding_service` we were able to create a new instance, \
              but now we are not.";
 
+        let status = state
+            .status
+            .as_ref()
+            .expect("Rust runtime does not support removing service status");
+        Self::assert_known_status(status);
+
         let mut service_api_changed = false;
-        match status {
-            InstanceStatus::Active | InstanceStatus::Frozen => {
+        let switch_off = if status.provides_read_access() {
+            if let Some(artifact) = state.associated_artifact() {
+                // Instantiate the service if necessary.
                 let maybe_instance = self
-                    .new_service_if_needed(&spec.artifact, &spec.as_descriptor())
+                    .new_service_if_needed(artifact, &state.spec.as_descriptor())
                     .expect(CANNOT_INSTANTIATE_SERVICE);
                 if let Some(instance) = maybe_instance {
                     self.add_started_service(instance);
@@ -720,21 +741,22 @@ impl Runtime for RustRuntime {
                     // (in the latter case, the instantiated version is outdated).
                     service_api_changed = true;
                 }
+                false
+            } else {
+                // Service is no longer associated with an artifact; its API needs switching off.
+                true
             }
-            InstanceStatus::Stopped => {
-                service_api_changed = self.started_services.contains_key(&spec.id);
-                self.remove_started_service(spec);
-            }
-            InstanceStatus::Migrating(_) => { /* Do nothing. */ }
-            other => {
-                panic!(
-                    "Received non-expected service status: {}; \
-                     Rust runtime isn't prepared to process this action, \
-                     probably Rust runtime is outdated relative to the core library",
-                    other
-                );
-            }
+        } else {
+            // Service status (e.g., `Stopped`) requires switching the API off.
+            true
+        };
+
+        if switch_off {
+            // Switch the service API off.
+            service_api_changed = self.started_services.contains_key(&state.spec.id);
+            self.remove_started_service(&state.spec);
         }
+
         self.changed_services_since_last_block =
             self.changed_services_since_last_block || service_api_changed;
     }

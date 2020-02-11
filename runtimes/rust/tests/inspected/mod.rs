@@ -26,8 +26,9 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
-        Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceState,
+        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
@@ -208,15 +209,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .initiate_resuming_service(context, artifact, parameters)
     }
 
-    fn update_service_status(
-        &mut self,
-        snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: &InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, snapshot: &dyn Snapshot, state: &InstanceState) {
         snapshot
             .for_dispatcher()
-            .get_instance(spec.id)
+            .get_instance(state.spec.id)
             .expect("Service instance should exist");
 
         let core_schema = CoreSchema::new(snapshot);
@@ -224,10 +220,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
 
         self.events.push(RuntimeEvent::CommitService(
             height,
-            spec.to_owned(),
-            status.to_owned(),
+            state.spec.to_owned(),
+            state.status.to_owned().unwrap(),
         ));
-        self.runtime.update_service_status(snapshot, spec, status)
+        self.runtime.update_service_status(snapshot, state)
     }
 
     fn migrate(
