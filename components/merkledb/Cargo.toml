@@ -40,7 +40,7 @@ exonum-derive = { version = "1.0.0-rc.1", path = "../derive" }
 assert_matches = "1.3.0"
 bincode = "1.1"
 criterion = "0.3"
-hex = "0.4"
+hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
 modifier = "0.1"
 proptest = "0.9"
 pretty_assertions = "0.6"
