@@ -1,6 +1,6 @@
 [package]
 name = "exonum-sample-runtime"
-version = "0.13.0-rc.2"
+version = "0.0.0"
 authors = ["The Exonum Team <contact@exonum.com>"]
 edition = "2018"
 homepage = "https://exonum.com/"
@@ -9,13 +9,14 @@ license = "Apache-2.0"
 keywords = ["exonum", "blockchain", "example"]
 categories = ["rust-patterns"]
 description = "Minimal Exonum blockchain example implementing a simple runtime."
+publish = false
 
 [dependencies]
 futures = "0.1.25"
 
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-node = { version = "0.13.0-rc.2", path = "../../exonum-node" }
-exonum-supervisor = { version = "0.13.0-rc.2", path = "../../services/supervisor" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
+exonum-supervisor = { version = "1.0.0-rc.1", path = "../../services/supervisor" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }

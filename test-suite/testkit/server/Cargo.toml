@@ -17,8 +17,8 @@ description = "This example demonstrates how to use the testkit together with cl
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../../exonum" }
-exonum-testkit = { version = "0.13.0-rc.2", path = ".." }
+exonum = { version = "1.0.0-rc.1", path = "../../../exonum" }
+exonum-testkit = { version = "1.0.0-rc.1", path = ".." }
 exonum-cryptocurrency = { version = "0.0.0", path = "../../../examples/cryptocurrency" }
-exonum-explorer-service = { version = "0.13.0-rc.2", path = "../../../services/explorer" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../../runtimes/rust" }
+exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../../services/explorer" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../../runtimes/rust" }

@@ -17,12 +17,12 @@ description = "Minimal Exonum blockchain example implementing a simple cryptocur
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-crypto = { version = "0.13.0-rc.2", path = "../../components/crypto" }
-exonum-derive = { version = "0.13.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "0.13.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "0.13.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "0.13.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-crypto = { version = "1.0.0-rc.1", path = "../../components/crypto" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 failure = "0.1.5"
 protobuf = "2.8.0"
@@ -31,13 +31,13 @@ serde_derive = "1.0"
 serde_json = "1.0"
 
 [dev-dependencies]
-exonum-cli = { version = "0.13.0-rc.2", path = "../../cli" }
-exonum-explorer-service = { version = "0.13.0-rc.2", path = "../../services/explorer" }
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit" }
+exonum-cli = { version = "1.0.0-rc.1", path = "../../cli" }
+exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../services/explorer" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
 assert_matches = "1.2.0"
 pretty_assertions = "0.6.1"
 rand = "0.7"
 
 [build-dependencies]
-exonum-build = { version = "0.13.0-rc.2", path = "../../components/build" }
+exonum-build = { version = "1.0.0-rc.1", path = "../../components/build" }

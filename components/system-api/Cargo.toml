@@ -1,6 +1,6 @@
 [package]
 name = "exonum-system-api"
-version = "0.13.0-rc.2"
+version = "1.0.0-rc.1"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -16,9 +16,9 @@ description = "System API plugin for the Exonum framework"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "0.13.0-rc.2", path = "../../exonum" }
-exonum-api = { version = "0.13.0-rc.2", path = "../api" }
-exonum-node = { version = "0.13.0-rc.2", path = "../../exonum-node" }
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-api = { version = "1.0.0-rc.1", path = "../api" }
+exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
 
 actix-web = { version = "0.7.18", default-features = false }
 futures = "0.1.25"
@@ -26,6 +26,6 @@ serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
-exonum-testkit = { version = "0.13.0-rc.2", path = "../../test-suite/testkit", features = ["exonum-node"] }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit", features = ["exonum-node"] }
 pretty_assertions = "0.6.1"
 failure = "0.1.5"
