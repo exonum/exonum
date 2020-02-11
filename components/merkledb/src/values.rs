@@ -261,7 +261,7 @@ impl BinaryValue for [u8; HASH_SIZE] {
     }
 }
 
-/// Concatenates slice of byte buffers prepending size of buffer before each one
+/// Concatenates buffer slices, prepends each slice with its size.
 pub fn concat_buffers(buffers: &mut [Vec<u8>]) -> Vec<u8> {
     use std::convert::TryFrom;
 
