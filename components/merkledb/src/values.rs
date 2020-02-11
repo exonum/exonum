@@ -261,7 +261,7 @@ impl BinaryValue for [u8; HASH_SIZE] {
     }
 }
 
-/// Concatenates slice of byte buffers prepending size of buffer before each one
+/// Concatenates buffer slices, prepends each slice with its size.
 pub fn concat_buffers(buffers: &mut [Vec<u8>]) -> Vec<u8> {
     use std::convert::TryFrom;
 
@@ -290,7 +290,7 @@ pub fn split_buffer_into_sized_parts<'a>(
         );
         let len = u32::from_bytes(bytes[pos..pos + size_of::<u32>()].into())? as usize;
         pos += size_of::<u32>();
-        ensure!(bytes.len() >= pos + len, "Unexpected end of buffer");
+        ensure!(bytes.len() >= pos + len, "Unexpected end of the buffer");
         result.push(bytes[pos..pos + len].into());
         pos += len;
     }
