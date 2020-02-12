@@ -418,11 +418,9 @@ impl ExonumInterface {
 
         let impl_method = |descriptor: &ServiceMethodDescriptor| {
             let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
-            let name_string = name.to_string();
             let descriptor = quote! {
                 #cr::MethodDescriptor::new(
                     #interface_name,
-                    #name_string,
                     #id,
                 )
             };
