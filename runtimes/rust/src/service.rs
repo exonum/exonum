@@ -48,8 +48,15 @@ pub trait ServiceDispatcher: Send {
 
 /// Describes an Exonum service instance.
 ///
-/// That is, `Service` determines how a service instance responds to certain requests and events
+/// `Service` determines how a service instance responds to certain requests and events
 /// from the runtime.
+///
+/// # Implementation Requirements
+///
+/// Any changes of the storage state in the methods that can perform such changes (i.e., methods
+/// receiving `ExecutionContext`) must be the same for all nodes in the blockchain network.
+/// In other words, the service should only use data available in the provided context to perform
+/// such changes.
 pub trait Service: ServiceDispatcher + Debug + 'static {
     /// Initializes a new service instance with the given parameters. This method is called once
     /// after creating a new service instance.
@@ -74,8 +81,10 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
     ///
-    /// **Warning:** please note that you should not change the service data layout,
-    /// as this may violate the migration process.
+    /// [Migration workflow] guarantees that the data layout is supported by the resumed
+    /// service version.
+    ///
+    /// [Migration workflow]: https://exonum.com/doc/version/latest/architecture/services/#data-migrations
     fn resume(
         &self,
         _context: ExecutionContext<'_>,
@@ -89,10 +98,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The default implementation does nothing and returns `Ok(())`.
     ///
-    /// Any changes of the storage state will affect `state_hash`, which means this method must
-    /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `ExecutionContext`.
-    ///
     /// Services should not rely on a particular ordering of `Service::before_transactions`
     /// invocations among services.
     fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
@@ -103,10 +108,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// in the block.
     ///
     /// The default implementation does nothing and returns `Ok(())`.
-    ///
-    /// Any changes of the storage state will affect `state_hash`, which means this method must
-    /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `ExecutionContext`.
     ///
     /// Note that if service was added in the genesis block, it will be activated immediately and
     /// thus `after_transactions` will be invoked for such a service after the genesis block creation.
@@ -145,8 +146,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The request handlers are mounted on the `/api/services/{instance_name}` path at the
     /// listen address of every full node in the blockchain network.
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
-
-    // TODO: add other hooks such as "on node startup", etc. [ECR-3222]
 }
 
 /// Describes a service instance factory for the specific Rust artifact.
@@ -278,6 +277,46 @@ impl<'a> AfterCommitContext<'a> {
 /// from outside the blockchain and need to translate it to transactions. As an example,
 /// a time oracle service may broadcast local node time and build the blockchain-wide time
 /// by processing corresponding transactions.
+///
+/// # Examples
+///
+/// Using `Broadcaster` in service logic:
+///
+/// ```
+/// # use exonum_derive::*;
+/// use exonum::runtime::{ExecutionContext, ExecutionError};
+/// use exonum_rust_runtime::{AfterCommitContext, Service};
+///
+/// #[exonum_interface]
+/// trait MyInterface<Ctx> {
+///     type Output;
+///     #[interface_method(id = 0)]
+///     fn publish_string(&self, ctx: Ctx, value: String) -> Self::Output;
+/// }
+///
+/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// #[service_dispatcher(implements("MyInterface"))]
+/// struct MyService;
+///
+/// impl MyInterface<ExecutionContext<'_>> for MyService {
+///     // implementation skipped...
+/// #   type Output = Result<(), ExecutionError>;
+/// #   fn publish_string(&self, ctx: ExecutionContext<'_>, value: String) -> Self::Output {
+/// #       Ok(())
+/// #   }
+/// }
+///
+/// impl Service for MyService {
+///     fn after_commit(&self, ctx: AfterCommitContext<'_>) {
+///         if let Some(broadcaster) = ctx.broadcaster() {
+///             // Broadcast a `do_something` transaction with
+///             // the specified payload. We swallow an error in this case
+///             // (in a more thorough setup, it could be logged).
+///             broadcaster.publish_string((), "!".to_owned()).ok();
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Broadcaster<'a> {
     instance: InstanceDescriptor,

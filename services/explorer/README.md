@@ -26,10 +26,10 @@ on a blockchain; an attempt to create a second service instance will lead to
 an error in the service constructor.
 
 The API types necessary to interact with the service HTTP API are defined in
-a separate crate, [`exonum-explorer`]. The base explorer provides Rust language
-APIs for retrieving info from the blockchain, while this crate translates these
-APIs into REST and WebSocket endpoints and packages this logic as an Exonum
-service.
+a separate crate, [`exonum-explorer`][explorer]. The base explorer provides
+Rust language APIs for retrieving info from the blockchain, while this crate
+translates these APIs into REST and WebSocket endpoints and packages this logic
+as an Exonum service.
 
 Thus, this crate is useful if you want to provide the way for external apps to
 query the blockchain info.
