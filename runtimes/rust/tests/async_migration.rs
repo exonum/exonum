@@ -14,12 +14,12 @@
 
 use assert_matches::assert_matches;
 use exonum::{
-    blockchain::{Blockchain, BlockchainBuilder, BlockchainMut},
+    blockchain::{ApiSender, Blockchain, BlockchainBuilder, BlockchainMut},
     crypto::KeyPair,
     helpers::Height,
     merkledb::{
         access::{Access, CopyAccessExt, FromAccess},
-        ObjectHash, ProofEntry,
+        Database, ObjectHash, ProofEntry, TemporaryDB,
     },
     runtime::{
         migrations::{
@@ -35,14 +35,13 @@ use exonum_derive::*;
 use futures::sync::mpsc;
 use pretty_assertions::assert_eq;
 
-use std::cmp;
+use std::{cmp, sync::Arc};
 
 use self::inspected::{
     assert_no_endpoint_update, create_genesis_config_builder, execute_transaction,
     get_endpoint_paths, CommitMigration, EventsHandle, Inspected, MigrateService, RuntimeEvent,
     ToySupervisor, ToySupervisorService,
 };
-use exonum::runtime::InstanceSpec;
 use exonum_rust_runtime::{
     ArtifactProtobufSpec, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
 };
@@ -51,6 +50,21 @@ mod inspected;
 
 /// Artifact versions initially deployed on the blockchain.
 const VERSIONS: &[&str] = &["0.1.0", "0.1.1", "0.1.5", "0.2.0"];
+
+impl CommitMigration {
+    fn for_counter(blockchain: &BlockchainMut, new_counter_value: u64) -> Self {
+        let migration_hash = {
+            let fork = blockchain.fork();
+            let mut aggregator = fork.get_proof_map("_temp");
+            aggregator.put("counter.counter", new_counter_value.object_hash());
+            aggregator.object_hash()
+        };
+        Self {
+            instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
+            migration_hash,
+        }
+    }
+}
 
 #[derive(Debug, FromAccess, RequireArtifact)]
 #[require_artifact(name = "counter", version = "^0.1")]
@@ -158,13 +172,15 @@ impl MigrateData for CounterFactory {
     }
 }
 
-fn create_runtime() -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoints>) {
+fn create_runtime(
+    db: impl Into<Arc<dyn Database>>,
+) -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoints>) {
     let factories: Vec<_> = VERSIONS
         .iter()
         .map(|&version| CounterFactory::new(version.parse().unwrap()))
         .collect();
 
-    let blockchain = Blockchain::build_for_tests();
+    let blockchain = Blockchain::new(db, KeyPair::random(), ApiSender::closed());
     let mut builder = create_genesis_config_builder()
         .with_artifact(ToySupervisorService.artifact_id())
         .with_instance(ToySupervisorService.default_instance());
@@ -190,7 +206,7 @@ fn create_runtime() -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoi
 }
 
 fn test_basic_migration(freeze_service: bool) {
-    let (mut blockchain, events, mut endpoints_rx) = create_runtime();
+    let (mut blockchain, events, mut endpoints_rx) = create_runtime(TemporaryDB::new());
     let old_spec = CounterFactory::new(VERSIONS[0].parse().unwrap())
         .default_instance()
         .instance_spec;
@@ -241,16 +257,7 @@ fn test_basic_migration(freeze_service: bool) {
     }
 
     // Commit migration.
-    let migration_hash = {
-        let fork = blockchain.fork();
-        let mut aggregator = fork.get_proof_map("_temp");
-        aggregator.put("counter.counter", 2_u64.object_hash());
-        aggregator.object_hash()
-    };
-    let commit = CommitMigration {
-        instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        migration_hash,
-    };
+    let commit = CommitMigration::for_counter(&blockchain, 2);
     let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
     execute_transaction(&mut blockchain, tx).unwrap();
     assert_no_endpoint_update(&mut endpoints_rx);
@@ -317,9 +324,149 @@ fn basic_migration_with_service_freeze() {
     test_basic_migration(true);
 }
 
+#[derive(Debug, Clone, Copy)]
+struct RestartScenario {
+    after_initiation: bool,
+    after_commitment: bool,
+    after_flush: bool,
+}
+
+fn check_state_after_restart(
+    events: &EventsHandle,
+    endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>,
+) {
+    let initial_events = events.take();
+    assert_eq!(initial_events[0], RuntimeEvent::InitializeRuntime);
+    assert_eq!(*initial_events.last().unwrap(), RuntimeEvent::ResumeRuntime);
+    let supervisor = ToySupervisorService.default_instance().instance_spec;
+    assert!(initial_events.iter().any(|event| match event {
+        RuntimeEvent::CommitService(_, spec, InstanceStatus::Active) if *spec == supervisor => true,
+        _ => false,
+    }));
+
+    let old_spec = CounterFactory::new(VERSIONS[0].parse().unwrap())
+        .default_instance()
+        .instance_spec;
+    let counter_status = initial_events
+        .iter()
+        .filter_map(|event| match event {
+            RuntimeEvent::CommitService(_, spec, status) if *spec == old_spec => Some(status),
+            _ => None,
+        })
+        .next();
+    let counter_status = counter_status.expect("No event regarding counter service");
+    let is_migrating = match counter_status {
+        InstanceStatus::Migrating(_) => true,
+        InstanceStatus::Stopped => false,
+        other => panic!("Unexpected counter status: {:?}", other),
+    };
+
+    // Check that endpoints of the migrating service are on.
+    let paths = get_endpoint_paths(endpoints_rx);
+    assert!(paths.contains("services/supervisor"));
+    assert_eq!(paths.contains("services/counter"), is_migrating);
+}
+
+fn test_node_restart_during_migration(scenario: RestartScenario) {
+    let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
+    let (mut blockchain, ..) = create_runtime(Arc::clone(&db));
+    let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
+    let keypair = KeyPair::random();
+
+    let tx = keypair.increment(CounterFactory::INSTANCE_ID, 1);
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    // Stop the service.
+    let tx = keypair.stop_service(
+        ToySupervisorService::INSTANCE_ID,
+        CounterFactory::INSTANCE_ID,
+    );
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    // Start async migration.
+    let migration = MigrateService {
+        instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
+        artifact: new_artifact,
+    };
+    let tx = keypair.migrate_service(ToySupervisorService::INSTANCE_ID, migration);
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    if scenario.after_initiation {
+        let (new_blockchain, events, mut endpoints_rx) = create_runtime(Arc::clone(&db));
+        blockchain = new_blockchain;
+        check_state_after_restart(&events, &mut endpoints_rx);
+    }
+
+    // Commit migration.
+    let commit = CommitMigration::for_counter(&blockchain, 2);
+    let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    if scenario.after_commitment {
+        let (new_blockchain, events, mut endpoints_rx) = create_runtime(Arc::clone(&db));
+        blockchain = new_blockchain;
+        check_state_after_restart(&events, &mut endpoints_rx);
+    }
+
+    let tx = keypair.flush_migration(
+        ToySupervisorService::INSTANCE_ID,
+        CounterFactory::INSTANCE_NAME.to_owned(),
+    );
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    if scenario.after_flush {
+        let (new_blockchain, events, mut endpoints_rx) = create_runtime(Arc::clone(&db));
+        blockchain = new_blockchain;
+        check_state_after_restart(&events, &mut endpoints_rx);
+    }
+
+    // Check that the service data has been updated.
+    let snapshot = blockchain.snapshot();
+    assert_eq!(
+        snapshot.get_proof_entry::<_, u64>("counter.counter").get(),
+        Some(2)
+    );
+}
+
+#[test]
+fn node_restart_after_migration_initiation() {
+    test_node_restart_during_migration(RestartScenario {
+        after_initiation: true,
+        after_commitment: false,
+        after_flush: false,
+    });
+}
+
+#[test]
+fn node_restart_after_migration_commitment() {
+    test_node_restart_during_migration(RestartScenario {
+        after_initiation: false,
+        after_commitment: true,
+        after_flush: false,
+    });
+}
+
+#[test]
+fn node_restart_after_migration_flush() {
+    test_node_restart_during_migration(RestartScenario {
+        after_initiation: false,
+        after_commitment: false,
+        after_flush: true,
+    });
+}
+
+#[test]
+fn node_restarts_after_each_migration_step() {
+    test_node_restart_during_migration(RestartScenario {
+        after_initiation: true,
+        after_commitment: true,
+        after_flush: true,
+    });
+}
+
 #[test]
 fn two_step_migration_without_intermediate_update() {
-    let (mut blockchain, events, mut endpoints_rx) = create_runtime();
+    let (mut blockchain, events, mut endpoints_rx) = create_runtime(TemporaryDB::new());
     let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
     get_endpoint_paths(&mut endpoints_rx);
 
@@ -343,16 +490,7 @@ fn two_step_migration_without_intermediate_update() {
     execute_transaction(&mut blockchain, tx).unwrap();
 
     // Commit migration.
-    let migration_hash = {
-        let fork = blockchain.fork();
-        let mut aggregator = fork.get_proof_map("_temp");
-        aggregator.put("counter.counter", 2_u64.object_hash());
-        aggregator.object_hash()
-    };
-    let commit = CommitMigration {
-        instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        migration_hash,
-    };
+    let commit = CommitMigration::for_counter(&blockchain, 2);
     let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
     execute_transaction(&mut blockchain, tx).unwrap();
 
@@ -412,7 +550,7 @@ fn two_step_migration_without_intermediate_update() {
 
 #[test]
 fn two_step_migration_with_intermediate_update() {
-    let (mut blockchain, events, mut endpoints_rx) = create_runtime();
+    let (mut blockchain, events, mut endpoints_rx) = create_runtime(TemporaryDB::new());
     let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
     get_endpoint_paths(&mut endpoints_rx);
 
@@ -436,16 +574,7 @@ fn two_step_migration_with_intermediate_update() {
     execute_transaction(&mut blockchain, tx).unwrap();
 
     // Commit migration.
-    let migration_hash = {
-        let fork = blockchain.fork();
-        let mut aggregator = fork.get_proof_map("_temp");
-        aggregator.put("counter.counter", 2_u64.object_hash());
-        aggregator.object_hash()
-    };
-    let commit = CommitMigration {
-        instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        migration_hash,
-    };
+    let commit = CommitMigration::for_counter(&blockchain, 2);
     let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
     execute_transaction(&mut blockchain, tx).unwrap();
 
