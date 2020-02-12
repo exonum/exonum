@@ -615,8 +615,6 @@ fn test_service_freezing() {
         .initiate_freezing_service(SERVICE_ID)
         .expect_err("Service cannot be frozen from `Stopped` status");
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotActive));
-
-    // Use
 }
 
 #[test]
@@ -662,7 +660,7 @@ fn service_freeze_then_restart() {
     );
     context
         .supervisor_extensions()
-        .initiate_resuming_service(SERVICE_ID, service.artifact, ())
+        .initiate_resuming_service(SERVICE_ID, ())
         .expect("Cannot resume service");
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);

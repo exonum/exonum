@@ -19,8 +19,8 @@ use crate::{
     merkledb::{access::Prefixed, BinaryValue, Fork},
     runtime::{
         ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
-        DispatcherSchema, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+        DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId,
+        InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -394,11 +394,6 @@ impl<'a> SupervisorExtensions<'a> {
 
     /// Initiates resuming previously stopped service instance in the blockchain.
     ///
-    /// Provided artifact will be used in attempt to resume service. Artifact name should be equal to
-    /// the artifact name of the previously stopped instance.
-    /// Artifact version should be same as the `data_version` stored in the stopped service
-    /// instance.
-    ///
     /// This method can be used to resume modified service after successful migration.
     ///
     /// The service is not immediately activated; it activates when the block containing
@@ -406,15 +401,26 @@ impl<'a> SupervisorExtensions<'a> {
     pub fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
-        artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         let state = DispatcherSchema::new(&*self.0.fork)
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        let mut spec = state.spec;
-        spec.artifact = artifact;
+        // Check that the service can be resumed.
+        if let Some(data_version) = state.data_version {
+            let msg = format!(
+                "Cannot resume service `{}` because its data version ({}) does not match \
+                 the associated artifact `{}`. To solve, associate the service with the newer \
+                 artifact revision, for example, via fast-forward migration.",
+                state.spec.as_descriptor(),
+                data_version,
+                state.spec.artifact
+            );
+            return Err(CoreError::CannotResumeService.with_description(msg));
+        }
+
+        let spec = state.spec;
         DispatcherSchema::new(&*self.0.fork)
             .initiate_resuming_service(instance_id, spec.artifact.clone())?;
 
