@@ -616,7 +616,8 @@ impl RustRuntime {
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
                     self.blockchain().clone(),
-                    InstanceDescriptor::new(instance.id, &instance.name),
+                    instance.descriptor(),
+                    instance.artifact_id.clone(),
                 );
                 instance.as_ref().wire_api(&mut builder);
                 let root_path = builder
