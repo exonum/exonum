@@ -72,8 +72,6 @@ message ServiceConfig {
 message ResumeService {
   // Corresponding service instance ID.
   uint32 instance_id = 1;
-  // Updated artifact ID.
-  exonum.runtime.ArtifactId artifact = 2;
   // Raw bytes representation of service resume parameters.
   bytes params = 3;
 }
