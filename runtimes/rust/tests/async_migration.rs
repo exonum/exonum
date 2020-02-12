@@ -39,8 +39,8 @@ use std::{cmp, sync::Arc};
 
 use self::inspected::{
     assert_no_endpoint_update, create_genesis_config_builder, execute_transaction,
-    get_endpoint_paths, CommitMigration, EventsHandle, Inspected, MigrateService, RuntimeEvent,
-    ToySupervisor, ToySupervisorService,
+    get_endpoint_paths, CommitMigration, EventsHandle, Inspected, MigrateService, ResumeService,
+    RuntimeEvent, ToySupervisor, ToySupervisorService,
 };
 use exonum_rust_runtime::{
     ArtifactProtobufSpec, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
@@ -464,43 +464,47 @@ fn node_restarts_after_each_migration_step() {
     });
 }
 
-#[test]
-fn two_step_migration_without_intermediate_update() {
-    let (mut blockchain, events, mut endpoints_rx) = create_runtime(TemporaryDB::new());
-    let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
-    get_endpoint_paths(&mut endpoints_rx);
-
+fn perform_first_migration(blockchain: &mut BlockchainMut, new_artifact: ArtifactId) {
     let keypair = KeyPair::random();
     let tx = keypair.increment(CounterFactory::INSTANCE_ID, 1);
-    execute_transaction(&mut blockchain, tx).unwrap();
+    execute_transaction(blockchain, tx).unwrap();
 
     // Freeze the service.
     let tx = keypair.freeze_service(
         ToySupervisorService::INSTANCE_ID,
         CounterFactory::INSTANCE_ID,
     );
-    execute_transaction(&mut blockchain, tx).unwrap();
+    execute_transaction(blockchain, tx).unwrap();
 
     // Start async migration.
     let migration = MigrateService {
         instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        artifact: new_artifact.clone(),
+        artifact: new_artifact,
     };
     let tx = keypair.migrate_service(ToySupervisorService::INSTANCE_ID, migration);
-    execute_transaction(&mut blockchain, tx).unwrap();
+    execute_transaction(blockchain, tx).unwrap();
 
     // Commit migration.
     let commit = CommitMigration::for_counter(&blockchain, 2);
     let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
-    execute_transaction(&mut blockchain, tx).unwrap();
+    execute_transaction(blockchain, tx).unwrap();
 
     // Flush migration.
     let tx = keypair.flush_migration(
         ToySupervisorService::INSTANCE_ID,
         CounterFactory::INSTANCE_NAME.to_owned(),
     );
-    execute_transaction(&mut blockchain, tx).unwrap();
+    execute_transaction(blockchain, tx).unwrap();
+}
 
+#[test]
+fn two_step_migration_without_intermediate_update() {
+    let (mut blockchain, events, mut endpoints_rx) = create_runtime(TemporaryDB::new());
+    let keypair = KeyPair::random();
+    let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
+    get_endpoint_paths(&mut endpoints_rx);
+
+    perform_first_migration(&mut blockchain, new_artifact.clone());
     // Since service has transitioned from `Migrating` to `Stopped`, its endpoints should
     // be removed.
     let paths = get_endpoint_paths(&mut endpoints_rx);
@@ -551,39 +555,11 @@ fn two_step_migration_without_intermediate_update() {
 #[test]
 fn two_step_migration_with_intermediate_update() {
     let (mut blockchain, events, mut endpoints_rx) = create_runtime(TemporaryDB::new());
+    let keypair = KeyPair::random();
     let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
     get_endpoint_paths(&mut endpoints_rx);
 
-    let keypair = KeyPair::random();
-    let tx = keypair.increment(CounterFactory::INSTANCE_ID, 1);
-    execute_transaction(&mut blockchain, tx).unwrap();
-
-    // Freeze the service.
-    let tx = keypair.freeze_service(
-        ToySupervisorService::INSTANCE_ID,
-        CounterFactory::INSTANCE_ID,
-    );
-    execute_transaction(&mut blockchain, tx).unwrap();
-
-    // Start async migration.
-    let migration = MigrateService {
-        instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        artifact: new_artifact.clone(),
-    };
-    let tx = keypair.migrate_service(ToySupervisorService::INSTANCE_ID, migration);
-    execute_transaction(&mut blockchain, tx).unwrap();
-
-    // Commit migration.
-    let commit = CommitMigration::for_counter(&blockchain, 2);
-    let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
-    execute_transaction(&mut blockchain, tx).unwrap();
-
-    // Flush migration.
-    let tx = keypair.flush_migration(
-        ToySupervisorService::INSTANCE_ID,
-        CounterFactory::INSTANCE_NAME.to_owned(),
-    );
-    execute_transaction(&mut blockchain, tx).unwrap();
+    perform_first_migration(&mut blockchain, new_artifact.clone());
     get_endpoint_paths(&mut endpoints_rx); // endpoint removal, as in the previous example.
 
     // Fast-forward the service to the intermediate artifact.
@@ -622,4 +598,48 @@ fn two_step_migration_with_intermediate_update() {
     let paths = get_endpoint_paths(&mut endpoints_rx);
     assert!(paths.contains("services/supervisor"));
     assert!(paths.contains("services/counter"));
+}
+
+#[test]
+fn resume_with_incorrect_artifact_version() {
+    let (mut blockchain, ..) = create_runtime(TemporaryDB::new());
+    let keypair = KeyPair::random();
+    let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
+
+    perform_first_migration(&mut blockchain, new_artifact.clone());
+
+    let resume = ResumeService {
+        instance_id: CounterFactory::INSTANCE_ID,
+        params: vec![],
+    };
+    let tx = keypair.resume_service(ToySupervisorService::INSTANCE_ID, resume);
+    let actual_err = execute_transaction(&mut blockchain, tx).unwrap_err();
+    let expected_msg = "Cannot resume service `100:counter` because its data version (0.1.1) \
+                        does not match the associated artifact `0:counter:0.1.0`";
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&CoreError::CannotResumeService)
+            .with_description_containing(expected_msg)
+    );
+
+    // Check that the problem is solved by fast-forward migration as the error description suggests.
+    let intermediate_factory = CounterFactory::new(Version::new(0, 1, 1));
+    let intermediate_artifact = intermediate_factory.artifact_id();
+    let migration = MigrateService {
+        instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
+        artifact: intermediate_artifact.clone(),
+    };
+    let tx = keypair.migrate_service(ToySupervisorService::INSTANCE_ID, migration);
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    let resume = ResumeService {
+        instance_id: CounterFactory::INSTANCE_ID,
+        params: vec![0], // get different transaction hash
+    };
+    let tx = keypair.resume_service(ToySupervisorService::INSTANCE_ID, resume);
+    execute_transaction(&mut blockchain, tx).unwrap();
+
+    // Check that the service processes transactions.
+    let tx = keypair.increment(CounterFactory::INSTANCE_ID, 5);
+    execute_transaction(&mut blockchain, tx).unwrap();
 }

@@ -328,7 +328,6 @@ pub struct StartService {
 #[derive(Debug, Serialize, Deserialize, BinaryValue)]
 #[binary_value(codec = "bincode")]
 pub struct ResumeService {
-    pub artifact: ArtifactId,
     pub instance_id: InstanceId,
     pub params: Vec<u8>,
 }
@@ -415,11 +414,9 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         mut context: ExecutionContext<'_>,
         request: ResumeService,
     ) -> Self::Output {
-        context.supervisor_extensions().initiate_resuming_service(
-            request.instance_id,
-            request.artifact,
-            request.params,
-        )
+        context
+            .supervisor_extensions()
+            .initiate_resuming_service(request.instance_id, request.params)
     }
 
     fn migrate_service(

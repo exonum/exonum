@@ -253,7 +253,6 @@ fn test_resume_without_migration(freeze_service: bool) {
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
                 instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact: WithdrawalServiceV1.artifact_id(),
                 params: vec![],
             },
         ),
@@ -435,7 +434,6 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
                 instance_id: WithdrawalServiceV2::INSTANCE_ID,
-                artifact: WithdrawalServiceV2.artifact_id(),
                 params: vec![],
             },
         ),
@@ -517,73 +515,6 @@ fn resume_with_fast_forward_migration_and_freeze() {
 }
 
 #[test]
-fn test_resume_incorrect_artifact_version() {
-    let (mut blockchain, ..) = create_runtime();
-    let keypair = blockchain.as_ref().service_keypair().clone();
-
-    execute_transaction(
-        &mut blockchain,
-        keypair.stop_service(
-            ToySupervisorService::INSTANCE_ID,
-            WithdrawalServiceV1::INSTANCE_ID,
-        ),
-    )
-    .unwrap();
-
-    let actual_err = execute_transaction(
-        &mut blockchain,
-        keypair.resume_service(
-            ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact: WithdrawalServiceV2.artifact_id(),
-                params: vec![],
-            },
-        ),
-    )
-    .unwrap_err();
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CoreError::CannotResumeService)
-    );
-}
-
-#[test]
-fn test_resume_incorrect_artifact_name() {
-    let (mut blockchain, ..) = create_runtime();
-    let keypair = blockchain.as_ref().service_keypair().clone();
-
-    execute_transaction(
-        &mut blockchain,
-        keypair.stop_service(
-            ToySupervisorService::INSTANCE_ID,
-            WithdrawalServiceV1::INSTANCE_ID,
-        ),
-    )
-    .unwrap();
-
-    let mut artifact = WithdrawalServiceV1.artifact_id();
-    artifact.name = "toy_supervisor".to_owned();
-
-    let actual_err = execute_transaction(
-        &mut blockchain,
-        keypair.resume_service(
-            ToySupervisorService::INSTANCE_ID,
-            ResumeService {
-                instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact,
-                params: vec![],
-            },
-        ),
-    )
-    .unwrap_err();
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&CoreError::CannotResumeService)
-    );
-}
-
-#[test]
 fn test_resume_service_error() {
     let (mut blockchain, ..) = create_runtime();
     let keypair = blockchain.as_ref().service_keypair().clone();
@@ -626,7 +557,6 @@ fn test_resume_service_error() {
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
                 instance_id: WithdrawalServiceV2::INSTANCE_ID,
-                artifact: WithdrawalServiceV2.artifact_id(),
                 params: vec![1, 2, 3, 4],
             },
         ),
@@ -666,7 +596,6 @@ fn resume_non_existent_service_error() {
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
                 instance_id: WithdrawalServiceV2::INSTANCE_ID + 1,
-                artifact: WithdrawalServiceV2.artifact_id(),
                 params: vec![],
             },
         ),
@@ -689,7 +618,6 @@ fn resume_active_service_error() {
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
                 instance_id: WithdrawalServiceV1::INSTANCE_ID,
-                artifact: WithdrawalServiceV1.artifact_id(),
                 params: vec![],
             },
         ),

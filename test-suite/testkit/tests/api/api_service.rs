@@ -114,7 +114,7 @@ struct ApiV2;
 
 impl ApiV2 {
     /// Re-envisioned version of `ping-pong` endpoint, designed to have better UX and push
-    /// the bounds of high performance and security.
+    /// the boundaries of high performance and security.
     fn ping_pong(_state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<u64> {
         Ok(ping.value + 1)
     }
@@ -126,7 +126,7 @@ impl ApiV2 {
     }
 }
 
-// // // // Supervisor Surrogate // // // //
+// // // // Supervisor surrogate // // // //
 
 #[exonum_interface(auto_ids)]
 pub trait SupervisorInterface<Ctx> {
@@ -159,7 +159,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
     fn start_migration(&self, mut context: ExecutionContext<'_>, _: ()) -> Self::Output {
         let mut extensions = context.supervisor_extensions();
         extensions.initiate_migration(ApiServiceV2.artifact_id(), SERVICE_NAME)?;
-        extensions.initiate_resuming_service(SERVICE_ID, ApiServiceV2.artifact_id(), ())
+        extensions.initiate_resuming_service(SERVICE_ID, ())
     }
 }
 

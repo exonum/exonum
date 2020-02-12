@@ -1000,7 +1000,6 @@ fn service_freezing() {
             ToySupervisorService::INSTANCE_ID,
             ResumeService {
                 instance_id: test_service.id,
-                artifact: test_service.artifact.clone(),
                 params: vec![],
             },
         ),
