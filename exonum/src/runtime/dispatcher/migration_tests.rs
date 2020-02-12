@@ -440,13 +440,7 @@ fn test_fast_forward_migration(freeze_service: bool) {
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     let state = schema.get_instance(service.id).unwrap();
-    let expected_status = if freeze_service {
-        InstanceStatus::Frozen
-    } else {
-        InstanceStatus::Stopped
-    };
-
-    assert_eq!(state.status, Some(expected_status));
+    assert_eq!(state.status, Some(InstanceStatus::Stopped));
     assert_eq!(state.pending_status, None);
     assert_eq!(state.spec.artifact, new_artifact);
     assert_eq!(state.data_version, None);
@@ -524,7 +518,10 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, unknown_artifact.clone(), &old_service.name)
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::UnknownArtifactId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::UnknownArtifactId).with_any_description()
+    );
 
     // Mark the artifact as pending.
     Dispatcher::commit_artifact(&fork, &unknown_artifact, vec![]);

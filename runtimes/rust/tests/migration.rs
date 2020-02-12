@@ -382,12 +382,12 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
     // We not interested in events in this case.
     drop(events_handle.take());
 
-    if !freeze_service {
+    if freeze_service {
+        assert_no_endpoint_update(&mut endpoints_rx);
+    } else {
         let paths = get_endpoint_paths(&mut endpoints_rx);
         assert!(paths.contains("services/supervisor"));
         assert!(!paths.contains("services/withdrawal"));
-    } else {
-        assert_no_endpoint_update(&mut endpoints_rx);
     }
 
     // Make fast-forward migration to the WithdrawalServiceV2.
@@ -404,11 +404,6 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
     .unwrap();
 
     let withdrawal_service = WithdrawalServiceV2.default_instance().instance_spec;
-    let service_status = if freeze_service {
-        InstanceStatus::Frozen
-    } else {
-        InstanceStatus::Stopped
-    };
     let expected_events = vec![
         RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
         RuntimeEvent::MigrateService(
@@ -416,7 +411,11 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
             WithdrawalServiceV1.artifact_id().version,
         ),
         RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-        RuntimeEvent::CommitService(Height(4), withdrawal_service.clone(), service_status),
+        RuntimeEvent::CommitService(
+            Height(4),
+            withdrawal_service.clone(),
+            InstanceStatus::Stopped,
+        ),
         RuntimeEvent::AfterCommit(Height(4)),
     ];
     assert_eq!(events_handle.take(), expected_events);
@@ -424,7 +423,7 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
     if freeze_service {
         let paths = get_endpoint_paths(&mut endpoints_rx);
         assert!(paths.contains("services/supervisor"));
-        assert!(paths.contains("services/withdrawal"));
+        assert!(!paths.contains("services/withdrawal"));
     } else {
         assert_no_endpoint_update(&mut endpoints_rx);
     }
@@ -471,13 +470,9 @@ fn test_resume_with_fast_forward_migration(freeze_service: bool) {
         &withdrawal_service.artifact.version
     );
 
-    if !freeze_service {
-        let paths = get_endpoint_paths(&mut endpoints_rx);
-        assert!(paths.contains("services/supervisor"));
-        assert!(paths.contains("services/withdrawal"));
-    } else {
-        assert_no_endpoint_update(&mut endpoints_rx);
-    }
+    let paths = get_endpoint_paths(&mut endpoints_rx);
+    assert!(paths.contains("services/supervisor"));
+    assert!(paths.contains("services/withdrawal"));
 
     // Make another withdrawal.
     let amount_2 = 20_000;

@@ -233,15 +233,18 @@ impl Schema<&Fork> {
         }
 
         // The new artifact should exist.
-        let artifact_state = self
-            .artifacts()
-            .get(new_artifact)
-            .ok_or(CoreError::UnknownArtifactId)?;
+        let artifact_state = self.artifacts().get(new_artifact).ok_or_else(|| {
+            let msg = format!(
+                "The target artifact `{}` for data migration of service `{}` is not deployed",
+                new_artifact,
+                instance_state.spec.as_descriptor()
+            );
+            CoreError::UnknownArtifactId.with_description(msg)
+        })?;
         // The new artifact should be deployed.
         if artifact_state.status != ArtifactStatus::Active {
             let msg = format!(
-                "The target artifact `{}` for data migration of service `{}` is not deployed \
-                 or is not active",
+                "The target artifact `{}` for data migration of service `{}` is not active",
                 new_artifact,
                 instance_state.spec.as_descriptor()
             );
@@ -282,15 +285,16 @@ impl Schema<&Fork> {
     }
 
     /// Fast-forwards data migration by bumping the recorded service version.
-    /// The entire migration workflow is skipped in this case; the service remains
-    /// with the `Stopped` status and no pending status is added. At the same time,
-    /// the runtime will be notified about the service state when the block is accepted.
+    /// The entire migration workflow is skipped in this case; the service transitions to
+    /// the `Stopped` status and no pending status is added.
+    /// The runtime will be notified about the service state when the block is accepted.
     pub(super) fn fast_forward_migration(
         &mut self,
         mut instance_state: InstanceState,
         new_artifact: ArtifactId,
     ) {
         debug_assert!(*instance_state.data_version() <= new_artifact.version);
+        instance_state.status = Some(InstanceStatus::Stopped);
         instance_state.data_version = None;
         instance_state.spec.artifact = new_artifact;
         let instance_name = instance_state.spec.name.clone();
