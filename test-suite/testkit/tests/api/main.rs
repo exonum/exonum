@@ -14,16 +14,25 @@
 
 //! Tests related to the API.
 
+use exonum::runtime::SUPERVISOR_INSTANCE_ID;
 use exonum_api as api;
-use exonum_testkit::{ApiKind, TestKit, TestKitApi};
+use exonum_rust_runtime::ServiceFactory;
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
-use crate::api_service::{ApiService, PingQuery, SERVICE_ID, SERVICE_NAME};
+use crate::api_service::{
+    ApiService, ApiServiceV2, PingQuery, Supervisor, SupervisorInterface, SERVICE_ID, SERVICE_NAME,
+};
 
 mod api_service;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
-    let mut testkit = TestKit::for_rust_service(ApiService, SERVICE_NAME, SERVICE_ID, ());
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(Supervisor)
+        .with_default_rust_service(ApiService)
+        .with_migrating_rust_service(ApiServiceV2)
+        .with_artifact(ApiServiceV2.artifact_id())
+        .build();
     let api = testkit.api();
     (testkit, api)
 }
@@ -185,4 +194,55 @@ fn endpoint_with_new_error_type() {
         format!("{}:{}", SERVICE_ID, SERVICE_NAME)
     );
     assert_eq!(error.body.error_code, Some(42));
+}
+
+#[test]
+fn error_after_migration() {
+    let (mut testkit, api) = init_testkit();
+
+    let tx = testkit
+        .us()
+        .service_keypair()
+        .freeze(SUPERVISOR_INSTANCE_ID, ());
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().unwrap();
+
+    // Check that API endpoints are available.
+    let pong: u64 = api
+        .public(ApiKind::Service(SERVICE_NAME))
+        .query(&PingQuery { value: 10 })
+        .get("ping-pong")
+        .expect("API should work fine after restart");
+    assert_eq!(pong, 10);
+
+    let tx = testkit
+        .us()
+        .service_keypair()
+        .start_migration(SUPERVISOR_INSTANCE_ID, ());
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().unwrap();
+
+    // Check that API endpoints return 50x errors now.
+    let error = api
+        .public(ApiKind::Service(SERVICE_NAME))
+        .query(&PingQuery { value: 10 })
+        .get::<u64>("ping-pong")
+        .expect_err("API should return errors now");
+    assert_eq!(error.http_code, api::HttpStatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(
+        error.body.title,
+        "Service has been upgraded, but its HTTP handlers are not rebooted yet"
+    );
+    assert!(error
+        .body
+        .detail
+        .contains("Service `3:api-service` was upgraded to version 2.0.0"));
+
+    let new_api = testkit.api();
+    let pong: u64 = new_api
+        .public(ApiKind::Service(SERVICE_NAME))
+        .query(&PingQuery { value: 10 })
+        .get("ping-pong")
+        .expect("API should work fine after restart");
+    assert_eq!(pong, 11);
 }

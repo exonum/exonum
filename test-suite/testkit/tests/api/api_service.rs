@@ -16,15 +16,20 @@
 //! This service can be used for testing features related only to the API.
 
 use chrono::{TimeZone, Utc};
-use exonum::runtime::InstanceId;
+use exonum::runtime::{
+    migrations::{InitMigrationError, MigrateData, MigrationScript},
+    versioning::Version,
+    ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
+};
 use exonum_derive::*;
 use exonum_rust_runtime::{
     api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
-    DefaultInstance, Service,
+    DefaultInstance, Service, ServiceFactory,
 };
 use serde_derive::{Deserialize, Serialize};
 
 pub const SERVICE_NAME: &str = "api-service";
+// We need supervisor privileges to start service migration.
 pub const SERVICE_ID: InstanceId = 3;
 
 /// Sample query supported by API.
@@ -104,6 +109,60 @@ impl Api {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ApiV2;
+
+impl ApiV2 {
+    /// Re-envisioned version of `ping-pong` endpoint, designed to have better UX and push
+    /// the bounds of high performance and security.
+    fn ping_pong(_state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<u64> {
+        Ok(ping.value + 1)
+    }
+
+    fn wire(builder: &mut ServiceApiBuilder) {
+        let public_scope = builder.public_scope();
+        // Normal endpoint.
+        public_scope.endpoint("ping-pong", Self::ping_pong);
+    }
+}
+
+// // // // Supervisor Surrogate // // // //
+
+#[exonum_interface(auto_ids)]
+pub trait SupervisorInterface<Ctx> {
+    type Output;
+    fn freeze(&self, context: Ctx, _: ()) -> Self::Output;
+    fn start_migration(&self, context: Ctx, _: ()) -> Self::Output;
+}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("SupervisorInterface"))]
+#[service_factory(artifact_name = "supervisor", artifact_version = "1.0.0")]
+pub struct Supervisor;
+
+impl Service for Supervisor {}
+
+impl DefaultInstance for Supervisor {
+    const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
+    const INSTANCE_NAME: &'static str = "supervisor";
+}
+
+impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
+    type Output = Result<(), ExecutionError>;
+
+    fn freeze(&self, mut context: ExecutionContext<'_>, _: ()) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .initiate_freezing_service(SERVICE_ID)
+    }
+
+    fn start_migration(&self, mut context: ExecutionContext<'_>, _: ()) -> Self::Output {
+        let mut extensions = context.supervisor_extensions();
+        extensions.initiate_migration(ApiServiceV2.artifact_id(), SERVICE_NAME)?;
+        extensions.initiate_resuming_service(SERVICE_ID, ApiServiceV2.artifact_id(), ())
+    }
+}
+
 // // // // Service // // // //
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -118,5 +177,28 @@ impl DefaultInstance for ApiService {
 impl Service for ApiService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         Api::wire(builder)
+    }
+}
+
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_factory(artifact_name = "api-service", artifact_version = "2.0.0")]
+pub struct ApiServiceV2;
+
+impl Service for ApiServiceV2 {
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        ApiV2::wire(builder)
+    }
+}
+
+impl MigrateData for ApiServiceV2 {
+    fn migration_scripts(
+        &self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        if *start_version == Version::new(1, 0, 0) {
+            Ok(vec![])
+        } else {
+            Err(InitMigrationError::NotSupported)
+        }
     }
 }
