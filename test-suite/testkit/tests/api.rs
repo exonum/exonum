@@ -20,11 +20,13 @@ use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
-use crate::api_service::{
-    ApiService, ApiServiceV2, PingQuery, Supervisor, SupervisorInterface, SERVICE_ID, SERVICE_NAME,
+use crate::{
+    api_service::{ApiService, ApiServiceV2, PingQuery, SERVICE_ID, SERVICE_NAME},
+    supervisor::{StartMigration, Supervisor, SupervisorInterface},
 };
 
 mod api_service;
+mod supervisor;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
@@ -199,11 +201,9 @@ fn endpoint_with_new_error_type() {
 #[test]
 fn error_after_migration() {
     let (mut testkit, api) = init_testkit();
+    let keys = testkit.us().service_keypair();
 
-    let tx = testkit
-        .us()
-        .service_keypair()
-        .freeze(SUPERVISOR_INSTANCE_ID, ());
+    let tx = keys.freeze_service(SUPERVISOR_INSTANCE_ID, SERVICE_ID);
     let block = testkit.create_block_with_transaction(tx);
     block[0].status().unwrap();
 
@@ -215,10 +215,14 @@ fn error_after_migration() {
         .expect("API should work fine after restart");
     assert_eq!(pong, 10);
 
-    let tx = testkit
-        .us()
-        .service_keypair()
-        .start_migration(SUPERVISOR_INSTANCE_ID, ());
+    let tx = keys.start_migration(
+        SUPERVISOR_INSTANCE_ID,
+        StartMigration {
+            instance_id: SERVICE_ID,
+            new_artifact: ApiServiceV2.artifact_id(),
+            migration_len: 0,
+        },
+    );
     let block = testkit.create_block_with_transaction(tx);
     block[0].status().unwrap();
 

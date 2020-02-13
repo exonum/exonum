@@ -19,12 +19,12 @@ use chrono::{TimeZone, Utc};
 use exonum::runtime::{
     migrations::{InitMigrationError, MigrateData, MigrationScript},
     versioning::Version,
-    ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID,
+    InstanceId,
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
     api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
-    DefaultInstance, Service, ServiceFactory,
+    DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
 
@@ -123,43 +123,6 @@ impl ApiV2 {
         let public_scope = builder.public_scope();
         // Normal endpoint.
         public_scope.endpoint("ping-pong", Self::ping_pong);
-    }
-}
-
-// // // // Supervisor surrogate // // // //
-
-#[exonum_interface(auto_ids)]
-pub trait SupervisorInterface<Ctx> {
-    type Output;
-    fn freeze(&self, context: Ctx, _: ()) -> Self::Output;
-    fn start_migration(&self, context: Ctx, _: ()) -> Self::Output;
-}
-
-#[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("SupervisorInterface"))]
-#[service_factory(artifact_name = "supervisor", artifact_version = "1.0.0")]
-pub struct Supervisor;
-
-impl Service for Supervisor {}
-
-impl DefaultInstance for Supervisor {
-    const INSTANCE_ID: u32 = SUPERVISOR_INSTANCE_ID;
-    const INSTANCE_NAME: &'static str = "supervisor";
-}
-
-impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
-    type Output = Result<(), ExecutionError>;
-
-    fn freeze(&self, mut context: ExecutionContext<'_>, _: ()) -> Self::Output {
-        context
-            .supervisor_extensions()
-            .initiate_freezing_service(SERVICE_ID)
-    }
-
-    fn start_migration(&self, mut context: ExecutionContext<'_>, _: ()) -> Self::Output {
-        let mut extensions = context.supervisor_extensions();
-        extensions.initiate_migration(ApiServiceV2.artifact_id(), SERVICE_NAME)?;
-        extensions.initiate_resuming_service(SERVICE_ID, ())
     }
 }
 
