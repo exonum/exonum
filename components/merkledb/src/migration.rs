@@ -1,5 +1,10 @@
 //! Migration utilities.
 //!
+//! # Stability
+//!
+//! The entirety of this module is considered unstable. While the supported functionality
+//! is unlikely to break, the implementation details may change in the following releases.
+//!
 //! # Migration workflow
 //!
 //! **Migration** refers to the ability to update data in indexes, remove indexes,

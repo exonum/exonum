@@ -166,7 +166,7 @@ impl MultisigInterface<ExecutionContext<'_>> for MultisigService {
         let current_votes: u32 = proposal.votes.iter().map(|flag| *flag as u32).sum();
         if current_votes == config.threshold {
             let call_info = proposal.action.call_info;
-            let method = MethodDescriptor::new("", "", call_info.method_id);
+            let method = MethodDescriptor::inherent(call_info.method_id);
             context.generic_call_mut(call_info.instance_id, method, proposal.action.arguments)?;
             MultisigSchema::new(context.service_data())
                 .proposals

@@ -166,7 +166,7 @@ fn test_explorer_api_block_request() {
     assert_eq!(response.body.title, "Failed to get block info");
     assert_eq!(
         response.body.detail,
-        "Requested block height(10) exceeds the blockchain height (1)"
+        "Requested block height (10) exceeds the blockchain height (1)"
     );
     assert_eq!(response.body.source, "2:explorer");
 }

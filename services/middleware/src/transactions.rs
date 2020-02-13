@@ -197,7 +197,7 @@ impl MiddlewareInterface<ExecutionContext<'_>> for MiddlewareService {
         }
 
         // TODO: use interface name from `call_info` once it's added there
-        let method = MethodDescriptor::new("", "", arg.inner.call_info.method_id);
+        let method = MethodDescriptor::inherent(arg.inner.call_info.method_id);
         FallthroughAuth(context).generic_call_mut(instance_id, method, arg.inner.arguments)
     }
 
@@ -205,7 +205,7 @@ impl MiddlewareInterface<ExecutionContext<'_>> for MiddlewareService {
         let mut fallthrough_auth = FallthroughAuth(context);
         for call in arg.inner {
             // TODO: use interface name from `call_info` once it's added there
-            let method = MethodDescriptor::new("", "", call.call_info.method_id);
+            let method = MethodDescriptor::inherent(call.call_info.method_id);
             fallthrough_auth.generic_call_mut(
                 call.call_info.instance_id,
                 method,

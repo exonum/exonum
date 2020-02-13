@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Shows how to migrate database data. The migration follows the following scenario:
+//! Shared code among all migration examples. The migration follows the following scenario:
 //!
 //! 1. We create and fill database with random data according to schema defined in the
 //!   `migration::v1` module with the `create_initial_data` method.
@@ -32,7 +32,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use exonum_merkledb::{
-    access::{Access, AsReadonly, CopyAccessExt, FromAccess, Prefixed, RawAccess},
+    access::{Access, CopyAccessExt, FromAccess, Prefixed},
     migration::{flush_migration, Migration},
     Database, Entry, Group, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex,
     ProofMapIndex, Snapshot, SystemSchema, TemporaryDB,
@@ -115,7 +115,6 @@ fn create_initial_data() -> TemporaryDB {
 
     fork.get_proof_list("unrelated.list").extend(vec![1, 2, 3]);
     db.merge(fork.into_patch()).unwrap();
-
     db
 }
 
@@ -183,13 +182,13 @@ fn check_data_before_flush(snapshot: &dyn Snapshot) {
 }
 
 /// Checks that old data was replaced by new data in the storage.
-fn check_data_after_flush(view: impl RawAccess + AsReadonly + Copy) {
-    let new_schema = v2::Schema::new(Prefixed::new("test", view));
+fn check_data_after_flush(snapshot: &dyn Snapshot) {
+    let new_schema = v2::Schema::new(Prefixed::new("test", snapshot));
     assert_eq!(new_schema.config.get().unwrap().divisibility, 8);
-    assert!(!view.get_entry::<_, u8>("test.divisibility").exists());
+    assert!(!snapshot.get_entry::<_, u8>("test.divisibility").exists());
 
     // The indexes are now aggregated in the default namespace.
-    let system_schema = SystemSchema::new(view);
+    let system_schema = SystemSchema::new(snapshot);
     let state = system_schema.state_aggregator();
     assert_eq!(
         state.keys().collect::<Vec<_>>(),
@@ -223,7 +222,6 @@ where
     // Check that DB contains old and new data.
     let snapshot = db.snapshot();
     check_data_before_flush(&snapshot);
-
     // Finalize the migration by calling `flush_migration`.
     let mut fork = db.fork();
     flush_migration(&mut fork, "test");
@@ -234,15 +232,13 @@ where
     // Check that indexes are updated.
     let patch = fork.into_patch();
     check_data_after_flush(&patch);
-
     // When the patch is merged, the situation remains the same.
     db.merge(patch).unwrap();
-
     // Check that data was updated after merge.
     let snapshot = db.snapshot();
     check_data_after_flush(&snapshot);
 
-    // State after migration.
+    // Print DB state after migration is completed.
     let schema = v2::Schema::new(Prefixed::new("test", &snapshot));
     println!("After migration:");
     schema.print_wallets();
