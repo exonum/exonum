@@ -31,20 +31,25 @@ use exonum::{
 pub struct MethodDescriptor<'a> {
     /// Name of the interface.
     pub interface_name: &'a str,
-    /// Name of the method.
-    pub name: &'a str,
     /// Numerical ID of the method.
     pub id: MethodId,
 }
 
 impl<'a> MethodDescriptor<'a> {
     /// Creates the descriptor based on provided properties.
-    pub const fn new(interface_name: &'a str, name: &'a str, id: MethodId) -> Self {
-        Self {
-            interface_name,
-            name,
-            id,
-        }
+    pub const fn new(interface_name: &'a str, id: MethodId) -> Self {
+        Self { interface_name, id }
+    }
+
+    /// Creates a descriptor for an inherent method, that is, method in the default service
+    /// interface.
+    ///
+    /// See documentation of the `runtime` module in the `exonum` crate for mode details
+    /// about service interfaces. You may also consult [general Exonum docs].
+    ///
+    /// [general Exonum docs]: https://exonum.com/doc/version/latest/architecture/services/
+    pub const fn inherent(id: MethodId) -> Self {
+        Self::new("", id)
     }
 }
 
@@ -213,7 +218,6 @@ mod explanation {
         fn create_wallet(&self, context: Ctx, wallet: CreateWallet) -> Self::Output {
             const DESCRIPTOR: MethodDescriptor<'static> = MethodDescriptor {
                 interface_name: "",
-                name: "create_wallet",
                 id: 0,
             };
             self.generic_call(context, DESCRIPTOR, wallet.into_bytes())
@@ -222,7 +226,6 @@ mod explanation {
         fn transfer(&self, context: Ctx, transfer: Transfer) -> Self::Output {
             const DESCRIPTOR: MethodDescriptor<'static> = MethodDescriptor {
                 interface_name: "",
-                name: "transfer",
                 id: 1,
             };
             self.generic_call(context, DESCRIPTOR, transfer.into_bytes())
