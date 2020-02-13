@@ -21,7 +21,7 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use crate::{
-    api_service::{ApiService, ApiServiceV2, PingQuery, SERVICE_ID, SERVICE_NAME},
+    api_service::{ApiInterface, ApiService, ApiServiceV2, PingQuery, SERVICE_ID, SERVICE_NAME},
     supervisor::{StartMigration, Supervisor, SupervisorInterface},
 };
 
@@ -51,6 +51,24 @@ fn ping_pong() {
         .get("ping-pong")
         .expect("Request to the valid endpoint failed");
     assert_eq!(ping.value, pong);
+}
+
+#[test]
+fn submit_tx() {
+    let (mut testkit, api) = init_testkit();
+
+    let ping = PingQuery { value: 64 };
+    api.public(ApiKind::Service("api-service"))
+        .query(&ping)
+        .post::<()>("submit-tx")
+        .expect("Request to the valid endpoint failed");
+    let block = testkit.create_block();
+    assert_eq!(block.len(), 1);
+    let expected_tx = testkit
+        .us()
+        .service_keypair()
+        .do_nothing(SERVICE_ID, ping.value);
+    assert_eq!(*block[0].message(), expected_tx);
 }
 
 /// Checks that for deprecated endpoints the corresponding warning is added to the headers
@@ -196,6 +214,50 @@ fn endpoint_with_new_error_type() {
         format!("{}:{}", SERVICE_ID, SERVICE_NAME)
     );
     assert_eq!(error.body.error_code, Some(42));
+}
+
+#[test]
+fn submit_tx_when_service_is_stopped() {
+    let (mut testkit, api) = init_testkit();
+    let keys = testkit.us().service_keypair();
+
+    let tx = keys.stop_service(SUPERVISOR_INSTANCE_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Cannot stop service");
+
+    let ping = PingQuery { value: 64 };
+    let err = api
+        .public(ApiKind::Service("api-service"))
+        .query(&ping)
+        .post::<()>("submit-tx")
+        .expect_err("Request to the valid endpoint should fail");
+    assert_eq!(err.http_code, api::HttpStatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(err.body.title, "Service is not active");
+
+    let block = testkit.create_block();
+    assert!(block.is_empty());
+}
+
+#[test]
+fn submit_tx_when_service_is_frozen() {
+    let (mut testkit, api) = init_testkit();
+    let keys = testkit.us().service_keypair();
+
+    let tx = keys.freeze_service(SUPERVISOR_INSTANCE_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Cannot freeze service");
+
+    let ping = PingQuery { value: 64 };
+    let err = api
+        .public(ApiKind::Service("api-service"))
+        .query(&ping)
+        .post::<()>("submit-tx")
+        .expect_err("Request to the valid endpoint should fail");
+    assert_eq!(err.http_code, api::HttpStatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(err.body.title, "Service is not active");
+
+    let block = testkit.create_block();
+    assert!(block.is_empty());
 }
 
 #[test]

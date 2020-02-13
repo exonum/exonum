@@ -19,7 +19,7 @@ use chrono::{TimeZone, Utc};
 use exonum::runtime::{
     migrations::{InitMigrationError, MigrateData, MigrationScript},
     versioning::Version,
-    InstanceId,
+    ExecutionContext, ExecutionError, InstanceId,
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{
@@ -48,6 +48,19 @@ impl Api {
         Ok(ping.value)
     }
 
+    /// Submits transaction to the service if it is active; otherwise, returns a 503 error.
+    fn submit_tx(state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<()> {
+        if let Some(broadcaster) = state.broadcaster() {
+            broadcaster
+                .do_nothing((), ping.value)
+                .map(drop)
+                .map_err(api::Error::internal)
+        } else {
+            Err(api::Error::new(api::HttpStatusCode::SERVICE_UNAVAILABLE)
+                .title("Service is not active"))
+        }
+    }
+
     /// Returns `Gone` error.
     fn gone(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
         Err(api::Error::new(api::HttpStatusCode::GONE))
@@ -57,7 +70,9 @@ impl Api {
         let public_scope = builder.public_scope();
 
         // Normal endpoint.
-        public_scope.endpoint("ping-pong", Self::ping_pong);
+        public_scope
+            .endpoint("ping-pong", Self::ping_pong)
+            .endpoint_mut("submit-tx", Self::submit_tx);
 
         // Deprecated endpoints.
         public_scope
@@ -128,9 +143,24 @@ impl ApiV2 {
 
 // // // // Service // // // //
 
+#[exonum_interface(auto_ids)]
+pub trait ApiInterface<Ctx> {
+    type Output;
+    fn do_nothing(&self, context: Ctx, seed: u64) -> Self::Output;
+}
+
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("ApiInterface"))]
 #[service_factory(artifact_name = "api-service", artifact_version = "1.0.0")]
 pub struct ApiService;
+
+impl ApiInterface<ExecutionContext<'_>> for ApiService {
+    type Output = Result<(), ExecutionError>;
+
+    fn do_nothing(&self, _context: ExecutionContext<'_>, _seed: u64) -> Self::Output {
+        Ok(())
+    }
+}
 
 impl DefaultInstance for ApiService {
     const INSTANCE_ID: u32 = SERVICE_ID;
