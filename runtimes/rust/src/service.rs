@@ -19,7 +19,7 @@ use exonum::{
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
         ArtifactId, BlockchainData, DispatcherAction, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceId, Mailbox, MethodId,
+        InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
 use futures::{Future, IntoFuture};
@@ -195,6 +195,8 @@ pub struct AfterCommitContext<'a> {
     broadcaster: Broadcaster<'a>,
     /// ID of the node as a validator.
     validator_id: Option<ValidatorId>,
+    /// Current status of the service.
+    status: InstanceStatus,
 }
 
 impl<'a> AfterCommitContext<'a> {
@@ -207,11 +209,20 @@ impl<'a> AfterCommitContext<'a> {
         tx_sender: &'a ApiSender,
         validator_id: Option<ValidatorId>,
     ) -> Self {
+        let status = snapshot
+            .for_dispatcher()
+            .get_instance(instance.id)
+            .unwrap_or_else(|| {
+                panic!("BUG: Cannot find instance state for service `{}`", instance);
+            })
+            .status
+            .expect("BUG: status for a service receiving `after_commit` hook cannot be `None`");
         Self {
             mailbox,
             snapshot,
             validator_id,
             broadcaster: Broadcaster::new(instance, service_keypair, tx_sender),
+            status,
         }
     }
 
@@ -241,14 +252,29 @@ impl<'a> AfterCommitContext<'a> {
         self.validator_id
     }
 
-    /// Returns a transaction broadcaster if the current node is a validator. If the node
-    /// is not a validator, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
-        self.validator_id?;
-        Some(self.broadcaster.clone())
+    /// Returns the current status of the service.
+    pub fn status(&self) -> &InstanceStatus {
+        &self.status
     }
 
-    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
+    /// Returns a transaction broadcaster if the current node is a validator and the service
+    /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
+    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+        self.validator_id?;
+        if self.status.is_active() {
+            Some(self.broadcaster.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor)
+    /// and the service status (active or not).
+    ///
+    /// # Safety
+    ///
+    /// Transactions for non-active services will not be broadcast successfully; they will be
+    /// filtered on the receiving nodes as ones that cannot (currently) be processed.
     pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
     }
