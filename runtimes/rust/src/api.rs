@@ -20,7 +20,9 @@ use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::PublicKey,
     merkledb::{access::Prefixed, Snapshot},
-    runtime::{ArtifactId, BlockchainData, InstanceDescriptor, SnapshotExt},
+    runtime::{
+        ArtifactId, BlockchainData, InstanceDescriptor, InstanceState, InstanceStatus, SnapshotExt,
+    },
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
 use futures::{future, Future, IntoFuture};
@@ -40,6 +42,8 @@ pub struct ServiceApiState<'a> {
     snapshot: Box<dyn Snapshot>,
     /// Endpoint path relative to the service root.
     endpoint: String,
+    /// Current status of the service.
+    status: InstanceStatus,
 }
 
 impl<'a> ServiceApiState<'a> {
@@ -50,17 +54,37 @@ impl<'a> ServiceApiState<'a> {
         expected_artifact: &ArtifactId,
         endpoint: S,
     ) -> Result<Self> {
-        let this = Self {
+        let snapshot = blockchain.snapshot();
+        let instance_state = snapshot
+            .for_dispatcher()
+            .get_instance(instance.id)
+            .ok_or_else(|| Self::removed_service_error(&instance))?;
+        Self::check_service_artifact(&instance_state, expected_artifact)?;
+        let status = instance_state
+            .status
+            .ok_or_else(|| Self::removed_service_error(&instance))?;
+
+        Ok(Self {
             broadcaster: Broadcaster::new(
                 instance,
                 blockchain.service_keypair(),
                 blockchain.sender(),
             ),
-            snapshot: blockchain.snapshot(),
+            snapshot,
             endpoint: endpoint.into(),
-        };
-        this.check_service_artifact(expected_artifact)?;
-        Ok(this)
+            status,
+        })
+    }
+
+    fn removed_service_error(instance: &InstanceDescriptor) -> Error {
+        let details = format!(
+            "Service `{}` has been removed from the blockchain services, making it \
+             impossible to process HTTP handlers",
+            instance
+        );
+        Error::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+            .title("Service is gone")
+            .detail(details)
     }
 
     /// Returns readonly access to blockchain data.
@@ -89,14 +113,29 @@ impl<'a> ServiceApiState<'a> {
         &self.broadcaster.instance()
     }
 
-    /// Returns a transaction broadcaster if the current node is a validator. If the node
-    /// is not a validator, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
-        CoreSchema::new(&self.snapshot).validator_id(self.broadcaster.keypair().public_key())?;
-        Some(self.broadcaster.clone())
+    /// Returns the current status of the service.
+    pub fn status(&self) -> &InstanceStatus {
+        &self.status
     }
 
-    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
+    /// Returns a transaction broadcaster if the current node is a validator and the service
+    /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
+    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+        if self.status.is_active() {
+            CoreSchema::new(&self.snapshot).validator_id(self.service_key())?;
+            Some(self.broadcaster.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor)
+    /// and the service status (active or not).
+    ///
+    /// # Safety
+    ///
+    /// Transactions for non-active services will not be broadcast successfully; they will be
+    /// filtered on the receiving nodes as ones that cannot (currently) be processed.
     pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
     }
@@ -123,22 +162,10 @@ impl<'a> ServiceApiState<'a> {
         format!("{}{}", path_to_service_root, new_endpoint)
     }
 
-    fn check_service_artifact(&self, expected_artifact: &ArtifactId) -> Result<()> {
-        let instance_state = self
-            .snapshot
-            .for_dispatcher()
-            .get_instance(self.instance().id)
-            .ok_or_else(|| {
-                let details = format!(
-                    "Service `{}` has been removed from the blockchain services, making it \
-                     impossible to process HTTP handlers",
-                    self.instance()
-                );
-                Error::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
-                    .title("Service is gone")
-                    .detail(details)
-            })?;
-
+    fn check_service_artifact(
+        instance_state: &InstanceState,
+        expected_artifact: &ArtifactId,
+    ) -> Result<()> {
         let actual_artifact = instance_state.associated_artifact();
         if actual_artifact == Some(expected_artifact) {
             Ok(())
@@ -147,7 +174,7 @@ impl<'a> ServiceApiState<'a> {
                 "Service `{}` was upgraded to version {}, making it impossible to continue \
                  using HTTP handlers from artifact `{}`. Depending on administrative actions, \
                  the server may be soon rebooted with updated endpoints",
-                self.instance(),
+                instance_state.spec.as_descriptor(),
                 instance_state.data_version(),
                 expected_artifact
             );
