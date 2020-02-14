@@ -36,7 +36,7 @@ impl NodeHandler {
             // ignore tx duplication error,
             Message::Service(Service::AnyTx(msg)) => drop(self.handle_tx(msg)),
             Message::Responses(Responses::BlockResponse(msg)) => {
-                self.handle_block(&msg).log_error()
+                self.handle_block(msg);
             }
             Message::Responses(Responses::TransactionsResponse(msg)) => {
                 self.handle_txs_batch(&msg).log_error()

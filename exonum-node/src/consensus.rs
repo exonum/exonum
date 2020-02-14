@@ -19,7 +19,7 @@ use exonum::{
     merkledb::{BinaryValue, Fork, ObjectHash, Patch},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
 };
-use failure::{bail, format_err};
+use failure::bail;
 use log::{error, info, trace, warn};
 
 use std::{collections::HashSet, convert::TryFrom};
@@ -32,7 +32,7 @@ use crate::{
         TransactionsResponse,
     },
     schema::NodeSchema,
-    state::{ProposeState, RequestData},
+    state::{IncompleteBlock, ProposeState, RequestData},
     NodeHandler,
 };
 
@@ -69,7 +69,7 @@ impl PersistChanges for BlockchainMut {
 
 /// Result of an action within a round.
 #[derive(Debug, Clone, Copy, PartialEq)]
-enum RoundAction {
+pub(crate) enum RoundAction {
     /// New height was achieved.
     NewHeight,
     /// No actions happened.
@@ -190,7 +190,12 @@ impl NodeHandler {
         }
     }
 
-    fn validate_block_response(&self, msg: &Verified<BlockResponse>) -> Result<(), failure::Error> {
+    /// Validates a `BlockResponse`. Returns list of precommits authenticating the block, or
+    /// an error if the block is invalid.
+    fn validate_block_response(
+        &self,
+        msg: &Verified<BlockResponse>,
+    ) -> Result<Vec<Verified<Precommit>>, failure::Error> {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
@@ -228,51 +233,68 @@ impl NodeHandler {
         if self.state.incomplete_block().is_some() {
             bail!("Already there is an incomplete block, msg={:?}", msg);
         }
-
         if !msg.payload().verify_tx_hash() {
             bail!("Received block has invalid tx_hash, msg={:?}", msg);
         }
+        if block.get_header::<ProposerId>()?.is_none() {
+            bail!("Received block without `proposer_id` header");
+        }
+
         let precommits = into_verified(msg.payload().precommits())?;
         self.validate_precommits(&precommits, block_hash, block.height)?;
-
-        Ok(())
+        Ok(precommits)
     }
 
     /// Handles the `Block` message. For details see the message documentation.
-    pub(crate) fn handle_block(
-        &mut self,
-        msg: &Verified<BlockResponse>,
-    ) -> Result<(), failure::Error> {
-        self.validate_block_response(&msg)?;
+    pub(crate) fn handle_block(&mut self, msg: Verified<BlockResponse>) {
+        let precommits = match self.validate_block_response(&msg) {
+            Ok(precommits) => precommits,
+            Err(e) => {
+                log::error!("Received incorrect block {:?}: {}", msg.payload(), e);
+                return;
+            }
+        };
+        // At this point, the block is valid.
 
-        let block = msg.payload().block();
+        let sender = msg.author();
+        let BlockResponse {
+            block,
+            transactions,
+            ..
+        } = msg.into_payload();
         let block_hash = block.object_hash();
+
         if self.state.block(&block_hash).is_none() {
+            let block_height = block.height;
+            let incomplete_block = IncompleteBlock::new(block, transactions, precommits);
             let snapshot = self.blockchain.snapshot();
             let schema = Schema::new(&snapshot);
+
             let has_unknown_txs = self
                 .state
-                .create_incomplete_block(&msg, &schema.transactions(), &schema.transactions_pool())
+                .create_incomplete_block(
+                    incomplete_block,
+                    &schema.transactions(),
+                    &schema.transactions_pool(),
+                )
                 .has_unknown_txs();
 
-            let known_nodes = self.remove_request(&RequestData::Block(block.height));
+            let known_nodes = self.remove_request(&RequestData::Block(block_height));
 
             if has_unknown_txs {
                 trace!("REQUEST TRANSACTIONS");
-                self.request(RequestData::BlockTransactions, msg.author());
-
+                self.request(RequestData::BlockTransactions, sender);
                 for node in known_nodes {
                     self.request(RequestData::BlockTransactions, node);
                 }
             } else {
-                self.handle_full_block(&msg)?;
+                // We know all transactions in the block!
+                self.handle_full_block();
             }
         } else {
-            let precommits = into_verified(msg.payload().precommits())?;
             self.commit(block_hash, precommits.into_iter(), None);
             self.request_next_block();
         }
-        Ok(())
     }
 
     /// Checks if propose is correct (doesn't contain invalid transactions), and then
@@ -380,39 +402,38 @@ impl NodeHandler {
     /// # Panics
     ///
     /// Panics if the received block has incorrect `block_hash`.
-    fn handle_full_block(&mut self, msg: &Verified<BlockResponse>) -> Result<(), failure::Error> {
+    fn handle_full_block(&mut self) {
         // We suppose that the block doesn't contain incorrect transactions,
         // since `self.state` checks for it while creating an `IncompleteBlock`.
+        let IncompleteBlock {
+            header,
+            precommits,
+            transactions,
+            ..
+        } = self.state.take_completed_block();
 
-        let block = msg.payload().block();
-        let block_hash = block.object_hash();
-
+        let block_hash = header.object_hash();
         if self.state.block(&block_hash).is_none() {
-            let proposer_id = block
-                .get_header::<ProposerId>()?
-                .ok_or_else(|| format_err!("Proposer_id is not found in the block"))?;
+            let proposer_id = header
+                .get_header::<ProposerId>()
+                .expect("`ProposerId` header should be checked in `validate_block_response`")
+                .expect("`ProposerId` header should be checked in `validate_block_response`");
 
             let (computed_block_hash, patch) =
-                self.create_block(proposer_id, block.height, msg.payload().transactions());
+                self.create_block(proposer_id, header.height, &transactions);
             // Verify block_hash.
             assert_eq!(
                 computed_block_hash, block_hash,
                 "Block_hash incorrect in the received block={:?}. Either a node's \
                  implementation is incorrect or validators majority works incorrectly",
-                msg
+                header
             );
 
-            self.state.add_block(
-                computed_block_hash,
-                patch,
-                msg.payload().transactions().to_vec(),
-                proposer_id,
-            );
+            self.state
+                .add_block(computed_block_hash, patch, transactions, proposer_id);
         }
-        let precommits = into_verified(msg.payload().precommits())?;
         self.commit(block_hash, precommits.into_iter(), None);
         self.request_next_block();
-        Ok(())
     }
 
     /// Handles the `Prevote` message. For details see the message documentation.
@@ -767,11 +788,11 @@ impl NodeHandler {
         // Note that this scenario should be mutually exclusive with the scenario 1:
         // if our height is not the height of the blockchain, validator nodes do not
         // process the consensus messages.
-        let full_block = self.state.remove_unknown_transaction(hash);
-        // Go to handle full block if we get last transaction
-        if let Some(block) = full_block {
+        let action = self.state.remove_unknown_transaction(hash);
+        // Go to handle full block if we've got the last necessary transaction.
+        if action == RoundAction::NewHeight {
             self.remove_request(&RequestData::BlockTransactions);
-            self.handle_full_block(block.message())?;
+            self.handle_full_block();
         }
         Ok(())
     }
