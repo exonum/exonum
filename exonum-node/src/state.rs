@@ -78,7 +78,7 @@ pub(crate) struct State {
     queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
-    precommits_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
+    proposes_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
 
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
@@ -142,8 +142,8 @@ struct RequestState {
 }
 
 /// `ProposeState` represents the state of some propose and is used for tracking of unknown
-#[derive(Debug)]
 /// transactions.
+#[derive(Debug)]
 pub struct ProposeState {
     propose: Verified<Propose>,
     unknown_txs: HashSet<Hash>,
@@ -468,7 +468,7 @@ impl State {
             queued: Vec::new(),
 
             unknown_txs: HashMap::new(),
-            precommits_confirmed_by_majority: HashMap::new(),
+            proposes_confirmed_by_majority: HashMap::new(),
 
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
@@ -788,7 +788,7 @@ impl State {
         // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
-        self.precommits_confirmed_by_majority.clear();
+        self.proposes_confirmed_by_majority.clear();
         self.prevotes.clear();
         self.precommits.clear();
         self.validators_rounds.clear();
@@ -1167,18 +1167,18 @@ impl State {
         block_hash: Hash,
     ) {
         let old_value = self
-            .precommits_confirmed_by_majority
+            .proposes_confirmed_by_majority
             .insert(propose_hash, (round, block_hash));
 
         debug_assert!(
-            old_value.is_none(),
-            "Attempt to add propose confirmed by majority twice"
+            old_value.map_or(true, |val| val == (round, block_hash)),
+            "Attempt to add another propose confirmed by majority"
         );
     }
 
     /// Removes a propose from the list of unknown proposes and returns its round and hash.
     pub(super) fn take_confirmed_propose(&mut self, propose_hash: &Hash) -> Option<(Round, Hash)> {
-        self.precommits_confirmed_by_majority.remove(propose_hash)
+        self.proposes_confirmed_by_majority.remove(propose_hash)
     }
 
     /// Returns true if the node has +2/3 pre-commits for the specified round and block hash.

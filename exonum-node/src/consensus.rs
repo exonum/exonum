@@ -32,7 +32,7 @@ use crate::{
         TransactionsResponse,
     },
     schema::NodeSchema,
-    state::RequestData,
+    state::{ProposeState, RequestData},
     NodeHandler,
 };
 
@@ -402,10 +402,6 @@ impl NodeHandler {
                 msg
             );
 
-            let proposer_id = block
-                .get_header::<ProposerId>()?
-                .ok_or_else(|| format_err!("Proposer_id is not found in the block"))?;
-
             self.state.add_block(
                 computed_block_hash,
                 patch,
@@ -493,16 +489,18 @@ impl NodeHandler {
         // broadcast and the whole voting process. Nevertheless, we will store this propose
         // in the list of confirmed proposes, so we will be able to commit the block once the
         // information about the propose is known.
-        if self.state.propose(propose_hash).is_none() {
+        let maybe_propose_state = self.state.propose(propose_hash);
+        if maybe_propose_state.map_or(true, ProposeState::has_unknown_txs) {
             self.state
                 .add_propose_confirmed_by_majority(round, *propose_hash, *block_hash);
-            return RoundAction::None;
         }
 
-        // Achieving this point means that propose is known, so unwraps below are safe.
+        let propose_state = match self.state.propose(propose_hash) {
+            Some(state) => state,
+            None => return RoundAction::None,
+        };
 
         // Check if we have all the transactions for this propose.
-        let propose_state = self.state.propose(propose_hash).unwrap();
         if propose_state.has_unknown_txs() {
             // Some of transactions are missing, we can't commit the block right now.
             // Instead, request transactions from proposer.
@@ -805,7 +803,6 @@ impl NodeHandler {
 
     /// Handles external boxed transaction. Additionally transaction will be broadcast to the
     /// Node's peers.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
     pub(crate) fn handle_incoming_tx(&mut self, msg: Verified<AnyTx>) {
         trace!("Handle incoming transaction");
 
@@ -852,6 +849,7 @@ impl NodeHandler {
             self.handle_consensus(msg);
         }
     }
+
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
     pub(crate) fn handle_round_timeout(&mut self, height: Height, round: Round) {

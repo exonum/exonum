@@ -100,6 +100,7 @@ struct SandboxInner {
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
     pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
+    pub transactions_rx: mpsc::Receiver<Verified<AnyTx>>,
 }
 
 impl SandboxInner {
@@ -167,6 +168,14 @@ impl SandboxInner {
             Ok(())
         });
         api_getter.wait().unwrap();
+
+        let tx_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(tx)) = self.transactions_rx.poll()? {
+                self.handler.handle_event(tx.into());
+            }
+            Ok(())
+        });
+        tx_getter.wait().unwrap();
     }
 }
 
@@ -912,6 +921,7 @@ impl Sandbox {
             internal_requests_rx: internal_channel.1,
             network_requests_rx: network_channel.1,
             api_requests_rx: api_channel.1,
+            transactions_rx: tx_channel.1,
             handler,
             time: Arc::clone(&inner.time),
         };
@@ -1200,6 +1210,7 @@ fn sandbox_with_services_uninitialized(
         timers: BinaryHeap::new(),
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,
+        transactions_rx: tx_channel.1,
         internal_requests_rx: internal_channel.1,
         handler,
         time: shared_time,
@@ -1224,7 +1235,6 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new()
-        .with_rust_service(TimestampingService)
         .with_default_rust_service(TimestampingService)
         .with_default_rust_service(ConfigUpdaterService)
 }
