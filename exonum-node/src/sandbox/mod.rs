@@ -183,6 +183,7 @@ impl SandboxInner {
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,
+    pub api_sender: ApiSender,
     inner: RefCell<SandboxInner>,
     addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
@@ -929,6 +930,7 @@ impl Sandbox {
             inner: RefCell::new(inner),
             validators_map: self.validators_map,
             services_map: self.services_map,
+            api_sender: ApiSender::new(tx_channel.0),
             addresses: self.addresses,
             connect: None,
         };
@@ -1217,6 +1219,7 @@ fn sandbox_with_services_uninitialized(
     };
     let sandbox = Sandbox {
         inner: RefCell::new(inner),
+        api_sender: ApiSender::new(tx_channel.0),
         validators_map: HashMap::from_iter(validators),
         services_map: HashMap::from_iter(service_keys),
         addresses: connect_infos,

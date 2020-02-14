@@ -22,6 +22,7 @@ use exonum::{
     merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified},
 };
+use futures::Future;
 
 use std::time::Duration;
 
@@ -639,4 +640,31 @@ fn expedited_propose_on_transaction_pressure() {
 
     sandbox.broadcast(&propose);
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
+}
+
+#[test]
+fn valid_txs_are_broadcast() {
+    let sandbox = timestamping_sandbox();
+    let tx = gen_timestamping_tx();
+    sandbox
+        .api_sender
+        .broadcast_transaction(tx.clone())
+        .wait()
+        .unwrap();
+    sandbox.process_events();
+    sandbox.broadcast(&tx);
+}
+
+#[test]
+#[ignore]
+fn incorrect_txs_are_not_broadcast() {
+    let sandbox = timestamping_sandbox();
+    let incorrect_tx = gen_incorrect_tx();
+    sandbox
+        .api_sender
+        .broadcast_transaction(incorrect_tx.clone())
+        .wait()
+        .unwrap();
+    sandbox.process_events();
+    // If the transaction is broadcast, the sandbox will panic on drop.
 }
