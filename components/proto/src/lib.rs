@@ -72,14 +72,14 @@ pub trait ProtobufConvert: Sized {
 impl ProtobufConvert for DateTime<Utc> {
     type ProtoStruct = well_known_types::Timestamp;
 
-    fn to_pb(&self) -> well_known_types::Timestamp {
-        let mut ts = well_known_types::Timestamp::new();
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut ts = Self::ProtoStruct::new();
         ts.set_seconds(self.timestamp());
         ts.set_nanos(self.timestamp_subsec_nanos() as i32);
         ts
     }
 
-    fn from_pb(pb: well_known_types::Timestamp) -> Result<Self, Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Utc.timestamp_opt(pb.get_seconds(), pb.get_nanos() as u32)
             .single()
             .ok_or_else(|| format_err!("Failed to convert timestamp from bytes"))

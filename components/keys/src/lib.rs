@@ -210,6 +210,19 @@ pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys,
         .ok_or_else(|| format_err!("Error deriving keys from master key."))
 }
 
+/// Creates a TOML file from seed that contains encrypted master and returns `Keys` derived from it.
+pub fn generate_keys_from_seed<P: AsRef<Path>>(
+    path: P,
+    passphrase: &[u8],
+    seed: &[u8],
+) -> Result<Keys, failure::Error> {
+    let tree = SecretTree::from_seed(seed)
+        .ok_or_else(|| format_err!("Error crating SecretTree from seed"))?;
+    save_master_key(path, passphrase, tree.seed())?;
+    generate_keys_from_master_password(&tree)
+        .ok_or_else(|| format_err!("Error deriving keys from master key."))
+}
+
 fn generate_keys_from_master_password(tree: &SecretTree) -> Option<Keys> {
     let mut buffer = [0_u8; 32];
 

@@ -44,7 +44,7 @@ fn create_path_to_protobuf_schema_env() {
 fn write_user_agent_file() {
     let package_name = option_env!("CARGO_PKG_NAME").unwrap_or("exonum");
     let package_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
-    let rust_version = rust_version().unwrap_or("rust ?".to_string());
+    let rust_version = rust_version().unwrap_or_else(|| "rust ?".to_string());
     let user_agent = format!("{} {}/{}\n", package_name, package_version, rust_version);
 
     let out_dir = env::var("OUT_DIR").expect("Unable to get OUT_DIR");

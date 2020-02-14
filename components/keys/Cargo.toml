@@ -17,8 +17,10 @@ rand = "0.7"
 failure = "0.1.5"
 pwbox = "0.2.1"
 secret-tree = "0.2.0"
-serde = "1.0.10"
-serde_derive = "1.0.64"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+structopt = "0.3"
 toml = "0.5.0"
 
 exonum-crypto = { version = "1.0.0-rc.1", path = "../crypto" }
@@ -26,3 +28,7 @@ exonum-crypto = { version = "1.0.0-rc.1", path = "../crypto" }
 [dev-dependencies]
 tempdir = "0.3.7"
 hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
+
+[[example]]
+name = "key-generator"
+path = "exmples/key_generator.rs"
