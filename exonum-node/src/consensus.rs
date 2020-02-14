@@ -18,11 +18,12 @@ use exonum::{
     helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, Fork, ObjectHash, Patch},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
+    runtime::ExecutionError,
 };
 use failure::bail;
 use log::{error, info, trace, warn};
 
-use std::{collections::HashSet, convert::TryFrom};
+use std::{collections::HashSet, convert::TryFrom, fmt};
 
 use crate::{
     events::InternalRequest,
@@ -74,6 +75,28 @@ pub(crate) enum RoundAction {
     NewHeight,
     /// No actions happened.
     None,
+}
+
+/// Error that may occur during transaction processing in `NodeHandler::handle_tx()`.
+#[derive(Debug)]
+pub(crate) enum HandleTxError {
+    /// Transaction is committed in one of blocks.
+    AlreadyProcessed,
+    /// Transaction is invalid according to `Blockchain::check_tx`.
+    Invalid(ExecutionError),
+}
+
+impl fmt::Display for HandleTxError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HandleTxError::AlreadyProcessed => {
+                formatter.write_str("Transaction is already processed")
+            }
+            HandleTxError::Invalid(e) => {
+                write!(formatter, "Transaction failed preliminary checks: {}", e)
+            }
+        }
+    }
 }
 
 // TODO Reduce view invocations. (ECR-171)
@@ -245,7 +268,14 @@ impl NodeHandler {
         Ok(precommits)
     }
 
-    /// Handles the `Block` message. For details see the message documentation.
+    /// Handles the `BlockResponse` message.
+    ///
+    /// The message is first verified via `validate_block_response`. If the verification fails,
+    /// this is logged and no further processing is performed.
+    ///
+    /// The node then remembers the block, waiting until the node knows all transactions in the block.
+    /// If the node knows all transactions right away, it executes and commits the block.
+    /// (The execution stage may be skipped if the block was executed earlier.)
     pub(crate) fn handle_block(&mut self, msg: Verified<BlockResponse>) {
         let precommits = match self.validate_block_response(&msg) {
             Ok(precommits) => precommits,
@@ -733,15 +763,16 @@ impl NodeHandler {
     /// # Panics
     ///
     /// This function panics if it receives an invalid transaction for an already committed block.
-    pub(crate) fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), failure::Error> {
+    pub(crate) fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), HandleTxError> {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         if contains_transaction(&hash, &schema.transactions(), self.state.tx_cache()) {
-            bail!("Received already processed transaction, hash {:?}", hash)
+            return Err(HandleTxError::AlreadyProcessed);
         }
 
+        let outcome;
         if let Err(e) = Blockchain::check_tx(&snapshot, &msg) {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
@@ -752,14 +783,12 @@ impl NodeHandler {
             // network, we have to deal with it. We don't consider the transaction unknown
             // anymore, but we've marked it as incorrect, and if it'll be a part of the block,
             // we will be able to panic.
-            // Thus, we don't stop the execution here, but just log an error.
-            error!(
-                "Received invalid transaction {:?}, result of the pre-check: {}",
-                msg, e
-            );
+            // Thus, we don't stop the execution here.
+            outcome = Err(HandleTxError::Invalid(e));
         } else {
             // Transaction is OK, store it to the cache.
             self.state.tx_cache_mut().insert(hash, msg);
+            outcome = Ok(());
         }
 
         if self.state.is_leader() && self.state.round() != Round::zero() {
@@ -794,7 +823,7 @@ impl NodeHandler {
             self.remove_request(&RequestData::BlockTransactions);
             self.handle_full_block();
         }
-        Ok(())
+        outcome
     }
 
     /// Handles raw transactions.
@@ -822,14 +851,18 @@ impl NodeHandler {
         Ok(())
     }
 
-    /// Handles external boxed transaction. Additionally transaction will be broadcast to the
-    /// Node's peers.
+    /// Handles external boxed transaction. If the transaction is considered valid by the node,
+    /// it will be broadcast to the peers.
     pub(crate) fn handle_incoming_tx(&mut self, msg: Verified<AnyTx>) {
         trace!("Handle incoming transaction");
 
         match self.handle_tx(msg.clone()) {
-            Ok(_) => self.broadcast(msg),
-            Err(e) => error!("{}", e),
+            Ok(()) => self.broadcast(msg),
+            Err(e) => log::warn!(
+                "Failed to process transaction {:?} received via `ApiSender`: {}",
+                msg.payload(),
+                e
+            ),
         }
     }
 
@@ -839,7 +872,6 @@ impl NodeHandler {
         if height != self.state.height() {
             return;
         }
-
         if round <= self.state.round() {
             return;
         }
@@ -888,7 +920,6 @@ impl NodeHandler {
 
         // Add timeout for this round
         self.add_round_timeout();
-
         self.process_new_round();
     }
 
@@ -1204,9 +1235,8 @@ impl NodeHandler {
         let round = precommits[0].payload().round;
         for precommit in precommits {
             if !validators.insert(precommit.payload().validator) {
-                bail!("Several precommits from one validator in block")
+                bail!("Several precommits from one validator in block");
             }
-
             self.validate_precommit(block_hash, block_height, round, precommit)?;
         }
 
@@ -1227,8 +1257,8 @@ impl NodeHandler {
         if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator) {
             if pub_key != precommit_author {
                 bail!(
-                    "Received precommit with different validator id,\
-                     validator_id = {}, validator_key: {:?},\
+                    "Received precommit with different validator id, \
+                     validator_id = {}, validator_key: {:?}, \
                      author_key = {:?}",
                     precommit.validator,
                     pub_key,

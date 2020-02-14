@@ -656,7 +656,6 @@ fn valid_txs_are_broadcast() {
 }
 
 #[test]
-#[ignore]
 fn incorrect_txs_are_not_broadcast() {
     let sandbox = timestamping_sandbox();
     let incorrect_tx = gen_incorrect_tx();

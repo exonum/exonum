@@ -33,8 +33,12 @@ impl NodeHandler {
 
             Message::Service(Service::Connect(msg)) => self.handle_connect(msg),
             Message::Service(Service::Status(msg)) => self.handle_status(&msg),
-            // ignore tx duplication error,
-            Message::Service(Service::AnyTx(msg)) => drop(self.handle_tx(msg)),
+            Message::Service(Service::AnyTx(msg)) => {
+                if let Err(e) = self.handle_tx(msg.clone()) {
+                    log::warn!("Failed to process transaction {:?}: {}", msg.payload(), e);
+                }
+            }
+
             Message::Responses(Responses::BlockResponse(msg)) => {
                 self.handle_block(msg);
             }
