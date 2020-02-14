@@ -134,7 +134,7 @@ jobs:
     - cargo test --all --lib --tests --benches
     - cargo test --all --doc
 
-  # Run examples.
+  # Run examples and soak tests.
   - name: examples
     script:
     - cargo run -p exonum-merkledb --example manual_migration
@@ -146,6 +146,7 @@ jobs:
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-supervisor --example configuration_change
     - cargo run -p exonum-time --example simple_service
+    - cargo run -p exonum-soak-tests --bin toggle -- -H 10
 
   # Integration tests.
   - name: integration-tests
