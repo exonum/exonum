@@ -67,7 +67,7 @@ fn test_key_generator() {
     let passphrase = "passphrase";
 
     let json: serde_json::Value =
-        serde_json::from_str(&generate_json(passphrase, seed.as_ref()).unwrap()).unwrap();
+        serde_json::from_str(&generate_json(passphrase, seed).unwrap()).unwrap();
 
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
