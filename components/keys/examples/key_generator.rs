@@ -13,12 +13,9 @@
 // limitations under the License.
 
 use exonum_keys::*;
-use failure::format_err;
-use hex::decode;
+use hex;
 use serde_json::json;
-use std::fs::read_to_string;
 use structopt::StructOpt;
-use tempdir::TempDir;
 
 #[derive(Debug, StructOpt)]
 #[structopt(
@@ -43,12 +40,9 @@ fn main() {
 }
 
 fn generate_json(passphrase: &str, seed: &str) -> Result<String, failure::Error> {
-    let seed = decode(seed).map_err(|e| format_err!("{}", e))?;
-    let tempdir = TempDir::new("_prefix").map_err(|e| format_err!("{}", e))?;
-    let file_path = tempdir.path().join("master_key_file");
-    let keys = generate_keys_from_seed(&file_path, passphrase.as_bytes(), &seed)?;
-    let file_content =
-        read_to_string(file_path).expect("Couldn't read a content from the master key file");
+    let seed = hex::decode(seed)?;
+    let (keys, encrypted_key) = generate_keys_from_seed(passphrase.as_bytes(), &seed)?;
+    let file_content = toml::to_string_pretty(&encrypted_key)?;
 
     let result = json!({
         "consensus_pub_key": keys.consensus.public_key().to_hex(),
@@ -64,6 +58,7 @@ fn test_key_generator() {
     #[cfg(unix)]
     use std::os::unix::fs::OpenOptionsExt;
     use std::{fs::OpenOptions, io::Write};
+    use tempdir::TempDir;
 
     let tempdir = TempDir::new("test_key_generator").unwrap();
     let master_key_path = tempdir.path().join("master_key.toml");

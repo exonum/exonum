@@ -146,14 +146,12 @@ impl Keys {
     }
 }
 
-fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
+fn save_master_key<P: AsRef<Path>>(
     path: P,
-    pass_phrase: W,
-    key: &secret_tree::Seed,
+    encrypted_key: &EncryptedMasterKey,
 ) -> Result<(), Error> {
-    let encrypted_key = EncryptedMasterKey::encrypt(key, pass_phrase)?;
     let file_content =
-        toml::to_string_pretty(&encrypted_key).map_err(|e| Error::new(ErrorKind::Other, e))?;
+        toml::to_string_pretty(encrypted_key).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
     // By agreement we use the same permissions as for SSH private keys.
@@ -165,8 +163,16 @@ fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
-struct EncryptedMasterKey {
+fn encrypt_seed<W: AsRef<[u8]>>(
+    pass_phrase: W,
+    key: &secret_tree::Seed,
+) -> Result<EncryptedMasterKey, Error> {
+    EncryptedMasterKey::encrypt(key, pass_phrase)
+}
+
+/// Encrypted master key.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EncryptedMasterKey {
     key: ErasedPwBox,
 }
 
@@ -205,22 +211,24 @@ impl EncryptedMasterKey {
 /// Creates a TOML file that contains encrypted master and returns `Keys` derived from it.
 pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys, failure::Error> {
     let tree = SecretTree::new(&mut thread_rng());
-    save_master_key(path, passphrase, tree.seed())?;
+    let encrypted_key = encrypt_seed(passphrase, tree.seed())?;
+    save_master_key(path, &encrypted_key)?;
     generate_keys_from_master_password(&tree)
         .ok_or_else(|| format_err!("Error deriving keys from master key."))
 }
 
 /// Creates a TOML file from seed that contains encrypted master and returns `Keys` derived from it.
-pub fn generate_keys_from_seed<P: AsRef<Path>>(
-    path: P,
+pub fn generate_keys_from_seed(
     passphrase: &[u8],
     seed: &[u8],
-) -> Result<Keys, failure::Error> {
+) -> Result<(Keys, EncryptedMasterKey), failure::Error> {
     let tree = SecretTree::from_seed(seed)
         .ok_or_else(|| format_err!("Error crating SecretTree from seed"))?;
-    save_master_key(path, passphrase, tree.seed())?;
-    generate_keys_from_master_password(&tree)
-        .ok_or_else(|| format_err!("Error deriving keys from master key."))
+    let encrypted_key = encrypt_seed(passphrase, tree.seed())?;
+    let keys = generate_keys_from_master_password(&tree)
+        .ok_or_else(|| format_err!("Error deriving keys from master key."))?;
+
+    Ok((keys, encrypted_key))
 }
 
 fn generate_keys_from_master_password(tree: &SecretTree) -> Option<Keys> {
@@ -278,8 +286,7 @@ mod tests {
         let pass_phrase = b"passphrase";
         let tree = SecretTree::new(&mut thread_rng());
         let seed = tree.seed();
-        let key =
-            EncryptedMasterKey::encrypt(&seed, pass_phrase).expect("Couldn't encrypt master key");
+        let key = encrypt_seed(pass_phrase, &seed).expect("Couldn't encrypt master key");
 
         let decrypted_seed = key
             .decrypt(pass_phrase)
