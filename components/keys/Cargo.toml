@@ -32,3 +32,4 @@ tempdir = "0.3.7"
 [[example]]
 name = "key-generator"
 path = "examples/key_generator.rs"
+test = true
