@@ -23,8 +23,7 @@ use std::{
     mem, panic,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{channel, Sender},
-        Arc, Mutex,
+        mpsc, Arc, Mutex,
     },
     thread,
     time::Duration,
@@ -38,7 +37,7 @@ use crate::{
         migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, MethodId, Runtime, RuntimeInstance,
+        InstanceState, InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
     },
 };
 
@@ -147,7 +146,7 @@ struct SampleRuntime {
     services: BTreeMap<InstanceId, InstanceStatus>,
     // `BTreeMap` is used to make services order predictable.
     new_services: BTreeMap<InstanceId, InstanceStatus>,
-    new_service_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
+    new_service_sender: mpsc::Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
 }
 
 impl SampleRuntime {
@@ -155,7 +154,7 @@ impl SampleRuntime {
         runtime_type: u32,
         instance_id: InstanceId,
         method_id: MethodId,
-        api_changes_sender: Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
+        changes_sender: mpsc::Sender<(u32, Vec<(InstanceId, InstanceStatus)>)>,
     ) -> Self {
         Self {
             runtime_type,
@@ -163,7 +162,7 @@ impl SampleRuntime {
             method_id,
             services: BTreeMap::new(),
             new_services: BTreeMap::new(),
-            new_service_sender: api_changes_sender,
+            new_service_sender: changes_sender,
         }
     }
 }
@@ -180,7 +179,7 @@ impl Runtime for SampleRuntime {
             let changes = mem::replace(&mut self.new_services, BTreeMap::new());
             self.new_service_sender
                 .send((self.runtime_type, changes.into_iter().collect()))
-                .unwrap();
+                .ok();
         }
     }
 
@@ -219,25 +218,20 @@ impl Runtime for SampleRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        new_status: &InstanceStatus,
-    ) {
-        if spec.artifact.runtime_id == self.runtime_type {
-            let status_changed = if let Some(status) = self.services.get(&spec.id) {
-                status != new_status
-            } else {
-                true
-            };
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, new_state: &InstanceState) {
+        let spec = &new_state.spec;
+        let new_status = new_state.status.as_ref().unwrap();
 
-            if status_changed {
-                self.services.insert(spec.id, new_status.to_owned());
-                self.new_services.insert(spec.id, new_status.to_owned());
-            }
+        assert_eq!(spec.artifact.runtime_id, self.runtime_type);
+        let status_changed = if let Some(status) = self.services.get(&spec.id) {
+            status != new_status
         } else {
-            panic!("Incorrect runtime")
+            true
+        };
+
+        if status_changed {
+            self.services.insert(spec.id, new_status.to_owned());
+            self.new_services.insert(spec.id, new_status.to_owned());
         }
     }
 
@@ -278,8 +272,8 @@ impl Runtime for SampleRuntime {
 
 #[test]
 fn test_builder() {
-    let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, channel().0);
-    let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0, channel().0);
+    let runtime_a = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, mpsc::channel().0);
+    let runtime_b = SampleRuntime::new(SampleRuntimes::Second as u32, 1, 0, mpsc::channel().0);
 
     let dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime_a.runtime_type, runtime_a)
@@ -314,7 +308,7 @@ fn test_dispatcher_simple() {
         ApiSender::closed(),
     );
 
-    let (changes_tx, changes_rx) = channel();
+    let (changes_tx, changes_rx) = mpsc::channel();
     let runtime_a = SampleRuntime::new(
         SampleRuntimes::First as u32,
         RUST_SERVICE_ID,
@@ -444,7 +438,7 @@ fn test_dispatcher_simple() {
         )
         .expect_err("Incorrect tx java");
 
-    // Check that API changes in the dispatcher contain the started services.
+    // Check that changes in the dispatcher contain the started services.
     let expected_new_services = vec![
         (
             SampleRuntimes::First as u32,
@@ -474,6 +468,209 @@ fn test_dispatcher_simple() {
     );
 
     assert!(!should_rollback);
+}
+
+struct FreezingRig {
+    dispatcher: Dispatcher,
+    db: Arc<dyn Database>,
+    runtime: SampleRuntime,
+    changes_rx: mpsc::Receiver<(u32, Vec<(InstanceId, InstanceStatus)>)>,
+    service: InstanceSpec,
+}
+
+fn blockchain_with_frozen_service() -> FreezingRig {
+    const SERVICE_ID: InstanceId = 0;
+    const METHOD_ID: MethodId = 0;
+
+    // Create dispatcher and test data.
+    let db = Arc::new(TemporaryDB::new());
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender::closed(),
+    );
+
+    let (changes_tx, changes_rx) = mpsc::channel();
+    let runtime = SampleRuntime::new(
+        SampleRuntimes::First as u32,
+        SERVICE_ID,
+        METHOD_ID,
+        changes_tx,
+    );
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(runtime.runtime_type, runtime.clone())
+        .finalize(&blockchain);
+
+    let artifact = ArtifactId::from_raw_parts(
+        SampleRuntimes::First as _,
+        "first".to_owned(),
+        "0.5.0".parse().unwrap(),
+    );
+
+    // Deploy the artifact and instantiate the service.
+    let mut fork = db.fork();
+    dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
+    let service =
+        InstanceSpec::from_raw_parts(SERVICE_ID, "some-service".to_owned(), artifact.clone());
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .initiate_adding_service(service.clone(), vec![])
+        .expect("`initiate_adding_service` failed");
+
+    let patch = create_genesis_block(&mut dispatcher, fork);
+    db.merge(patch).unwrap();
+
+    let instantiated_change = (
+        SampleRuntimes::First as u32,
+        vec![(SERVICE_ID, InstanceStatus::Active)],
+    );
+    assert_eq!(instantiated_change, changes_rx.iter().next().unwrap());
+
+    // Command service freeze.
+    let mut fork = db.fork();
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .supervisor_extensions()
+        .initiate_freezing_service(SERVICE_ID)
+        .expect("Cannot freeze service");
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge(patch).unwrap();
+
+    let frozen_change = (
+        SampleRuntimes::First as u32,
+        vec![(SERVICE_ID, InstanceStatus::Frozen)],
+    );
+    assert_eq!(frozen_change, changes_rx.iter().next().unwrap());
+
+    FreezingRig {
+        dispatcher,
+        db,
+        runtime,
+        changes_rx,
+        service,
+    }
+}
+
+#[test]
+fn test_service_freezing() {
+    const SERVICE_ID: InstanceId = 0;
+    const METHOD_ID: MethodId = 0;
+
+    let FreezingRig {
+        db,
+        mut dispatcher,
+        service,
+        ..
+    } = blockchain_with_frozen_service();
+
+    // The service schema should be available.
+    let snapshot = db.snapshot();
+    assert!(snapshot.for_service(SERVICE_ID).is_some());
+
+    // Check that the service no longer processes transactions.
+    let mut fork = db.fork();
+    let err = dispatcher
+        .call(&mut fork, &CallInfo::new(SERVICE_ID, METHOD_ID), &[])
+        .expect_err("Transaction was dispatched to frozen service");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+
+    // Change service status to stopped.
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .supervisor_extensions()
+        .initiate_stopping_service(SERVICE_ID)
+        .expect("Cannot stop service");
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge(patch).unwrap();
+
+    // Check that the service cannot be easily changed to frozen.
+    let mut fork = db.fork();
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    let err = context
+        .supervisor_extensions()
+        .initiate_freezing_service(SERVICE_ID)
+        .expect_err("Service cannot be frozen from `Stopped` status");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotActive));
+}
+
+#[test]
+fn service_freeze_then_restart() {
+    const SERVICE_ID: InstanceId = 0;
+    const METHOD_ID: MethodId = 0;
+
+    let FreezingRig {
+        db,
+        runtime,
+        changes_rx,
+        service,
+        ..
+    } = blockchain_with_frozen_service();
+
+    // Emulate blockchain restart.
+    let blockchain = Blockchain::new(Arc::clone(&db), gen_keypair(), ApiSender::closed());
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(runtime.runtime_type, runtime)
+        .finalize(&blockchain);
+    dispatcher.restore_state(&db.snapshot());
+
+    let service_change = (
+        SampleRuntimes::First as u32,
+        vec![(SERVICE_ID, InstanceStatus::Frozen)],
+    );
+    assert_eq!(service_change, changes_rx.iter().next().unwrap());
+
+    // Check that the service does not accept transactions after restart.
+    let mut fork = db.fork();
+    let err = dispatcher
+        .call(&mut fork, &CallInfo::new(SERVICE_ID, METHOD_ID), &[])
+        .expect_err("Transaction was dispatched to frozen service");
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+
+    // Resume the service.
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    context
+        .supervisor_extensions()
+        .initiate_resuming_service(SERVICE_ID, ())
+        .expect("Cannot resume service");
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge(patch).unwrap();
+
+    // Check that the service can process transactions again.
+    let mut fork = db.fork();
+    dispatcher
+        .call(&mut fork, &CallInfo::new(SERVICE_ID, METHOD_ID), &[])
+        .expect("Transaction was not processed by resumed service");
 }
 
 #[derive(Debug, Clone)]
@@ -518,13 +715,7 @@ impl Runtime for ShutdownRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,
@@ -707,13 +898,7 @@ impl Runtime for DeploymentRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,
@@ -898,7 +1083,7 @@ fn stopped_service_workflow() {
         ApiSender::closed(),
     );
 
-    let (changes_tx, changes_rx) = channel();
+    let (changes_tx, changes_rx) = mpsc::channel();
     let runtime = SampleRuntime::new(SampleRuntimes::First as u32, 0, 0, changes_tx);
 
     let mut dispatcher = DispatcherBuilder::new()

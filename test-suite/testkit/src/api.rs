@@ -389,6 +389,7 @@ impl TestServer {
                 .disable_signals()
                 .listen(tcp)
                 .keep_alive(5)
+                .client_shutdown(100) // Decreases waiting interval during server shutdown
                 .workers(1)
                 .start();
 
@@ -423,8 +424,8 @@ impl TestServer {
 
 impl Drop for TestServer {
     fn drop(&mut self) {
-        // Stop http server gracefully.
-        let _ = self.backend.send(StopServer { graceful: true }).wait();
+        // Stop the HTTP server dropping all current connections.
+        let _ = self.backend.send(StopServer { graceful: false }).wait();
         self.system.stop();
         // Wait server thread.
         let _ = self.handle.take().unwrap().join();

@@ -44,8 +44,8 @@ mod failing_runtime {
     use exonum::runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus, Mailbox,
-        MethodId, Runtime, WellKnownRuntime,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceState, Mailbox, MethodId, Runtime,
+        WellKnownRuntime,
     };
     use exonum_derive::ExecutionFail;
     use futures::{Future, IntoFuture};
@@ -142,12 +142,7 @@ mod failing_runtime {
         }
 
         /// Commits status for the `SampleService` instance with the specified ID.
-        fn update_service_status(
-            &mut self,
-            _snapshot: &dyn Snapshot,
-            _spec: &InstanceSpec,
-            _status: &InstanceStatus,
-        ) {
+        fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {
             unimplemented!("This runtime does not support service instantiation");
         }
 
