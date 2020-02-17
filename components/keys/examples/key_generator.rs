@@ -36,21 +36,22 @@ fn main() {
     let args = Arguments::from_args();
     let result = generate_json(&args.passphrase, &args.seed).unwrap();
 
-    println!("{}", result);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&result).expect("Couldn't convert json object to string")
+    );
 }
 
-fn generate_json(passphrase: &str, seed: &str) -> Result<String, failure::Error> {
+fn generate_json(passphrase: &str, seed: &str) -> Result<serde_json::Value, failure::Error> {
     let seed = hex::decode(seed)?;
     let (keys, encrypted_key) = generate_keys_from_seed(passphrase.as_bytes(), &seed)?;
     let file_content = toml::to_string_pretty(&encrypted_key)?;
 
-    let result = json!({
+    Ok(json!({
         "consensus_pub_key": keys.consensus.public_key().to_hex(),
         "service_pub_key": keys.service.public_key().to_hex(),
         "master_key_file": file_content
-    });
-
-    Ok(result.to_string())
+    }))
 }
 
 #[test]
@@ -62,12 +63,10 @@ fn test_key_generator() {
 
     let tempdir = TempDir::new("test_key_generator").unwrap();
     let master_key_path = tempdir.path().join("master_key.toml");
-
     let seed = "a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344";
     let passphrase = "passphrase";
 
-    let json: serde_json::Value =
-        serde_json::from_str(&generate_json(passphrase, seed).unwrap()).unwrap();
+    let json = generate_json(passphrase, seed).unwrap();
 
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
