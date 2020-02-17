@@ -237,6 +237,23 @@ impl CounterApi {
             })
             .endpoint_mut("count", Self::increment);
 
+        // Check sending incorrect transactions via `ApiSender`. Testkit should not include
+        // such transactions to the transaction pool.
+        let api_sender = builder.blockchain().sender().to_owned();
+        let service_keys = builder.blockchain().service_keypair().to_owned();
+        builder.public_scope().endpoint_mut(
+            "incorrect-tx",
+            move |_state: &ServiceApiState, by: u64| {
+                let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
+                let hash = incorrect_tx.object_hash();
+                api_sender
+                    .clone()
+                    .broadcast_transaction(incorrect_tx)
+                    .map(move |()| hash)
+                    .map_err(api::Error::internal)
+            },
+        );
+
         // Check processing of custom HTTP headers. We test this using simple authorization
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
