@@ -144,12 +144,11 @@ fn after_commit_during_service_freeze() {
         assert!(block.is_empty());
     }
 
-    // Generic broadcast still should still be working though.
+    // Generic broadcast is switched off, too, due to transaction filtering within testkit.
     service.switch_to_generic_broadcast();
-    for i in 0..5 {
+    for _ in 0..5 {
         let block = testkit.create_block();
-        let expected_len = if i == 0 { 0 } else { 1 };
-        assert_eq!(block.len(), expected_len);
+        assert!(block.is_empty());
     }
 }
 
@@ -188,12 +187,11 @@ fn after_commit_during_migration() {
         let service_state = snapshot.for_dispatcher().get_instance(SERVICE_ID).unwrap();
         assert_matches!(service_state.status, Some(InstanceStatus::Migrating(_)));
     }
-    // Generic broadcast still should still be working though.
+    // Generic broadcast is switched off, too, due to transaction filtering within testkit.
     service.switch_to_generic_broadcast();
     for i in 0..5 {
         let block = testkit.create_block();
-        let expected_len = if i == 0 { 0 } else { 1 };
-        assert_eq!(block.len(), expected_len);
+        assert!(block.is_empty());
 
         let snapshot = testkit.snapshot();
         let service_state = snapshot.for_dispatcher().get_instance(SERVICE_ID).unwrap();
@@ -205,6 +203,41 @@ fn after_commit_during_migration() {
     let snapshot = testkit.snapshot();
     let service_state = snapshot.for_dispatcher().get_instance(SERVICE_ID).unwrap();
     assert_matches!(service_state.status, Some(InstanceStatus::Stopped));
+}
+
+#[test]
+fn incorrect_txs_are_not_included_into_blocks() {
+    let service = AfterCommitService::new();
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(Supervisor)
+        .with_default_rust_service(service.clone())
+        .build();
+    let keys = testkit.us().service_keypair();
+
+    // Generate some transactions using the service, but do not commit them.
+    for i in 0..5 {
+        let block = testkit.create_block_with_tx_hashes(&[]);
+        assert!(block.is_empty());
+        let new_tx = keys.after_commit(SERVICE_ID, testkit.height().0);
+        assert!(testkit.is_tx_in_pool(&new_tx.object_hash()));
+    }
+
+    let tx = keys.freeze_service(SUPERVISOR_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should freeze");
+
+    // Check that transactions in the pool are not committed while the service is frozen.
+    let block = testkit.create_block();
+    assert!(block.is_empty());
+
+    // Resume the service.
+    let tx = keys.resume_service(SUPERVISOR_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should resume");
+
+    // Check that all previously created transactions have been committed.
+    let block = testkit.create_block();
+    assert_eq!(block.len(), 6); // 5 old transactions + 1 generated after resume
 }
 
 #[test]
