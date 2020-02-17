@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_merkledb::{BinaryValue, MapProof};
+use exonum_merkledb::{BinaryValue, MapProof, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use failure::Fail;
 
 use std::borrow::Cow;
 
 use crate::{
-    crypto::Hash,
-    helpers::{Height, OrderedMap, ValidatorId},
+    helpers::{byzantine_quorum, Height, OrderedMap, ValidatorId},
     messages::{Precommit, Verified},
     proto::schema,
 };
@@ -207,6 +208,86 @@ impl BlockProof {
             non_exhaustive: (),
         }
     }
+
+    /// Verifies that the block in this proof is endorsed by the Byzantine majority of provided
+    /// validators.
+    pub fn verify(&self, validator_keys: &[PublicKey]) -> Result<(), VerificationError> {
+        if self.precommits.len() < byzantine_quorum(validator_keys.len()) {
+            return Err(VerificationError::NoQuorum);
+        }
+        if self.precommits.len() > validator_keys.len() {
+            return Err(VerificationError::DoubleEndorsement);
+        }
+
+        let correct_heights = self
+            .precommits
+            .iter()
+            .all(|precommit| precommit.payload().height == self.block.height);
+        if !correct_heights {
+            return Err(VerificationError::IncorrectHeight);
+        }
+
+        let block_hash = self.block.object_hash();
+        let correct_block_hashes = self
+            .precommits
+            .iter()
+            .all(|precommit| precommit.payload().block_hash == block_hash);
+        if !correct_block_hashes {
+            return Err(VerificationError::IncorrectBlockHash);
+        }
+
+        let mut endorsements = vec![false; validator_keys.len()];
+        for precommit in &self.precommits {
+            let validator_id = precommit.payload().validator.0 as usize;
+            let expected_key = *validator_keys
+                .get(validator_id)
+                .ok_or(VerificationError::IncorrectValidatorId)?;
+            if expected_key != precommit.author() {
+                return Err(VerificationError::ValidatorKeyMismatch);
+            }
+            if endorsements[validator_id] {
+                return Err(VerificationError::DoubleEndorsement);
+            }
+            endorsements[validator_id] = true;
+        }
+        debug_assert!(
+            endorsements.iter().map(|&b| b as usize).sum::<usize>()
+                >= byzantine_quorum(validator_keys.len())
+        );
+
+        Ok(())
+    }
+}
+
+/// Errors that can occur during verification of `BlockProof`s.
+#[derive(Debug, Fail)]
+pub enum VerificationError {
+    /// The block is authorized by an insufficient amount of precommits.
+    #[fail(display = "Insufficient number of precommits")]
+    NoQuorum,
+
+    /// Block height mentioned in at least one of precommits differs from the height mentioned
+    /// in the block header.
+    #[fail(display = "Incorrect block height in at least one of precommits")]
+    IncorrectHeight,
+
+    /// Hash of the block in at least one precommit differs from that of the real block.
+    #[fail(display = "Incorrect block hash in at least one of precommits")]
+    IncorrectBlockHash,
+
+    /// Validator ID mentioned in at least one precommit is incorrect.
+    #[fail(display = "Incorrect validator ID in at least one of precommits")]
+    IncorrectValidatorId,
+
+    /// Key of a validator differs from the expected.
+    #[fail(
+        display = "Mismatch between key in precommit message and key of corresponding validator"
+    )]
+    ValidatorKeyMismatch,
+
+    /// The same validator has authorized several precommits.
+    #[fail(display = "Multiple precommits from the same validator")]
+    DoubleEndorsement,
 }
 
 /// Proof of authenticity for a single index within the database.
@@ -241,12 +322,14 @@ impl IndexProof {
 
 #[cfg(test)]
 mod tests {
-    use exonum_crypto::hash;
+    use assert_matches::assert_matches;
+    use chrono::Utc;
+    use exonum_crypto::{hash, KeyPair};
     use exonum_merkledb::ObjectHash;
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
-    use crate::runtime::InstanceId;
+    use crate::{helpers::Round, runtime::InstanceId};
 
     impl BlockHeaderKey for Hash {
         const NAME: &'static str = "HASH";
@@ -385,5 +468,126 @@ mod tests {
         let block = create_block(AdditionalHeaders { headers });
         let services = block.get_header::<ActiveServices>();
         assert!(services.is_err());
+    }
+
+    fn create_block_proof(keys: &[KeyPair]) -> BlockProof {
+        let mut block = Block {
+            height: Height(1),
+            tx_count: 0,
+            prev_hash: Hash::zero(),
+            tx_hash: Hash::zero(),
+            state_hash: Hash::zero(),
+            error_hash: Hash::zero(),
+            additional_headers: AdditionalHeaders::default(),
+        };
+        block
+            .additional_headers
+            .insert::<ProposerId>(ValidatorId(1));
+
+        let precommits = keys.iter().enumerate().map(|(i, keypair)| {
+            let i = i as u16;
+            let precommit = Precommit::new(
+                ValidatorId(i),
+                Height(1),
+                Round(1),
+                Hash::zero(),
+                block.object_hash(),
+                Utc::now(),
+            );
+            Verified::from_value(precommit, keypair.public_key(), keypair.secret_key())
+        });
+        let precommits = precommits.collect();
+
+        BlockProof::new(block, precommits)
+    }
+
+    #[test]
+    fn correct_block_proof() {
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+
+        let mut proof = create_block_proof(&keys);
+        proof.verify(&public_keys).unwrap();
+        // We can remove one `Precommit` without disturbing the proof integrity.
+        proof.precommits.truncate(3);
+        proof.verify(&public_keys).unwrap();
+    }
+
+    #[test]
+    fn incorrect_block_proofs() {
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+
+        // Too many precommits.
+        let proof = create_block_proof(&keys);
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.push(proof.precommits[0].clone());
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            VerificationError::DoubleEndorsement
+        );
+
+        // Too few precommits.
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            VerificationError::NoQuorum
+        );
+
+        // Double endorsement.
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(proof.precommits[0].clone());
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            VerificationError::DoubleEndorsement
+        );
+
+        // Key mismatch.
+        let mut expected_public_keys = public_keys.clone();
+        expected_public_keys[3] = KeyPair::random().public_key();
+        assert_matches!(
+            proof.verify(&expected_public_keys).unwrap_err(),
+            VerificationError::ValidatorKeyMismatch
+        );
+
+        // Incorrect height in a precommit.
+        let bogus_precommit = Precommit::new(
+            ValidatorId(3),
+            Height(100),
+            Round(1),
+            Hash::zero(),
+            proof.block.object_hash(),
+            Utc::now(),
+        );
+        let bogus_precommit =
+            Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(bogus_precommit);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            VerificationError::IncorrectHeight
+        );
+
+        // Incorrect block hash in a precommit.
+        let bogus_precommit = Precommit::new(
+            ValidatorId(3),
+            Height(1),
+            Round(1),
+            Hash::zero(),
+            Hash::zero(),
+            Utc::now(),
+        );
+        let bogus_precommit =
+            Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(bogus_precommit);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            VerificationError::IncorrectBlockHash
+        );
     }
 }
