@@ -50,7 +50,7 @@ fn generate_json(passphrase: &str, seed: &str) -> Result<serde_json::Value, fail
     Ok(json!({
         "consensus_pub_key": keys.consensus.public_key().to_hex(),
         "service_pub_key": keys.service.public_key().to_hex(),
-        "master_key_file": file_content
+        "master_key_file": file_content,
     }))
 }
 
