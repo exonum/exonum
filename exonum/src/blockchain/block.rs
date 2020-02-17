@@ -302,6 +302,11 @@ pub enum ProofError {
     /// Index proof is incorrect.
     #[fail(display = "index proof is incorrect: {}", _0)]
     IncorrectIndexProof(#[fail(cause)] ValidationError<MapProofError>),
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    #[fail(display = "")]
+    __NonExhaustive,
 }
 
 /// Proof of authenticity for a single index within the database.
