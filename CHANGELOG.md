@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Bug Fixes
+
+#### exonum-node
+
+- Fixed potential node hang-up if the node received a proposal and
+  a supermajority of transactions approving it before all transactions
+  in the proposal are known. (#1781)
+
+- Switched off broadcasting of transactions which the node considers
+  incorrect. (#1781)
+
 ## 1.0.0-rc.1 - 2020-02-07
 
 ### Breaking changes
