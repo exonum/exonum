@@ -18,6 +18,7 @@
 //! about the storage state.
 
 use exonum::{
+    blockchain::IndexProof,
     crypto::{Hash, KeyPair, PublicKey},
     merkledb::ObjectHash,
     messages::{AnyTx, Verified},
@@ -267,7 +268,8 @@ fn test_unknown_wallet_request() {
 /// Wrapper for the cryptocurrency service API allowing to easily use it
 /// (compared to `TestKitApi` calls).
 struct CryptocurrencyApi {
-    pub inner: TestKitApi,
+    validator_keys: Vec<PublicKey>,
+    inner: TestKitApi,
 }
 
 impl CryptocurrencyApi {
@@ -300,21 +302,15 @@ impl CryptocurrencyApi {
             .unwrap();
 
         // Check parts of the proof returned together with the wallet.
-        let state_hash = wallet_info.block_proof.block.state_hash;
-        let to_table = wallet_info
-            .wallet_proof
-            .to_table
-            .check_against_hash(state_hash)
-            .unwrap();
-        let table_entries: Vec<_> = to_table.entries().collect();
-        assert_eq!(table_entries.len(), 1);
-        assert_eq!(*table_entries[0].0, format!("{}.wallets", SERVICE_NAME));
-        let table_hash = *table_entries[0].1;
+        let index_proof =
+            IndexProof::new(wallet_info.block_proof, wallet_info.wallet_proof.to_table);
+        let (index_name, index_hash) = index_proof.verify(&self.validator_keys).unwrap();
+        assert_eq!(index_name, format!("{}.wallets", SERVICE_NAME));
 
         let to_wallet = wallet_info
             .wallet_proof
             .to_wallet
-            .check_against_hash(table_hash)
+            .check_against_hash(index_hash)
             .unwrap();
         let address = Caller::Transaction { author: pub_key }.address();
         let (_, wallet) = to_wallet.all_entries().find(|(&key, _)| key == address)?;
@@ -373,7 +369,9 @@ fn create_testkit() -> (TestKit, CryptocurrencyApi) {
         .with_artifact(artifact.clone())
         .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
         .build();
+
     let api = CryptocurrencyApi {
+        validator_keys: vec![testkit.us().public_keys().consensus_key],
         inner: testkit.api(),
     };
     (testkit, api)

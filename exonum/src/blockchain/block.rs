@@ -264,7 +264,7 @@ impl BlockProof {
 /// Errors that can occur during verification of `BlockProof`s and `IndexProof`s.
 #[derive(Debug, Fail)]
 pub enum ProofError {
-    /// The block is authorized by an insufficient amount of precommits.
+    /// The block is authorized by an insufficient number of precommits.
     #[fail(display = "Insufficient number of precommits")]
     NoQuorum,
 
