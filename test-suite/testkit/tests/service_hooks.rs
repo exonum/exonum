@@ -189,7 +189,7 @@ fn after_commit_during_migration() {
     }
     // Generic broadcast is switched off, too, due to transaction filtering within testkit.
     service.switch_to_generic_broadcast();
-    for i in 0..5 {
+    for _ in 0..5 {
         let block = testkit.create_block();
         assert!(block.is_empty());
 
@@ -215,7 +215,7 @@ fn incorrect_txs_are_not_included_into_blocks() {
     let keys = testkit.us().service_keypair();
 
     // Generate some transactions using the service, but do not commit them.
-    for i in 0..5 {
+    for _ in 0..5 {
         let block = testkit.create_block_with_tx_hashes(&[]);
         assert!(block.is_empty());
         let new_tx = keys.after_commit(SERVICE_ID, testkit.height().0);
