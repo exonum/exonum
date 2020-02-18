@@ -427,6 +427,7 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         context
             .supervisor_extensions()
             .initiate_migration(request.artifact, &request.instance_name)
+            .map(drop)
     }
 
     fn commit_migration(

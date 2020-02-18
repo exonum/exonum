@@ -18,9 +18,9 @@ use crate::{
     helpers::{Height, ValidateInput},
     merkledb::{access::Prefixed, BinaryValue, Fork},
     runtime::{
-        ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
-        DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId,
-        InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+        migrations::MigrationType, ArtifactId, BlockchainData, CallSite, CallType, Caller,
+        CoreError, Dispatcher, DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor,
+        InstanceId, InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -454,7 +454,7 @@ impl<'a> SupervisorExtensions<'a> {
         &self,
         new_artifact: ArtifactId,
         old_service: &str,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<MigrationType, ExecutionError> {
         self.0
             .dispatcher
             .initiate_migration(self.0.fork, new_artifact, old_service)

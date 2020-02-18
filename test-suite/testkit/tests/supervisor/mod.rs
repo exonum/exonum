@@ -20,8 +20,8 @@ use exonum::{
         HashTag, MapIndex,
     },
     runtime::{
-        ArtifactId, CoreError, ExecutionContext, ExecutionError, InstanceId, InstanceStatus,
-        SUPERVISOR_INSTANCE_ID,
+        migrations::MigrationType, ArtifactId, CoreError, ExecutionContext, ExecutionError,
+        InstanceId, InstanceStatus, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -155,15 +155,10 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             .spec
             .name;
 
-        context
+        let migration_type = context
             .supervisor_extensions()
             .initiate_migration(arg.new_artifact.clone(), &instance_name)?;
-        let new_instance_state = context
-            .data()
-            .for_dispatcher()
-            .get_instance(arg.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
-        if *new_instance_state.data_version() == arg.new_artifact.version {
+        if let MigrationType::FastForward = migration_type {
             assert_eq!(arg.migration_len, 0);
             context
                 .supervisor_extensions()

@@ -16,8 +16,8 @@ use exonum::{
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidateInput},
     runtime::{
-        CommonError, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus,
+        migrations::MigrationType, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
+        InstanceId, InstanceSpec, InstanceState, InstanceStatus,
     },
 };
 use exonum_derive::*;
@@ -552,27 +552,26 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
 
             // Check whether migration started successfully.
-            if let Err(error) = result {
-                // Migration failed even before start, softly mark it as failed.
-                let initiate_rollback = false;
-                return self.fail_migration(context, request, error, initiate_rollback);
-            }
+            let migration_type = match result {
+                Ok(ty) => ty,
+                Err(error) => {
+                    // Migration failed even before start, softly mark it as failed.
+                    let initiate_rollback = false;
+                    return self.fail_migration(context, request, error, initiate_rollback);
+                }
+            };
 
-            // Migration started. Check if migration is fast-forward.
-            let instance = get_instance_by_name(&context, request.service.as_ref())
-                .expect("BUG: Instance disappeared");
-            if request.new_artifact.version == *instance.data_version() {
+            if let MigrationType::FastForward = migration_type {
                 // Migration is fast-forward, complete it immediately.
                 // No agreement needed, since nodes which will behave differently will obtain
                 // different blockchain state hash and will be excluded from consensus.
                 log::trace!("Applied fast-forward migration with request {:?}", request);
+                let new_version = request.new_artifact.version.clone();
 
                 let mut schema = SchemaImpl::new(context.service_data());
-
                 // Update the state of a migration.
-                state.update(AsyncEventState::Succeed, instance.data_version().clone());
+                state.update(AsyncEventState::Succeed, new_version);
                 schema.migration_states.put(&request, state);
-
                 // Remove the migration from the list of pending.
                 schema.pending_migrations.remove(&request);
             }
