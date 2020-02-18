@@ -252,8 +252,12 @@ impl BlockProof {
             }
             endorsements[validator_id] = true;
         }
+
+        // This assertion should always hold. Indeed, we've checked that there are +2/3 precommits
+        // and that there are no double endorsements; hence, the block should be approved
+        // by +2/3 validators.
         debug_assert!(
-            endorsements.iter().map(|&b| b as usize).sum::<usize>()
+            endorsements.iter().filter(|&&flag| flag).count()
                 >= byzantine_quorum(validator_keys.len())
         );
 
@@ -524,9 +528,8 @@ mod tests {
             .insert::<ProposerId>(ValidatorId(1));
 
         let precommits = keys.iter().enumerate().map(|(i, keypair)| {
-            let i = i as u16;
             let precommit = Precommit::new(
-                ValidatorId(i),
+                ValidatorId(i as u16),
                 Height(1),
                 Round(1),
                 Hash::zero(),
