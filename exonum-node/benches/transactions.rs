@@ -247,7 +247,7 @@ fn bench_verify_transactions(c: &mut Criterion) {
     );
     c.bench(
         "transactions/event_loop",
-        ParameterizedBenchmark::new("size", bench_verify_messages_event_loop, parameters.clone())
+        ParameterizedBenchmark::new("size", bench_verify_messages_event_loop, parameters)
             .throughput(|_| Throughput::Elements(MESSAGES_COUNT))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
             .sample_size(SAMPLE_SIZE),

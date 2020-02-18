@@ -1346,7 +1346,7 @@ fn two_part_migration_with_intermediate_artifact() {
     // the state will indicate that read endpoints may be retained for the service.
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact.clone(), &service.name)
+        .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
     rig.create_block(fork);
 

@@ -868,7 +868,7 @@ impl Sandbox {
         let node_sender = NodeSender {
             network_requests: network_channel.0.clone().wait(),
             internal_requests: internal_channel.0.clone().wait(),
-            transactions: tx_channel.0.clone().wait(),
+            transactions: tx_channel.0.wait(),
             api_requests: api_channel.0.clone().wait(),
         };
         let peers = inner
@@ -1178,7 +1178,7 @@ fn sandbox_with_services_uninitialized(
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone().wait(),
         internal_requests: internal_channel.0.clone().wait(),
-        transactions: tx_channel.0.clone().wait(),
+        transactions: tx_channel.0.wait(),
         api_requests: api_channel.0.clone().wait(),
     };
     let api_state = SharedNodeState::new(5000);
