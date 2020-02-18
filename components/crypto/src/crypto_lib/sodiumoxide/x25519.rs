@@ -52,7 +52,8 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// let (pk, sk) = exonum_crypto::gen_keypair();
 /// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
+#[must_use]
 pub fn into_x25519_keypair(
     pk: crypto_PublicKey,
     sk: crypto_SecretKey,
@@ -81,6 +82,7 @@ pub fn scalarmult(sc: &SecretKey, pk: &PublicKey) -> Result<PublicKey, ()> {
 }
 
 /// Calculates the public key based on private key for X25519.
+#[must_use]
 pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
     sodium_scalarmult_base(sc.as_ref()).into()
 }
@@ -88,6 +90,7 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 /// Converts Ed25519 public key to Curve25519 public key.
 ///
 /// See also: [`into_x25519_keypair()`](fn.into_x25519_public_key.html)
+#[must_use]
 pub fn into_x25519_public_key(pk: crypto_PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
@@ -103,6 +106,7 @@ macro_rules! implement_x25519_type {
 
     impl $name {
         /// Creates a new instance filled with zeros.
+        #[must_use]
         pub fn zero() -> Self {
             $name::new([0; $size])
         }
@@ -110,11 +114,13 @@ macro_rules! implement_x25519_type {
 
     impl $name {
         /// Creates a new instance from bytes array.
+        #[must_use]
         pub fn new(bytes_array: [u8; $size]) -> Self {
             $name($name_from(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
+        #[must_use]
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
             $name_from::from_slice(bytes_slice).map($name)
         }

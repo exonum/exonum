@@ -55,6 +55,8 @@
     clippy::indexing_slicing,
     clippy::use_self,
     clippy::default_trait_access,
+    // Too much work to fix this issues.
+    clippy::missing_errors_doc
 )]
 
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
@@ -97,6 +99,7 @@ pub struct Keys {
 impl Keys {
     /// Creates a random set of keys using the random number generator provided
     /// by the crypto backend.
+    #[must_use]
     pub fn random() -> Self {
         Self {
             consensus: KeyPair::random(),
@@ -126,21 +129,25 @@ impl Keys {
 
 impl Keys {
     /// Consensus public key.
+    #[must_use]
     pub fn consensus_pk(&self) -> PublicKey {
         self.consensus.public_key()
     }
 
     /// Consensus private key.
+    #[must_use]
     pub fn consensus_sk(&self) -> &SecretKey {
         &self.consensus.secret_key()
     }
 
     /// Service public key.
+    #[must_use]
     pub fn service_pk(&self) -> PublicKey {
         self.service.public_key()
     }
 
     /// Service secret key.
+    #[must_use]
     pub fn service_sk(&self) -> &SecretKey {
         &self.service.secret_key()
     }
