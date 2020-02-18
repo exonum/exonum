@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for the phases of the service life cycle, including starting and stopping service instances.
+//! Tests for the phases of the service life cycle, including starting, freezing and stopping
+//! service instances.
 
 use exonum::{
     messages::{AnyTx, Verified},
@@ -76,6 +77,7 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
 #[test]
 fn start_stop_inc_service() {
     let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
     let instance_id = start_inc_service(&mut testkit).spec.id;
     assert!(
         is_inc_service_api_available(&mut testkit),
@@ -84,7 +86,44 @@ fn start_stop_inc_service() {
 
     // Stop service instance.
     let change = ConfigPropose::immediate(1).stop_service(instance_id);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change)
+        .expect("Stop service transaction should be processed");
+    assert!(
+        !is_inc_service_api_available(&mut testkit),
+        "Inc service API should not be available after stopping."
+    );
+
+    // Check that we cannot freeze service now.
+    let change = ConfigPropose::immediate(2).freeze_service(instance_id);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let err = execute_transaction(&mut testkit, change)
+        .expect_err("Freeze service transaction should not be processed");
+    let expected_err = ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+        .with_description_containing(
+            "Discarded an attempt to freeze service `inc` with inappropriate status (stopped)",
+        );
+    assert_eq!(err, expected_err);
+}
+
+#[test]
+fn start_freeze_and_stop_inc_service() {
+    let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
+    let instance_id = start_inc_service(&mut testkit).spec.id;
+
+    // Freeze service instance.
+    let change = ConfigPropose::immediate(1).freeze_service(instance_id);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change)
+        .expect("Freeze service transaction should be processed");
+    assert!(
+        is_inc_service_api_available(&mut testkit),
+        "Inc service API should be available after freezing."
+    );
+
+    // Stop the same service instance.
+    let change = ConfigPropose::immediate(2).stop_service(instance_id);
     let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     execute_transaction(&mut testkit, change)
         .expect("Stop service transaction should be processed");
@@ -132,9 +171,7 @@ fn duplicate_stop_service_request() {
         actual_err,
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing(
-                "Discarded multiple instances with the same name in one request."
-            )
+            .with_description_containing("Discarded several actions concerning service with ID 1")
     )
 }
 
@@ -160,7 +197,7 @@ fn stop_already_stopped_service() {
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
-                "Discarded an attempt to stop the already stopped service instance"
+                "Discarded an attempt to stop service `inc` with inappropriate status (stopped)"
             )
     )
 }
@@ -202,7 +239,7 @@ fn resume_active_service() {
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
-                "Discarded an attempt to resume not stopped service instance"
+                "Discarded an attempt to resume service `inc` with inappropriate status (active)"
             )
     )
 }
@@ -226,8 +263,6 @@ fn multiple_stop_resume_requests() {
         actual_err,
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing(
-                "Discarded multiple instances with the same name in one request"
-            )
+            .with_description_containing("Discarded several actions concerning service with ID 1")
     )
 }

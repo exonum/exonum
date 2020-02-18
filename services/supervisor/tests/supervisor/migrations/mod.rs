@@ -175,12 +175,8 @@ fn wait_while_pending(
         let migration_state = migration_state(&api, request.clone());
 
         match migration_state.inner {
-            AsyncEventState::Pending => {
-                // Not ready yet.
-            }
-            _ => {
-                return migration_state;
-            }
+            AsyncEventState::Pending => { /* Not ready yet. */ }
+            _ => return migration_state,
         }
     }
 
