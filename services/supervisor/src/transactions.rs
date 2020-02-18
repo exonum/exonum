@@ -17,7 +17,7 @@ use exonum::{
     helpers::{Height, ValidateInput},
     runtime::{
         migrations::MigrationType, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceId, InstanceSpec, InstanceState, InstanceStatus,
+        InstanceId, InstanceSpec, InstanceState, InstanceStatus, RuntimeFeature,
     },
 };
 use exonum_derive::*;
@@ -168,11 +168,12 @@ impl StopService {
             "stop",
             InstanceStatus::can_be_stopped,
         )
+        .map(drop)
     }
 }
 
 impl FreezeService {
-    fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
+    fn validate(&self, context: &ExecutionContext<'_>) -> Result<InstanceState, ExecutionError> {
         validate_status(
             context,
             self.instance_id,
@@ -252,13 +253,13 @@ fn validate_status(
     instance_id: InstanceId,
     action: &str,
     check_fn: fn(&InstanceStatus) -> bool,
-) -> Result<(), ExecutionError> {
+) -> Result<InstanceState, ExecutionError> {
     let instance = get_instance(context, instance_id)?;
     let status = instance.status.as_ref();
     let is_valid_transition = status.map_or(false, check_fn);
 
     if is_valid_transition {
-        Ok(())
+        Ok(instance)
     } else {
         let err = ConfigurationError::MalformedConfigPropose.with_description(format!(
             "Discarded an attempt to {} service `{}` with inappropriate status ({})",
@@ -675,7 +676,22 @@ impl Supervisor {
                     stop_service.validate(&context)?;
                 }
                 ConfigChange::FreezeService(freeze_service) => {
-                    freeze_service.validate(&context)?;
+                    let instance_state = freeze_service.validate(&context)?;
+                    let runtime_id = instance_state.spec.artifact.runtime_id;
+                    if !context
+                        .supervisor_extensions()
+                        .check_feature(runtime_id, &RuntimeFeature::FreezingServices)
+                    {
+                        let msg = format!(
+                            "Cannot freeze service `{}`: runtime with ID {}, with which \
+                             its artifact `{}` is associated, does not support service freezing",
+                            instance_state.spec.as_descriptor(),
+                            runtime_id,
+                            instance_state.spec.artifact,
+                        );
+                        let err = ConfigurationError::MalformedConfigPropose.with_description(msg);
+                        return Err(err);
+                    }
                 }
                 ConfigChange::ResumeService(resume_service) => {
                     resume_service.validate(&context)?;

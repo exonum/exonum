@@ -16,14 +16,98 @@
 //! service instances.
 
 use exonum::{
+    helpers::Height,
+    merkledb::Snapshot,
     messages::{AnyTx, Verified},
-    runtime::{ErrorMatch, ExecutionError, InstanceState, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        migrations::{InitMigrationError, MigrationScript},
+        versioning::Version,
+        ArtifactId, ErrorMatch, ExecutionError, InstanceState, InstanceStatus, Mailbox, Runtime,
+        SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    },
 };
-use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
+use exonum_rust_runtime::{DefaultInstance, ExecutionContext, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+use futures::{future, Future};
 
 use crate::inc::IncService;
 use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor, SupervisorInterface};
+
+#[derive(Debug, Clone, Copy)]
+struct RuntimeWithoutFreeze;
+
+impl RuntimeWithoutFreeze {
+    fn artifact() -> ArtifactId {
+        ArtifactId::from_raw_parts(Self::ID, "some-service".to_owned(), Version::new(1, 0, 0))
+    }
+}
+
+impl Runtime for RuntimeWithoutFreeze {
+    fn deploy_artifact(
+        &mut self,
+        _artifact: ArtifactId,
+        _deploy_spec: Vec<u8>,
+    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        Box::new(future::ok(()))
+    }
+
+    fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
+        true
+    }
+
+    fn initiate_adding_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _artifact: &ArtifactId,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn initiate_resuming_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _artifact: &ArtifactId,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        unimplemented!("Outside the test scope")
+    }
+
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
+        assert_ne!(state.status, Some(InstanceStatus::Frozen));
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
+    }
+
+    fn execute(
+        &self,
+        _context: ExecutionContext<'_>,
+        _method_id: u32,
+        _arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        unimplemented!("Outside the test scope")
+    }
+
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
+}
+
+impl WellKnownRuntime for RuntimeWithoutFreeze {
+    const ID: u32 = 5;
+}
 
 /// Creates block with the specified transaction and returns its execution result.
 pub fn execute_transaction(
@@ -51,6 +135,18 @@ fn create_testkit() -> TestKit {
         .with_artifact(Supervisor.artifact_id())
         .with_artifact(IncService.artifact_id())
         .with_instance(Supervisor::simple())
+        .build()
+}
+
+fn create_testkit_with_additional_runtime() -> TestKit {
+    let artifact = RuntimeWithoutFreeze::artifact();
+    TestKitBuilder::validator()
+        .with_additional_runtime(RuntimeWithoutFreeze)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_artifact(artifact.clone())
+        .with_instance(Supervisor::simple())
+        .with_instance(artifact.into_default_instance(100, "test"))
         .build()
 }
 
@@ -265,4 +361,20 @@ fn multiple_stop_resume_requests() {
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing("Discarded several actions concerning service with ID 1")
     )
+}
+
+#[test]
+fn freeze_without_runtime_support() {
+    let mut testkit = create_testkit_with_additional_runtime();
+    let change = ConfigPropose::new(0, Height(5)).freeze_service(100);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing("Cannot freeze service `100:test`")
+    );
 }
