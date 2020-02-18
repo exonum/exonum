@@ -506,7 +506,7 @@ fn test_start_two_services_in_one_request() {
 
     let request = ConfigPropose::new(0, deadline)
         .start_service(artifact.clone(), instance_name_1, Vec::default())
-        .start_service(artifact.clone(), instance_name_2, Vec::default());
+        .start_service(artifact, instance_name_2, Vec::default());
 
     let api = testkit.api();
     let hash = start_service(&api, request);
@@ -655,7 +655,7 @@ fn test_two_validators() {
         let propose_hash = request_start.object_hash();
 
         // Send a start instance request from this node.
-        start_service(&api, request_start.clone());
+        start_service(&api, request_start);
         testkit.create_block();
 
         // Confirm changes.
@@ -698,7 +698,7 @@ fn test_multiple_validators_no_confirmation() {
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
 
     // Send an artifact deploy request from this validator.
-    deploy_artifact(&api, request_deploy.clone());
+    deploy_artifact(&api, request_deploy);
     // Deliberately not sending an artifact deploy request from the second validator.
     let block = testkit.create_block();
     block.iter().for_each(|tx| tx.status().unwrap());
@@ -720,7 +720,7 @@ fn test_auditor_cant_send_requests() {
     let artifact = default_artifact();
     assert!(!artifact_exists(&testkit, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
+    let request_deploy = deploy_request(artifact, DEPLOY_HEIGHT);
 
     // Try to send an artifact deploy request from the auditor.
     let deploy_request_from_auditor = {
@@ -884,7 +884,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     let artifact = default_artifact();
     assert!(!artifact_exists(&testkit, &artifact.name));
 
-    let request_deploy = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
+    let request_deploy = deploy_request(artifact, DEPLOY_HEIGHT);
 
     // Send deploy requests by byzantine majority of validators.
     for i in 0..byzantine_minority {
@@ -920,7 +920,7 @@ fn test_id_assignment() {
 
     let request = ConfigPropose::new(0, deadline)
         .start_service(artifact.clone(), instance_name_1, Vec::default())
-        .start_service(artifact.clone(), instance_name_2, Vec::default());
+        .start_service(artifact, instance_name_2, Vec::default());
 
     let api = testkit.api();
     start_service(&api, request);
@@ -962,7 +962,7 @@ fn test_id_assignment_sparse() {
 
     let instance_name = "inc2";
     let request = ConfigPropose::new(0, deadline).start_service(
-        artifact.clone(),
+        artifact,
         instance_name,
         Vec::default(),
     );

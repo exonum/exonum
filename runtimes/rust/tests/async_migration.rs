@@ -588,7 +588,7 @@ fn two_step_migration_with_intermediate_update() {
     // Start another async migration.
     let migration = MigrateService {
         instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        artifact: new_artifact.clone(),
+        artifact: new_artifact,
     };
     let tx = keypair.migrate_service(ToySupervisorService::INSTANCE_ID, migration);
     execute_transaction(&mut blockchain, tx).unwrap();
@@ -606,7 +606,7 @@ fn resume_with_incorrect_artifact_version() {
     let keypair = KeyPair::random();
     let new_artifact = CounterFactory::new(VERSIONS[2].parse().unwrap()).artifact_id();
 
-    perform_first_migration(&mut blockchain, new_artifact.clone());
+    perform_first_migration(&mut blockchain, new_artifact);
 
     let resume = ResumeService {
         instance_id: CounterFactory::INSTANCE_ID,
@@ -627,7 +627,7 @@ fn resume_with_incorrect_artifact_version() {
     let intermediate_artifact = intermediate_factory.artifact_id();
     let migration = MigrateService {
         instance_name: CounterFactory::INSTANCE_NAME.to_owned(),
-        artifact: intermediate_artifact.clone(),
+        artifact: intermediate_artifact,
     };
     let tx = keypair.migrate_service(ToySupervisorService::INSTANCE_ID, migration);
     execute_transaction(&mut blockchain, tx).unwrap();

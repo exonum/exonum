@@ -267,7 +267,7 @@ fn test_transactions_subscribe_with_bad_filter() {
     let alice = KeyPair::random();
     let reset_tx = alice.reset(SERVICE_ID, ());
     let inc_tx = alice.increment(SERVICE_ID, 3);
-    testkit.create_block_with_transactions(vec![reset_tx.clone(), inc_tx.clone()]);
+    testkit.create_block_with_transactions(vec![reset_tx, inc_tx]);
 
     assert_no_message(&mut client);
 }

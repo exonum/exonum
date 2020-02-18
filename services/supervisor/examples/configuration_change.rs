@@ -69,7 +69,7 @@ impl Configure for ConfigChangeService {
         println!("Apply config called with params {}", params);
         Schema::new(context.service_data())
             .params
-            .set(params.clone());
+            .set(params);
 
         Ok(())
     }

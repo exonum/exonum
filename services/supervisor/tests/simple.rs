@@ -221,7 +221,7 @@ fn incorrect_actual_from_field() {
     testkit.create_blocks_until(cfg_change_height);
 
     let config_propose = ConfigPropose::new(0, cfg_change_height)
-        .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
+        .service_config(ConfigChangeService::INSTANCE_ID, params);
 
     testkit
         .create_block_with_transaction(sign_config_propose_transaction_by_us(
@@ -256,7 +256,7 @@ fn discard_config_propose_from_auditor() {
 
     // Sign request by an auditor.
     let propose =
-        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
+        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config);
     let keys = testkit.us().service_keypair();
     let propose = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, propose);
     let block = testkit.create_block_with_transaction(propose);

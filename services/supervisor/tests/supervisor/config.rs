@@ -58,7 +58,7 @@ fn test_deadline_config_exceeded() {
     let new_consensus_config = consensus_config_propose_first_variant(&testkit);
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(new_consensus_config.clone())
+        .extend_consensus_config_propose(new_consensus_config)
         .build();
     testkit
         .create_block_with_transaction(sign_config_propose_transaction(
@@ -84,7 +84,7 @@ fn test_sent_new_config_after_expired_one() {
 
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .configuration_number(0)
-        .extend_consensus_config_propose(first_consensus_config.clone())
+        .extend_consensus_config_propose(first_consensus_config)
         .build();
 
     testkit
@@ -141,7 +141,7 @@ fn test_discard_config_with_not_enough_confirms() {
     let cfg_change_height = Height(3);
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(cfg_change_height)
-        .extend_consensus_config_propose(consensus_config.clone())
+        .extend_consensus_config_propose(consensus_config)
         .build();
     let proposal_hash = config_proposal.object_hash();
 
@@ -224,7 +224,7 @@ fn test_send_confirmation_by_initiator() {
 
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(consensus_config.clone())
+        .extend_consensus_config_propose(consensus_config)
         .build();
     let proposal_hash = config_proposal.object_hash();
 
@@ -262,7 +262,7 @@ fn test_propose_config_change_by_incorrect_validator() {
 
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let change = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(consensus_config.clone())
+        .extend_consensus_config_propose(consensus_config)
         .build();
     let keys = KeyPair::random();
     let signed_confirm = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
@@ -282,7 +282,7 @@ fn test_confirm_config_by_incorrect_validator() {
 
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(consensus_config.clone())
+        .extend_consensus_config_propose(consensus_config)
         .build();
     let proposal_hash = config_proposal.object_hash();
 
@@ -319,7 +319,7 @@ fn test_try_confirm_non_existent_proposal() {
 
     let consensus_config = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(consensus_config.clone())
+        .extend_consensus_config_propose(consensus_config)
         .build();
 
     testkit
@@ -403,7 +403,7 @@ fn test_discard_panicked_service_config_change() {
     let new_consensus_config = consensus_config_propose_first_variant(&testkit);
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
+        .extend_service_config_propose(params)
         .extend_service_config_propose("panic".to_string())
         .extend_consensus_config_propose(new_consensus_config)
         .build();
@@ -425,7 +425,7 @@ fn test_incorrect_actual_from_field() {
     let mut testkit = testkit_with_supervisor_and_service(1);
     let params = "I am a new parameter".to_owned();
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_service_config_propose(params.clone())
+        .extend_service_config_propose(params)
         .build();
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT);
@@ -723,7 +723,7 @@ fn test_services_config_discard_multiple_configs() {
 
     let propose = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_service_config_propose(params.clone())
-        .extend_second_service_config_propose(params.clone())
+        .extend_second_service_config_propose(params)
         .extend_second_service_config_propose("I am a extra proposal".to_owned())
         .build();
 
