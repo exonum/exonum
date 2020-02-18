@@ -138,8 +138,8 @@ pub use self::{
     migration_state::MigrationState,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
-        DeployResult, MigrationRequest, MigrationResult, ResumeService, ServiceConfig,
-        StartService, StopService, SupervisorConfig,
+        DeployResult, FreezeService, MigrationRequest, MigrationResult, ResumeService,
+        ServiceConfig, StartService, StopService, SupervisorConfig,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -188,6 +188,9 @@ fn update_configs(
     context: &mut ExecutionContext<'_>,
     changes: Vec<ConfigChange>,
 ) -> Result<(), ExecutionError> {
+    const NO_SERVICE: &str =
+        "BUG: Instance with the specified ID is absent in the dispatcher schema";
+
     for change in changes.into_iter() {
         match change {
             ConfigChange::Consensus(config) => {
@@ -243,12 +246,10 @@ fn update_configs(
                     .data()
                     .for_dispatcher()
                     .get_instance(stop_service.instance_id)
-                    .expect(
-                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
-                    );
+                    .expect(NO_SERVICE);
 
                 log::trace!(
-                    "Request stop service with name {} from artifact {}",
+                    "Stopping service with name {} from artifact {}",
                     instance.spec.name,
                     instance.spec.artifact
                 );
@@ -258,17 +259,33 @@ fn update_configs(
                     .initiate_stopping_service(stop_service.instance_id)?;
             }
 
+            ConfigChange::FreezeService(freeze_service) => {
+                let instance = context
+                    .data()
+                    .for_dispatcher()
+                    .get_instance(freeze_service.instance_id)
+                    .expect(NO_SERVICE);
+
+                log::trace!(
+                    "Freezing service with name {} from artifact {}",
+                    instance.spec.name,
+                    instance.spec.artifact
+                );
+
+                context
+                    .supervisor_extensions()
+                    .initiate_freezing_service(freeze_service.instance_id)?;
+            }
+
             ConfigChange::ResumeService(resume_service) => {
                 let instance = context
                     .data()
                     .for_dispatcher()
                     .get_instance(resume_service.instance_id)
-                    .expect(
-                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
-                    );
+                    .expect(NO_SERVICE);
 
                 log::trace!(
-                    "Request resume service with name {} with artifact {}",
+                    "Resuming service with name {} with artifact {}",
                     instance.spec.name,
                     instance.spec.artifact,
                 );
