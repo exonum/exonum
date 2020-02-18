@@ -42,6 +42,7 @@ struct TemporarySnapshot {
 
 impl TemporaryDB {
     /// Creates a new, empty database.
+    #[must_use]
     pub fn new() -> Self {
         let dir = Arc::new(TempDir::new().unwrap());
         let options = DbOptions::default();

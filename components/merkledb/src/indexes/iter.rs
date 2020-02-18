@@ -72,6 +72,7 @@ where
     }
 
     /// Skips values in the iterator output without parsing them.
+    #[must_use]
     pub fn skip_values(self) -> Keys<'a, K> {
         Keys {
             base_iter: self.base_iter.drop_value_type(),
@@ -79,6 +80,7 @@ where
     }
 
     /// Skips keys in the iterator output without parsing them.
+    #[must_use]
     pub fn skip_keys(self) -> Values<'a, V> {
         Values {
             base_iter: self.base_iter.drop_key_type(),

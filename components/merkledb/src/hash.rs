@@ -77,11 +77,13 @@ impl HashTag {
     }
 
     /// Obtains a hashed value of a leaf in a Merkle tree.
+    #[must_use]
     pub fn hash_leaf(value: &[u8]) -> Hash {
         HashTag::Blob.hash_stream().update(value).hash()
     }
 
     /// Obtains a hashed value of a branch in a Merkle tree.
+    #[must_use]
     pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
         HashTag::ListBranchNode
             .hash_stream()
@@ -91,6 +93,7 @@ impl HashTag {
     }
 
     /// Obtains a hashed value of a Merkle tree branch with one child.
+    #[must_use]
     pub fn hash_single_node(hash: &Hash) -> Hash {
         HashTag::ListBranchNode
             .hash_stream()
@@ -104,6 +107,7 @@ impl HashTag {
     /// ```text
     /// h = sha256( HashTag::ListNode || len as u64 || merkle_root )
     /// ```
+    #[must_use]
     pub fn hash_list_node(len: u64, root: Hash) -> Hash {
         let mut len_bytes = [0; 8];
         LittleEndian::write_u64(&mut len_bytes, len);
@@ -120,6 +124,7 @@ impl HashTag {
     /// ```text
     /// h = sha256( HashTag::ListNode || 0 || Hash::zero() )
     /// ```
+    #[must_use]
     pub fn empty_list_hash() -> Hash {
         Hash::new(EMPTY_LIST_HASH)
     }
@@ -135,6 +140,7 @@ impl HashTag {
     /// ```text
     /// h = sha256( HashTag::MapNode || merkle_root )
     /// ```
+    #[must_use]
     pub fn hash_map_node(root: Hash) -> Hash {
         HashStream::new()
             .update(&[HashTag::MapNode as u8])
@@ -152,6 +158,7 @@ impl HashTag {
     /// See [`ProofMapIndex`] for details how branch nodes are serialized.
     ///
     /// [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html#impl-ObjectHash
+    #[must_use]
     pub fn hash_map_branch(branch_node: &[u8]) -> Hash {
         HashStream::new()
             .update(&[HashTag::MapBranchNode as u8])
@@ -168,6 +175,7 @@ impl HashTag {
     /// See [`ProofMapIndex`] for details how `path` is serialized.
     ///
     /// [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html#impl-ObjectHash
+    #[must_use]
     pub fn hash_single_entry_map(path: &ProofPath, child_hash: &Hash) -> Hash {
         // `HASH_SIZE` bytes are necessary for `path` bytes, and 2 additional bytes
         // for the `LEB128` encoding of bit length (`HASH_SIZE * 8`).
@@ -188,6 +196,7 @@ impl HashTag {
     /// ```text
     /// sha256( HashTag::MapNode || Hash::zero() )
     /// ```
+    #[must_use]
     pub fn empty_map_hash() -> Hash {
         Hash::new(EMPTY_MAP_HASH)
     }

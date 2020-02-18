@@ -75,6 +75,7 @@ impl IndexAddress {
     }
 
     /// Returns the name part of `IndexAddress`.
+    #[must_use]
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -112,6 +113,7 @@ impl IndexAddress {
     /// let prefixed = addr.prepend_name("prefix");
     /// assert_eq!(prefixed.name(), "prefix.foo");
     /// ```
+    #[must_use]
     pub fn prepend_name(self, prefix: &str) -> Self {
         let name = if self.name.is_empty() {
             prefix.to_owned()
@@ -134,6 +136,7 @@ impl IndexAddress {
     /// let suffixed = addr.append_name("suffix");
     /// assert_eq!(suffixed.name(), "foo.suffix");
     /// ```
+    #[must_use]
     pub fn append_name(self, suffix: &str) -> Self {
         let name = if self.name.is_empty() {
             suffix.to_owned()

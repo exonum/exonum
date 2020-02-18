@@ -439,11 +439,13 @@ impl<V: BinaryValue> ListProof<V> {
     }
 
     /// Returns the length of the underlying `ProofListIndex`.
+    #[must_use]
     pub fn list_len(&self) -> u64 {
         self.length
     }
 
     /// Returns indexes and references to elements in the proof without verifying it.
+    #[must_use]
     pub fn entries_unchecked(&self) -> &[(u64, V)] {
         &self.entries
     }
@@ -587,6 +589,7 @@ pub struct CheckedListProof<'a, V> {
 
 impl<'a, V> CheckedListProof<'a, V> {
     /// Returns indexes and references to elements in the proof.
+    #[must_use]
     pub fn entries(&self) -> &'a [(u64, V)] {
         self.entries
     }
@@ -598,11 +601,13 @@ impl<'a, V> CheckedListProof<'a, V> {
     }
 
     /// Returns the length of the underlying `ProofListIndex`.
+    #[must_use]
     pub fn list_len(&self) -> u64 {
         self.length
     }
 
     /// Returns the `object_hash()` of the underlying `ProofListIndex`.
+    #[must_use]
     pub fn index_hash(&self) -> Hash {
         self.hash
     }
