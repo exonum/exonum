@@ -636,7 +636,12 @@ impl TestKit {
         self.do_create_block(&tx_hashes)
     }
 
-    /// Adds transaction into persistent pool.
+    /// Adds a transaction into the persistent pool.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the transaction is incorrect. See the [type-level docs](#transaction-checks)
+    ///   for more details.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
         if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
             panic!(
@@ -648,7 +653,7 @@ impl TestKit {
             .add_transactions_into_pool(iter::once(transaction));
     }
 
-    /// Checks if transaction can be found in pool.
+    /// Checks if a transaction with the specified hash is found in the transaction pool.
     pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
         self.snapshot()
             .for_core()
@@ -696,7 +701,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - Panics if validator with the given id is absent in test network.
+    /// - Panics if validator with the given ID is absent in the test network.
     pub fn validator(&self, id: ValidatorId) -> TestNode {
         self.network.validators()[id.0 as usize].clone()
     }
