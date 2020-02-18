@@ -67,9 +67,7 @@ impl Configure for ConfigChangeService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         println!("Apply config called with params {}", params);
-        Schema::new(context.service_data())
-            .params
-            .set(params);
+        Schema::new(context.service_data()).params.set(params);
 
         Ok(())
     }

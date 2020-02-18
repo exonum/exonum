@@ -961,11 +961,8 @@ fn test_id_assignment_sparse() {
     let deadline = testkit.height().next();
 
     let instance_name = "inc2";
-    let request = ConfigPropose::new(0, deadline).start_service(
-        artifact,
-        instance_name,
-        Vec::default(),
-    );
+    let request =
+        ConfigPropose::new(0, deadline).start_service(artifact, instance_name, Vec::default());
 
     let api = testkit.api();
     start_service(&api, request);

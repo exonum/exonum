@@ -255,8 +255,7 @@ fn discard_config_propose_from_auditor() {
     let old_validators = testkit.network().validators();
 
     // Sign request by an auditor.
-    let propose =
-        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config);
+    let propose = ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config);
     let keys = testkit.us().service_keypair();
     let propose = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, propose);
     let block = testkit.create_block_with_transaction(propose);

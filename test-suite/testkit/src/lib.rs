@@ -59,7 +59,6 @@
 //!     }
 //! }
 //!
-//! # fn main() {
 //! // Create testkit for network with four validators
 //! // and add a builtin timestamping service with ID=1.
 //! let service = TimestampingService;
@@ -93,7 +92,6 @@
 //! assert!(schema.transactions().contains(&tx2.object_hash()));
 //! assert!(schema.transactions().contains(&tx3.object_hash()));
 //! assert!(schema.transactions().contains(&tx4.object_hash()));
-//! # }
 //! ```
 
 #![warn(missing_debug_implementations, missing_docs)]
@@ -374,7 +372,6 @@ impl TestKit {
     /// # fn expensive_setup(_: &mut TestKit) {}
     /// # fn assert_something_about(_: &TestKit) {}
     /// #
-    /// # fn main() {
     /// // ...with this ID:
     /// const SERVICE_ID: u32 = 1;
     ///
@@ -400,7 +397,6 @@ impl TestKit {
     /// testkit.create_block_with_transaction(tx_b);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
-    /// # }
     /// ```
     pub fn rollback(&mut self) {
         self.db_handler.rollback()
@@ -587,11 +583,9 @@ impl TestKit {
     /// # extern crate exonum;
     /// # use exonum::helpers::Height;
     /// # use exonum_testkit::TestKitBuilder;
-    /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator().build();
     /// testkit.create_blocks_until(Height(5));
     /// assert_eq!(Height(5), testkit.height());
-    /// # }
     pub fn create_blocks_until(&mut self, height: Height) {
         while self.height() < height {
             self.create_block();

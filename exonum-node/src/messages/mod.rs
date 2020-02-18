@@ -368,11 +368,8 @@ mod tests {
             pool_size: 0,
         };
         let protocol_message = ExonumMessage::from(msg);
-        let mut signed = SignedMessage::new(
-            protocol_message,
-            keypair.public_key(),
-            keypair.secret_key(),
-        );
+        let mut signed =
+            SignedMessage::new(protocol_message, keypair.public_key(), keypair.secret_key());
         // Update author
         signed.author = KeyPair::random().public_key();
         let err = signed.into_verified::<ExonumMessage>().unwrap_err();
