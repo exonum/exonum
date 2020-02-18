@@ -265,11 +265,34 @@ impl RuntimeIdentifier {
 }
 
 impl fmt::Display for RuntimeIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RuntimeIdentifier::Rust => f.write_str("Rust runtime"),
-            RuntimeIdentifier::Java => f.write_str("Java runtime"),
+            RuntimeIdentifier::Rust => formatter.write_str("Rust runtime"),
+            RuntimeIdentifier::Java => formatter.write_str("Java runtime"),
             RuntimeIdentifier::__NonExhaustive => unreachable!("Never actually generated"),
+        }
+    }
+}
+
+/// Optional features that may or may not be supported by a particular `Runtime`.
+///
+/// This type is not intended to be exhaustively matched. It can be extended in the future
+/// without breaking the semver compatibility.
+#[derive(Debug)]
+pub enum RuntimeFeature {
+    /// Freezing services: disabling APIs mutating service state (e.g., transactions)
+    /// while leaving read-only APIs switched on.
+    FreezingServices,
+
+    #[doc(hidden)]
+    __NonExhaustive,
+}
+
+impl fmt::Display for RuntimeFeature {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RuntimeFeature::FreezingServices => formatter.write_str("freezing services"),
+            RuntimeFeature::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -301,7 +324,7 @@ impl fmt::Display for RuntimeIdentifier {
 /// COMMIT ::= deploy_artifact* update_service_status* after_commit
 /// ```
 ///
-/// The ordering for the "read-only" method `is_artifact_deployed` in relation
+/// The ordering for the "read-only" methods `is_artifact_deployed` and `is_supported` in relation
 /// to the lifecycle above is not specified.
 ///
 /// # Consensus and Local Methods
@@ -335,6 +358,19 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///
     /// The default implementation does nothing.
     fn initialize(&mut self, blockchain: &Blockchain) {}
+
+    /// Checks if the runtime supports an optional feature.
+    ///
+    /// This method can be called by the core before performing operations that might not
+    /// be implemented in a runtime, or by the supervisor service in order to check that a potential
+    /// service / artifact state transition can be handled by the runtime.
+    ///
+    /// An implementation should return `false` for all features the runtime does not recognize.
+    /// The default implementation always returns `false`, i.e., signals that the runtime supports
+    /// no optional features.
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        false
+    }
 
     /// Notifies the runtime that the dispatcher has completed re-initialization after the
     /// node restart. Re-initialization includes restoring the deployed artifacts / started service
@@ -445,7 +481,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// dispatcher. Runtime should perform corresponding actions in according to changes in
     /// the service instance state.
     ///
-    /// Method is called for a specific service instance during the `Runtime` lifetime in the
+    /// This method is called for a specific service instance during the `Runtime` lifetime in the
     /// following cases:
     ///
     /// - For newly added instances, or modified existing this method is called when the fork

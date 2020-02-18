@@ -29,6 +29,7 @@ use std::{
     time::Duration,
 };
 
+use crate::runtime::CommonError;
 use crate::{
     blockchain::{AdditionalHeaders, ApiSender, Block, Blockchain, Schema as CoreSchema},
     helpers::Height,
@@ -37,7 +38,8 @@ use crate::{
         migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
+        InstanceState, InstanceStatus, MethodId, Runtime, RuntimeFeature, RuntimeInstance,
+        SnapshotExt,
     },
 };
 
@@ -105,6 +107,7 @@ impl Dispatcher {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
 enum SampleRuntimes {
     First = 5,
     Second = 6,
@@ -174,6 +177,13 @@ impl From<SampleRuntime> for Arc<dyn Runtime> {
 }
 
 impl Runtime for SampleRuntime {
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        match feature {
+            RuntimeFeature::FreezingServices => self.runtime_type == SampleRuntimes::First as u32,
+            _ => false,
+        }
+    }
+
     fn on_resume(&mut self) {
         if !self.new_services.is_empty() {
             let changes = mem::replace(&mut self.new_services, BTreeMap::new());
@@ -478,7 +488,7 @@ struct FreezingRig {
     service: InstanceSpec,
 }
 
-fn blockchain_with_frozen_service() -> FreezingRig {
+fn blockchain_with_frozen_service(rt: SampleRuntimes) -> Result<FreezingRig, ExecutionError> {
     const SERVICE_ID: InstanceId = 0;
     const METHOD_ID: MethodId = 0;
 
@@ -491,21 +501,13 @@ fn blockchain_with_frozen_service() -> FreezingRig {
     );
 
     let (changes_tx, changes_rx) = mpsc::channel();
-    let runtime = SampleRuntime::new(
-        SampleRuntimes::First as u32,
-        SERVICE_ID,
-        METHOD_ID,
-        changes_tx,
-    );
+    let runtime = SampleRuntime::new(rt as u32, SERVICE_ID, METHOD_ID, changes_tx);
     let mut dispatcher = DispatcherBuilder::new()
         .with_runtime(runtime.runtime_type, runtime.clone())
         .finalize(&blockchain);
 
-    let artifact = ArtifactId::from_raw_parts(
-        SampleRuntimes::First as _,
-        "first".to_owned(),
-        "0.5.0".parse().unwrap(),
-    );
+    let artifact =
+        ArtifactId::from_raw_parts(rt as _, "first".to_owned(), "0.5.0".parse().unwrap());
 
     // Deploy the artifact and instantiate the service.
     let mut fork = db.fork();
@@ -519,17 +521,12 @@ fn blockchain_with_frozen_service() -> FreezingRig {
         &mut should_rollback,
         service.as_descriptor(),
     );
-    context
-        .initiate_adding_service(service.clone(), vec![])
-        .expect("`initiate_adding_service` failed");
+    context.initiate_adding_service(service.clone(), vec![])?;
 
     let patch = create_genesis_block(&mut dispatcher, fork);
     db.merge(patch).unwrap();
 
-    let instantiated_change = (
-        SampleRuntimes::First as u32,
-        vec![(SERVICE_ID, InstanceStatus::Active)],
-    );
+    let instantiated_change = (rt as u32, vec![(SERVICE_ID, InstanceStatus::Active)]);
     assert_eq!(instantiated_change, changes_rx.iter().next().unwrap());
 
     // Command service freeze.
@@ -542,25 +539,21 @@ fn blockchain_with_frozen_service() -> FreezingRig {
     );
     context
         .supervisor_extensions()
-        .initiate_freezing_service(SERVICE_ID)
-        .expect("Cannot freeze service");
+        .initiate_freezing_service(SERVICE_ID)?;
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge(patch).unwrap();
 
-    let frozen_change = (
-        SampleRuntimes::First as u32,
-        vec![(SERVICE_ID, InstanceStatus::Frozen)],
-    );
+    let frozen_change = (rt as u32, vec![(SERVICE_ID, InstanceStatus::Frozen)]);
     assert_eq!(frozen_change, changes_rx.iter().next().unwrap());
 
-    FreezingRig {
+    Ok(FreezingRig {
         dispatcher,
         db,
         runtime,
         changes_rx,
         service,
-    }
+    })
 }
 
 #[test]
@@ -573,7 +566,7 @@ fn test_service_freezing() {
         mut dispatcher,
         service,
         ..
-    } = blockchain_with_frozen_service();
+    } = blockchain_with_frozen_service(SampleRuntimes::First).unwrap();
 
     // The service schema should be available.
     let snapshot = db.snapshot();
@@ -618,6 +611,18 @@ fn test_service_freezing() {
 }
 
 #[test]
+fn test_service_freezing_without_runtime_support() {
+    let err = blockchain_with_frozen_service(SampleRuntimes::Second)
+        .map(drop)
+        .unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CommonError::FeatureNotSupported)
+            .with_description_containing("Runtime with ID 6 does not support freezing services")
+    );
+}
+
+#[test]
 fn service_freeze_then_restart() {
     const SERVICE_ID: InstanceId = 0;
     const METHOD_ID: MethodId = 0;
@@ -628,7 +633,7 @@ fn service_freeze_then_restart() {
         changes_rx,
         service,
         ..
-    } = blockchain_with_frozen_service();
+    } = blockchain_with_frozen_service(SampleRuntimes::First).unwrap();
 
     // Emulate blockchain restart.
     let blockchain = Blockchain::new(Arc::clone(&db), gen_keypair(), ApiSender::closed());

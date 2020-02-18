@@ -55,6 +55,14 @@ impl WellKnownRuntime for MigrationRuntime {
 }
 
 impl Runtime for MigrationRuntime {
+    // We use service freezing in some tests.
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        match feature {
+            RuntimeFeature::FreezingServices => true,
+            _ => false,
+        }
+    }
+
     fn deploy_artifact(
         &mut self,
         _artifact: ArtifactId,
@@ -333,7 +341,9 @@ impl Rig {
 
     fn freeze_service(&mut self, spec: &InstanceSpec) {
         let fork = self.blockchain.fork();
-        Dispatcher::initiate_freezing_service(&fork, spec.id).unwrap();
+        self.dispatcher()
+            .initiate_freezing_service(&fork, spec.id)
+            .unwrap();
         self.create_block(fork);
     }
 }
