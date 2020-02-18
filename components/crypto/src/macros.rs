@@ -22,7 +22,6 @@ macro_rules! implement_public_crypto_wrapper {
 
     impl $name {
         /// Creates a new instance filled with zeros.
-        #[must_use]
         pub fn zero() -> Self {
             $name::new([0; $size])
         }
@@ -30,26 +29,22 @@ macro_rules! implement_public_crypto_wrapper {
 
     impl $name {
         /// Creates a new instance from bytes array.
-        #[must_use]
         pub fn new(bytes_array: [u8; $size]) -> Self {
             $name($crate::crypto_impl::$name(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
-        #[must_use]
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
             $crate::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
         /// Copies bytes from this instance.
-        #[must_use]
         pub fn as_bytes(&self) -> [u8; $size] {
             (self.0).0
         }
 
         /// Returns a hex representation of binary data.
         /// Lower case letters are used (e.g. `f9b4ca`).
-        #[must_use]
         pub fn to_hex(&self) -> String {
             encode_hex(self)
         }
@@ -92,7 +87,6 @@ macro_rules! implement_private_crypto_wrapper {
 
     impl $name {
         /// Creates a new instance filled with zeros.
-        #[must_use]
         pub fn zero() -> Self {
             $name::new([0; $size])
         }
@@ -100,20 +94,17 @@ macro_rules! implement_private_crypto_wrapper {
 
     impl $name {
         /// Creates a new instance from bytes array.
-        #[must_use]
         pub fn new(bytes_array: [u8; $size]) -> Self {
             $name($crate::crypto_impl::$name(bytes_array))
         }
 
         /// Creates a new instance from bytes slice.
-        #[must_use]
         pub fn from_slice(bytes_slice: &[u8]) -> Option<Self> {
             $crate::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
         /// Returns a hex representation of binary data.
         /// Lower case letters are used (e.g. f9b4ca).
-        #[must_use]
         pub fn to_hex(&self) -> String {
             encode_hex(&self[..])
         }

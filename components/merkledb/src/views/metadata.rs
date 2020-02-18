@@ -65,7 +65,6 @@ pub enum IndexType {
 
 impl IndexType {
     /// Checks if the index of this type is Merkelized.
-    #[must_use]
     pub fn is_merkelized(self) -> bool {
         match self {
             IndexType::ProofList | IndexType::ProofMap | IndexType::ProofEntry => true,
@@ -242,9 +241,10 @@ impl<V> IndexMetadata<V> {
     }
 
     /// Returns a globally unique numeric index identifier.
-    /// `MerkleDB` assigns a unique numeric ID for each fully-qualified index name.
+    /// MerkleDB assigns a unique numeric ID for each fully-qualified index name.
     ///
-    /// `MerkleDB` never re-uses the identifiers.
+    /// MerkleDB never re-uses the identifiers.
+    #[allow(clippy::doc_markdown)] // Ticks around MerkleDB in this context is redundant.
     pub fn identifier(&self) -> NonZeroU64 {
         self.identifier
     }

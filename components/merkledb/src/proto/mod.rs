@@ -14,9 +14,6 @@
 
 //! Module of the rust-protobuf generated files.
 
-// For protobuf generated files.
-#![allow(clippy::must_use_candidate)]
-
 pub use self::{list_proof::*, map_proof::*};
 
 use exonum_crypto::{proto::*, HASH_SIZE};

@@ -33,7 +33,7 @@
     // `filter(..).map(..)` often looks more shorter and readable.
     clippy::filter_map,
     // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names,
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
     // Variant name ends with the enum name. Similar behavior to similar_names.
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
@@ -41,7 +41,7 @@
     clippy::use_self,
     clippy::default_trait_access,
     // Too much work to fix this issues.
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc,
 )]
 
 #[macro_use]
@@ -109,7 +109,6 @@ fn write_short_hex(f: &mut fmt::Formatter<'_>, slice: &[u8]) -> fmt::Result {
 /// let signature = exonum_crypto::sign(&data, &secret_key);
 /// assert!(exonum_crypto::verify(&signature, &data, &public_key));
 /// ```
-#[must_use]
 pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
     let impl_signature = crypto_impl::sign(data, &secret_key.0);
     Signature(impl_signature)
@@ -128,7 +127,6 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// # exonum_crypto::init();
 /// let (public_key, secret_key) = exonum_crypto::gen_keypair_from_seed(&Seed::new([1; SEED_LENGTH]));
 /// ```
-#[must_use]
 pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
     let (impl_pub_key, impl_secret_key) = crypto_impl::gen_keypair_from_seed(&seed.0);
     (PublicKey(impl_pub_key), SecretKey(impl_secret_key))
@@ -145,7 +143,6 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// # exonum_crypto::init();
 /// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// ```
-#[must_use]
 pub fn gen_keypair() -> (PublicKey, SecretKey) {
     let (pubkey, secret_key) = crypto_impl::gen_keypair();
     (PublicKey(pubkey), SecretKey(secret_key))
@@ -167,7 +164,6 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// let signature = exonum_crypto::sign(&data, &secret_key);
 /// assert!(exonum_crypto::verify(&signature, &data, &public_key));
 /// ```
-#[must_use]
 pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
     crypto_impl::verify(&sig.0, data, &pubkey.0)
 }
@@ -185,7 +181,6 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// let data = [1, 2, 3];
 /// let hash = exonum_crypto::hash(&data);
 /// ```
-#[must_use]
 pub fn hash(data: &[u8]) -> Hash {
     let dig = crypto_impl::hash(data);
     Hash(dig)
@@ -235,13 +230,11 @@ pub struct HashStream(crypto_impl::HashState);
 
 impl HashStream {
     /// Creates a new instance of `HashStream`.
-    #[must_use]
     pub fn new() -> Self {
         HashStream(crypto_impl::HashState::init())
     }
 
     /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
-    #[must_use]
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
@@ -249,7 +242,6 @@ impl HashStream {
 
     /// Returns the resulting hash of the system calculated upon the commit
     /// of currently supplied data.
-    #[must_use]
     pub fn hash(self) -> Hash {
         let dig = self.0.finalize();
         Hash(dig)
@@ -293,7 +285,6 @@ impl SignStream {
     ///
     /// let stream = SignStream::new();
     /// ```
-    #[must_use]
     pub fn new() -> Self {
         SignStream(crypto_impl::SignState::init())
     }
@@ -312,7 +303,6 @@ impl SignStream {
     ///     stream = stream.update(chunk);
     /// }
     /// ```
-    #[must_use]
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
@@ -510,7 +500,6 @@ impl KeyPair {
     /// # Panics
     ///
     /// - If the keys do not match.
-    #[must_use]
     pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
         assert!(
             verify_keys_match(&public_key, &secret_key),
@@ -524,7 +513,6 @@ impl KeyPair {
     }
 
     /// Generates a random keypair using the random number generator provided by the crypto backend.
-    #[must_use]
     pub fn random() -> Self {
         let (public_key, secret_key) = gen_keypair();
         Self {
@@ -534,7 +522,6 @@ impl KeyPair {
     }
 
     /// Generates a keypair from the provided seed.
-    #[must_use]
     pub fn from_seed(seed: &Seed) -> Self {
         let (public_key, secret_key) = gen_keypair_from_seed(seed);
         Self {
@@ -544,13 +531,11 @@ impl KeyPair {
     }
 
     /// Gets the public key.
-    #[must_use]
     pub fn public_key(&self) -> PublicKey {
         self.public_key
     }
 
     /// Gets a reference to the secret key.
-    #[must_use]
     pub fn secret_key(&self) -> &SecretKey {
         &self.secret_key
     }

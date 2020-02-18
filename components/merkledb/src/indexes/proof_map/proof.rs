@@ -384,7 +384,6 @@ fn collect(entries: &[Cow<'_, MapProofEntry>]) -> Result<Hash, MapProofError> {
 
 impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     /// Provides access to the proof part of the view. Useful mainly for debug purposes.
-    #[must_use]
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof
             .iter()
@@ -621,7 +620,6 @@ impl<'a, K, V> CheckedMapProof<'a, K, V> {
     }
 
     /// Returns the `object_hash()` of the underlying `ProofMapIndex`.
-    #[must_use]
     pub fn index_hash(&self) -> Hash {
         self.hash
     }

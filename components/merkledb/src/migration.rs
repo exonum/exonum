@@ -638,7 +638,6 @@ impl AbortHandle {
     }
 
     /// Returns `true` if the `MigrationHelper` associated with this handle has been dropped.
-    #[must_use]
     pub fn is_finished(&self) -> bool {
         Arc::strong_count(&self.inner) <= 1
     }

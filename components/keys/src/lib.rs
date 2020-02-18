@@ -48,7 +48,7 @@
     // `filter(..).map(..)` often looks more shorter and readable.
     clippy::filter_map,
     // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names,
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
     // Variant name ends with the enum name. Similar behavior to similar_names.
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
@@ -99,7 +99,6 @@ pub struct Keys {
 impl Keys {
     /// Creates a random set of keys using the random number generator provided
     /// by the crypto backend.
-    #[must_use]
     pub fn random() -> Self {
         Self {
             consensus: KeyPair::random(),
@@ -129,25 +128,21 @@ impl Keys {
 
 impl Keys {
     /// Consensus public key.
-    #[must_use]
     pub fn consensus_pk(&self) -> PublicKey {
         self.consensus.public_key()
     }
 
     /// Consensus private key.
-    #[must_use]
     pub fn consensus_sk(&self) -> &SecretKey {
         &self.consensus.secret_key()
     }
 
     /// Service public key.
-    #[must_use]
     pub fn service_pk(&self) -> PublicKey {
         self.service.public_key()
     }
 
     /// Service secret key.
-    #[must_use]
     pub fn service_sk(&self) -> &SecretKey {
         &self.service.secret_key()
     }

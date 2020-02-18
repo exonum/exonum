@@ -143,7 +143,6 @@ pub enum GenericRawAccess<'a> {
 
 impl GenericRawAccess<'_> {
     /// Checks if the underlying access is mutable.
-    #[must_use]
     pub fn is_mutable(&self) -> bool {
         match self {
             GenericRawAccess::Fork(_) | GenericRawAccess::OwnedFork(_) => true,
@@ -370,7 +369,6 @@ pub type ErasedAccess<'a> = GenericAccess<GenericRawAccess<'a>>;
 
 impl ErasedAccess<'_> {
     /// Checks if the underlying access is mutable.
-    #[must_use]
     pub fn is_mutable(&self) -> bool {
         match self {
             GenericAccess::Raw(access) => access.is_mutable(),

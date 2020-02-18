@@ -53,7 +53,6 @@ pub struct DbOptions {
 
 impl DbOptions {
     /// Creates a new `DbOptions` object.
-    #[must_use]
     pub fn new(
         max_open_files: Option<i32>,
         create_if_missing: bool,
