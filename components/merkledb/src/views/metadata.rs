@@ -241,9 +241,9 @@ impl<V> IndexMetadata<V> {
     }
 
     /// Returns a globally unique numeric index identifier.
-    /// MerkleDB assigns a unique numeric ID for each fully-qualified index name.
+    /// `MerkleDB` assigns a unique numeric ID for each fully-qualified index name.
     ///
-    /// MerkleDB never re-uses the identifiers.
+    /// `MerkleDB` never re-uses the identifiers.
     pub fn identifier(&self) -> NonZeroU64 {
         self.identifier
     }
