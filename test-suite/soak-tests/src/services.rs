@@ -19,7 +19,7 @@ use exonum::{
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service, ServiceFactory};
+use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
 
 #[exonum_interface(auto_ids)]
 pub trait MainServiceInterface<Ctx> {
@@ -87,11 +87,7 @@ impl Service for TogglingSupervisor {
 
         match height.0 % 5 {
             1 => extensions.initiate_stopping_service(MainService::INSTANCE_ID),
-            4 => extensions.initiate_resuming_service(
-                MainService::INSTANCE_ID,
-                MainService.artifact_id(),
-                (),
-            ),
+            4 => extensions.initiate_resuming_service(MainService::INSTANCE_ID, ()),
             _ => Ok(()),
         }
     }
