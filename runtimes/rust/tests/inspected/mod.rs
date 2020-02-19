@@ -27,7 +27,7 @@ use exonum::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceState,
-        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeFeature, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -182,6 +182,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
     fn initialize(&mut self, blockchain: &Blockchain) {
         self.events.push(RuntimeEvent::InitializeRuntime);
         self.runtime.initialize(blockchain)
+    }
+
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        self.runtime.is_supported(feature)
     }
 
     fn on_resume(&mut self) {
