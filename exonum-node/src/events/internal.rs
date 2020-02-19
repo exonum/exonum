@@ -76,7 +76,7 @@ impl InternalPart {
 
             match request {
                 InternalRequest::VerifyMessage(tx) => {
-                    let fut = Self::verify_message(tx, internal_tx.clone());
+                    let fut = Self::verify_message(tx, internal_tx);
                     verify_executor
                         .execute(Box::new(fut))
                         .expect("cannot schedule message verification");
