@@ -553,6 +553,9 @@ pub enum InstanceStatus {
     Active,
     /// The service instance is stopped.
     Stopped,
+    /// The service instance is frozen; it can process read-only requests,
+    /// but not transactions and `before_transactions` / `after_transactions` hooks.
+    Frozen,
     /// The service instance is migrating to the specified artifact.
     Migrating(Box<InstanceMigration>),
 
@@ -569,6 +572,43 @@ impl InstanceStatus {
     /// Indicates whether the service instance status is active.
     pub fn is_active(&self) -> bool {
         *self == InstanceStatus::Active
+    }
+
+    /// Returns `true` if a service with this status provides at least read access to its data.
+    pub fn provides_read_access(&self) -> bool {
+        match self {
+            // Migrations are non-destructive currently; i.e., the old service data is consistent
+            // during migration.
+            InstanceStatus::Active | InstanceStatus::Frozen | InstanceStatus::Migrating(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be resumed.
+    pub(super) fn can_be_resumed(&self) -> bool {
+        match self {
+            InstanceStatus::Stopped | InstanceStatus::Frozen => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be stopped.
+    pub(super) fn can_be_stopped(&self) -> bool {
+        match self {
+            InstanceStatus::Active | InstanceStatus::Frozen => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be frozen in all cases.
+    pub(super) fn can_be_frozen(&self) -> bool {
+        match self {
+            InstanceStatus::Active => true,
+            // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service
+            // may have a data version differing from the artifact recorded in service spec,
+            // or, more generally, from any of deployed artifacts.
+            _ => false,
+        }
     }
 
     pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
@@ -593,6 +633,7 @@ impl Display for InstanceStatus {
         formatter.write_str(match self {
             InstanceStatus::Active => "active",
             InstanceStatus::Stopped => "stopped",
+            InstanceStatus::Frozen => "frozen",
             InstanceStatus::Migrating(..) => "migrating",
             InstanceStatus::__NonExhaustive => unreachable!("Never actually constructed"),
         })
@@ -614,6 +655,7 @@ impl InstanceStatus {
             None => pb.set_simple(NONE),
             Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
             Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
+            Some(InstanceStatus::Frozen) => pb.set_simple(FROZEN),
             Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
             Some(InstanceStatus::__NonExhaustive) => unreachable!("Never actually constructed"),
         }
@@ -630,6 +672,7 @@ impl InstanceStatus {
                 NONE => None,
                 ACTIVE => Some(InstanceStatus::Active),
                 STOPPED => Some(InstanceStatus::Stopped),
+                FROZEN => Some(InstanceStatus::Frozen),
             })
         } else if pb.has_migration() {
             InstanceMigration::from_pb(pb.take_migration())
@@ -778,12 +821,40 @@ impl InstanceState {
             .unwrap_or(&self.spec.artifact.version)
     }
 
+    /// Returns the artifact currently associated with the service; that is, one that understands
+    /// its data and is deployed on the blockchain.
+    ///
+    /// This method will return `None` if a service has been [migrated] because the migration
+    /// workflow does not guarantee that the resulting data version corresponds to a deployed
+    /// artifact.
+    ///
+    /// A [runtime] may use this method to determine how to treat service state updates.
+    ///
+    /// [migrated]: migrations/index.html
+    /// [runtime]: trait.Runtime.html
+    pub fn associated_artifact(&self) -> Option<&ArtifactId> {
+        if self.data_version.is_some() {
+            None
+        } else {
+            Some(&self.spec.artifact)
+        }
+    }
+
+    /// Returns true if a service with this state can have its data read.
+    pub(super) fn is_readable(&self) -> bool {
+        let status = self
+            .status
+            .as_ref()
+            .or_else(|| self.pending_status.as_ref());
+        status.map_or(false, InstanceStatus::provides_read_access)
+    }
+
     /// Sets next status as current and changes next status to `None`
     ///
     /// # Panics
     ///
     /// - If next status is already `None`.
-    pub(crate) fn commit_pending_status(&mut self) {
+    pub(super) fn commit_pending_status(&mut self) {
         assert!(
             self.pending_status.is_some(),
             "Next instance status should not be `None`"

@@ -19,8 +19,8 @@ use crate::{
     merkledb::{access::Prefixed, BinaryValue, Fork},
     runtime::{
         ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
-        DispatcherSchema, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, InstanceStatus, MethodId, SUPERVISOR_INSTANCE_ID,
+        DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId,
+        InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -373,7 +373,7 @@ impl<'a> SupervisorExtensions<'a> {
             .initiate_adding_service(instance_spec, constructor)
     }
 
-    /// Initiates stopping an active service instance in the blockchain.
+    /// Initiates stopping an active or frozen service instance.
     ///
     /// The service is not immediately stopped; it stops if / when the block containing
     /// the stopping transaction is committed.
@@ -381,12 +381,18 @@ impl<'a> SupervisorExtensions<'a> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
     }
 
-    /// Initiates resuming previously stopped service instance in the blockchain.
+    /// Initiates freezing an active service instance.
     ///
-    /// Provided artifact will be used in attempt to resume service. Artifact name should be equal to
-    /// the artifact name of the previously stopped instance.
-    /// Artifact version should be same as the `data_version` stored in the stopped service
-    /// instance.
+    /// The service is not immediately frozen; it freezes if / when the block containing
+    /// the stopping transaction is committed.
+    ///
+    /// Note that this method **cannot** be used to transition service to frozen
+    /// from the stopped state; this transition is not supported as of now.
+    pub fn initiate_freezing_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
+        Dispatcher::initiate_freezing_service(self.0.fork, instance_id)
+    }
+
+    /// Initiates resuming previously stopped service instance in the blockchain.
     ///
     /// This method can be used to resume modified service after successful migration.
     ///
@@ -395,19 +401,28 @@ impl<'a> SupervisorExtensions<'a> {
     pub fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
-        artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         let state = DispatcherSchema::new(&*self.0.fork)
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        if state.status != Some(InstanceStatus::Stopped) {
-            return Err(CoreError::ServiceNotStopped.into());
+        // Check that the service can be resumed.
+        if let Some(data_version) = state.data_version {
+            let msg = format!(
+                "Cannot resume service `{}` because its data version ({}) does not match \
+                 the associated artifact `{}`. To solve, associate the service with the newer \
+                 artifact revision, for example, via fast-forward migration.",
+                state.spec.as_descriptor(),
+                data_version,
+                state.spec.artifact
+            );
+            return Err(CoreError::CannotResumeService.with_description(msg));
         }
 
-        let mut spec = state.spec;
-        spec.artifact = artifact;
+        let spec = state.spec;
+        DispatcherSchema::new(&*self.0.fork)
+            .initiate_resuming_service(instance_id, spec.artifact.clone())?;
 
         let runtime = self
             .0
@@ -426,11 +441,7 @@ impl<'a> SupervisorExtensions<'a> {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
                 err
-            })?;
-
-        DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact)
-            .map_err(From::from)
+            })
     }
 
     /// Provides writeable access to core schema.

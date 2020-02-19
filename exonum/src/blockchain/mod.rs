@@ -59,7 +59,7 @@ pub mod tests;
 /// [`BlockchainMut`]: struct.BlockchainMut.html
 #[derive(Debug, Clone)]
 pub struct Blockchain {
-    pub(crate) api_sender: ApiSender,
+    api_sender: ApiSender,
     db: Arc<dyn Database>,
     service_keypair: KeyPair,
 }

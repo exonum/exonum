@@ -17,7 +17,7 @@ use exonum::{
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus, Mailbox,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceState, Mailbox,
         MethodId, Runtime, WellKnownRuntime,
     },
 };
@@ -132,13 +132,7 @@ impl Runtime for TestRuntime {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,

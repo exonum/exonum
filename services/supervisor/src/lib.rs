@@ -268,17 +268,14 @@ fn update_configs(
                     );
 
                 log::trace!(
-                    "Request resume service with name {} from artifact {} up to {}",
+                    "Request resume service with name {} with artifact {}",
                     instance.spec.name,
                     instance.spec.artifact,
-                    resume_service.artifact,
                 );
 
-                context.supervisor_extensions().initiate_resuming_service(
-                    resume_service.instance_id,
-                    resume_service.artifact,
-                    resume_service.params,
-                )?;
+                context
+                    .supervisor_extensions()
+                    .initiate_resuming_service(resume_service.instance_id, resume_service.params)?;
             }
         }
     }

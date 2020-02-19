@@ -12,17 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// HACK: Silent "dead_code" warning.
-pub use crate::hooks::{AfterCommitInterface, AfterCommitService, SERVICE_ID, SERVICE_NAME};
-
-use exonum::helpers::Height;
+use assert_matches::assert_matches;
+use exonum::{
+    helpers::Height,
+    runtime::{InstanceId, InstanceStatus, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+};
 use exonum_explorer::BlockchainExplorer;
 use exonum_merkledb::{BinaryValue, ObjectHash};
-use exonum_rust_runtime::RustRuntime;
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_testkit::TestKitBuilder;
 use pretty_assertions::assert_eq;
 
-mod hooks;
+pub use crate::{
+    hooks_service::{
+        AfterCommitInterface, AfterCommitService, AfterCommitServiceV2, SERVICE_ID, SERVICE_NAME,
+    },
+    supervisor::{StartMigration, Supervisor, SupervisorInterface},
+};
+
+mod hooks_service;
+mod supervisor;
+
+const SUPERVISOR_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
 #[test]
 fn test_after_commit() {
@@ -81,6 +92,119 @@ fn test_after_commit_with_auditor() {
         let expected_block_len = if i == 0 { 0 } else { 1 };
         assert_eq!(block.len(), expected_block_len);
     }
+}
+
+#[test]
+fn after_commit_not_called_after_service_stop() {
+    let service = AfterCommitService::new();
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(Supervisor)
+        .with_default_rust_service(service.clone())
+        .build();
+    service.switch_to_generic_broadcast();
+
+    let keys = testkit.us().service_keypair();
+    let tx = keys.stop_service(SUPERVISOR_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should stop");
+
+    // Check that `after_commit` hook is not called for the stopped service.
+    for _ in 0..5 {
+        let block = testkit.create_block();
+        assert!(block.is_empty());
+    }
+
+    // Resume the service and check that `after_commit` starts being called again.
+    let tx = keys.resume_service(SUPERVISOR_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should resume");
+    for _ in 0..5 {
+        let block = testkit.create_block();
+        assert_eq!(block.len(), 1);
+    }
+}
+
+#[test]
+fn after_commit_during_service_freeze() {
+    let service = AfterCommitService::new();
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(Supervisor)
+        .with_default_rust_service(service.clone())
+        .build();
+
+    let keys = testkit.us().service_keypair();
+    let tx = keys.freeze_service(SUPERVISOR_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should freeze");
+
+    // `broadcaster` used in `after_commit` hook by default is not exposed when the service
+    // is frozen.
+    for _ in 0..5 {
+        let block = testkit.create_block();
+        assert!(block.is_empty());
+    }
+
+    // Generic broadcast still should still be working though.
+    service.switch_to_generic_broadcast();
+    for i in 0..5 {
+        let block = testkit.create_block();
+        let expected_len = if i == 0 { 0 } else { 1 };
+        assert_eq!(block.len(), expected_len);
+    }
+}
+
+#[test]
+fn after_commit_during_migration() {
+    let service = AfterCommitService::new();
+    let mut testkit = TestKitBuilder::validator()
+        .with_default_rust_service(Supervisor)
+        .with_default_rust_service(service.clone())
+        .with_migrating_rust_service(AfterCommitServiceV2)
+        .with_artifact(AfterCommitServiceV2.artifact_id())
+        .build();
+
+    let keys = testkit.us().service_keypair();
+    let tx = keys.stop_service(SUPERVISOR_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should stop");
+
+    let tx = keys.start_migration(
+        SUPERVISOR_ID,
+        StartMigration {
+            instance_id: SERVICE_ID,
+            new_artifact: AfterCommitServiceV2.artifact_id(),
+            migration_len: 10,
+        },
+    );
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().expect("Service should start migrating");
+
+    // As with frozen service, the ordinary broadcast should be switched off.
+    for _ in 0..5 {
+        let block = testkit.create_block();
+        assert!(block.is_empty());
+
+        let snapshot = testkit.snapshot();
+        let service_state = snapshot.for_dispatcher().get_instance(SERVICE_ID).unwrap();
+        assert_matches!(service_state.status, Some(InstanceStatus::Migrating(_)));
+    }
+    // Generic broadcast still should still be working though.
+    service.switch_to_generic_broadcast();
+    for i in 0..5 {
+        let block = testkit.create_block();
+        let expected_len = if i == 0 { 0 } else { 1 };
+        assert_eq!(block.len(), expected_len);
+
+        let snapshot = testkit.snapshot();
+        let service_state = snapshot.for_dispatcher().get_instance(SERVICE_ID).unwrap();
+        assert_matches!(service_state.status, Some(InstanceStatus::Migrating(_)));
+    }
+
+    testkit.create_block();
+    testkit.create_block();
+    let snapshot = testkit.snapshot();
+    let service_state = snapshot.for_dispatcher().get_instance(SERVICE_ID).unwrap();
+    assert_matches!(service_state.status, Some(InstanceStatus::Stopped));
 }
 
 #[test]

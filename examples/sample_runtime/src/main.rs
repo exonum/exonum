@@ -24,7 +24,7 @@ use exonum::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
         AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceDescriptor, InstanceId, InstanceSpec, InstanceStatus, Mailbox, MethodId, Runtime,
+        InstanceDescriptor, InstanceId, InstanceState, InstanceStatus, Mailbox, MethodId, Runtime,
         SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -136,14 +136,10 @@ impl Runtime for SampleRuntime {
     }
 
     /// Commits status for the `SampleService` instance with the specified ID.
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: &InstanceStatus,
-    ) {
-        match status {
-            InstanceStatus::Active => {
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
+        let spec = &state.spec;
+        match state.status {
+            Some(InstanceStatus::Active) => {
                 // Unwrap here is safe, since by invocation of this method
                 // `exonum` guarantees that `initiate_adding_service` was invoked
                 // before and it returned `Ok(..)`.
@@ -154,13 +150,9 @@ impl Runtime for SampleRuntime {
                 self.started_services.insert(spec.id, instance);
             }
 
-            InstanceStatus::Stopped => {
+            Some(InstanceStatus::Stopped) => {
                 let instance = self.started_services.remove(&spec.id);
                 println!("Stopping service {}: {:?}", spec, instance);
-            }
-
-            InstanceStatus::Migrating(_) => {
-                // We don't migrate service data in this demo.
             }
 
             _ => {

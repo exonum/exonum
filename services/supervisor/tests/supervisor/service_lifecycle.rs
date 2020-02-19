@@ -177,11 +177,7 @@ fn resume_stopped_service() {
     execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
     // Resume service instance.
-    let change = ConfigPropose::immediate(2).resume_service(
-        instance.spec.id,
-        instance.spec.artifact,
-        vec![],
-    );
+    let change = ConfigPropose::immediate(2).resume_service(instance.spec.id, vec![]);
     let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
@@ -195,11 +191,7 @@ fn resume_active_service() {
     let instance = start_inc_service(&mut testkit);
 
     // Resume service instance.
-    let change = ConfigPropose::immediate(1).resume_service(
-        instance.spec.id,
-        instance.spec.artifact,
-        vec![],
-    );
+    let change = ConfigPropose::immediate(1).resume_service(instance.spec.id, vec![]);
     let keypair = testkit.us().service_keypair();
     let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     let actual_err =
@@ -216,64 +208,6 @@ fn resume_active_service() {
 }
 
 #[test]
-fn resume_service_with_different_artifact_name() {
-    let mut testkit = create_testkit();
-    let instance = start_inc_service(&mut testkit);
-
-    // Stop service instance.
-    let change = ConfigPropose::immediate(1).stop_service(instance.spec.id);
-    let keypair = testkit.us().service_keypair();
-    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
-    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
-
-    // Resume service instance.
-    let mut artifact = instance.spec.artifact;
-    artifact.name = "inc2".to_owned();
-    let change = ConfigPropose::immediate(2).resume_service(instance.spec.id, artifact, vec![]);
-    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
-    let actual_err =
-        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
-
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
-            .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing(
-                "Discarded an attempt to resume service with different artifact name"
-            )
-    )
-}
-
-#[test]
-fn resume_service_with_different_artifact_version() {
-    let mut testkit = create_testkit();
-    let instance = start_inc_service(&mut testkit);
-
-    // Stop service instance.
-    let change = ConfigPropose::immediate(1).stop_service(instance.spec.id);
-    let keypair = testkit.us().service_keypair();
-    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
-    execute_transaction(&mut testkit, change).expect("Transaction should be processed");
-
-    // Resume service instance.
-    let mut artifact = instance.spec.artifact;
-    artifact.version.patch += 1;
-    let change = ConfigPropose::immediate(2).resume_service(instance.spec.id, artifact, vec![]);
-    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
-    let actual_err =
-        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
-
-    assert_eq!(
-        actual_err,
-        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
-            .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing(
-                "Discarded an attempt to resume service with incorrect artifact version"
-            )
-    )
-}
-
-#[test]
 fn multiple_stop_resume_requests() {
     let mut testkit = create_testkit();
 
@@ -282,7 +216,7 @@ fn multiple_stop_resume_requests() {
     // Config proposal with two requests for single service instance.
     let change = ConfigPropose::immediate(2)
         .stop_service(spec.id)
-        .resume_service(spec.id, spec.artifact, vec![]);
+        .resume_service(spec.id, ());
     let keypair = testkit.us().service_keypair();
     let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     let actual_err =

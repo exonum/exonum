@@ -283,12 +283,12 @@ impl Dispatcher {
         // Restart active service instances.
         for state in schema.instances().values() {
             let data_version = state.data_version().to_owned();
+            self.update_service_status(snapshot, &state);
+
+            // Restart a migration script if it is not finished locally.
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined status.");
-            self.update_service_status(snapshot, &state.spec, status.clone());
-
-            // Restart a migration script if it is not finished locally.
             if let Some(target) = status.ongoing_migration_target() {
                 if schema.local_migration_result(&state.spec.name).is_none() {
                     self.start_migration_script(target, state.spec, data_version);
@@ -345,13 +345,12 @@ impl Dispatcher {
         let pending_instances = schema.take_modified_instances();
         let patch = fork.into_patch();
         for (state, _) in pending_instances {
-            let status = state.status;
             debug_assert_eq!(
-                status,
+                state.status,
                 Some(InstanceStatus::Active),
                 "BUG: The built-in service instance must have an active status at startup"
             );
-            self.update_service_status(&patch, &state.spec, status.unwrap());
+            self.update_service_status(&patch, &state);
         }
         patch
     }
@@ -422,7 +421,7 @@ impl Dispatcher {
         } else {
             // No migration script means that the service instance may be immediately updated to
             // the new artifact version.
-            schema.fast_forward_migration(instance_state, new_artifact.version);
+            schema.fast_forward_migration(instance_state, new_artifact);
         }
         Ok(())
     }
@@ -460,7 +459,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Initiates stopping of an existing service instance in the blockchain. The stopping
+    /// Initiates stopping an existing service instance in the blockchain. The stopping
     /// service is active (i.e., processes transactions and the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     pub(crate) fn initiate_stopping_service(
@@ -468,7 +467,16 @@ impl Dispatcher {
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Schema::new(fork)
-            .initiate_stopping_service(instance_id)
+            .initiate_simple_service_transition(instance_id, InstanceStatus::Stopped)
+            .map_err(From::from)
+    }
+
+    pub(crate) fn initiate_freezing_service(
+        fork: &Fork,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork)
+            .initiate_simple_service_transition(instance_id, InstanceStatus::Frozen)
             .map_err(From::from)
     }
 
@@ -661,9 +669,10 @@ impl Dispatcher {
             let data_version = state.data_version().to_owned();
             let status = state
                 .status
+                .as_ref()
                 .expect("BUG: Service status cannot be changed to `None`");
 
-            self.update_service_status(&patch, &state.spec, status.clone());
+            self.update_service_status(&patch, &state);
             if modified_info.migration_transition == Some(MigrationTransition::Start) {
                 let target = status
                     .ongoing_migration_target()
@@ -879,29 +888,29 @@ impl Dispatcher {
     ///
     /// This method assumes that it was previously checked if runtime can change the state
     /// of the service, and will panic if it cannot be done.
-    fn update_service_status(
-        &mut self,
-        snapshot: &dyn Snapshot,
-        instance: &InstanceSpec,
-        status: InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, snapshot: &dyn Snapshot, instance: &InstanceState) {
+        let runtime_id = instance.spec.artifact.runtime_id;
         // Notify the runtime that the service has been committed.
-        let runtime = self.runtimes.get_mut(&instance.artifact.runtime_id).expect(
+        let runtime = self.runtimes.get_mut(&runtime_id).expect(
             "BUG: `update_service_status` was invoked for incorrect runtime, \
              this should never happen because of preemptive checks.",
         );
-        runtime.update_service_status(snapshot, instance, &status);
+        runtime.update_service_status(snapshot, instance);
 
+        let status = instance
+            .status
+            .clone()
+            .expect("BUG: instance status cannot change to `None`");
         info!(
             "Committing service instance {:?} with status {}",
-            instance, status
+            instance.spec, status
         );
 
         self.service_infos.insert(
-            instance.id,
+            instance.spec.id,
             ServiceInfo {
-                runtime_id: instance.artifact.runtime_id,
-                name: instance.name.to_owned(),
+                runtime_id,
+                name: instance.spec.name.clone(),
                 status,
             },
         );

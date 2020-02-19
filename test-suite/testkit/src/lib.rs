@@ -523,6 +523,7 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics in the case any of transaction hashes are not in the pool.
+    // FIXME: clarify behavior with incorrect transactions (ECR-4244)
     pub fn create_block_with_tx_hashes(
         &mut self,
         tx_hashes: &[crypto::Hash],
@@ -542,6 +543,7 @@ impl TestKit {
     /// # Return value
     ///
     /// Returns information about the created block.
+    // FIXME: clarify behavior with incorrect transactions (ECR-4244)
     pub fn create_block(&mut self) -> BlockWithTransactions {
         self.poll_events();
         let tx_hashes: Vec<_> = self
@@ -563,7 +565,7 @@ impl TestKit {
 
     /// Calls `Blockchain::check_tx` and panics on an error.
     fn check_tx(&self, transaction: &Verified<AnyTx>) {
-        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
+        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), transaction) {
             panic!("Attempt to add invalid tx in the pool: {}", error);
         }
     }
