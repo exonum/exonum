@@ -23,6 +23,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Testkit now does not include incorrect transactions into blocks or memory pool,
   similar to real Exonum nodes. (#1785)
 
+### Bug Fixes
+
+#### exonum-node
+
+- Fixed incorrect invalidation of block proposals. (#1782)
+
 ## 1.0.0-rc.1 - 2020-02-07
 
 ### Breaking changes

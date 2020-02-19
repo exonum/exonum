@@ -779,6 +779,51 @@ fn not_sending_precommit_for_proposal_with_incorrect_tx() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
+#[test]
+fn invalid_tx_does_not_invalidate_unrelated_proposes() {
+    let sandbox = timestamping_sandbox();
+    let invalid_tx = gen_incorrect_tx();
+
+    let propose = ProposeBuilder::new(&sandbox).with_tx_hashes(&[]).build();
+    sandbox.recv(&propose);
+    let our_prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&our_prevote);
+
+    sandbox.recv(&invalid_tx);
+    {
+        let inner = sandbox.inner.borrow();
+        let propose_state = inner.handler.state.propose(&propose.object_hash()).unwrap();
+        assert!(!propose_state.has_invalid_txs());
+    }
+
+    let block = sandbox.create_block(&[]);
+    let precommits = (1..4).map(|i| {
+        let validator_id = ValidatorId(i);
+        sandbox.create_precommit(
+            validator_id,
+            Height(1),
+            Round(1),
+            propose.object_hash(),
+            block.object_hash(),
+            sandbox.time().into(),
+            sandbox.secret_key(validator_id),
+        )
+    });
+
+    for precommit in precommits {
+        sandbox.recv(&precommit);
+    }
+    sandbox.assert_state(Height(2), Round(1));
+    sandbox.check_broadcast_status(Height(2), block.object_hash());
+}
+
 /// scenario: // HANDLE PRECOMMIT positive scenario with commit
 #[test]
 fn handle_precommit_positive_scenario_commit() {

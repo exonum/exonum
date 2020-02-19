@@ -840,9 +840,8 @@ impl State {
     pub(super) fn check_incomplete_proposes(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
-            propose_state.unknown_txs.remove(&tx_hash);
-
-            if self.invalid_txs.contains(&tx_hash) {
+            let contained_tx = propose_state.unknown_txs.remove(&tx_hash);
+            if contained_tx && self.invalid_txs.contains(&tx_hash) {
                 // Mark prevote with newly received invalid transaction as invalid.
                 propose_state.is_valid = false;
             }
