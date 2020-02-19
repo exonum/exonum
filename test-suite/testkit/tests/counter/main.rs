@@ -13,15 +13,15 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{CallInBlock, ValidatorKeys},
-    crypto::{Hash, KeyPair},
+    blockchain::CallInBlock,
+    crypto::{Hash, KeyPair, PublicKey},
     helpers::Height,
     messages::{AnyTx, Verified},
     runtime::SnapshotExt,
 };
 use exonum_explorer::{api::TransactionResponse, BlockchainExplorer};
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
@@ -39,12 +39,12 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn get_validator_keys(testkit: &TestKit) -> Vec<ValidatorKeys> {
+fn get_validator_keys(testkit: &TestKit) -> Vec<PublicKey> {
     testkit
         .network()
         .validators()
         .iter()
-        .map(TestNode::public_keys)
+        .map(|node| node.public_keys().consensus_key)
         .collect()
 }
 
