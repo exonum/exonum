@@ -100,6 +100,7 @@ struct SandboxInner {
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
     pub api_requests_rx: mpsc::Receiver<ExternalMessage>,
+    pub transactions_rx: mpsc::Receiver<Verified<AnyTx>>,
 }
 
 impl SandboxInner {
@@ -167,6 +168,14 @@ impl SandboxInner {
             Ok(())
         });
         api_getter.wait().unwrap();
+
+        let tx_getter = futures::lazy(|| -> Result<(), ()> {
+            while let Async::Ready(Some(tx)) = self.transactions_rx.poll()? {
+                self.handler.handle_event(tx.into());
+            }
+            Ok(())
+        });
+        tx_getter.wait().unwrap();
     }
 }
 
@@ -174,6 +183,7 @@ impl SandboxInner {
 pub struct Sandbox {
     pub validators_map: HashMap<PublicKey, SecretKey>,
     pub services_map: HashMap<PublicKey, SecretKey>,
+    pub api_sender: ApiSender,
     inner: RefCell<SandboxInner>,
     addresses: Vec<ConnectInfo>,
     /// Connect message used during initialization.
@@ -868,7 +878,7 @@ impl Sandbox {
         let node_sender = NodeSender {
             network_requests: network_channel.0.clone().wait(),
             internal_requests: internal_channel.0.clone().wait(),
-            transactions: tx_channel.0.wait(),
+            transactions: tx_channel.0.clone().wait(),
             api_requests: api_channel.0.clone().wait(),
         };
         let peers = inner
@@ -912,6 +922,7 @@ impl Sandbox {
             internal_requests_rx: internal_channel.1,
             network_requests_rx: network_channel.1,
             api_requests_rx: api_channel.1,
+            transactions_rx: tx_channel.1,
             handler,
             time: Arc::clone(&inner.time),
         };
@@ -919,6 +930,7 @@ impl Sandbox {
             inner: RefCell::new(inner),
             validators_map: self.validators_map,
             services_map: self.services_map,
+            api_sender: ApiSender::new(tx_channel.0),
             addresses: self.addresses,
             connect: None,
         };
@@ -1178,7 +1190,7 @@ fn sandbox_with_services_uninitialized(
     let node_sender = NodeSender {
         network_requests: network_channel.0.clone().wait(),
         internal_requests: internal_channel.0.clone().wait(),
-        transactions: tx_channel.0.wait(),
+        transactions: tx_channel.0.clone().wait(),
         api_requests: api_channel.0.clone().wait(),
     };
     let api_state = SharedNodeState::new(5000);
@@ -1200,12 +1212,14 @@ fn sandbox_with_services_uninitialized(
         timers: BinaryHeap::new(),
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,
+        transactions_rx: tx_channel.1,
         internal_requests_rx: internal_channel.1,
         handler,
         time: shared_time,
     };
     let sandbox = Sandbox {
         inner: RefCell::new(inner),
+        api_sender: ApiSender::new(tx_channel.0),
         validators_map: HashMap::from_iter(validators),
         services_map: HashMap::from_iter(service_keys),
         addresses: connect_infos,
@@ -1224,7 +1238,6 @@ pub fn timestamping_sandbox() -> Sandbox {
 
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new()
-        .with_rust_service(TimestampingService)
         .with_default_rust_service(TimestampingService)
         .with_default_rust_service(ConfigUpdaterService)
 }

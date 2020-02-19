@@ -547,8 +547,7 @@ fn try_check_and_broadcast_propose_and_prevote(
         return Ok(None);
     }
 
-    let time_millis_since_round_start_copy =
-        { *sandbox_state.time_millis_since_round_start.borrow() };
+    let time_millis_since_round_start_copy = *sandbox_state.time_millis_since_round_start.borrow();
     let time_increment_millis = PROPOSE_TIMEOUT - time_millis_since_round_start_copy + 1;
 
     trace!(

@@ -282,16 +282,12 @@ impl Prevote {
 
 /// Information about a block.
 ///
-/// ### Validation
-/// The message is ignored if
-///     * its `to` field corresponds to a different node
-///     * the `block`, `transaction` and `precommits` fields cannot be
-///     parsed or verified
-///
 /// ### Processing
+///
 /// The block is added to the blockchain.
 ///
 /// ### Generation
+///
 /// The message is sent as response to `BlockRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::BlockResponse")]
