@@ -210,7 +210,7 @@ fn incorrect_txs_are_not_included_into_blocks() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(Supervisor)
-        .with_default_rust_service(service.clone())
+        .with_default_rust_service(service)
         .build();
     let keys = testkit.us().service_keypair();
 
