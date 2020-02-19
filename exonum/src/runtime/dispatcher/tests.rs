@@ -32,12 +32,11 @@ use crate::{
     blockchain::{AdditionalHeaders, ApiSender, Block, Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
-        self,
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
-        ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
-        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, MethodId, Receiver, Runtime, RuntimeInstance, SnapshotExt,
+        oneshot, ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        InstanceState, InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
     },
 };
 
@@ -187,8 +186,8 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
-        let (tx, rx) = runtime::channel();
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = oneshot::channel();
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
@@ -691,8 +690,8 @@ impl Runtime for ShutdownRuntime {
         &mut self,
         _artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
-        let (tx, rx) = runtime::channel();
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = oneshot::channel();
         tx.send(Ok(()));
         rx
     }
@@ -828,7 +827,7 @@ impl Runtime for DeploymentRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
         let delay = BinaryValue::from_bytes(spec.into()).unwrap();
         let delay = Duration::from_millis(delay);
 
@@ -866,7 +865,7 @@ impl Runtime for DeploymentRuntime {
             status.is_deployed = true;
         }
 
-        let (tx, rx) = runtime::channel();
+        let (tx, rx) = oneshot::channel();
         tx.send(result);
         rx
     }

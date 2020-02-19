@@ -21,19 +21,19 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     runtime::{
-        self,
         migrations::{InitMigrationError, MigrationScript},
+        oneshot,
         versioning::Version,
         AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceDescriptor, InstanceId, InstanceState, InstanceStatus, Mailbox, MethodId, Receiver,
-        Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        InstanceDescriptor, InstanceId, InstanceState, InstanceStatus, Mailbox, MethodId, Runtime,
+        SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
 use exonum_node::{NodeApiConfig, NodeBuilder, NodeConfig};
 use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
-use futures::{Future, IntoFuture};
+use futures::Future;
 
 use std::{cell::Cell, collections::BTreeMap, thread, time::Duration};
 
@@ -100,8 +100,8 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
-        let (tx, rx) = runtime::channel();
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = oneshot::channel();
         tx.send(self.deploy_artifact(artifact, spec));
         rx
     }

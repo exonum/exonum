@@ -15,11 +15,11 @@
 use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
-        self,
         migrations::{InitMigrationError, MigrationScript},
+        oneshot,
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceState, Mailbox,
-        MethodId, Receiver, Runtime, WellKnownRuntime,
+        MethodId, Runtime, WellKnownRuntime,
     },
 };
 use exonum_merkledb::Snapshot;
@@ -104,10 +104,10 @@ impl Runtime for TestRuntime {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
         self.tester.deploy_artifact(artifact, deploy_spec);
 
-        let (tx, rx) = runtime::channel();
+        let (tx, rx) = oneshot::channel();
         tx.send(Ok(()));
         rx
     }

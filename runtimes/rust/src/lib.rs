@@ -322,11 +322,12 @@ use exonum::{
     helpers::Height,
     merkledb::Snapshot,
     runtime::{
-        self, catch_panic,
+        catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
+        oneshot,
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, Mailbox, MethodId, Receiver, Runtime, RuntimeIdentifier,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier,
         WellKnownRuntime,
     },
 };
@@ -677,7 +678,7 @@ impl Runtime for RustRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
         let result = if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             Err(Error::IncorrectArtifactId.into())
@@ -685,7 +686,7 @@ impl Runtime for RustRuntime {
             self.deploy(&artifact)
         };
 
-        let (tx, rx) = runtime::channel();
+        let (tx, rx) = oneshot::channel();
         tx.send(result);
         rx
     }

@@ -19,6 +19,8 @@ canonicalize
 checkpointed
 chmod
 chrono
+cipherparams
+ciphertext
 clippy
 cloneable
 codecov
@@ -32,10 +34,9 @@ cryptocurrency
 cryptographically
 ctrlc
 cyclomatic
-ciphertext
-cipherparams
 datetime
 deadlinks
+deallocated
 decodable
 deployable
 deque
@@ -132,6 +133,7 @@ proxying
 pubkey
 pubkeys
 pwbox
+quantile
 quux
 readonly
 rebasing
@@ -154,7 +156,6 @@ rtype
 runtimes
 rustfmt
 rustup
-quantile
 scalarmult
 scrypt
 seedable

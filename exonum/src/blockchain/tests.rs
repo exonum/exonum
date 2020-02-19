@@ -35,12 +35,12 @@ use crate::{
     helpers::{Height, ValidatorId},
     messages::Verified,
     runtime::{
-        self, catch_panic,
+        catch_panic,
         migrations::{InitMigrationError, MigrationScript},
-        AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
+        oneshot, AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
         ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, Mailbox, MethodId, Receiver, Runtime, SnapshotExt,
-        WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -258,13 +258,13 @@ impl Runtime for RuntimeInspector {
         &mut self,
         artifact: ArtifactId,
         _deploy_spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
         assert!(self.available.contains(&artifact));
         assert!(!self.deployed.contains(&artifact));
 
         self.deployed.push(artifact);
 
-        let (tx, rx) = runtime::channel();
+        let (tx, rx) = oneshot::channel();
         tx.send(Ok(()));
         rx
     }

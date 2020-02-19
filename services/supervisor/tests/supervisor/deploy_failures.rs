@@ -42,11 +42,11 @@ mod failing_runtime {
 
     use exonum::merkledb::Snapshot;
     use exonum::runtime::{
-        self,
         migrations::{InitMigrationError, MigrationScript},
+        oneshot,
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceState, Mailbox, MethodId, Receiver,
-        Runtime, WellKnownRuntime,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceState, Mailbox, MethodId, Runtime,
+        WellKnownRuntime,
     };
     use exonum_derive::ExecutionFail;
 
@@ -96,7 +96,7 @@ mod failing_runtime {
             &mut self,
             artifact: ArtifactId,
             _spec: Vec<u8>,
-        ) -> Receiver<Result<(), ExecutionError>> {
+        ) -> oneshot::Receiver<Result<(), ExecutionError>> {
             let result = {
                 if artifact.runtime_id != FAILING_RUNTIME_ID {
                     Err(FailingRuntimeError::GenericError.into())
@@ -109,7 +109,7 @@ mod failing_runtime {
                 }
             };
 
-            let (tx, rx) = runtime::channel();
+            let (tx, rx) = oneshot::channel();
             tx.send(result);
             rx
         }

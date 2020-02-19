@@ -27,7 +27,7 @@ use crate::{
     helpers::ValidatorId,
     runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
-        self, BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, Receiver,
+        oneshot, BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId,
         RuntimeIdentifier, SnapshotExt, WellKnownRuntime,
     },
 };
@@ -57,8 +57,8 @@ impl Runtime for MigrationRuntime {
         &mut self,
         _artifact: ArtifactId,
         _deploy_spec: Vec<u8>,
-    ) -> Receiver<Result<(), ExecutionError>> {
-        let (tx, rx) = runtime::channel();
+    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = oneshot::channel();
         tx.send(Ok(()));
         rx
     }
