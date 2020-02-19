@@ -51,9 +51,8 @@ impl RunHandle {
     }
 
     fn join(self) -> KeyPair {
-        self.shutdown_handle.shutdown().wait().unwrap();
-        // FIXME: use `expect` once "cannot send internal event" panic is removed.
-        self.node_thread.join().ok();
+        self.shutdown_handle.shutdown().wait().expect("Cannot shut down node");
+        self.node_thread.join().expect("Node panicked during shutdown");
         self.service_keys
     }
 }
