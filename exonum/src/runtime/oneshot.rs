@@ -16,7 +16,7 @@
 
 use std::sync::mpsc;
 
-/// Create a new one-shot channel for sending single values, 
+/// Create a new one-shot channel for sending single values,
 /// returning the sender/receiver halves.
 pub fn channel<T>() -> (Sender<T>, Receiver<T>) {
     let (tx, rx) = mpsc::channel();
@@ -57,7 +57,7 @@ impl<T> Receiver<T> {
 /// owned by one thread, but it can be cloned to send to other threads.
 ///
 /// Message can be sent through this channel with [`send`].
-/// 
+///
 /// [`channel`]: fn.channel.html
 /// [`send`]: struct.Sender.html#method.send
 #[derive(Debug)]
