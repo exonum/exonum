@@ -51,8 +51,13 @@ impl RunHandle {
     }
 
     fn join(self) -> KeyPair {
-        self.shutdown_handle.shutdown().wait().expect("Cannot shut down node");
-        self.node_thread.join().expect("Node panicked during shutdown");
+        self.shutdown_handle
+            .shutdown()
+            .wait()
+            .expect("Cannot shut down node");
+        self.node_thread
+            .join()
+            .expect("Node panicked during shutdown");
         self.service_keys
     }
 }
