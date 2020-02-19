@@ -25,8 +25,8 @@ use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
-    api::MigrationInfoQuery, AsyncEventState, ConfigPropose, MigrationError, MigrationRequest,
-    MigrationResult, MigrationState, SchemaImpl, Supervisor, SupervisorInterface,
+    api::MigrationInfoQuery, AsyncEventState, ConfigPropose, ConfigurationError, MigrationError,
+    MigrationRequest, MigrationResult, MigrationState, SchemaImpl, Supervisor, SupervisorInterface,
 };
 
 use std::{thread, time::Duration};
@@ -282,6 +282,26 @@ fn migration() {
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v02::verify_schema(prefixed);
+
+    // Check that the service cannot be resumed after migration.
+    let change = ConfigPropose::immediate(2).resume_service(MigrationService::INSTANCE_ID, ());
+    let change = testkit
+        .us()
+        .service_keypair()
+        .propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(
+                "Service `migration-service` has data version (0.2.0) differing from \
+                 its artifact version (`0:exonum.test.Migration:0.1.0`) and thus \
+                 cannot be resumed"
+            )
+    )
 }
 
 /// This test applies two migrations to one service, one after another.

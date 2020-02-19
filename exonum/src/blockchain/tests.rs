@@ -40,7 +40,7 @@ use crate::{
         migrations::{InitMigrationError, MigrationScript},
         AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
         ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -293,13 +293,7 @@ impl Runtime for RuntimeInspector {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,

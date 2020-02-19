@@ -20,10 +20,12 @@ use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::PublicKey,
     merkledb::{access::Prefixed, Snapshot},
-    runtime::{BlockchainData, InstanceDescriptor, InstanceId},
+    runtime::{
+        ArtifactId, BlockchainData, InstanceDescriptor, InstanceState, InstanceStatus, SnapshotExt,
+    },
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
-use futures::{Future, IntoFuture};
+use futures::{future, Future, IntoFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
@@ -38,26 +40,51 @@ pub struct ServiceApiState<'a> {
     broadcaster: Broadcaster<'a>,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
-    /// Endpoint path relative to the service root
+    /// Endpoint path relative to the service root.
     endpoint: String,
+    /// Current status of the service.
+    status: InstanceStatus,
 }
 
 impl<'a> ServiceApiState<'a> {
-    /// Create service API state snapshot from the given blockchain and instance descriptor.
-    pub fn from_api_context<S: Into<String>>(
+    /// Creates service API context from the given blockchain and instance descriptor.
+    fn new<S: Into<String>>(
         blockchain: &'a Blockchain,
         instance: InstanceDescriptor,
+        expected_artifact: &ArtifactId,
         endpoint: S,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        let snapshot = blockchain.snapshot();
+        let instance_state = snapshot
+            .for_dispatcher()
+            .get_instance(instance.id)
+            .ok_or_else(|| Self::removed_service_error(&instance))?;
+        Self::check_service_artifact(&instance_state, expected_artifact)?;
+        let status = instance_state
+            .status
+            .ok_or_else(|| Self::removed_service_error(&instance))?;
+
+        Ok(Self {
             broadcaster: Broadcaster::new(
                 instance,
                 blockchain.service_keypair(),
                 blockchain.sender(),
             ),
-            snapshot: blockchain.snapshot(),
+            snapshot,
             endpoint: endpoint.into(),
-        }
+            status,
+        })
+    }
+
+    fn removed_service_error(instance: &InstanceDescriptor) -> Error {
+        let details = format!(
+            "Service `{}` has been removed from the blockchain services, making it \
+             impossible to process HTTP handlers",
+            instance
+        );
+        Error::new(HttpStatusCode::INTERNAL_SERVER_ERROR)
+            .title("Service is gone")
+            .detail(details)
     }
 
     /// Returns readonly access to blockchain data.
@@ -86,14 +113,29 @@ impl<'a> ServiceApiState<'a> {
         &self.broadcaster.instance()
     }
 
-    /// Returns a transaction broadcaster if the current node is a validator. If the node
-    /// is not a validator, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
-        CoreSchema::new(&self.snapshot).validator_id(self.broadcaster.keypair().public_key())?;
-        Some(self.broadcaster.clone())
+    /// Returns the current status of the service.
+    pub fn status(&self) -> &InstanceStatus {
+        &self.status
     }
 
-    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
+    /// Returns a transaction broadcaster if the current node is a validator and the service
+    /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
+    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+        if self.status.is_active() {
+            CoreSchema::new(&self.snapshot).validator_id(self.service_key())?;
+            Some(self.broadcaster.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor)
+    /// and the service status (active or not).
+    ///
+    /// # Safety
+    ///
+    /// Transactions for non-active services will not be broadcast successfully; they will be
+    /// filtered on the receiving nodes as ones that cannot (currently) be processed.
     pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
         self.broadcaster.clone()
     }
@@ -116,10 +158,30 @@ impl<'a> ServiceApiState<'a> {
 
         // Mounting points do not contain the leading slash, e.g. `endpoint("v1/stats")`.
         nesting_level += 1;
-
         let path_to_service_root = "../".repeat(nesting_level);
-
         format!("{}{}", path_to_service_root, new_endpoint)
+    }
+
+    fn check_service_artifact(
+        instance_state: &InstanceState,
+        expected_artifact: &ArtifactId,
+    ) -> Result<()> {
+        let actual_artifact = instance_state.associated_artifact();
+        if actual_artifact == Some(expected_artifact) {
+            Ok(())
+        } else {
+            let details = format!(
+                "Service `{}` was upgraded to version {}, making it impossible to continue \
+                 using HTTP handlers from artifact `{}`. Depending on administrative actions, \
+                 the server may be soon rebooted with updated endpoints",
+                instance_state.spec.as_descriptor(),
+                instance_state.data_version(),
+                expected_artifact
+            );
+            Err(Error::new(HttpStatusCode::SERVICE_UNAVAILABLE)
+                .title("Service has been upgraded, but its HTTP handlers are not rebooted yet")
+                .detail(details))
+        }
     }
 }
 
@@ -128,16 +190,19 @@ impl<'a> ServiceApiState<'a> {
 pub struct ServiceApiScope {
     inner: ApiScope,
     blockchain: Blockchain,
-    descriptor: (InstanceId, String),
+    descriptor: InstanceDescriptor,
+    // Artifact associated with the service.
+    artifact: ArtifactId,
 }
 
 impl ServiceApiScope {
     /// Creates a new service API scope for the specified service instance.
-    pub fn new(blockchain: Blockchain, instance: &InstanceDescriptor) -> Self {
+    fn new(blockchain: Blockchain, descriptor: InstanceDescriptor, artifact: ArtifactId) -> Self {
         Self {
             inner: ApiScope::new(),
             blockchain,
-            descriptor: (instance.id, instance.name.clone()),
+            descriptor,
+            artifact,
         }
     }
 
@@ -152,17 +217,21 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let (instance_id, instance_name) = self.descriptor.clone();
+        let descriptor = self.descriptor.clone();
+        let artifact = self.artifact.clone();
         self.inner
             .endpoint(name, move |query: Q| -> FutureResult<I> {
-                let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
-                let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
-                let result = handler(&state, query);
+                let maybe_state =
+                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+                let state = match maybe_state {
+                    Ok(state) => state,
+                    Err(err) => return Box::new(future::err(err)),
+                };
 
-                let instance_name = instance_name.clone();
-                let future = result
+                let descriptor = descriptor.clone();
+                let future = handler(&state, query)
                     .into_future()
-                    .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+                    .map_err(move |err| err.source(descriptor.to_string()));
                 Box::new(future)
             });
         self
@@ -179,25 +248,29 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let (instance_id, instance_name) = self.descriptor.clone();
+        let descriptor = self.descriptor.clone();
+        let artifact = self.artifact.clone();
         self.inner
             .endpoint_mut(name, move |query: Q| -> FutureResult<I> {
-                let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
-                let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
-                let result = handler(&state, query);
+                let maybe_state =
+                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+                let state = match maybe_state {
+                    Ok(state) => state,
+                    Err(err) => return Box::new(future::err(err)),
+                };
 
-                let instance_name = instance_name.clone();
-                let future = result
+                let descriptor = descriptor.clone();
+                let future = handler(&state, query)
                     .into_future()
-                    .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+                    .map_err(move |err| err.source(descriptor.to_string()));
                 Box::new(future)
             });
         self
     }
 
-    /// Same as `endpoint`, but the response will contain a warning about endpoint being deprecated.
-    /// Optional endpoint expiration date and deprecation-related information (e.g., link to a documentation for
-    /// a new API) can be included in the warning.
+    /// Same as `endpoint`, but the response will contain a warning about the endpoint
+    /// being deprecated. The endpoint expiration date and deprecation-related information
+    /// (e.g., a link to documentation for a new API) can be included in the warning.
     pub fn deprecated_endpoint<Q, I, F, R>(
         &mut self,
         name: &'static str,
@@ -210,17 +283,22 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let (instance_id, instance_name) = self.descriptor.clone();
+        let descriptor = self.descriptor.clone();
+        let artifact = self.artifact.clone();
         let inner = deprecated.handler.clone();
-        let handler = move |query: Q| -> FutureResult<I> {
-            let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
-            let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
-            let result = inner(&state, query);
 
-            let instance_name = instance_name.clone();
-            let future = result
+        let handler = move |query: Q| -> FutureResult<I> {
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return Box::new(future::err(err)),
+            };
+
+            let descriptor = descriptor.clone();
+            let future = inner(&state, query)
                 .into_future()
-                .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+                .map_err(move |err| err.source(descriptor.to_string()));
             Box::new(future)
         };
         // Mark endpoint as deprecated.
@@ -229,9 +307,9 @@ impl ServiceApiScope {
         self
     }
 
-    /// Same as `endpoint_mut`, but the response will contain a warning about endpoint being deprecated.
-    /// Optional endpoint expiration date and deprecation-related information (e.g., link to a documentation for
-    /// a new API) can be included in the warning.
+    /// Same as `endpoint_mut`, but the response will contain a warning about the endpoint
+    /// being deprecated. The endpoint expiration date and deprecation-related information
+    /// (e.g., a link to documentation for a new API) can be included in the warning.
     pub fn deprecated_endpoint_mut<Q, I, F, R>(
         &mut self,
         name: &'static str,
@@ -244,17 +322,22 @@ impl ServiceApiScope {
         R: IntoFuture<Item = I, Error = Error> + 'static,
     {
         let blockchain = self.blockchain.clone();
-        let (instance_id, instance_name) = self.descriptor.clone();
+        let descriptor = self.descriptor.clone();
+        let artifact = self.artifact.clone();
         let inner = deprecated.handler.clone();
-        let handler = move |query: Q| -> FutureResult<I> {
-            let descriptor = InstanceDescriptor::new(instance_id, &instance_name);
-            let state = ServiceApiState::from_api_context(&blockchain, descriptor, name);
-            let result = inner(&state, query);
 
-            let instance_name = instance_name.clone();
-            let future = result
+        let handler = move |query: Q| -> FutureResult<I> {
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return Box::new(future::err(err)),
+            };
+
+            let descriptor = descriptor.clone();
+            let future = inner(&state, query)
                 .into_future()
-                .map_err(move |err| err.source(format!("{}:{}", instance_id, instance_name)));
+                .map_err(move |err| err.source(descriptor.to_string()));
             Box::new(future)
         };
         // Mark endpoint as deprecated.
@@ -339,23 +422,6 @@ impl ServiceApiScope {
 ///         .endpoint("v1/ping", MyApi::ping);
 ///     builder
 /// }
-/// # use exonum::{
-/// #     blockchain::{ApiSender, Blockchain}, merkledb::TemporaryDB,
-/// #     runtime::InstanceDescriptor,
-/// # };
-/// # use futures::sync::mpsc;
-/// # fn main() {
-/// #     let blockchain = Blockchain::new(
-/// #         TemporaryDB::new(),
-/// #         exonum::crypto::gen_keypair(),
-/// #         ApiSender::closed(),
-/// #     );
-/// #     let mut builder = ServiceApiBuilder::new(
-/// #         blockchain,
-/// #         InstanceDescriptor::new(1100, "example"),
-/// #     );
-/// #     wire_api(&mut builder);
-/// # }
 /// ```
 #[derive(Debug)]
 pub struct ServiceApiBuilder {
@@ -366,28 +432,35 @@ pub struct ServiceApiBuilder {
 }
 
 impl ServiceApiBuilder {
-    /// Create a new service API builder for the specified service instance.
-    #[doc(hidden)]
-    pub fn new(blockchain: Blockchain, instance: InstanceDescriptor) -> Self {
+    /// Creates a new service API builder for the specified service instance.
+    pub(crate) fn new(
+        blockchain: Blockchain,
+        instance: InstanceDescriptor,
+        artifact: ArtifactId,
+    ) -> Self {
         Self {
             blockchain: blockchain.clone(),
-            public_scope: ServiceApiScope::new(blockchain.clone(), &instance),
-            private_scope: ServiceApiScope::new(blockchain, &instance),
+            public_scope: ServiceApiScope::new(
+                blockchain.clone(),
+                instance.clone(),
+                artifact.clone(),
+            ),
+            private_scope: ServiceApiScope::new(blockchain, instance, artifact),
             root_path: None,
         }
     }
 
-    /// Return a mutable reference to the public API scope builder.
+    /// Returns a mutable reference to the public API scope builder.
     pub fn public_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.public_scope
     }
 
-    /// Return a mutable reference to the private API scope builder.
+    /// Returns a mutable reference to the private API scope builder.
     pub fn private_scope(&mut self) -> &mut ServiceApiScope {
         &mut self.private_scope
     }
 
-    /// Return a reference to the blockchain.
+    /// Returns a reference to the blockchain.
     pub fn blockchain(&self) -> &Blockchain {
         &self.blockchain
     }

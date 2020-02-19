@@ -326,7 +326,8 @@ use exonum::{
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier, WellKnownRuntime,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier,
+        WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -407,13 +408,10 @@ struct Instance {
     id: InstanceId,
     name: String,
     service: Box<dyn Service>,
+    artifact_id: ArtifactId,
 }
 
 impl Instance {
-    fn new(id: InstanceId, name: String, service: Box<dyn Service>) -> Self {
-        Self { id, name, service }
-    }
-
     fn descriptor(&self) -> InstanceDescriptor {
         InstanceDescriptor::new(self.id, &self.name)
     }
@@ -498,6 +496,24 @@ impl RustRuntime {
         RustRuntimeBuilder::new()
     }
 
+    fn assert_known_status(status: &InstanceStatus) {
+        match status {
+            InstanceStatus::Active
+            | InstanceStatus::Stopped
+            | InstanceStatus::Frozen
+            | InstanceStatus::Migrating(_) => (),
+
+            other => {
+                panic!(
+                    "Received non-expected service status: {}; \
+                     Rust runtime isn't prepared to process this action, \
+                     probably Rust runtime is outdated relative to the core library",
+                    other
+                );
+            }
+        }
+    }
+
     fn blockchain(&self) -> &Blockchain {
         self.blockchain
             .as_ref()
@@ -542,31 +558,56 @@ impl RustRuntime {
         artifact: &ArtifactId,
         instance: &InstanceDescriptor,
     ) -> Result<Instance, ExecutionError> {
-        if !self.deployed_artifacts.contains(artifact) {
+        let factory = self.available_artifacts.get(artifact).unwrap_or_else(|| {
             panic!(
                 "BUG: Core requested service instance start ({}) of not deployed artifact {}",
                 instance.name, artifact
             );
-        }
-        if self.started_services.contains_key(&instance.id) {
-            panic!(
-                "BUG: Core requested service service instance start ({}) with already taken ID",
-                instance
-            );
-        }
-        if self.started_services_by_name.contains_key(&instance.name) {
-            panic!(
-                "BUG: Core requested service service instance start ({}) with already taken name",
-                instance
-            );
-        }
+        });
 
-        let service = self.available_artifacts[artifact].create_instance();
-        Ok(Instance::new(
-            instance.id,
-            instance.name.to_owned(),
+        let service = factory.create_instance();
+        Ok(Instance {
+            id: instance.id,
+            name: instance.name.to_owned(),
             service,
-        ))
+            artifact_id: artifact.to_owned(),
+        })
+    }
+
+    /// Instantiates a service after checking that a matching service is not instantiated
+    /// already.
+    ///
+    /// # Return value
+    ///
+    /// - `Some(_)` if a new service was instantiated.
+    /// - `None` if a matching service is already stored in `self.services`.
+    ///
+    /// # Panics
+    ///
+    /// If the stored service does not match the provided `artifact` / `descriptor`,
+    /// this method will panic.
+    fn new_service_if_needed(
+        &self,
+        artifact: &ArtifactId,
+        descriptor: &InstanceDescriptor,
+    ) -> Result<Option<Instance>, ExecutionError> {
+        if let Some(instance) = self.started_services.get(&descriptor.id) {
+            assert!(
+                instance.artifact_id == *artifact || artifact.is_upgrade_of(&instance.artifact_id),
+                "Mismatch between the requested artifact and the artifact associated \
+                 with the running service {}. This is either a bug in the lifecycle \
+                 workflow in the core, or this version of the Rust runtime is outdated \
+                 compared to the core.",
+                descriptor
+            );
+
+            if instance.artifact_id == *artifact {
+                // We just continue running the existing service since we've just checked
+                // that it corresponds to the same artifact.
+                return Ok(None);
+            }
+        }
+        Some(self.new_service(artifact, descriptor)).transpose()
     }
 
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
@@ -575,7 +616,8 @@ impl RustRuntime {
             .map(|instance| {
                 let mut builder = ServiceApiBuilder::new(
                     self.blockchain().clone(),
-                    InstanceDescriptor::new(instance.id, &instance.name),
+                    instance.descriptor(),
+                    instance.artifact_id.clone(),
                 );
                 instance.as_ref().wire_api(&mut builder);
                 let root_path = builder
@@ -665,42 +707,59 @@ impl Runtime for RustRuntime {
         artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(artifact, context.instance())?;
-        let service = instance.as_ref();
+        let maybe_instance = self.new_service_if_needed(artifact, context.instance())?;
+        let service = if let Some(ref instance) = maybe_instance {
+            instance.as_ref()
+        } else {
+            // Indexing is safe due to how `new_service_if_needed` is implemented.
+            self.started_services[&context.instance().id].as_ref()
+        };
         catch_panic(|| service.resume(context, parameters))
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: &InstanceStatus,
-    ) {
-        match status {
-            InstanceStatus::Active => {
-                let instance = self
-                    .new_service(&spec.artifact, &spec.as_descriptor())
-                    .expect(
-                    "BUG: Attempt to create a new service instance failed; \
-                     within `instantiate_adding_service` we were able to create a new instance, \
-                     but now we are not.",
-                );
-                self.add_started_service(instance);
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
+        const CANNOT_INSTANTIATE_SERVICE: &str =
+            "BUG: Attempt to create a new service instance failed; \
+             within `instantiate_adding_service` we were able to create a new instance, \
+             but now we are not.";
+
+        let status = state
+            .status
+            .as_ref()
+            .expect("Rust runtime does not support removing service status");
+        Self::assert_known_status(status);
+
+        let mut service_api_changed = false;
+        let switch_off = if status.provides_read_access() {
+            if let Some(artifact) = state.associated_artifact() {
+                // Instantiate the service if necessary.
+                let maybe_instance = self
+                    .new_service_if_needed(artifact, &state.spec.as_descriptor())
+                    .expect(CANNOT_INSTANTIATE_SERVICE);
+                if let Some(instance) = maybe_instance {
+                    self.add_started_service(instance);
+                    // The service API has changed even if it was previously instantiated
+                    // (in the latter case, the instantiated version is outdated).
+                    service_api_changed = true;
+                }
+                false
+            } else {
+                // Service is no longer associated with an artifact; its API needs switching off.
+                true
             }
-            InstanceStatus::Stopped => {
-                self.remove_started_service(spec);
-            }
-            InstanceStatus::Migrating(_) => { /* Do nothing. */ }
-            other => {
-                panic!(
-                    "Received non-expected service status: {}; \
-                     Rust runtime isn't prepared to process this action, \
-                     probably Rust runtime is outdated relative to the core library",
-                    other
-                );
-            }
+        } else {
+            // Service status (e.g., `Stopped`) requires switching the API off.
+            true
+        };
+
+        if switch_off {
+            // Switch the service API off.
+            service_api_changed = self.started_services.contains_key(&state.spec.id);
+            self.remove_started_service(&state.spec);
         }
-        self.changed_services_since_last_block = true;
+
+        self.changed_services_since_last_block =
+            self.changed_services_since_last_block || service_api_changed;
     }
 
     fn migrate(

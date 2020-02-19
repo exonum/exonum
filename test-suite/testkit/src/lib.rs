@@ -156,7 +156,36 @@ type ApiNotifierChannel = (
 );
 
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
-/// (with no real network setup).
+/// with no real network setup.
+///
+/// # Transaction Checks
+///
+/// The testkit strives to emulate consensus rules and other behavior as close as possible.
+/// As a result, the testkit checks incoming transactions regardless of their source
+/// with [`Blockchain::check_tx`] and does not create blocks with incorrect transactions.
+/// Exonum nodes never include transactions failing `check_tx` in block proposals,
+/// and any proposal with such a transaction is incorrect per consensus rules.
+///
+/// Similarly, incorrect transactions are not included to the pool of the testkit
+/// since they are not included into the pools of real Exonum nodes and are not broadcast
+/// by the nodes. Note that it is still possible to obtain an incorrect transaction in the pool,
+/// e.g., by stopping the service targeted by an otherwise valid transaction. Again, the testkit
+/// does not differ in this regard from real nodes.
+///
+/// The testkit will panic if explicitly asked to create a block with an incorrect transaction
+/// (e.g., via [`create_block_with_transaction`]) or to add it to the pool via [`add_tx`].
+/// If an incorrect transaction is being added to pool or block implicitly (e.g.,
+/// via [`create_block`] or by generating a transaction in the service), the testkit will ignore
+/// the transaction and log this event with the `warn` level.
+///
+/// [`Blockchain::check_tx`]: https://docs.rs/exonum/latest/exonum/blockchain/struct.Blockchain.html#method.check_tx
+/// [`create_block_with_transaction`]: #method.create_block_with_transaction
+/// [`add_tx`]: #method.add_tx
+/// [`create_block`]: #method.create_block
+///
+/// # Examples
+///
+/// See the [crate-level docs](index.html) for examples of usage.
 pub struct TestKit {
     blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
@@ -237,7 +266,19 @@ impl TestKit {
         let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
             Box::new(api_channel.1.and_then(move |transaction| {
                 let _guard = processing_lock_.lock().unwrap();
-                BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(transaction));
+                let snapshot = db.snapshot();
+                if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                    log::warn!(
+                        "Did not add transaction {:?} to pool because it is incorrect. {}",
+                        transaction.payload(),
+                        error
+                    );
+                } else {
+                    BlockchainMut::add_transactions_into_db_pool(
+                        db.as_ref(),
+                        iter::once(transaction),
+                    );
+                }
                 Ok(())
             }));
 
@@ -406,6 +447,7 @@ impl TestKit {
         self.db_handler.rollback()
     }
 
+    /// Creates a block with the specified transaction hashes.
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let saved_consensus_config = self.consensus_config();
@@ -466,7 +508,8 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
-    /// - Panics if any of the transactions is incorrect.
+    /// - Panics if any of transactions in the created block is incorrect.
+    ///   See the [type-level docs](#transaction-checks) for more details.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
@@ -477,8 +520,6 @@ impl TestKit {
         let tx_hashes: Vec<_> = txs
             .into_iter()
             .map(|tx| {
-                self.check_tx(&tx);
-
                 let tx_id = tx.object_hash();
                 let tx_not_found = !schema.transactions().contains(&tx_id);
                 let tx_in_pool = schema.transactions_pool().contains(&tx_id);
@@ -507,10 +548,11 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - Panics if given transaction has been already committed to the blockchain.
-    /// - Panics if any of the transactions is incorrect.
+    /// - Panics if the given transaction has been already committed to the blockchain.
+    /// - Panics if the transaction is incorrect. See the [type-level docs](#transaction-checks)
+    ///   for more details.
     pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
-        self.create_block_with_transactions(vec![tx])
+        self.create_block_with_transactions(iter::once(tx))
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
@@ -523,6 +565,8 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics in the case any of transaction hashes are not in the pool.
+    /// - Panics if any of transactions in the created block is incorrect.
+    ///   See the [type-level docs](#transaction-checks) for more details.
     pub fn create_block_with_tx_hashes(
         &mut self,
         tx_hashes: &[crypto::Hash],
@@ -532,43 +576,84 @@ impl TestKit {
         let snapshot = self.blockchain.snapshot();
         let schema = snapshot.for_core();
         for hash in tx_hashes {
-            assert!(schema.transactions_pool().contains(hash));
+            assert!(
+                schema.transactions_pool().contains(hash),
+                "Transaction with hash {:?} is not found in the transaction pool",
+                hash
+            );
+
+            let transaction = schema
+                .transactions()
+                .get(hash)
+                .expect("Transaction is saved in pool, but not in the `transactions` map");
+            if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                panic!(
+                    "Cannot create block with incorrect transaction (hash = {:?}): {}",
+                    hash, error
+                );
+            }
         }
         self.do_create_block(tx_hashes)
     }
 
-    /// Creates block with all transactions in the pool.
+    /// Creates a block with all correct transactions in the pool.
+    ///
+    /// Transaction correctness is defined per [`Blockchain::check_tx`] method.
+    /// See the [type-level docs](#transaction-checks) for more details.
     ///
     /// # Return value
     ///
     /// Returns information about the created block.
+    ///
+    /// [`Blockchain::check_tx`]: https://docs.rs/exonum/latest/exonum/blockchain/struct.Blockchain.html#method.check_tx
     pub fn create_block(&mut self) -> BlockWithTransactions {
         self.poll_events();
-        let tx_hashes: Vec<_> = self
-            .snapshot()
-            .for_core()
+        let snapshot = self.snapshot();
+        let core_schema = snapshot.for_core();
+        let transactions = core_schema.transactions();
+        let filter_transactions = |hash: &Hash| {
+            let transaction = transactions
+                .get(hash)
+                .expect("Transaction is saved in pool, but not in the `transactions` map");
+            if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                log::warn!(
+                    "Skipped transaction with hash = {:?} when creating a block \
+                     because the transaction is incorrect: {}",
+                    hash,
+                    error
+                );
+                false
+            } else {
+                true
+            }
+        };
+
+        let tx_hashes: Vec<_> = core_schema
             .transactions_pool()
             .iter()
+            .filter(filter_transactions)
             .collect();
         self.do_create_block(&tx_hashes)
     }
 
-    /// Adds transaction into persistent pool.
+    /// Adds a transaction into the persistent pool.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the transaction is incorrect. See the [type-level docs](#transaction-checks)
+    ///   for more details.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
-        self.check_tx(&transaction);
-
+        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
+            panic!(
+                "Attempt to add incorrect transaction in the pool: {}",
+                error
+            );
+        }
         self.blockchain
             .add_transactions_into_pool(iter::once(transaction));
     }
 
-    /// Calls `Blockchain::check_tx` and panics on an error.
-    fn check_tx(&self, transaction: &Verified<AnyTx>) {
-        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
-            panic!("Attempt to add invalid tx in the pool: {}", error);
-        }
-    }
-
-    /// Checks if transaction can be found in pool
+    /// Checks if a transaction with the specified hash is found in the transaction pool.
     pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
         self.snapshot()
             .for_core()
@@ -590,6 +675,7 @@ impl TestKit {
     /// testkit.create_blocks_until(Height(5));
     /// assert_eq!(Height(5), testkit.height());
     /// # }
+    /// ```
     pub fn create_blocks_until(&mut self, height: Height) {
         while self.height() < height {
             self.create_block();
@@ -615,7 +701,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - Panics if validator with the given id is absent in test network.
+    /// - Panics if validator with the given ID is absent in the test network.
     pub fn validator(&self, id: ValidatorId) -> TestNode {
         self.network.validators()[id.0 as usize].clone()
     }
@@ -764,7 +850,12 @@ impl TestKit {
 /// }
 ///
 /// let service = AfterCommitService::new();
-/// let mut testkit = TestKit::for_rust_service(service.clone(), "after_commit", SERVICE_ID, ());
+/// let mut testkit = TestKit::for_rust_service(
+///     service.clone(),
+///     "after_commit",
+///     SERVICE_ID,
+///     (),
+/// );
 /// testkit.create_blocks_until(Height(5));
 /// assert_eq!(service.counter(), 5);
 ///

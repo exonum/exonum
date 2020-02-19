@@ -90,8 +90,6 @@ pub struct StopService {
 pub struct ResumeService {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
-    /// Updated artifact ID.
-    pub artifact: ArtifactId,
     /// Raw bytes representation of service resume parameters.
     pub params: Vec<u8>,
 }
@@ -204,16 +202,10 @@ impl ConfigPropose {
     }
 
     /// Adds service resume request to this proposal.
-    pub fn resume_service(
-        mut self,
-        instance_id: InstanceId,
-        artifact: ArtifactId,
-        params: impl BinaryValue,
-    ) -> Self {
+    pub fn resume_service(mut self, instance_id: InstanceId, params: impl BinaryValue) -> Self {
         self.changes
             .push(ConfigChange::ResumeService(ResumeService {
                 instance_id,
-                artifact,
                 params: params.into_bytes(),
             }));
         self

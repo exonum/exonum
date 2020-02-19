@@ -164,25 +164,15 @@ impl ResumeService {
             );
         }
 
-        if instance.data_version() != &self.artifact.version {
-            return Err(
-                ConfigurationError::MalformedConfigPropose.with_description(format!(
-                    "Discarded an attempt to resume service with incorrect artifact version: \
-                     got {}, expected {}",
-                    self.artifact.version,
-                    instance.data_version()
-                )),
+        if instance.associated_artifact().is_none() {
+            let msg = format!(
+                "Service `{}` has data version ({}) differing from its artifact version (`{}`) \
+                 and thus cannot be resumed",
+                instance.spec.name,
+                instance.data_version(),
+                instance.spec.artifact
             );
-        }
-
-        if instance.spec.artifact.name != self.artifact.name {
-            return Err(
-                ConfigurationError::MalformedConfigPropose.with_description(format!(
-                    "Discarded an attempt to resume service with different \
-                     artifact name: got {}, expected {}",
-                    self.artifact.name, instance.spec.artifact.name
-                )),
-            );
+            return Err(ConfigurationError::MalformedConfigPropose.with_description(msg));
         }
 
         Ok(())
