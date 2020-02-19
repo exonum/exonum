@@ -661,7 +661,7 @@ fn incorrect_txs_are_not_broadcast() {
     let incorrect_tx = gen_incorrect_tx();
     sandbox
         .api_sender
-        .broadcast_transaction(incorrect_tx.clone())
+        .broadcast_transaction(incorrect_tx)
         .wait()
         .unwrap();
     sandbox.process_events();
