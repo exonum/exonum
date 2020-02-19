@@ -270,7 +270,7 @@ impl ObjectHash for [u8] {
 #[derive(Debug, Fail)]
 pub enum ValidationError<E: Fail> {
     /// The hash of the proof is not equal to the trusted root hash.
-    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
+    #[fail(display = "hash of the proof is not equal to the trusted hash of the index")]
     UnmatchedRootHash,
 
     /// The proof is malformed.

@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Breaking changes
+
+#### exonum-testkit
+
+- Testkit now does not include incorrect transactions into blocks or memory pool,
+  similar to real Exonum nodes. (#1785)
+
 ## 1.0.0-rc.1 - 2020-02-07
 
 ### Breaking changes

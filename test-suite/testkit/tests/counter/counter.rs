@@ -15,7 +15,8 @@
 //! Sample counter service.
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
-    blockchain::{IndexProof, ValidatorKeys},
+    blockchain::IndexProof,
+    crypto::PublicKey,
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_api::{
@@ -36,7 +37,7 @@ use futures::{Future, IntoFuture};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 2;
@@ -122,41 +123,17 @@ pub struct CounterWithProof {
 
 impl CounterWithProof {
     /// Verifies the proof against the known set of validators. Panics on an error.
-    pub fn verify(&self, validators: &[ValidatorKeys]) -> Option<u64> {
-        let block_hash = self.proof.block_proof.block.object_hash();
-
-        // Check precommits.
-        let mut validator_ids = HashSet::new();
-        for precommit in &self.proof.block_proof.precommits {
-            assert_eq!(*precommit.payload().block_hash(), block_hash);
-            let validator_id = validators
-                .iter()
-                .position(|keys| precommit.author() == keys.consensus_key)
-                .expect("Precommit not from a validator");
-            validator_ids.insert(validator_id);
-        }
-        assert!(
-            validator_ids.len() > 2 * validators.len() / 3,
-            "Insufficient number of precommits"
-        );
-
-        let state_hash = self.proof.block_proof.block.state_hash;
-        let index_proof = self
-            .proof
-            .index_proof
-            .check_against_hash(state_hash)
-            .expect("`index_proof` is invalid");
-        let (key, value_hash) = index_proof
-            .entries()
-            .next()
-            .expect("`index_proof` does not contain entries");
+    pub fn verify(&self, validator_keys: &[PublicKey]) -> Option<u64> {
+        let (index_name, index_hash) = self.proof.verify(validator_keys).unwrap_or_else(|err| {
+            panic!("Proof verification failed: {}", err);
+        });
         assert_eq!(
-            *key,
+            index_name,
             format!("{}.counter", SERVICE_NAME),
-            "Invalid index name in proof"
+            "Invalid counter index in proof"
         );
         assert_eq!(
-            *value_hash,
+            index_hash,
             self.counter
                 .as_ref()
                 .map(ObjectHash::object_hash)
@@ -236,6 +213,23 @@ impl CounterApi {
                 Self::count_with_proof(state)
             })
             .endpoint_mut("count", Self::increment);
+
+        // Check sending incorrect transactions via `ApiSender`. Testkit should not include
+        // such transactions to the transaction pool.
+        let api_sender = builder.blockchain().sender().to_owned();
+        let service_keys = builder.blockchain().service_keypair().to_owned();
+        builder.public_scope().endpoint_mut(
+            "incorrect-tx",
+            move |_state: &ServiceApiState, by: u64| {
+                let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
+                let hash = incorrect_tx.object_hash();
+                api_sender
+                    .clone()
+                    .broadcast_transaction(incorrect_tx)
+                    .map(move |()| hash)
+                    .map_err(api::Error::internal)
+            },
+        );
 
         // Check processing of custom HTTP headers. We test this using simple authorization
         // with a fixed bearer token; for practical apps, the tokens might
