@@ -14,7 +14,7 @@
 
 use exonum::{merkledb::BinaryValue, messages::SignedMessage};
 use futures::{
-    future::{self, Either, Executor},
+    future::{self, Executor},
     sync::mpsc,
     Future, Sink, Stream,
 };
@@ -32,18 +32,13 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
-    // If the receiver for internal events is gone, we panic, as we cannot
-    // continue our work (e.g., timely responding to timeouts).
     fn send_event(
-        event: impl Future<Item = InternalEvent, Error = ()>,
         sender: mpsc::Sender<InternalEvent>,
+        event: InternalEvent,
     ) -> impl Future<Item = (), Error = ()> {
-        event.and_then(|evt| {
-            sender
-                .send(evt)
-                .map(drop)
-                .map_err(|_| panic!("cannot send internal event"))
-        })
+        // We don't make a fuss if the event receiver hanged up; this happens if the node
+        // is being terminated.
+        sender.send(event).then(|_| Ok(()))
     }
 
     fn verify_message(
@@ -57,59 +52,66 @@ impl InternalPart {
         })
         .map_err(drop)
         .and_then(|msg| {
-            let event = future::ok(InternalEvent::message_verified(msg));
-            Self::send_event(event, internal_tx)
+            let event = InternalEvent::message_verified(msg);
+            Self::send_event(internal_tx, event)
         })
     }
 
-    /// Represents a task that processes Internal Requests and produces Internal Events.
+    /// Represents a task that processes internal requests and produces internal events.
     /// `handle` is used to schedule additional tasks within this task.
-    /// `verify_executor` is where transaction verification task is executed.
+    /// `verify_executor` is where transaction verification tasks are executed.
     pub fn run<E>(self, handle: Handle, verify_executor: E) -> impl Future<Item = (), Error = ()>
     where
         E: Executor<Box<dyn Future<Item = (), Error = ()> + Send>>,
     {
         let internal_tx = self.internal_tx;
 
-        self.internal_requests_rx
-            .map(move |request| {
-                let event = match request {
-                    InternalRequest::VerifyMessage(tx) => {
-                        let fut = Self::verify_message(tx, internal_tx.clone());
-                        verify_executor
-                            .execute(Box::new(fut))
-                            .expect("cannot schedule message verification");
-                        return;
-                    }
+        let cycle = self.internal_requests_rx.for_each(move |request| {
+            // Check if the receiver of internal events has hanged up. If so, terminate
+            // event processing immediately since the generated events will be dropped anyway.
+            if internal_tx.is_closed() {
+                return Err(());
+            }
+            let internal_tx = internal_tx.clone();
 
-                    InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
-                        let duration = time
-                            .duration_since(SystemTime::now())
-                            .unwrap_or_else(|_| Duration::from_millis(0));
+            match request {
+                InternalRequest::VerifyMessage(tx) => {
+                    let fut = Self::verify_message(tx, internal_tx.clone());
+                    verify_executor
+                        .execute(Box::new(fut))
+                        .expect("cannot schedule message verification");
+                }
 
-                        let fut = Timeout::new(duration, &handle)
-                            .expect("Unable to create timeout")
-                            .map(|()| InternalEvent::timeout(timeout))
-                            .map_err(|e| panic!("Cannot execute timeout: {:?}", e));
+                InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
+                    let duration = time
+                        .duration_since(SystemTime::now())
+                        .unwrap_or_else(|_| Duration::from_millis(0));
 
-                        Either::A(fut)
-                    }
+                    let fut = Timeout::new(duration, &handle)
+                        .expect("Unable to create timeout")
+                        .map_err(drop)
+                        .and_then(|()| {
+                            Self::send_event(internal_tx, InternalEvent::timeout(timeout))
+                        });
+                    handle.spawn(fut);
+                }
 
-                    InternalRequest::JumpToRound(height, round) => {
-                        let event = InternalEvent::jump_to_round(height, round);
-                        Either::B(future::ok(event))
-                    }
+                InternalRequest::JumpToRound(height, round) => {
+                    let event = InternalEvent::jump_to_round(height, round);
+                    handle.spawn(Self::send_event(internal_tx, event));
+                }
 
-                    InternalRequest::Shutdown => {
-                        let event = InternalEvent::shutdown();
-                        Either::B(future::ok(event))
-                    }
-                };
+                InternalRequest::Shutdown => {
+                    let event = InternalEvent::shutdown();
+                    handle.spawn(Self::send_event(internal_tx, event));
+                }
+            }
+            Ok(())
+        });
 
-                let send_event = Self::send_event(event, internal_tx.clone());
-                handle.spawn(send_event);
-            })
-            .for_each(Ok)
+        // Since we generate an error only when then receiver hanged up, we can safely convert
+        // it here.
+        cycle.or_else(Ok)
     }
 }
 
