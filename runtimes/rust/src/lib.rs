@@ -322,16 +322,16 @@ use exonum::{
     helpers::Height,
     merkledb::Snapshot,
     runtime::{
-        catch_panic,
+        self, catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Receiver, Runtime, RuntimeIdentifier,
         WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
-use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
+use futures::{sync::mpsc, Future, Sink};
 use log::trace;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -677,13 +677,17 @@ impl Runtime for RustRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        if !spec.is_empty() {
+    ) -> Receiver<Result<(), ExecutionError>> {
+        let result = if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
-            Box::new(future::err(Error::IncorrectArtifactId.into()))
+            Err(Error::IncorrectArtifactId.into())
         } else {
-            Box::new(self.deploy(&artifact).into_future())
-        }
+            self.deploy(&artifact)
+        };
+
+        let (tx, rx) = runtime::channel();
+        tx.send(result);
+        rx
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

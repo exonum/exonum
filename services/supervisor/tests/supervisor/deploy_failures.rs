@@ -42,13 +42,13 @@ mod failing_runtime {
 
     use exonum::merkledb::Snapshot;
     use exonum::runtime::{
+        self,
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceState, Mailbox, MethodId, Runtime,
-        WellKnownRuntime,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceState, Mailbox, MethodId, Receiver,
+        Runtime, WellKnownRuntime,
     };
     use exonum_derive::ExecutionFail;
-    use futures::{Future, IntoFuture};
 
     /// Runtime which can fail within deployment.
     #[derive(Debug, Default)]
@@ -96,7 +96,7 @@ mod failing_runtime {
             &mut self,
             artifact: ArtifactId,
             _spec: Vec<u8>,
-        ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        ) -> Receiver<Result<(), ExecutionError>> {
             let result = {
                 if artifact.runtime_id != FAILING_RUNTIME_ID {
                     Err(FailingRuntimeError::GenericError.into())
@@ -109,7 +109,9 @@ mod failing_runtime {
                 }
             };
 
-            Box::new(result.into_future())
+            let (tx, rx) = runtime::channel();
+            tx.send(result);
+            rx
         }
 
         fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

@@ -21,11 +21,12 @@ use exonum::{
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     runtime::{
+        self,
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
         AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceDescriptor, InstanceId, InstanceState, InstanceStatus, Mailbox, MethodId, Runtime,
-        SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        InstanceDescriptor, InstanceId, InstanceState, InstanceStatus, Mailbox, MethodId, Receiver,
+        Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_derive::*;
@@ -99,8 +100,10 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(self.deploy_artifact(artifact, spec).into_future())
+    ) -> Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = runtime::channel();
+        tx.send(self.deploy_artifact(artifact, spec));
+        rx
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

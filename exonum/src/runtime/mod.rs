@@ -185,6 +185,8 @@
 //! [`ExecutionError`]: struct.ExecutionError.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.method_id
 
+pub use std::sync::mpsc::{channel, Receiver};
+
 pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
@@ -212,7 +214,6 @@ pub mod migrations;
 pub mod versioning;
 
 use exonum_merkledb::Snapshot;
-use futures::Future;
 use semver::Version;
 
 use std::fmt;
@@ -364,7 +365,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
         &mut self,
         artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
+    ) -> Receiver<Result<(), ExecutionError>>;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;

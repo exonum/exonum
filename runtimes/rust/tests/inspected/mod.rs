@@ -27,7 +27,7 @@ use exonum::{
         migrations::{InitMigrationError, MigrationScript},
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceState,
-        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        InstanceStatus, Mailbox, MethodId, Receiver, Runtime, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -193,7 +193,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         test_service_artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Receiver<Result<(), ExecutionError>> {
         self.events.push(RuntimeEvent::DeployArtifact(
             test_service_artifact.clone(),
             deploy_spec.clone(),

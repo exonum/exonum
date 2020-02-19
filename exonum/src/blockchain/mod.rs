@@ -32,7 +32,6 @@ use exonum_merkledb::{
     Snapshot, SystemSchema, TemporaryDB,
 };
 use failure::Error;
-use futures::Future;
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -222,7 +221,6 @@ impl BlockchainMut {
             Dispatcher::commit_artifact(&fork, &spec.artifact, spec.payload.clone());
             self.dispatcher
                 .deploy_artifact(spec.artifact, spec.payload)
-                .wait()
                 .expect("Cannot deploy an artifact");
         }
         // Add service instances.

@@ -18,7 +18,6 @@ use exonum_merkledb::{
     migration::Migration,
     HashTag, ObjectHash, SystemSchema, TemporaryDB,
 };
-use futures::IntoFuture;
 
 use std::time::Duration;
 
@@ -28,8 +27,8 @@ use crate::{
     helpers::ValidatorId,
     runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
-        BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier,
-        SnapshotExt, WellKnownRuntime,
+        self, BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, Receiver,
+        RuntimeIdentifier, SnapshotExt, WellKnownRuntime,
     },
 };
 
@@ -58,8 +57,10 @@ impl Runtime for MigrationRuntime {
         &mut self,
         _artifact: ArtifactId,
         _deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(Ok(()).into_future())
+    ) -> Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = runtime::channel();
+        tx.send(Ok(()));
+        rx
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {

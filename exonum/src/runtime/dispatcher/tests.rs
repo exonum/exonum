@@ -14,7 +14,6 @@
 
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
-use futures::{future, Future, IntoFuture};
 use pretty_assertions::assert_eq;
 use semver::Version;
 
@@ -33,11 +32,12 @@ use crate::{
     blockchain::{AdditionalHeaders, ApiSender, Block, Blockchain, Schema as CoreSchema},
     helpers::Height,
     runtime::{
+        self,
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
         ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
+        InstanceState, InstanceStatus, MethodId, Receiver, Runtime, RuntimeInstance, SnapshotExt,
     },
 };
 
@@ -187,13 +187,15 @@ impl Runtime for SampleRuntime {
         &mut self,
         artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = runtime::channel();
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
             Err(CoreError::IncorrectRuntime.into())
         };
-        Box::new(res.into_future())
+        tx.send(res);
+        rx
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -689,8 +691,10 @@ impl Runtime for ShutdownRuntime {
         &mut self,
         _artifact: ArtifactId,
         _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(Ok(()).into_future())
+    ) -> Receiver<Result<(), ExecutionError>> {
+        let (tx, rx) = runtime::channel();
+        tx.send(Ok(()));
+        rx
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
@@ -808,7 +812,7 @@ impl DeploymentRuntime {
             .push(Action::StartDeploy {
                 artifact: artifact.clone(),
                 spec: Self::SPEC.to_vec(),
-                then: Box::new(|_| Box::new(Ok(()).into_future())),
+                then: Box::new(|_| Ok(())),
             });
 
         let fork = db.fork();
@@ -824,7 +828,7 @@ impl Runtime for DeploymentRuntime {
         &mut self,
         artifact: ArtifactId,
         spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> Receiver<Result<(), ExecutionError>> {
         let delay = BinaryValue::from_bytes(spec.into()).unwrap();
         let delay = Duration::from_millis(delay);
 
@@ -850,24 +854,21 @@ impl Runtime for DeploymentRuntime {
         };
 
         let artifacts = Arc::clone(&self.artifacts);
-        let task = future::lazy(move || {
-            // This isn't a correct way to delay future completion, but the correct way
-            // (`tokio::timer::Delay`) cannot be used since the futures returned by
-            // `Runtime::deploy_artifact()` are not (yet?) run on the `tokio` runtime.
-            // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
-            thread::sleep(delay);
-            result
-        })
-        .then(move |res| {
-            let mut artifacts = artifacts.lock().unwrap();
-            let status = artifacts.entry(artifact.name).or_default();
-            status.attempts += 1;
-            if res.is_ok() {
-                status.is_deployed = true;
-            }
-            res
-        });
-        Box::new(task)
+
+        // This isn't a correct way to delay deploy completion.
+        // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
+        thread::sleep(delay);
+
+        let mut artifacts = artifacts.lock().unwrap();
+        let status = artifacts.entry(artifact.name).or_default();
+        status.attempts += 1;
+        if result.is_ok() {
+            status.is_deployed = true;
+        }
+
+        let (tx, rx) = runtime::channel();
+        tx.send(result);
+        rx
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
