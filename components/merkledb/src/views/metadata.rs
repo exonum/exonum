@@ -244,6 +244,7 @@ impl<V> IndexMetadata<V> {
     /// MerkleDB assigns a unique numeric ID for each fully-qualified index name.
     ///
     /// MerkleDB never re-uses the identifiers.
+    #[allow(clippy::doc_markdown)] // Ticks around MerkleDB in this context is redundant.
     pub fn identifier(&self) -> NonZeroU64 {
         self.identifier
     }

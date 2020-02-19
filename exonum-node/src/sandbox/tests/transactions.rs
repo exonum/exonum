@@ -86,7 +86,7 @@ fn response_to_request_txs() {
         &sandbox.create_transactions_response(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(1)),
-            vec![tx.clone()],
+            vec![tx],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -128,7 +128,7 @@ fn tx_pool_size_overflow() {
         sandbox.secret_key(ValidatorId(2)),
     );
 
-    let mut block = sandbox.create_block(&[tx1.clone()]);
+    let mut block = sandbox.create_block(&[tx1]);
     block.add_header::<ProposerId>(ValidatorId(2));
     block.height = Height(1);
 
@@ -234,7 +234,7 @@ fn duplicate_tx_in_pool() {
     sandbox.recv(&sandbox.create_transactions_response(
         sandbox.public_key(ValidatorId(2)),
         sandbox.public_key(ValidatorId(0)),
-        vec![tx1.clone()],
+        vec![tx1],
         sandbox.secret_key(ValidatorId(2)),
     ));
 }
@@ -267,7 +267,7 @@ fn response_size_larger_than_max_message_len() {
 
         TxConfig::create_signed(
             sandbox.public_key(ValidatorId(0)),
-            &consensus_cfg.clone().into_bytes(),
+            &consensus_cfg.into_bytes(),
             actual_from,
             sandbox.secret_key(ValidatorId(0)),
         )
@@ -292,7 +292,7 @@ fn response_size_larger_than_max_message_len() {
         &sandbox.create_transactions_response(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(1)),
-            vec![tx1.clone(), tx2.clone()],
+            vec![tx1, tx2],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -314,7 +314,7 @@ fn response_size_larger_than_max_message_len() {
         &sandbox.create_transactions_response(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(1)),
-            vec![tx3.clone()],
+            vec![tx3],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -324,7 +324,7 @@ fn response_size_larger_than_max_message_len() {
         &sandbox.create_transactions_response(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(1)),
-            vec![tx4.clone()],
+            vec![tx4],
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -466,7 +466,7 @@ fn respond_to_request_tx_propose_prevotes_precommits() {
             &sandbox.create_transactions_response(
                 sandbox.public_key(ValidatorId(0)),
                 sandbox.public_key(ValidatorId(1)),
-                vec![tx.clone()],
+                vec![tx],
                 sandbox.secret_key(ValidatorId(0)),
             ),
         );
@@ -661,7 +661,7 @@ fn incorrect_txs_are_not_broadcast() {
     let incorrect_tx = gen_incorrect_tx();
     sandbox
         .api_sender
-        .broadcast_transaction(incorrect_tx.clone())
+        .broadcast_transaction(incorrect_tx)
         .wait()
         .unwrap();
     sandbox.process_events();

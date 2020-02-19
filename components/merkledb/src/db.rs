@@ -1424,7 +1424,7 @@ mod tests {
         drop(entry);
         let entry = readonly.get_entry::<_, String>("entry");
         // Clone `readonly` access and get another `entry` instance.
-        let other_readonly = readonly.clone();
+        let other_readonly = readonly;
         let other_entry = other_readonly.get_entry::<_, String>("entry");
         assert_eq!(entry.get().unwrap(), "!");
         assert_eq!(other_entry.get().unwrap(), "!");

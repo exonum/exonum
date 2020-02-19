@@ -266,8 +266,7 @@ impl BinaryKey for String {
 
     #[cfg(not(feature = "yolo"))]
     fn read(buffer: &[u8]) -> Self::Owned {
-        const ERROR_MSG: &str =
-            "Error reading UTF-8 string from the database. \
+        const ERROR_MSG: &str = "Error reading UTF-8 string from the database. \
              Probable reason is data schema mismatch; for example, data was written to \
              `MapIndex<u64, _>` and is read as `MapIndex<str, _>`";
         std::str::from_utf8(buffer).expect(ERROR_MSG).to_string()

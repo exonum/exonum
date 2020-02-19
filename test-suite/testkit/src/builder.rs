@@ -51,7 +51,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # pub struct ExampleService;
 /// # impl Service for ExampleService {}
 /// #
-/// # fn main() {
 /// let service = ExampleService;
 /// let artifact = service.artifact_id();
 /// let mut testkit = TestKitBuilder::validator()
@@ -62,7 +61,6 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 ///     .build();
 /// testkit.create_block();
 /// // Other test code
-/// # }
 /// ```
 #[derive(Debug)]
 pub struct TestKitBuilder {

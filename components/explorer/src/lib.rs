@@ -515,7 +515,6 @@ impl CommittedTransaction {
 ///     fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 /// }
 ///
-/// # fn main() {
 /// // Create a signed transaction.
 /// let keypair = KeyPair::random();
 /// const SERVICE_ID: InstanceId = 100;
@@ -527,7 +526,6 @@ impl CommittedTransaction {
 /// });
 /// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
 /// assert!(parsed.is_in_pool());
-/// # }
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]

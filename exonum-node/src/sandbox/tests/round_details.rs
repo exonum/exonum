@@ -418,7 +418,7 @@ fn lock_to_propose_and_send_prevote() {
     let sandbox = timestamping_sandbox();
     let empty_propose = ProposeBuilder::new(&sandbox).build();
     sandbox.recv(&empty_propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose));
 
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
@@ -426,7 +426,7 @@ fn lock_to_propose_and_send_prevote() {
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[tx.object_hash()])
         .build();
-    let block = sandbox.create_block(&[tx.clone()]);
+    let block = sandbox.create_block(&[tx]);
     sandbox.recv(&propose);
 
     // inc round
@@ -719,7 +719,7 @@ fn not_sending_precommit_for_proposal_with_incorrect_tx() {
         .with_tx_hashes(&[tx.object_hash()])
         .build();
     // Create block.
-    let block = sandbox.create_block(&[tx.clone()]);
+    let block = sandbox.create_block(&[tx]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -1618,7 +1618,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(&precommit_1); //early precommit from future height
 
     sandbox.assert_state(Height(1), Round(1));
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx]);
     sandbox.assert_state(Height(2), Round(1));
     assert_eq!(first_block.object_hash(), sandbox.last_hash());
 

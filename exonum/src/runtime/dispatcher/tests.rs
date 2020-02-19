@@ -510,8 +510,7 @@ fn blockchain_with_frozen_service() -> FreezingRig {
     // Deploy the artifact and instantiate the service.
     let mut fork = db.fork();
     dispatcher.commit_artifact_sync(&fork, artifact.clone(), vec![]);
-    let service =
-        InstanceSpec::from_raw_parts(SERVICE_ID, "some-service".to_owned(), artifact.clone());
+    let service = InstanceSpec::from_raw_parts(SERVICE_ID, "some-service".to_owned(), artifact);
     let mut should_rollback = false;
     let mut context = ExecutionContext::for_block_call(
         &dispatcher,

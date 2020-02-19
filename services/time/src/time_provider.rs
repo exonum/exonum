@@ -48,7 +48,6 @@ impl TimeProvider for SystemTimeProvider {
 /// use exonum_testkit::TestKit;
 /// use exonum_time::{MockTimeProvider, TimeSchema, TimeServiceFactory};
 ///
-/// # fn main() {
 /// let service_name = "time";
 /// let service_id = 12;
 ///
@@ -69,7 +68,6 @@ impl TimeProvider for SystemTimeProvider {
 ///     Utc.timestamp(15, 0),
 ///     schema.time.get().unwrap()
 /// );
-/// # }
 /// ```
 ///
 /// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html

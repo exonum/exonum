@@ -1148,7 +1148,7 @@ impl Node {
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
             &self.state().keys().consensus,
-            self.state().connect_list().clone(),
+            self.state().connect_list(),
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
@@ -1158,7 +1158,7 @@ impl Node {
 
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
-        let connect_list = self.state().connect_list().clone();
+        let connect_list = self.state().connect_list();
         let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
         SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
         let (network_tx, network_rx) = self.channel.network_events;
