@@ -22,7 +22,7 @@
 //!
 //!     - [Obtaining consensus configuration](#obtaining-consensus-configuration)
 //!     - [Obtaining pending configuration proposal](#obtaining-pending-configuration-proposal)
-//!     - [Obtaingin deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
+//!     - [Obtaining deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
 //!
 //! - Private API:
 //!

@@ -86,7 +86,7 @@ fn system_api(
     shared_api_state: SharedNodeState,
 ) -> ApiBuilder {
     let mut builder = ApiBuilder::new();
-    SystemApi::new(blockchain, sender, shared_api_state.clone()).wire(builder.private_scope());
+    SystemApi::new(blockchain, sender, shared_api_state).wire(builder.private_scope());
     builder
 }
 

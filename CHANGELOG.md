@@ -19,7 +19,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `v1/info` - obtains information about the node;
   - `v1/stats` - obtains statistics of the node;
   - `v1/peers` - adds a peer to the Exonum node;
-  - `v1/consensus_status` - enables or disables consensus on the node; 
+  - `v1/consensus_status` - enables or disables consensus on the node;
   - `v1/shutdown` - shuts down the node.
 
 #### exonum-supervisor
