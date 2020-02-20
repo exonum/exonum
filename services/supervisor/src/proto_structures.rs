@@ -61,7 +61,7 @@ pub struct DeployResult {
     pub result: ExecutionStatus,
 }
 
-/// Request for the start service instance.
+/// Request to start a new service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::StartService")]
@@ -74,7 +74,7 @@ pub struct StartService {
     pub config: Vec<u8>,
 }
 
-/// Request for the stop existing service instance.
+/// Request to stop an existing service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::StopService")]
@@ -83,7 +83,16 @@ pub struct StopService {
     pub instance_id: InstanceId,
 }
 
-/// Request for the resume previously stopped service instance.
+/// Request to freeze an existing service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::FreezeService")]
+pub struct FreezeService {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+}
+
+/// Request to resume a previously stopped service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ResumeService")]
@@ -132,6 +141,8 @@ pub enum ConfigChange {
     StopService(StopService),
     /// Request to resume a previously stopped service instance.
     ResumeService(ResumeService),
+    /// Request to freeze an existing service instance.
+    FreezeService(FreezeService),
 }
 
 /// Request for the configuration change
@@ -177,7 +188,7 @@ impl ConfigPropose {
         self
     }
 
-    /// Adds service start request to this proposal.
+    /// Adds a service start request to this proposal.
     pub fn start_service(
         mut self,
         artifact: ArtifactId,
@@ -194,14 +205,21 @@ impl ConfigPropose {
         self
     }
 
-    /// Adds service stop request to this proposal.
+    /// Adds a service stop request to this proposal.
     pub fn stop_service(mut self, instance_id: InstanceId) -> Self {
         self.changes
             .push(ConfigChange::StopService(StopService { instance_id }));
         self
     }
 
-    /// Adds service resume request to this proposal.
+    /// Adds a service freeze request to this proposal.
+    pub fn freeze_service(mut self, instance_id: InstanceId) -> Self {
+        self.changes
+            .push(ConfigChange::FreezeService(FreezeService { instance_id }));
+        self
+    }
+
+    /// Adds a service resume request to this proposal.
     pub fn resume_service(mut self, instance_id: InstanceId, params: impl BinaryValue) -> Self {
         self.changes
             .push(ConfigChange::ResumeService(ResumeService {
@@ -212,7 +230,7 @@ impl ConfigPropose {
     }
 }
 
-/// Confirmation vote for the configuration change
+/// Confirmation vote for the configuration change.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigVote")]
 pub struct ConfigVote {
@@ -268,6 +286,7 @@ impl_serde_hex_for_binary_value! { DeployRequest }
 impl_serde_hex_for_binary_value! { DeployResult }
 impl_serde_hex_for_binary_value! { StartService }
 impl_serde_hex_for_binary_value! { StopService }
+impl_serde_hex_for_binary_value! { FreezeService }
 impl_serde_hex_for_binary_value! { ResumeService }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }

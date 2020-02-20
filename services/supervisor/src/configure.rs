@@ -18,9 +18,9 @@ use exonum::runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId,
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{GenericCallMut, Interface, MethodDescriptor};
 
-/// Fully qualified name of the ['Configure`] interface.
+/// Fully qualified name of the [`Configure`] interface.
 ///
-/// ['Configure`]: trait.Configure.html
+/// [`Configure`]: trait.Configure.html
 pub const CONFIGURE_INTERFACE_NAME: &str = "exonum.Configure";
 
 /// Identifier of the [`Configure::verify_config`] method.

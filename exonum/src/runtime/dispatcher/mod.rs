@@ -41,12 +41,14 @@ use crate::{
 
 use self::schema::{MigrationTransition, ModifiedInstanceInfo};
 use super::{
-    error::{CallSite, CallType, ErrorKind, ExecutionError},
+    error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
     migrations::{
         InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
+        MigrationType,
     },
-    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
+    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime, RuntimeFeature,
 };
+use crate::runtime::RuntimeIdentifier;
 
 #[cfg(test)]
 mod migration_tests;
@@ -405,20 +407,22 @@ impl Dispatcher {
         fork: &Fork,
         new_artifact: ArtifactId,
         service_name: &str,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<MigrationType, ExecutionError> {
         let mut schema = Schema::new(fork);
         let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
         let maybe_script =
             self.get_migration_script(&new_artifact, instance_state.data_version())?;
-        if let Some(script) = maybe_script {
+        let migration_type = if let Some(script) = maybe_script {
             let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
             schema.add_pending_migration(instance_state, migration);
+            MigrationType::Async
         } else {
             // No migration script means that the service instance may be immediately updated to
             // the new artifact version.
             schema.fast_forward_migration(instance_state, new_artifact);
-        }
-        Ok(())
+            MigrationType::FastForward
+        };
+        Ok(migration_type)
     }
 
     /// Initiates migration rollback. The rollback will actually be performed once
@@ -467,10 +471,29 @@ impl Dispatcher {
     }
 
     pub(crate) fn initiate_freezing_service(
+        &self,
         fork: &Fork,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
-        Schema::new(fork)
+        let mut schema = Schema::new(fork);
+        let instance_state = schema
+            .get_instance(instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+        let runtime_id = instance_state.spec.artifact.runtime_id;
+        let runtime = self
+            .runtime_by_id(runtime_id)
+            .ok_or(CoreError::IncorrectRuntime)?;
+
+        if !runtime.is_supported(&RuntimeFeature::FreezingServices) {
+            let runtime_description = RuntimeIdentifier::transform(runtime_id).ok().map_or_else(
+                || format!("Runtime with ID {}", runtime_id),
+                |id| id.to_string(),
+            );
+            let msg = format!("{} does not support freezing services", runtime_description);
+            return Err(CommonError::FeatureNotSupported.with_description(msg));
+        }
+
+        schema
             .initiate_simple_service_transition(instance_id, InstanceStatus::Frozen)
             .map_err(From::from)
     }

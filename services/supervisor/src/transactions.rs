@@ -16,8 +16,8 @@ use exonum::{
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidateInput},
     runtime::{
-        CommonError, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus,
+        migrations::MigrationType, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
+        InstanceId, InstanceSpec, InstanceState, InstanceStatus, RuntimeFeature,
     },
 };
 use exonum_derive::*;
@@ -28,9 +28,9 @@ use std::collections::HashSet;
 use super::{
     configure::ConfigureMut, migration_state::MigrationState, ArtifactError, AsyncEventState,
     CommonError as SupervisorCommonError, ConfigChange, ConfigProposalWithHash, ConfigPropose,
-    ConfigVote, ConfigurationError, DeployRequest, DeployResult, MigrationError, MigrationRequest,
-    MigrationResult, ResumeService, SchemaImpl, ServiceError, StartService, StopService,
-    Supervisor,
+    ConfigVote, ConfigurationError, DeployRequest, DeployResult, FreezeService, MigrationError,
+    MigrationRequest, MigrationResult, ResumeService, SchemaImpl, ServiceError, StartService,
+    StopService, Supervisor,
 };
 
 /// Supervisor service transactions.
@@ -98,6 +98,31 @@ pub trait SupervisorInterface<Ctx> {
     fn report_migration_result(&self, context: Ctx, result: MigrationResult) -> Self::Output;
 }
 
+impl ConfigChange {
+    fn register_instance(
+        &self,
+        modified_instances: &mut HashSet<InstanceId>,
+    ) -> Result<(), ExecutionError> {
+        let maybe_instance_id = match self {
+            ConfigChange::StopService(service) => Some(service.instance_id),
+            ConfigChange::FreezeService(service) => Some(service.instance_id),
+            ConfigChange::ResumeService(service) => Some(service.instance_id),
+            ConfigChange::Service(service) => Some(service.instance_id),
+            _ => None,
+        };
+        if let Some(instance_id) = maybe_instance_id {
+            if !modified_instances.insert(instance_id) {
+                let msg = format!(
+                    "Discarded several actions concerning service with ID {}",
+                    instance_id
+                );
+                return Err(ConfigurationError::MalformedConfigPropose.with_description(msg));
+            }
+        }
+        Ok(())
+    }
+}
+
 impl StartService {
     fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
         self.artifact
@@ -137,31 +162,41 @@ impl StartService {
 
 impl StopService {
     fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        let instance = get_instance(context, self.instance_id)?;
+        validate_status(
+            context,
+            self.instance_id,
+            "stop",
+            InstanceStatus::can_be_stopped,
+        )
+        .map(drop)
+    }
+}
 
-        match instance.status {
-            Some(InstanceStatus::Active) => Ok(()),
-            _ => Err(
-                ConfigurationError::MalformedConfigPropose.with_description(format!(
-                    "Discarded an attempt to stop the already stopped service instance: {}",
-                    instance.spec.name
-                )),
-            ),
-        }
+impl FreezeService {
+    fn validate(&self, context: &ExecutionContext<'_>) -> Result<InstanceState, ExecutionError> {
+        validate_status(
+            context,
+            self.instance_id,
+            "freeze",
+            InstanceStatus::can_be_frozen,
+        )
     }
 }
 
 impl ResumeService {
     fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = get_instance(context, self.instance_id)?;
-
-        if instance.status != Some(InstanceStatus::Stopped) {
-            return Err(
-                ConfigurationError::MalformedConfigPropose.with_description(format!(
-                    "Discarded an attempt to resume not stopped service instance: {}",
-                    instance.spec.name
-                )),
-            );
+        let status = instance.status.as_ref();
+        let can_be_resumed = status.map_or(false, InstanceStatus::can_be_resumed);
+        if !can_be_resumed {
+            let err = ConfigurationError::MalformedConfigPropose.with_description(format!(
+                "Discarded an attempt to resume service `{}` with inappropriate status ({})",
+                instance.spec.name,
+                status
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| "none".to_owned())
+            ));
+            return Err(err);
         }
 
         if instance.associated_artifact().is_none() {
@@ -210,6 +245,32 @@ fn get_instance(
                 .with_description("Instance with the specified ID is absent.")
         })
         .map_err(From::from)
+}
+
+/// Checks that the current service status allows a specified transition.
+fn validate_status(
+    context: &ExecutionContext<'_>,
+    instance_id: InstanceId,
+    action: &str,
+    check_fn: fn(&InstanceStatus) -> bool,
+) -> Result<InstanceState, ExecutionError> {
+    let instance = get_instance(context, instance_id)?;
+    let status = instance.status.as_ref();
+    let is_valid_transition = status.map_or(false, check_fn);
+
+    if is_valid_transition {
+        Ok(instance)
+    } else {
+        let err = ConfigurationError::MalformedConfigPropose.with_description(format!(
+            "Discarded an attempt to {} service `{}` with inappropriate status ({})",
+            action,
+            instance.spec.name,
+            status
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "none".to_owned())
+        ));
+        Err(err)
+    }
 }
 
 /// Returns the information about a service instance by its name.
@@ -457,7 +518,6 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
         // Check that target instance exists.
         let instance = get_instance_by_name(&context, request.service.as_ref())?;
-
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
 
@@ -493,27 +553,26 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
 
             // Check whether migration started successfully.
-            if let Err(error) = result {
-                // Migration failed even before start, softly mark it as failed.
-                let initiate_rollback = false;
-                return self.fail_migration(context, request, error, initiate_rollback);
-            }
+            let migration_type = match result {
+                Ok(ty) => ty,
+                Err(error) => {
+                    // Migration failed even before start, softly mark it as failed.
+                    let initiate_rollback = false;
+                    return self.fail_migration(context, request, error, initiate_rollback);
+                }
+            };
 
-            // Migration started. Check if migration is fast-forward.
-            let instance = get_instance_by_name(&context, request.service.as_ref())
-                .expect("BUG: Instance disappeared");
-            if request.new_artifact.version == *instance.data_version() {
+            if let MigrationType::FastForward = migration_type {
                 // Migration is fast-forward, complete it immediately.
                 // No agreement needed, since nodes which will behave differently will obtain
                 // different blockchain state hash and will be excluded from consensus.
                 log::trace!("Applied fast-forward migration with request {:?}", request);
+                let new_version = request.new_artifact.version.clone();
 
                 let mut schema = SchemaImpl::new(context.service_data());
-
                 // Update the state of a migration.
-                state.update(AsyncEventState::Succeed, instance.data_version().clone());
+                state.update(AsyncEventState::Succeed, new_version);
                 schema.migration_states.put(&request, state);
-
                 // Remove the migration from the list of pending.
                 schema.pending_migrations.remove(&request);
             }
@@ -586,6 +645,7 @@ impl Supervisor {
 
         // Perform config verification.
         for change in changes {
+            change.register_instance(&mut modified_instances)?;
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
@@ -600,12 +660,6 @@ impl Supervisor {
                 }
 
                 ConfigChange::Service(config) => {
-                    if !modified_instances.insert(config.instance_id) {
-                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
-                            "Discarded multiple service change proposals in one request.",
-                        ));
-                    }
-
                     context.verify_config(config.instance_id, config.params.clone())?;
                 }
 
@@ -619,21 +673,27 @@ impl Supervisor {
                 }
 
                 ConfigChange::StopService(stop_service) => {
-                    if !modified_instances.insert(stop_service.instance_id) {
-                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
-                            "Discarded multiple instances with the same name in one request.",
-                        ));
-                    }
                     stop_service.validate(&context)?;
                 }
-
-                ConfigChange::ResumeService(resume_service) => {
-                    if !modified_instances.insert(resume_service.instance_id) {
-                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
-                            "Discarded multiple instances with the same name in one request.",
-                        ));
+                ConfigChange::FreezeService(freeze_service) => {
+                    let instance_state = freeze_service.validate(&context)?;
+                    let runtime_id = instance_state.spec.artifact.runtime_id;
+                    if !context
+                        .supervisor_extensions()
+                        .check_feature(runtime_id, &RuntimeFeature::FreezingServices)
+                    {
+                        let msg = format!(
+                            "Cannot freeze service `{}`: runtime with ID {}, with which \
+                             its artifact `{}` is associated, does not support service freezing",
+                            instance_state.spec.as_descriptor(),
+                            runtime_id,
+                            instance_state.spec.artifact,
+                        );
+                        let err = ConfigurationError::MalformedConfigPropose.with_description(msg);
+                        return Err(err);
                     }
-
+                }
+                ConfigChange::ResumeService(resume_service) => {
                     resume_service.validate(&context)?;
                 }
             }
@@ -650,9 +710,7 @@ impl Supervisor {
         author: PublicKey,
     ) -> Result<(), ExecutionError> {
         let core_schema = context.data().for_core();
-
         let mut schema = SchemaImpl::new(context.service_data());
-
         schema.deploy_confirmations.confirm(&deploy_request, author);
 
         // Check if we have enough confirmations for the deployment.

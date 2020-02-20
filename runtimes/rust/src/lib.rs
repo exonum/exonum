@@ -327,8 +327,8 @@ use exonum::{
         oneshot::Receiver,
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
-        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier,
-        WellKnownRuntime,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeFeature,
+        RuntimeIdentifier, WellKnownRuntime,
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
@@ -667,6 +667,13 @@ impl WellKnownRuntime for RustRuntime {
 impl Runtime for RustRuntime {
     fn initialize(&mut self, blockchain: &Blockchain) {
         self.blockchain = Some(blockchain.clone());
+    }
+
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        match feature {
+            RuntimeFeature::FreezingServices => true,
+            _ => false,
+        }
     }
 
     // Propagates changes in the services immediately after initialization.
