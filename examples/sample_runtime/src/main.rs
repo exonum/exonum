@@ -22,7 +22,7 @@ use exonum::{
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
-        oneshot,
+        oneshot::Receiver,
         versioning::Version,
         AnyTx, ArtifactId, CallInfo, CommonError, ExecutionContext, ExecutionError, ExecutionFail,
         InstanceDescriptor, InstanceId, InstanceState, InstanceStatus, Mailbox, MethodId, Runtime,
@@ -96,10 +96,8 @@ impl SampleRuntime {
 }
 
 impl Runtime for SampleRuntime {
-    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> oneshot::Receiver {
-        let (tx, rx) = oneshot::channel();
-        tx.send(self.deploy_artifact(artifact, spec));
-        rx
+    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(self.deploy_artifact(artifact, spec))
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

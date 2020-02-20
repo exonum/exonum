@@ -480,7 +480,7 @@ impl Dispatcher {
             self.deploy_artifact(artifact, payload).unwrap_or_else(|e| {
                 // In this case artifact deployment error is fatal because there are
                 // confirmation that this node can deploy this artifact.
-                panic!("Unable to deploy registered artifact. {}", e)
+                panic!("Unable to deploy registered artifact. {}", e);
             });
         }
     }
@@ -923,6 +923,9 @@ impl Mailbox {
     }
 }
 
+/// The actions that will be performed after the deployment is finished.
+pub type ThenFn = Box<dyn FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send>;
+
 /// Action to be performed by the dispatcher.
 ///
 /// This type is not intended to be exhaustively matched. It can be extended in the future
@@ -936,7 +939,7 @@ pub enum Action {
         spec: Vec<u8>,
         /// The actions that will be performed after the deployment is finished.
         /// For example, this closure may create a transaction with the deployment confirmation.
-        then: Box<dyn FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send>,
+        then: ThenFn,
     },
 
     /// Never actually generated.

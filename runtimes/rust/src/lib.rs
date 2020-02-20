@@ -324,7 +324,7 @@ use exonum::{
     runtime::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
-        oneshot,
+        oneshot::Receiver,
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeIdentifier,
@@ -674,7 +674,7 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
     }
 
-    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> oneshot::Receiver {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> Receiver {
         let result = if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             Err(Error::IncorrectArtifactId.into())
@@ -682,9 +682,7 @@ impl Runtime for RustRuntime {
             self.deploy(&artifact)
         };
 
-        let (tx, rx) = oneshot::channel();
-        tx.send(result);
-        rx
+        Receiver::with_result(result)
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

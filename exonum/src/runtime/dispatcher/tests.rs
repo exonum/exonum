@@ -34,8 +34,9 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
-        oneshot, ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind,
-        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        oneshot::{self, Receiver},
+        ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
+        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus, MethodId, Runtime, RuntimeInstance, SnapshotExt,
     },
 };
@@ -182,15 +183,13 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> oneshot::Receiver {
-        let (tx, rx) = oneshot::channel();
+    fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> Receiver {
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
             Err(CoreError::IncorrectRuntime.into())
         };
-        tx.send(res);
-        rx
+        Receiver::with_result(res)
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -681,10 +680,8 @@ impl ShutdownRuntime {
 }
 
 impl Runtime for ShutdownRuntime {
-    fn deploy_artifact(&mut self, _artifact: ArtifactId, _spec: Vec<u8>) -> oneshot::Receiver {
-        let (tx, rx) = oneshot::channel();
-        tx.send(Ok(()));
-        rx
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
@@ -841,10 +838,6 @@ impl Runtime for DeploymentRuntime {
 
         let artifacts = Arc::clone(&self.artifacts);
 
-        // This isn't a correct way to delay deploy completion.
-        // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
-        thread::sleep(delay);
-
         let mut artifacts = artifacts.lock().unwrap();
         let status = artifacts.entry(artifact.name).or_default();
         status.attempts += 1;
@@ -853,7 +846,13 @@ impl Runtime for DeploymentRuntime {
         }
 
         let (tx, rx) = oneshot::channel();
-        tx.send(result);
+
+        thread::spawn(move || {
+            // This isn't a correct way to delay deploy completion.
+            thread::sleep(delay);
+            tx.send(result);
+        });
+
         rx
     }
 

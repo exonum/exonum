@@ -25,23 +25,27 @@ pub fn channel() -> (Sender, Receiver) {
     (Sender(tx), Receiver(rx))
 }
 
-/// The receiving half of [`channel`] type. This half can only be owned by one thread.
+/// The receiving half of [`channel`] type.
 ///
 /// [`channel`]: fn.channel.html
 #[derive(Debug)]
 pub struct Receiver(mpsc::Receiver<Result<(), ExecutionError>>);
 
 impl Receiver {
+    /// Creates receiver which contains specified result.
+    pub fn with_result(result: Result<(), ExecutionError>) -> Self {
+        let (tx, rx) = channel();
+        tx.send(result);
+        rx
+    }
+
     /// Attempts to wait for a value on this receiver, returning an error if the
     /// corresponding channel has hung up.
     pub(crate) fn wait(self) -> Result<(), ExecutionError> {
-        self.0.recv().map_err(|e| {
+        self.0.recv().map_err(|_| {
             ExecutionError::new(
                 ErrorKind::Unexpected,
-                format!(
-                    "An error during waiting for deployment status occurred: {:?}",
-                    e
-                ),
+                "An error during waiting for deployment status occurred",
             )
         })?
     }
@@ -54,7 +58,7 @@ impl Receiver {
 ///
 /// [`channel`]: fn.channel.html
 /// [`send`]: struct.Sender.html#method.send
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Sender(mpsc::Sender<Result<(), ExecutionError>>);
 
 impl Sender {
@@ -62,11 +66,8 @@ impl Sender {
     ///
     /// This method will never block the current thread.
     pub fn send(self, deployment_status: Result<(), ExecutionError>) {
-        if let Err(e) = self.0.send(deployment_status) {
-            log::warn!(
-                "Unable to send deployment status: an error occurred {:?}",
-                e
-            );
+        if self.0.send(deployment_status).is_err() {
+            log::warn!("Unable to send deployment status: an error occurred",);
         }
     }
 }

@@ -16,7 +16,7 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
-        oneshot,
+        oneshot::Receiver,
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceState, Mailbox,
         MethodId, Runtime, WellKnownRuntime,
@@ -100,12 +100,10 @@ impl TestRuntime {
 }
 
 impl Runtime for TestRuntime {
-    fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> oneshot::Receiver {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> Receiver {
         self.tester.deploy_artifact(artifact, deploy_spec);
 
-        let (tx, rx) = oneshot::channel();
-        tx.send(Ok(()));
-        rx
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

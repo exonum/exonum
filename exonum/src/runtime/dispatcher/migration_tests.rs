@@ -25,10 +25,11 @@ use super::*;
 use crate::{
     blockchain::{ApiSender, Block, BlockchainMut},
     helpers::ValidatorId,
-    runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
-        oneshot, BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId,
-        RuntimeIdentifier, SnapshotExt, WellKnownRuntime,
+        migrations::{InitMigrationError, MigrationError},
+        oneshot::Receiver,
+        BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier,
+        SnapshotExt, WellKnownRuntime,
     },
 };
 
@@ -53,14 +54,8 @@ impl WellKnownRuntime for MigrationRuntime {
 }
 
 impl Runtime for MigrationRuntime {
-    fn deploy_artifact(
-        &mut self,
-        _artifact: ArtifactId,
-        _deploy_spec: Vec<u8>,
-    ) -> oneshot::Receiver {
-        let (tx, rx) = oneshot::channel();
-        tx.send(Ok(()));
-        rx
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
