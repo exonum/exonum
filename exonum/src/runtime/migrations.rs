@@ -137,12 +137,13 @@ use crate::runtime::{CoreError, ExecutionError, ExecutionFail, InstanceSpec};
 
 type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
 
-/// Denotes possible types of data migrations.
+/// Types of data migrations.
 #[derive(Debug)]
 pub enum MigrationType {
-    /// Fast-forward migration, that is, migration that does not actually change data layout.
+    /// Fast-forward migration, that is, migration that does not actually change the data layout
+    /// of a service.
     FastForward,
-    /// Asynchronous data migration that can change data layout.
+    /// Asynchronous data migration that can change the data layout of a service.
     Async,
 
     #[doc(hidden)]

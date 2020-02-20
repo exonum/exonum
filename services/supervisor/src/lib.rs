@@ -17,7 +17,7 @@
 //! - Deploying service artifacts
 //! - Instantiating services
 //! - Changing configuration of instantiated services
-//! - Changing state of instantiated services: stopping, freezing, resuming,
+//! - Changing a state of instantiated services: stopping, freezing, resuming,
 //!   and initiating data migrations
 //! - Changing consensus configuration
 //!
