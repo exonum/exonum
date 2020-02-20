@@ -16,7 +16,7 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{contains_transaction, ConsensusConfig, ValidatorKeys},
+    blockchain::{contains_transaction, Block, ConsensusConfig, ValidatorKeys},
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
@@ -34,8 +34,9 @@ use std::{
 
 use crate::{
     connect_list::ConnectList,
+    consensus::RoundAction,
     events::network::ConnectedPeerAddr,
-    messages::{BlockResponse, Connect, Consensus as ConsensusMessage, Prevote, Propose},
+    messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose},
     ConnectInfo,
 };
 
@@ -78,7 +79,7 @@ pub(crate) struct State {
     queued: Vec<ConsensusMessage>,
 
     unknown_txs: HashMap<Hash, Vec<Hash>>,
-    precommits_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
+    proposes_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
 
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
@@ -142,8 +143,8 @@ struct RequestState {
 }
 
 /// `ProposeState` represents the state of some propose and is used for tracking of unknown
-#[derive(Debug)]
 /// transactions.
+#[derive(Debug)]
 pub struct ProposeState {
     propose: Verified<Propose>,
     unknown_txs: HashSet<Hash>,
@@ -167,7 +168,9 @@ pub struct BlockState {
 /// Incomplete block.
 #[derive(Clone, Debug)]
 pub struct IncompleteBlock {
-    msg: Verified<BlockResponse>,
+    pub header: Block,
+    pub precommits: Vec<Verified<Precommit>>,
+    pub transactions: Vec<Hash>,
     unknown_txs: HashSet<Hash>,
 }
 
@@ -369,9 +372,17 @@ impl BlockState {
 }
 
 impl IncompleteBlock {
-    /// Returns `BlockResponse` message.
-    pub fn message(&self) -> &Verified<BlockResponse> {
-        &self.msg
+    pub fn new(
+        header: Block,
+        transactions: Vec<Hash>,
+        precommits: Vec<Verified<Precommit>>,
+    ) -> Self {
+        Self {
+            header,
+            transactions,
+            precommits,
+            unknown_txs: HashSet::new(),
+        }
     }
 
     /// Returns unknown transactions of the block.
@@ -468,7 +479,7 @@ impl State {
             queued: Vec::new(),
 
             unknown_txs: HashMap::new(),
-            precommits_confirmed_by_majority: HashMap::new(),
+            proposes_confirmed_by_majority: HashMap::new(),
 
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
@@ -777,6 +788,13 @@ impl State {
         self.incomplete_block.as_ref()
     }
 
+    /// Returns a saved block that was just completed.
+    pub(super) fn take_completed_block(&mut self) -> IncompleteBlock {
+        let block = self.incomplete_block.take().expect("No saved block");
+        debug_assert!(!block.has_unknown_txs());
+        block
+    }
+
     /// Increments the node height by one and resets previous height data.
     pub(super) fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
         self.height.increment();
@@ -788,7 +806,7 @@ impl State {
         // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
-        self.precommits_confirmed_by_majority.clear();
+        self.proposes_confirmed_by_majority.clear();
         self.prevotes.clear();
         self.precommits.clear();
         self.validators_rounds.clear();
@@ -822,9 +840,8 @@ impl State {
     pub(super) fn check_incomplete_proposes(&mut self, tx_hash: Hash) -> Vec<(Hash, Round)> {
         let mut full_proposes = Vec::new();
         for (propose_hash, propose_state) in &mut self.proposes {
-            propose_state.unknown_txs.remove(&tx_hash);
-
-            if self.invalid_txs.contains(&tx_hash) {
+            let contained_tx = propose_state.unknown_txs.remove(&tx_hash);
+            if contained_tx && self.invalid_txs.contains(&tx_hash) {
                 // Mark prevote with newly received invalid transaction as invalid.
                 propose_state.is_valid = false;
             }
@@ -887,7 +904,9 @@ impl State {
     }
 
     /// Checks if there is an incomplete block that waits for this transaction.
-    /// Returns a block that don't contain unknown transactions.
+    ///
+    /// Returns `NewHeight` if the locally saved block has been completed (i.e., the node can
+    /// commit it now), `None` otherwise.
     ///
     /// Transaction is ignored if the following criteria are fulfilled:
     ///
@@ -897,7 +916,7 @@ impl State {
     /// # Panics
     ///
     /// Panics if transaction for incomplete block is known as invalid.
-    pub(super) fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> Option<IncompleteBlock> {
+    pub(super) fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> RoundAction {
         if let Some(ref mut incomplete_block) = self.incomplete_block {
             if self.invalid_txs.contains(&tx_hash) {
                 panic!("Received a block with transaction known as invalid");
@@ -905,10 +924,10 @@ impl State {
 
             incomplete_block.unknown_txs.remove(&tx_hash);
             if incomplete_block.unknown_txs.is_empty() {
-                return Some(incomplete_block.clone());
+                return RoundAction::NewHeight;
             }
         }
-        None
+        RoundAction::None
     }
 
     /// Returns pre-votes for the specified round and propose hash.
@@ -1046,33 +1065,25 @@ impl State {
     /// - Block contains a transaction that is incorrect.
     pub(super) fn create_incomplete_block<S: RawAccess>(
         &mut self,
-        msg: &Verified<BlockResponse>,
-        txs: &MapIndex<S, Hash, Verified<AnyTx>>,
+        mut incomplete_block: IncompleteBlock,
+        txs_map: &MapIndex<S, Hash, Verified<AnyTx>>,
         txs_pool: &KeySetIndex<S, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
 
-        let mut unknown_txs = HashSet::new();
-        for hash in &msg.payload().transactions {
-            if contains_transaction(hash, &txs, &self.tx_cache) {
+        for hash in &incomplete_block.transactions {
+            if contains_transaction(hash, &txs_map, &self.tx_cache) {
                 if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
-                    panic!(
-                        "Received block with already \
-                         committed transaction"
-                    )
+                    panic!("Received block with already committed transaction");
                 }
             } else if self.invalid_txs.contains(hash) {
-                panic!("Received a block with transaction known as invalid")
+                panic!("Received a block with transaction known as invalid");
             } else {
-                unknown_txs.insert(*hash);
+                incomplete_block.unknown_txs.insert(*hash);
             }
         }
 
-        self.incomplete_block = Some(IncompleteBlock {
-            msg: msg.clone(),
-            unknown_txs,
-        });
-
+        self.incomplete_block = Some(incomplete_block);
         self.incomplete_block().unwrap()
     }
 
@@ -1167,18 +1178,18 @@ impl State {
         block_hash: Hash,
     ) {
         let old_value = self
-            .precommits_confirmed_by_majority
+            .proposes_confirmed_by_majority
             .insert(propose_hash, (round, block_hash));
 
         debug_assert!(
-            old_value.is_none(),
-            "Attempt to add propose confirmed by majority twice"
+            old_value.map_or(true, |val| val == (round, block_hash)),
+            "Attempt to add another propose confirmed by majority"
         );
     }
 
     /// Removes a propose from the list of unknown proposes and returns its round and hash.
     pub(super) fn take_confirmed_propose(&mut self, propose_hash: &Hash) -> Option<(Round, Hash)> {
-        self.precommits_confirmed_by_majority.remove(propose_hash)
+        self.proposes_confirmed_by_majority.remove(propose_hash)
     }
 
     /// Returns true if the node has +2/3 pre-commits for the specified round and block hash.

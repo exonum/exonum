@@ -153,7 +153,6 @@ impl EventsHandle {
         self.0.lock().unwrap().push(event);
     }
 
-    #[must_use]
     pub fn take(&self) -> Vec<RuntimeEvent> {
         self.0.lock().unwrap().drain(..).collect()
     }

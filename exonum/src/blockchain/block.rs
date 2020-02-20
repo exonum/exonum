@@ -12,15 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_merkledb::{BinaryValue, MapProof};
+use exonum_merkledb::{
+    proof_map::MapProofError, BinaryValue, MapProof, ObjectHash, ValidationError,
+};
 use exonum_proto::ProtobufConvert;
+use failure::Fail;
 
 use std::borrow::Cow;
 
 use crate::{
-    crypto::Hash,
-    helpers::{Height, OrderedMap, ValidatorId},
+    helpers::{byzantine_quorum, Height, OrderedMap, ValidatorId},
     messages::{Precommit, Verified},
     proto::schema,
 };
@@ -207,6 +210,107 @@ impl BlockProof {
             non_exhaustive: (),
         }
     }
+
+    /// Verifies that the block in this proof is endorsed by the Byzantine majority of provided
+    /// validators.
+    pub fn verify(&self, validator_keys: &[PublicKey]) -> Result<(), ProofError> {
+        if self.precommits.len() < byzantine_quorum(validator_keys.len()) {
+            return Err(ProofError::NoQuorum);
+        }
+        if self.precommits.len() > validator_keys.len() {
+            return Err(ProofError::DoubleEndorsement);
+        }
+
+        let correct_heights = self
+            .precommits
+            .iter()
+            .all(|precommit| precommit.payload().height == self.block.height);
+        if !correct_heights {
+            return Err(ProofError::IncorrectHeight);
+        }
+
+        let block_hash = self.block.object_hash();
+        let correct_block_hashes = self
+            .precommits
+            .iter()
+            .all(|precommit| precommit.payload().block_hash == block_hash);
+        if !correct_block_hashes {
+            return Err(ProofError::IncorrectBlockHash);
+        }
+
+        let mut endorsements = vec![false; validator_keys.len()];
+        for precommit in &self.precommits {
+            let validator_id = precommit.payload().validator.0 as usize;
+            let expected_key = *validator_keys
+                .get(validator_id)
+                .ok_or(ProofError::IncorrectValidatorId)?;
+            if expected_key != precommit.author() {
+                return Err(ProofError::ValidatorKeyMismatch);
+            }
+            if endorsements[validator_id] {
+                return Err(ProofError::DoubleEndorsement);
+            }
+            endorsements[validator_id] = true;
+        }
+
+        // This assertion should always hold. Indeed, we've checked that there are +2/3 precommits
+        // and that there are no double endorsements; hence, the block should be approved
+        // by +2/3 validators.
+        debug_assert!(
+            endorsements.iter().filter(|&&flag| flag).count()
+                >= byzantine_quorum(validator_keys.len())
+        );
+
+        Ok(())
+    }
+}
+
+/// Errors that can occur during verification of `BlockProof`s and `IndexProof`s.
+#[derive(Debug, Fail)]
+pub enum ProofError {
+    /// The block is authorized by an insufficient number of precommits.
+    #[fail(display = "Insufficient number of precommits")]
+    NoQuorum,
+
+    /// Block height mentioned in at least one of precommits differs from the height mentioned
+    /// in the block header.
+    #[fail(display = "Incorrect block height in at least one of precommits")]
+    IncorrectHeight,
+
+    /// Hash of the block in at least one precommit differs from that of the real block.
+    #[fail(display = "Incorrect block hash in at least one of precommits")]
+    IncorrectBlockHash,
+
+    /// Validator ID mentioned in at least one precommit is incorrect.
+    #[fail(display = "Incorrect validator ID in at least one of precommits")]
+    IncorrectValidatorId,
+
+    /// Key of a validator differs from the expected.
+    #[fail(
+        display = "Mismatch between key in precommit message and key of corresponding validator"
+    )]
+    ValidatorKeyMismatch,
+
+    /// The same validator has authorized several precommits.
+    #[fail(display = "Multiple precommits from the same validator")]
+    DoubleEndorsement,
+
+    /// Index proof does not actually prove existence of any index.
+    #[fail(display = "Index proof does not actually prove existence of any index")]
+    NoIndex,
+
+    /// Index proof purports to prove existence of more than one index.
+    #[fail(display = "index proof purports to prove existence of more than one index")]
+    AmbiguousIndex,
+
+    /// Index proof is incorrect.
+    #[fail(display = "index proof is incorrect: {}", _0)]
+    IncorrectIndexProof(#[fail(cause)] ValidationError<MapProofError>),
+
+    /// Never actually generated.
+    #[doc(hidden)]
+    #[fail(display = "")]
+    __NonExhaustive,
 }
 
 /// Proof of authenticity for a single index within the database.
@@ -237,16 +341,38 @@ impl IndexProof {
             non_exhaustive: (),
         }
     }
+
+    /// Verifies this proof, returning the full index name (e.g., `cryptocurrency.wallets`)
+    /// and its hash on success.
+    pub fn verify(&self, validator_keys: &[PublicKey]) -> Result<(&str, Hash), ProofError> {
+        self.block_proof.verify(validator_keys)?;
+
+        // The index proof should feature exactly one present entry.
+        let mut unchecked_entries = self.index_proof.all_entries_unchecked();
+        let (name, maybe_hash) = unchecked_entries.next().ok_or(ProofError::NoIndex)?;
+        if unchecked_entries.next().is_some() {
+            return Err(ProofError::AmbiguousIndex);
+        }
+        let index_hash = *maybe_hash.ok_or(ProofError::NoIndex)?;
+        self.index_proof
+            .check_against_hash(self.block_proof.block.state_hash)
+            .map_err(ProofError::IncorrectIndexProof)?;
+        Ok((name.as_str(), index_hash))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use exonum_crypto::hash;
-    use exonum_merkledb::ObjectHash;
+    use assert_matches::assert_matches;
+    use chrono::Utc;
+    use exonum_crypto::{hash, KeyPair};
+    use exonum_merkledb::{
+        access::CopyAccessExt, Database, HashTag, ObjectHash, SystemSchema, TemporaryDB,
+    };
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
-    use crate::runtime::InstanceId;
+    use crate::{helpers::Round, runtime::InstanceId};
 
     impl BlockHeaderKey for Hash {
         const NAME: &'static str = "HASH";
@@ -385,5 +511,237 @@ mod tests {
         let block = create_block(AdditionalHeaders { headers });
         let services = block.get_header::<ActiveServices>();
         assert!(services.is_err());
+    }
+
+    fn create_block_proof(keys: &[KeyPair], state_hash: Hash) -> BlockProof {
+        let mut block = Block {
+            height: Height(1),
+            tx_count: 0,
+            prev_hash: Hash::zero(),
+            tx_hash: Hash::zero(),
+            state_hash,
+            error_hash: Hash::zero(),
+            additional_headers: AdditionalHeaders::default(),
+        };
+        block
+            .additional_headers
+            .insert::<ProposerId>(ValidatorId(1));
+
+        let precommits = keys.iter().enumerate().map(|(i, keypair)| {
+            let precommit = Precommit::new(
+                ValidatorId(i as u16),
+                Height(1),
+                Round(1),
+                Hash::zero(),
+                block.object_hash(),
+                Utc::now(),
+            );
+            Verified::from_value(precommit, keypair.public_key(), keypair.secret_key())
+        });
+        let precommits = precommits.collect();
+
+        BlockProof::new(block, precommits)
+    }
+
+    #[test]
+    fn correct_block_proof() {
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+
+        let mut proof = create_block_proof(&keys, Hash::zero());
+        proof.verify(&public_keys).unwrap();
+        // We can remove one `Precommit` without disturbing the proof integrity.
+        proof.precommits.truncate(3);
+        proof.verify(&public_keys).unwrap();
+    }
+
+    #[test]
+    fn incorrect_block_proofs() {
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+
+        // Too many precommits.
+        let proof = create_block_proof(&keys, Hash::zero());
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.push(proof.precommits[0].clone());
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            ProofError::DoubleEndorsement
+        );
+
+        // Too few precommits.
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            ProofError::NoQuorum
+        );
+
+        // Double endorsement.
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(proof.precommits[0].clone());
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            ProofError::DoubleEndorsement
+        );
+
+        // Key mismatch.
+        let mut expected_public_keys = public_keys.clone();
+        expected_public_keys[3] = KeyPair::random().public_key();
+        assert_matches!(
+            proof.verify(&expected_public_keys).unwrap_err(),
+            ProofError::ValidatorKeyMismatch
+        );
+
+        // Incorrect height in a precommit.
+        let bogus_precommit = Precommit::new(
+            ValidatorId(3),
+            Height(100),
+            Round(1),
+            Hash::zero(),
+            proof.block.object_hash(),
+            Utc::now(),
+        );
+        let bogus_precommit =
+            Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(bogus_precommit);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            ProofError::IncorrectHeight
+        );
+
+        // Incorrect block hash in a precommit.
+        let bogus_precommit = Precommit::new(
+            ValidatorId(3),
+            Height(1),
+            Round(1),
+            Hash::zero(),
+            Hash::zero(),
+            Utc::now(),
+        );
+        let bogus_precommit =
+            Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
+        let mut mauled_proof = proof;
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(bogus_precommit);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            ProofError::IncorrectBlockHash
+        );
+    }
+
+    fn create_index_proof() -> (Hash, MapProof<String, Hash>) {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_list("test.list").extend(vec![1_u8, 2, 3]);
+        let patch = fork.into_patch();
+        let system_schema = SystemSchema::new(&patch);
+        let state_hash = system_schema.state_hash();
+        let index_proof = system_schema
+            .state_aggregator()
+            .get_proof("test.list".to_owned());
+        (state_hash, index_proof)
+    }
+
+    #[test]
+    fn correct_index_proof() {
+        let (state_hash, index_proof) = create_index_proof();
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, state_hash);
+        let index_proof = IndexProof::new(block_proof, index_proof);
+        let (index_name, index_hash) = index_proof.verify(&public_keys).unwrap();
+        assert_eq!(index_name, "test.list");
+        let expected_index_hash = HashTag::hash_list(&[1_u8, 2, 3]);
+        assert_eq!(index_hash, expected_index_hash);
+    }
+
+    #[test]
+    fn index_proof_with_incorrect_auth() {
+        let (state_hash, index_proof) = create_index_proof();
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, state_hash);
+        let index_proof = IndexProof::new(block_proof, index_proof);
+
+        let mut expected_public_keys = public_keys;
+        expected_public_keys.pop();
+        expected_public_keys.push(KeyPair::random().public_key());
+        assert_matches!(
+            index_proof.verify(&expected_public_keys).unwrap_err(),
+            ProofError::ValidatorKeyMismatch
+        );
+    }
+
+    #[test]
+    fn index_proof_with_no_index() {
+        let db = TemporaryDB::new();
+        let snapshot = db.snapshot();
+        let system_schema = SystemSchema::new(&snapshot);
+        let state_hash = system_schema.state_hash();
+        let index_proof = system_schema
+            .state_aggregator()
+            .get_proof("test.list".to_owned());
+
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, state_hash);
+        let index_proof = IndexProof::new(block_proof, index_proof);
+
+        assert_matches!(
+            index_proof.verify(&public_keys).unwrap_err(),
+            ProofError::NoIndex
+        );
+    }
+
+    #[test]
+    fn index_proof_with_multiple_indexes() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_entry("test.some").set("!".to_owned());
+        fork.get_proof_entry("test.other").set(42_u64);
+        let patch = fork.into_patch();
+        let system_schema = SystemSchema::new(&patch);
+        let state_hash = system_schema.state_hash();
+        let index_proof = system_schema
+            .state_aggregator()
+            .get_multiproof(vec!["test.some".to_owned(), "test.other".to_owned()]);
+
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, state_hash);
+        let index_proof = IndexProof::new(block_proof, index_proof);
+
+        assert_matches!(
+            index_proof.verify(&public_keys).unwrap_err(),
+            ProofError::AmbiguousIndex
+        );
+    }
+
+    #[test]
+    fn index_proof_with_mismatched_state_hash() {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        fork.get_proof_entry("test.some").set("!".to_owned());
+        fork.get_proof_entry("test.other").set(42_u64);
+        let patch = fork.into_patch();
+        let system_schema = SystemSchema::new(&patch);
+        let index_proof = system_schema
+            .state_aggregator()
+            .get_proof("test.some".to_owned());
+
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let bogus_state_hash = Hash::zero();
+        let block_proof = create_block_proof(&keys, bogus_state_hash);
+        let index_proof = IndexProof::new(block_proof, index_proof);
+
+        assert_matches!(
+            index_proof.verify(&public_keys).unwrap_err(),
+            ProofError::IncorrectIndexProof(ValidationError::UnmatchedRootHash)
+        );
     }
 }

@@ -1,0 +1,25 @@
+[package]
+name = "exonum-soak-tests"
+version = "0.0.0"
+edition = "2018"
+authors = ["The Exonum Team <exonum@bitfury.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+readme = "README.md"
+description = "The crate for soak testing of Exonum node."
+publish = false
+
+[[bin]]
+name = "toggle"
+path = "src/toggle.rs"
+
+[dependencies]
+exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
+exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
+exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
+exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
+
+futures = "0.1.29"
+log = "0.4.6"
+structopt = "0.3.9"

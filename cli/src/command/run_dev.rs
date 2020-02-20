@@ -93,7 +93,7 @@ impl ExonumCommand for RunDev {
         generate_template.execute()?;
 
         let generate_config = GenerateConfig {
-            common_config: common_config.clone(),
+            common_config,
             output_dir: self.artifacts_dir.clone(),
             peer_address: "127.0.0.1:6200".parse().unwrap(),
             listen_address: None,

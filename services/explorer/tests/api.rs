@@ -175,7 +175,7 @@ fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
         let tx = KeyPair::random().increment(SERVICE_ID, height);
-        testkit.api().send(tx.clone());
+        testkit.api().send(tx);
     }
     testkit.create_block();
 }
@@ -548,7 +548,7 @@ fn test_explorer_api_with_before_transactions_error() {
     let tx = key_pair.increment(SERVICE_ID, 13);
 
     // This tx lead to error in before_transaction on the next transaction
-    testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx);
     let response = api
         .public(ApiKind::Explorer)
         .query(&CallStatusQuery {

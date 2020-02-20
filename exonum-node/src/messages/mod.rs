@@ -367,15 +367,12 @@ mod tests {
             last_hash: Hash::zero(),
             pool_size: 0,
         };
-        let protocol_message = ExonumMessage::from(msg.clone());
-        let mut signed = SignedMessage::new(
-            protocol_message.clone(),
-            keypair.public_key(),
-            keypair.secret_key(),
-        );
+        let protocol_message = ExonumMessage::from(msg);
+        let mut signed =
+            SignedMessage::new(protocol_message, keypair.public_key(), keypair.secret_key());
         // Update author
         signed.author = KeyPair::random().public_key();
-        let err = signed.clone().into_verified::<ExonumMessage>().unwrap_err();
+        let err = signed.into_verified::<ExonumMessage>().unwrap_err();
         assert_eq!(err.to_string(), "Failed to verify signature.");
     }
 
@@ -529,7 +526,7 @@ mod tests {
         assert_eq!(block2.payload().block, content);
         assert_eq!(block2.payload().precommits, precommits_buf);
         assert_eq!(block2.payload().transactions, transactions);
-        let block_proof = BlockProof::new(content.clone(), precommits.clone());
+        let block_proof = BlockProof::new(content, precommits);
         let json_str = serde_json::to_string(&block_proof).unwrap();
         let block_proof_1: BlockProof = serde_json::from_str(&json_str).unwrap();
         assert_eq!(block_proof, block_proof_1);

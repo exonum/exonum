@@ -185,7 +185,7 @@ impl TestEvents {
             network_config,
             max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
             network_requests: channel.network_requests,
-            network_tx: network_tx.clone(),
+            network_tx,
             connect_list: self.connect_list,
         };
 
@@ -264,7 +264,7 @@ impl ConnectionParams {
     }
 
     fn spawn(&mut self, events: TestEvents, connect_list: SharedConnectList) -> TestHandler {
-        self.handshake_params.connect_list = connect_list.clone();
+        self.handshake_params.connect_list = connect_list;
         events.spawn(&self.handshake_params, self.connect.clone())
     }
 }
@@ -293,8 +293,8 @@ fn test_network_handshake() {
     let mut e2 = t2.spawn(e2, connect_list);
 
     e1.connect_with(second_key, t1.connect.clone());
-    assert_eq!(e2.wait_for_connect(), t1.connect.clone());
-    assert_eq!(e1.wait_for_connect(), t2.connect.clone());
+    assert_eq!(e2.wait_for_connect(), t1.connect);
+    assert_eq!(e1.wait_for_connect(), t2.connect);
 
     e1.disconnect_with(second_key);
     assert_eq!(e1.wait_for_disconnect(), second_key);
@@ -329,7 +329,7 @@ fn test_network_big_message() {
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second_key, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect);
 
     e2.wait_for_connect();
     e1.wait_for_connect();
@@ -387,7 +387,7 @@ fn test_network_max_message_len() {
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second_key, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect);
 
     e2.wait_for_connect();
     e1.wait_for_connect();
@@ -395,7 +395,7 @@ fn test_network_max_message_len() {
     e1.send_to(second_key, acceptable_message.clone());
     assert_eq!(e2.wait_for_message(), acceptable_message);
 
-    e2.send_to(first_key, too_big_message.clone());
+    e2.send_to(first_key, too_big_message);
     assert_eq!(e1.wait_for_disconnect(), second_key);
 }
 
@@ -441,8 +441,8 @@ fn test_network_reconnect() {
     let mut e2 = t2.spawn(e2, connect_list);
 
     e1.connect_with(second_key, t1.connect.clone());
-    assert_eq!(e2.wait_for_connect(), t1.connect.clone());
-    assert_eq!(e1.wait_for_connect(), t2.connect.clone());
+    assert_eq!(e2.wait_for_connect(), t1.connect);
+    assert_eq!(e1.wait_for_connect(), t2.connect);
 
     e1.send_to(second_key, msg.clone());
     assert_eq!(e2.wait_for_message(), msg);
@@ -525,7 +525,7 @@ fn test_send_first_not_connect() {
     let other_node = TestEvents::with_addr(other, &connect_list);
 
     let mut node = t1.spawn(node, connect_list.clone());
-    let other_node = t2.spawn(other_node, connect_list.clone());
+    let other_node = t2.spawn(other_node, connect_list);
 
     let message = raw_message(1000);
     other_node.send_to(main_key, message.clone()); // should connect before send message
@@ -556,7 +556,7 @@ fn test_connect_list_ignore_when_connecting() {
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e1.connect_with(second_key, t1.connect.clone());
+    e1.connect_with(second_key, t1.connect);
     e2.wait_for_connect();
     e1.wait_for_connect();
 }
@@ -583,7 +583,7 @@ fn test_connect_list_ignore_when_listening() {
     let mut e1 = t1.spawn(e1, connect_list.clone());
     let mut e2 = t2.spawn(e2, connect_list);
 
-    e2.connect_with(first_key, t1.connect.clone());
+    e2.connect_with(first_key, t1.connect);
     e1.wait_for_connect();
     e2.wait_for_connect();
 }

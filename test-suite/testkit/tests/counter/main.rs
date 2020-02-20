@@ -13,15 +13,15 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{CallInBlock, ValidatorKeys},
-    crypto::{Hash, KeyPair},
+    blockchain::CallInBlock,
+    crypto::{Hash, KeyPair, PublicKey},
     helpers::Height,
     messages::{AnyTx, Verified},
     runtime::SnapshotExt,
 };
 use exonum_explorer::{api::TransactionResponse, BlockchainExplorer};
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
@@ -39,12 +39,12 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-fn get_validator_keys(testkit: &TestKit) -> Vec<ValidatorKeys> {
+fn get_validator_keys(testkit: &TestKit) -> Vec<PublicKey> {
     testkit
         .network()
         .validators()
         .iter()
-        .map(TestNode::public_keys)
+        .map(|node| node.public_keys().consensus_key)
         .collect()
 }
 
@@ -78,7 +78,7 @@ fn test_inc_add_tx() {
 }
 
 #[test]
-#[should_panic(expected = "Attempt to add invalid tx in the pool")]
+#[should_panic(expected = "Attempt to add incorrect transaction in the pool")]
 fn test_inc_add_tx_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_inc_incorrect_tx(5);
@@ -124,8 +124,8 @@ fn test_inc_count_create_block() {
     assert_eq!(counter_with_proof.verify(&validator_keys), Some(10));
 }
 
-#[should_panic(expected = "Transaction is already committed")]
 #[test]
+#[should_panic(expected = "Transaction is already committed")]
 fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
     let keypair = KeyPair::random();
@@ -136,7 +136,7 @@ fn test_inc_count_create_block_with_committed_transaction() {
 }
 
 #[test]
-#[should_panic(expected = "Attempt to add invalid tx in the pool")]
+#[should_panic(expected = "Cannot create block with incorrect transaction")]
 fn test_inc_count_create_block_with_transaction_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_inc_incorrect_tx(5);
@@ -381,4 +381,21 @@ fn test_explorer_single_block() {
     }
 
     assert!(validators.len() >= testkit.majority_count());
+}
+
+#[test]
+fn submitting_incorrect_tx_via_sender() {
+    exonum::helpers::init_logger().ok();
+
+    let (mut testkit, api) = init_testkit();
+    let tx_hash: Hash = api
+        .public(ApiKind::Service("counter"))
+        .query(&11_u64)
+        .post("incorrect-tx")
+        .unwrap();
+    // The transaction should not appear in the pool.
+    let incorrect_tx = testkit.us().service_keypair().increment(SERVICE_ID + 1, 11);
+    assert_eq!(incorrect_tx.object_hash(), tx_hash);
+    testkit.poll_events();
+    assert!(!testkit.is_tx_in_pool(&tx_hash));
 }

@@ -178,7 +178,7 @@ mod test {
         check_in_connect_list(&connect_list, &regular, &[0], &[1, 2, 3]);
         connect_list.add(ConnectInfo {
             public_key: regular[2],
-            address: address.clone(),
+            address,
         });
         check_in_connect_list(&connect_list, &regular, &[0, 2], &[1, 3]);
 

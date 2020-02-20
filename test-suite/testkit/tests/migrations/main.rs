@@ -342,7 +342,7 @@ fn migration_with_two_scripts() {
 fn generate_users(rng: &mut impl Rng, user_count: usize) -> Vec<TestUser> {
     (0..user_count)
         .map(|i| {
-            let first_name = ["Mouse", "Vogon"].choose(rng).unwrap().to_string();
+            let first_name = ["Mouse", "Vogon"].choose(rng).unwrap().to_owned();
             let last_name = format!("#{}", i);
             TestUser {
                 full_name: format!("{} {}", first_name, last_name).into(),
