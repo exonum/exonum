@@ -14,19 +14,21 @@
 
 //! Supervisor is an [Exonum][exonum] service capable of the following activities:
 //!
-//! - Service artifact deployment;
-//! - Service instances creation;
-//! - Changing consensus configuration;
-//! - Changing service instances configuration.
-//! - Migrating service data.
+//! - Deploying service artifacts
+//! - Instantiating services
+//! - Changing configuration of instantiated services
+//! - Changing state of instantiated services: stopping, freezing, resuming,
+//!   and initiating data migrations
+//! - Changing consensus configuration
 //!
-//! More information on the artifact/service lifecycle can be found in the documentation for
-//! the Exonum [runtime module][runtime-docs].
+//! More information on the artifact / service lifecycle can be found in the
+//! documentation of [service lifecycle][docs:lifecycle] and the [supervisor][docs:supervisor].
 //!
 //! Supervisor service has two different operating modes: a "simple" mode and a "decentralized" mode.
 //! The difference between modes is in the decision making approach:
+//!
 //! - Within the decentralized mode, to deploy a service or apply a new configuration,
-//!  no less than (2/3)+1 validators should reach a consensus;
+//!   more than 2/3rds of validators should reach a consensus;
 //! - Within the simple mode, any decision is executed after a single validator approval.
 //!
 //! The simple mode can be useful if one network administrator manages all the validator nodes
@@ -42,8 +44,6 @@
 //!
 //! Key point here is that user **should not** send transactions to the supervisor by himself.
 //!
-//! An expected format of requests for those endpoints is a serialized Protobuf message.
-//!
 //! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
 //! of the nodes should receive a [`DeployRequest`] message through API.
 //!
@@ -53,8 +53,8 @@
 //! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
 //! This node votes for the configuration propose automatically.
 //!
-//! The operation of starting or resuming a service is treated similarly to a configuration change
-//! and follows the same rules.
+//! The operation of changing a service state except for data migrations is treated similarly
+//! to a configuration change and follows the same rules.
 //!
 //! ## Migrations Management
 //!
@@ -67,17 +67,16 @@
 //!
 //! The following requirements should be satisfied in order to start a migration:
 //!
-//! - Target service instance should exist and be stopped.
+//! - Target service instance should exist and be stopped or frozen.
 //! - End artifact for a migration should be a superior version of the artifact of target instance.
 //! - New (end) version of artifact should be deployed.
-//! - Service should have all the migration scripts required to migrate to the end artifact version.
 //!
 //! Violation of any of requirements listed above will result in a request failure without
 //! actual start of migration.
 //!
 //! ## Migration Workflow
 //!
-//! Migration starts after the block with the request is committed, and performed asynchronously.
+//! Migration starts after the block with the request is committed and is performed asynchronously.
 //!
 //! After the local migration completion, validator nodes report the result of migration, which can
 //! be either successful or unsuccessful.
@@ -97,11 +96,10 @@
 //!
 //! If migration contains more than one migration script (e.g. if you need to migrate service from
 //! version 0.1 to version 0.3, and this will include execution of two migration scripts: 0.1 -> 0.2
-//! and 0.2 -> 0.3), supervisor will perform one migration script at the time.
+//! and 0.2 -> 0.3), supervisor will execute one migration script at the time.
 //!
 //! After the first migration request to version 0.3, migration will be performed for version 0.2,
-//! and you need to create the same migration request again (with different deadline height though).
-//!
+//! and you need to create the same migration request with a different deadline height.
 //! After the second migration request, the version will be updated to 0.3.
 //!
 //! To put it simply, you may need to perform the same migration request several times until every
@@ -109,17 +107,18 @@
 //!
 //! ### Incomplete Migrations
 //!
-//! Migrations require only the current and the last version of artifact to be deployed. If you will
-//! decide to stop migration until reaching the last version (e.g. you requested migration to version
-//! 0.3, but decided to go with version 0.2), you will have to deploy a corresponding artifact after
-//! you migrate to version 0.2, before you'll be able to start your service.
+//! Migrations require only the current and the last version of artifact to be deployed. If you
+//! decide to stop migration before reaching the last version (e.g. you requested migration to version
+//! 0.3, but decided to go with version 0.2), you will need to deploy the 0.2 artifact
+//! in order to resume the migrated service.
 //!
 //! # HTTP API
 //!
 //! REST API of the service is documented in the [`api` module](api/index.html).
 //!
 //! [exonum]: https://github.com/exonum/exonum
-//! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
+//! [docs:supervisor]: https://exonum.com/doc/version/latest/advanced/supervisor/
+//! [docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
 //! [`DeployRequest`]: struct.DeployRequest.html
 //! [`ConfigPropose`]: struct.ConfigPropose.html
 //! [`ConfigVote`]: struct.ConfigVote.html
