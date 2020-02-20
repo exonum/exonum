@@ -93,14 +93,19 @@
 //!   the transition to the "active" state is not immediate;
 //!   see [*Service State Transitions*](#service-state-transitions) section below.)
 //!
-//! 4. Active service instances can be stopped by a corresponding request to the dispatcher.
-//!   A stopped service no longer participates in business logic, i.e. it does not process
-//!   transactions, events, does not interact with the users in any way.
-//!   Service data becomes unavailable for the other services, but still exists. The service name
-//!   and identifier remain reserved for the stopped service and can't be used again for
-//!   adding new services.
+//! 4. Active service instances can be stopped or frozen by a corresponding request to the dispatcher.
 //!
 //! The dispatcher is responsible for persisting artifacts and services across node restarts.
+//!
+//! A **stopped** service no longer participates in business logic, i.e.,
+//! it does not process transactions or hooks, and does not interact with the users
+//! in any way. Service data becomes unavailable for the other services,
+//! but still exists. The service name and identifier remain reserved
+//! for the stopped service and can't be used again for adding new services.
+//!
+//! **Frozen** service state is similar to the stopped one, except the service
+//! state can be read both by internal readers (other services) and external ones
+//! (HTTP API handlers).
 //!
 //! ## Service Hooks
 //!
@@ -123,7 +128,7 @@
 //! (`before_transactions` / `after_transactions`) are *not* called in the block with service
 //! instantiation.
 //!
-//! When the service is stopped, the reverse is true:
+//! When the service is stopped or frozen, the reverse is true:
 //!
 //! - The service continues processing transactions until the end of the block containing
 //!   the stop command
@@ -172,6 +177,11 @@
 //! in services: if a certain transaction originates from a service with `SUPERVISOR_INSTANCE_ID`,
 //! it is authorized by the administrators.
 //!
+//! # See Also
+//!
+//! - [Article on service lifecycle in general docs][docs:lifecycle]
+//! - [Blog article on service lifecycle][blog:lifecycle]
+//!
 //! [`AnyTx`]: struct.AnyTx.html
 //! [`CallInfo`]: struct.CallInfo.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.instance_id
@@ -184,6 +194,8 @@
 //! [`Mailbox`]: struct.Mailbox.html
 //! [`ExecutionError`]: struct.ExecutionError.html
 //! [`instance_id`]: struct.CallInfo.html#structfield.method_id
+//! [docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
+//! [blog:lifecycle]: https://medium.com/meetbitfury/about-service-lifecycles-in-exonum-58c67678c6bb
 
 pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
