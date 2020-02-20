@@ -15,13 +15,14 @@
 //! Module responsible for actix web API management after new service is deployed.
 
 use actix::prelude::*;
-use actix_net::server::Server;
-use actix_web::server::{HttpServer, StopServer};
-use futures::{sync::mpsc, Future};
+use actix_cors::{Cors, CorsFactory};
+use actix_web::{dev::Server, HttpServer, App};
+use futures_01::{sync::mpsc, Future};
+use futures::{future::join_all};
 
 use std::{collections::HashMap, fmt, io, net::SocketAddr, time::Duration};
 
-use crate::{backends::actix::create_app, AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
+use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
 /// Configuration parameters for a single web server.
 #[derive(Debug, Clone)]
@@ -38,6 +39,13 @@ impl WebServerConfig {
         Self {
             listen_address,
             allow_origin: None,
+        }
+    }
+
+    fn cors_factory(&self) -> CorsFactory {
+        match self.allow_origin.clone() {
+            Some(origin) => CorsFactory::from(origin),
+            None => Cors::new().finish(),
         }
     }
 }
@@ -61,7 +69,7 @@ pub struct ApiManagerConfig {
 /// is capable of updating them via `UpdateEndpoints`.
 pub struct ApiManager {
     config: ApiManagerConfig,
-    server_addresses: HashMap<ApiAccess, Addr<Server>>,
+    server_addresses: HashMap<ApiAccess, Server>,
     variable_endpoints: Vec<(String, ApiBuilder)>,
     endpoints_rx: Option<mpsc::Receiver<UpdateEndpoints>>,
 }
@@ -105,28 +113,22 @@ impl ApiManager {
         &self,
         access: ApiAccess,
         server_config: WebServerConfig,
-    ) -> io::Result<Addr<Server>> {
-        let listen_address = server_config.listen_address;
-        log::info!("Starting {} web api on {}", access, listen_address);
-
-        let mut aggregator = self.config.api_aggregator.clone();
-        aggregator.extend(self.variable_endpoints.clone());
-        HttpServer::new(move || create_app(&aggregator, access, &server_config))
-            .disable_signals()
-            .bind(listen_address)
-            .map(HttpServer::start)
+    ) -> io::Result<Server> {
+        todo!()
     }
 
     fn initiate_restart(&mut self, manager: Addr<Self>) {
         log::info!("Restarting servers.");
-        for (access, addr) in self.server_addresses.drain() {
-            let manager = manager.clone();
-            Arbiter::spawn(
-                addr.send(StopServer { graceful: true })
-                    .then(move |_| manager.send(StartServer { access, attempt: 0 }))
-                    .map_err(|e| log::error!("Error while restarting API server: {}", e)),
-            );
-        }
+        todo!();
+
+        // for (access, server) in self.server_addresses.drain() {
+        //     let manager = manager.clone();
+        //     Arbiter::spawn(
+        //         addr.send(StopServer { graceful: true })
+        //             .then(move |_| manager.send(StartServer { access, attempt: 0 }))
+        //             .map_err(|e| log::error!("Error while restarting API server: {}", e)),
+        //     );
+        // }
     }
 }
 
@@ -139,7 +141,7 @@ impl Actor for ApiManager {
             .endpoints_rx
             .take()
             .expect("`Actor::started()` called twice for `ApiManager`");
-        Self::add_stream(endpoints_rx, ctx);
+        // Self::add_stream(endpoints_rx, ctx);
     }
 }
 
@@ -198,10 +200,67 @@ impl Message for UpdateEndpoints {
     type Result = ();
 }
 
-impl StreamHandler<UpdateEndpoints, ()> for ApiManager {
+impl StreamHandler<UpdateEndpoints> for ApiManager {
     fn handle(&mut self, msg: UpdateEndpoints, ctx: &mut Context<Self>) {
         log::info!("Server restart requested");
         self.variable_endpoints = msg.endpoints;
         self.initiate_restart(ctx.address());
+    }
+}
+
+/// Actor responsible for API management. The actor encapsulates endpoint handlers and
+/// is capable of updating them via `UpdateEndpoints`.
+#[derive(Clone)]
+pub struct ApiManager2 {
+    config: ApiManagerConfig,
+    server_addresses: HashMap<ApiAccess, Server>,
+    variable_endpoints: Vec<(String, ApiBuilder)>,
+}
+
+impl ApiManager2 {
+    /// Creates a new API manager instance with the specified runtime configuration and
+    /// the receiver of the `UpdateEndpoints` events.
+    pub fn new(config: ApiManagerConfig) -> Self {
+        Self {
+            config,
+            server_addresses: HashMap::new(),
+            variable_endpoints: vec![],
+        }
+    }
+
+    pub fn start_servers(&mut self) -> impl std::future::Future<Output = Vec<io::Result<()>>> {
+        self.server_addresses = self
+            .config
+            .servers
+            .iter()
+            .map(|(&access, server_config)| {
+                let server_address = self
+                    .start_server(access, server_config.to_owned())
+                    .expect("Failed to start API server");
+                (access, server_address)
+            }).collect();
+
+        join_all(self.server_addresses.values().cloned())
+    }
+
+    fn start_server(
+        &self,
+        access: ApiAccess,
+        server_config: WebServerConfig,
+    ) -> io::Result<Server> {
+        let listen_address = server_config.listen_address;
+        log::info!("Starting {} web api on {}", access, listen_address);
+
+        let mut aggregator = self.config.api_aggregator.clone();
+        aggregator.extend(self.variable_endpoints.clone());
+        let server = HttpServer::new(move || {
+            App::new()
+                .wrap(server_config.cors_factory())
+                .service(aggregator.extend_backend(access, actix_web::web::scope("api")))
+        })
+        .disable_signals()
+        .bind(listen_address)?
+        .run();
+        Ok(server)
     }
 }

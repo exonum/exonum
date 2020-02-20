@@ -13,16 +13,18 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use futures::Future;
+use futures::future::LocalBoxFuture;
 
-use std::marker::PhantomData;
+use std::{marker::PhantomData};
 
 use super::{error, EndpointMutability};
 
 /// Type alias for the usual synchronous result.
 pub type Result<I> = std::result::Result<I, error::Error>;
 /// Type alias for the asynchronous result that will be ready in the future.
-pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
+pub type FutureResult<I> = LocalBoxFuture<'static, Result<I>>;
+
+//Box<dyn Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract a handler from various entities.
 ///
@@ -139,7 +141,7 @@ where
     }
 }
 
-impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F> {
+impl<'a, Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F> {
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,
