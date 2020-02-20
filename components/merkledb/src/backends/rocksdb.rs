@@ -193,8 +193,11 @@ impl RocksDB {
         RocksDBSnapshot {
             // SAFETY:
             // The snapshot carries an `Arc` to the database to make sure that database
-            // is not dropped before the snapshot. We don't care about changes in the database
-            // after taking a snapshot which could occur from another threads.
+            // is not dropped before the snapshot. Additionally, the pointer to `rocksdb::DB`
+            // is stable within `Arc<ShardedLock<rocksdb::DB>>` and its part used in dropping
+            // the snapshot (`*mut ffi::rocksdb_t`) is never changed, i.e., not affected
+            // by potential incoherence if the `ShardedLock` is being concurrently written to.
+            // FIXME: Investigate changing `rocksdb::Snapshot` / `DB` to remove `unsafe` (ECR-4273).
             snapshot: unsafe { mem::transmute(self.get_lock_guard().snapshot()) },
             db: Arc::clone(&self.db),
         }
