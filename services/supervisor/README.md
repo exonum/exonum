@@ -15,7 +15,7 @@ of the started services.
 Supervisor is an Exonum service capable of the following activities:
 
 - Deploying service artifacts
-- Instantiating services 
+- Instantiating services
 - Changing configuration of instantiated services
 - Changing a state of instantiated services: stopping, freezing, resuming,
   and initiating data migrations
