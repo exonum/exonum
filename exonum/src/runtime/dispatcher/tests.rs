@@ -182,11 +182,7 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        _spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> oneshot::Receiver {
         let (tx, rx) = oneshot::channel();
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
@@ -685,11 +681,7 @@ impl ShutdownRuntime {
 }
 
 impl Runtime for ShutdownRuntime {
-    fn deploy_artifact(
-        &mut self,
-        _artifact: ArtifactId,
-        _spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _spec: Vec<u8>) -> oneshot::Receiver {
         let (tx, rx) = oneshot::channel();
         tx.send(Ok(()));
         rx
@@ -822,11 +814,7 @@ impl DeploymentRuntime {
 }
 
 impl Runtime for DeploymentRuntime {
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> oneshot::Receiver {
         let delay = BinaryValue::from_bytes(spec.into()).unwrap();
         let delay = Duration::from_millis(delay);
 

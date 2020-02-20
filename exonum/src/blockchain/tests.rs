@@ -258,7 +258,7 @@ impl Runtime for RuntimeInspector {
         &mut self,
         artifact: ArtifactId,
         _deploy_spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver {
         assert!(self.available.contains(&artifact));
         assert!(!self.deployed.contains(&artifact));
 

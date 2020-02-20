@@ -369,7 +369,6 @@ impl Dispatcher {
             runtime
                 .deploy_artifact(artifact, payload)
                 .wait()
-                .expect("BUG: Unable to receive deploy status")
                 .map_err(move |mut err| {
                     err.set_runtime_id(runtime_id);
                     err

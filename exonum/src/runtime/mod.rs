@@ -360,11 +360,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
     /// a bug in core.
     // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        deploy_spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>>;
+    fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> oneshot::Receiver;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;

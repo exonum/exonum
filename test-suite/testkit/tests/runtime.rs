@@ -100,11 +100,7 @@ impl TestRuntime {
 }
 
 impl Runtime for TestRuntime {
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        deploy_spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> oneshot::Receiver {
         self.tester.deploy_artifact(artifact, deploy_spec);
 
         let (tx, rx) = oneshot::channel();

@@ -193,7 +193,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         test_service_artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver {
         self.events.push(RuntimeEvent::DeployArtifact(
             test_service_artifact.clone(),
             deploy_spec.clone(),

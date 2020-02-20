@@ -674,11 +674,7 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
     }
 
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> oneshot::Receiver {
         let result = if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
             Err(Error::IncorrectArtifactId.into())

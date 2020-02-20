@@ -92,11 +92,7 @@ mod failing_runtime {
     }
 
     impl Runtime for FailingRuntime {
-        fn deploy_artifact(
-            &mut self,
-            artifact: ArtifactId,
-            _spec: Vec<u8>,
-        ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+        fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> oneshot::Receiver {
             let result = {
                 if artifact.runtime_id != FAILING_RUNTIME_ID {
                     Err(FailingRuntimeError::GenericError.into())

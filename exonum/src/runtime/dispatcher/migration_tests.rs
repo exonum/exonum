@@ -57,7 +57,7 @@ impl Runtime for MigrationRuntime {
         &mut self,
         _artifact: ArtifactId,
         _deploy_spec: Vec<u8>,
-    ) -> oneshot::Receiver<Result<(), ExecutionError>> {
+    ) -> oneshot::Receiver {
         let (tx, rx) = oneshot::channel();
         tx.send(Ok(()));
         rx
