@@ -37,13 +37,13 @@ fn test_exclude_validator_from_consensus() {
 
         TxConfig::create_signed(
             sandbox.public_key(ValidatorId(0)),
-            &consensus_cfg.clone().into_bytes(),
+            &consensus_cfg.into_bytes(),
             Height(0),
             sandbox.secret_key(ValidatorId(0)),
         )
     };
 
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg.clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx_cfg]);
     // node loses validator status
     add_one_height_with_transactions_from_other_validator(&sandbox, &sandbox_state, &[]);
 }

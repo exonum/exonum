@@ -189,7 +189,7 @@ fn test_runtime_factory() {
 
     let inst_cfg =
         InstanceInitParams::from(instance_spec.clone()).with_constructor(constructor.clone());
-    let artifact = instance_spec.artifact.clone();
+    let artifact = instance_spec.artifact;
 
     // This causes artifact deploying and service instantiation.
     TestKitBuilder::validator()

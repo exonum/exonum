@@ -125,9 +125,8 @@ impl TestKitActor {
         api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
             Box::new(addr_.send(RollBack(height)).then(flatten_err)) as api::FutureResult<_>
         });
-        let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
-            Box::new(addr_.send(query).then(flatten_err)) as api::FutureResult<_>
+            Box::new(addr.send(query).then(flatten_err)) as api::FutureResult<_>
         });
         builder
     }

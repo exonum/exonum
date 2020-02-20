@@ -264,7 +264,7 @@ fn test_resume_without_migration(freeze_service: bool) {
         events_handle.take(),
         vec![
             RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::StartResumingService(withdrawal_service.clone(), vec![]),
+            RuntimeEvent::StartResumingService(withdrawal_service, vec![]),
             RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::CommitService(
                 Height(4),

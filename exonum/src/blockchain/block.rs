@@ -624,7 +624,7 @@ mod tests {
         );
         let bogus_precommit =
             Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
-        let mut mauled_proof = proof.clone();
+        let mut mauled_proof = proof;
         mauled_proof.precommits.truncate(2);
         mauled_proof.precommits.push(bogus_precommit);
         assert_matches!(
@@ -667,7 +667,7 @@ mod tests {
         let block_proof = create_block_proof(&keys, state_hash);
         let index_proof = IndexProof::new(block_proof, index_proof);
 
-        let mut expected_public_keys = public_keys.clone();
+        let mut expected_public_keys = public_keys;
         expected_public_keys.pop();
         expected_public_keys.push(KeyPair::random().public_key());
         assert_matches!(

@@ -157,11 +157,11 @@ fn test_send_proposal_with_api() {
 fn apply_config(testkit: &mut TestKit) {
     let consensus_proposal = consensus_config_propose_first_variant(testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
-        .extend_consensus_config_propose(consensus_proposal.clone())
+        .extend_consensus_config_propose(consensus_proposal)
         .build();
 
     // Create proposal.
-    create_proposal(&testkit.api(), config_proposal.clone());
+    create_proposal(&testkit.api(), config_proposal);
     testkit.create_block();
 
     // Get proposal info.

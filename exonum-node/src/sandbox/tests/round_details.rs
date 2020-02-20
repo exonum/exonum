@@ -418,7 +418,7 @@ fn lock_to_propose_and_send_prevote() {
     let sandbox = timestamping_sandbox();
     let empty_propose = ProposeBuilder::new(&sandbox).build();
     sandbox.recv(&empty_propose);
-    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose.clone()));
+    sandbox.broadcast(&make_prevote_from_propose(&sandbox, &empty_propose));
 
     let tx = gen_timestamping_tx();
     sandbox.recv(&tx);
@@ -426,7 +426,7 @@ fn lock_to_propose_and_send_prevote() {
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[tx.object_hash()])
         .build();
-    let block = sandbox.create_block(&[tx.clone()]);
+    let block = sandbox.create_block(&[tx]);
     sandbox.recv(&propose);
 
     // inc round
@@ -695,19 +695,10 @@ fn test_handle_precommit_incorrect_tx(known_before_propose: bool) {
 /// node should panic because it doesn't agree with the block being accepted.
 #[test]
 #[should_panic(expected = "handle_majority_precommits: propose contains")]
-fn handle_precommit_incorrect_txs() {
+fn handle_precommit_incorrect_tx() {
     test_handle_precommit_incorrect_tx(false);
 }
 
-/// Scenario for this test is similar to the `handle_precommit_incorrect_txs`
-/// but node receives incorrect tx before propose.
-///
-/// Here, node receives majority of precommits for a block with incorrect tx.
-///
-/// Normally, after receiving all the transactions for a propose, node should send a prevote for it.
-/// In our case, propose contains the incorrect tx, so we expect node **NOT** to vote for it.
-/// Later, when majority of nodes will send precommits (meaning that they agree with propose),
-/// node should panic because it doesn't agree with the block being accepted.
 #[test]
 #[should_panic(expected = "handle_majority_precommits: propose contains")]
 fn handle_precommit_incorrect_tx_received_before_propose() {
@@ -728,7 +719,7 @@ fn not_sending_precommit_for_proposal_with_incorrect_tx() {
         .with_tx_hashes(&[tx.object_hash()])
         .build();
     // Create block.
-    let block = sandbox.create_block(&[tx.clone()]);
+    let block = sandbox.create_block(&[tx]);
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -786,6 +777,51 @@ fn not_sending_precommit_for_proposal_with_incorrect_tx() {
     ));
 
     sandbox.add_time(Duration::from_millis(0));
+}
+
+#[test]
+fn invalid_tx_does_not_invalidate_unrelated_proposes() {
+    let sandbox = timestamping_sandbox();
+    let invalid_tx = gen_incorrect_tx();
+
+    let propose = ProposeBuilder::new(&sandbox).with_tx_hashes(&[]).build();
+    sandbox.recv(&propose);
+    let our_prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&our_prevote);
+
+    sandbox.recv(&invalid_tx);
+    {
+        let inner = sandbox.inner.borrow();
+        let propose_state = inner.handler.state.propose(&propose.object_hash()).unwrap();
+        assert!(!propose_state.has_invalid_txs());
+    }
+
+    let block = sandbox.create_block(&[]);
+    let precommits = (1..4).map(|i| {
+        let validator_id = ValidatorId(i);
+        sandbox.create_precommit(
+            validator_id,
+            Height(1),
+            Round(1),
+            propose.object_hash(),
+            block.object_hash(),
+            sandbox.time().into(),
+            sandbox.secret_key(validator_id),
+        )
+    });
+
+    for precommit in precommits {
+        sandbox.recv(&precommit);
+    }
+    sandbox.assert_state(Height(2), Round(1));
+    sandbox.check_broadcast_status(Height(2), block.object_hash());
 }
 
 /// scenario: // HANDLE PRECOMMIT positive scenario with commit
@@ -863,6 +899,79 @@ fn handle_precommit_positive_scenario_commit() {
     sandbox.assert_state(Height(2), Round(1));
     sandbox.check_broadcast_status(Height(2), block.object_hash());
     sandbox.add_time(Duration::from_millis(0));
+}
+
+/// Checks that `handle_majority_precommits` saves a `Propose` confirmed by the supermajority
+/// if it has unknown transactions or the proposal itself is not known.
+fn test_transaction_after_propose_and_precommits(precommits_before_propose: usize) {
+    let sandbox = timestamping_sandbox();
+
+    let tx = gen_timestamping_tx();
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_validator(ValidatorId(2))
+        .with_tx_hashes(&[tx.object_hash()])
+        .with_height(Height(1))
+        .with_round(Round(1))
+        .with_prev_hash(&sandbox.last_hash())
+        .build();
+
+    let block = sandbox.create_block(&[tx.clone()]);
+    let mut precommits = (1..4).map(|i| {
+        let validator_id = ValidatorId(i);
+        sandbox.create_precommit(
+            validator_id,
+            Height(1),
+            Round(1),
+            propose.object_hash(),
+            block.object_hash(),
+            sandbox.time().into(),
+            sandbox.secret_key(validator_id),
+        )
+    });
+
+    for precommit in precommits.by_ref().take(precommits_before_propose) {
+        sandbox.recv(&precommit);
+    }
+    sandbox.recv(&propose);
+    for precommit in precommits {
+        sandbox.recv(&precommit);
+    }
+
+    // Finally, the node receives the transaction from the propose.
+    sandbox.recv(&tx);
+    // This should be enough to commit the block.
+    sandbox.assert_state(Height(2), Round(1));
+
+    let our_prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        Round::zero(),
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&our_prevote);
+    sandbox.check_broadcast_status(Height(2), block.object_hash());
+}
+
+#[test]
+fn transaction_after_propose_and_precommits() {
+    test_transaction_after_propose_and_precommits(0);
+}
+
+#[test]
+fn transaction_after_1_precommit_and_propose() {
+    test_transaction_after_propose_and_precommits(1);
+}
+
+#[test]
+fn transaction_after_2_precommits_and_propose() {
+    test_transaction_after_propose_and_precommits(2);
+}
+
+#[test]
+fn transaction_after_all_precommits_and_propose() {
+    test_transaction_after_propose_and_precommits(3);
 }
 
 /// LOCK
@@ -1509,7 +1618,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     sandbox.recv(&precommit_1); //early precommit from future height
 
     sandbox.assert_state(Height(1), Round(1));
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx]);
     sandbox.assert_state(Height(2), Round(1));
     assert_eq!(first_block.object_hash(), sandbox.last_hash());
 

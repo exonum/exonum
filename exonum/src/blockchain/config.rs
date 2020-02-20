@@ -236,26 +236,24 @@ impl ConsensusConfig {
     ///     helpers::ValidatorId,
     /// };
     ///
-    /// fn main() {
-    ///     let config = ConsensusConfig::default()
-    ///         .with_validator_keys(
-    ///             (0..4)
-    ///                 .map(|_| ValidatorKeys::new(
-    ///                     crypto::gen_keypair().0,
-    ///                     crypto::gen_keypair().0,
-    ///                 ))
-    ///                 .collect(),
-    ///         );
-    ///
-    ///     let some_validator_consensus_key = config.validator_keys[2].consensus_key;
-    ///     // Try to find validator ID for this key.
-    ///     assert_eq!(
-    ///         config.find_validator(|validator_keys| {
-    ///             validator_keys.consensus_key == some_validator_consensus_key
-    ///         }),
-    ///         Some(ValidatorId(2)),
+    /// let config = ConsensusConfig::default()
+    ///     .with_validator_keys(
+    ///         (0..4)
+    ///             .map(|_| ValidatorKeys::new(
+    ///                 crypto::gen_keypair().0,
+    ///                 crypto::gen_keypair().0,
+    ///             ))
+    ///             .collect(),
     ///     );
-    /// }
+    ///
+    /// let some_validator_consensus_key = config.validator_keys[2].consensus_key;
+    /// // Try to find validator ID for this key.
+    /// assert_eq!(
+    ///     config.find_validator(|validator_keys| {
+    ///         validator_keys.consensus_key == some_validator_consensus_key
+    ///     }),
+    ///     Some(ValidatorId(2)),
+    /// );
     /// ```
     pub fn find_validator(
         &self,

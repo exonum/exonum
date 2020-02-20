@@ -512,7 +512,7 @@ fn runtime_restart() {
             ToySupervisorService::INSTANCE_ID,
             StartService {
                 spec: test_instance.instance_spec.clone(),
-                constructor: test_instance.constructor.clone(),
+                constructor: test_instance.constructor,
             },
         ),
     )
@@ -640,7 +640,7 @@ fn conflicting_service_instances() {
         keypair.deploy_artifact(
             ToySupervisorService::INSTANCE_ID,
             DeployArtifact {
-                test_service_artifact: test_service_artifact.clone(),
+                test_service_artifact,
                 spec: vec![],
             },
         ),
@@ -709,7 +709,7 @@ fn conflicting_service_instances() {
         vec![
             RuntimeEvent::CommitService(
                 Height(3),
-                init_params.instance_spec.clone(),
+                init_params.instance_spec,
                 InstanceStatus::Active
             ),
             RuntimeEvent::AfterCommit(Height(3)),
@@ -812,7 +812,7 @@ fn dependent_service_with_no_dependency() {
             ToySupervisorService::INSTANCE_ID,
             StartService {
                 spec: dep_instance.instance_spec.clone(),
-                constructor: dep_instance.constructor.clone(),
+                constructor: dep_instance.constructor,
             },
         ),
     )
@@ -930,7 +930,7 @@ fn dependent_service_in_successive_block() {
             ToySupervisorService::INSTANCE_ID,
             StartService {
                 spec: dep_service.instance_spec.clone(),
-                constructor: dep_service.constructor.clone(),
+                constructor: dep_service.constructor,
             },
         ),
     )
@@ -1013,7 +1013,7 @@ fn service_freezing() {
             RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
             RuntimeEvent::StartResumingService(test_service.clone(), vec![]),
             RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::CommitService(Height(3), test_service.clone(), InstanceStatus::Active),
+            RuntimeEvent::CommitService(Height(3), test_service, InstanceStatus::Active),
             RuntimeEvent::AfterCommit(Height(3)),
         ]
     );

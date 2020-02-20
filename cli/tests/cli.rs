@@ -592,7 +592,7 @@ fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), fail
     generate_template.execute()?;
 
     let generate_config = GenerateConfig {
-        common_config: common_config_path.clone(),
+        common_config: common_config_path,
         output_dir: testnet_dir.path().to_owned(),
         peer_address: "127.0.0.1:5400".parse().unwrap(),
         listen_address: None,
@@ -623,7 +623,7 @@ fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), fail
     finalize.execute()?;
 
     let run = Run {
-        node_config: node_config_path.clone(),
+        node_config: node_config_path,
         db_path: testnet_dir.path().to_owned(),
         public_api_address: None,
         private_api_address: None,

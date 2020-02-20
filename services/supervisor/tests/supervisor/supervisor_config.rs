@@ -100,7 +100,7 @@ fn configure_call() {
     };
 
     // Apply it (in simple mode no confirmations required).
-    create_proposal(&testkit.api(), config_proposal.clone());
+    create_proposal(&testkit.api(), config_proposal);
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
     // Check that supervisor now in the decentralized mode.

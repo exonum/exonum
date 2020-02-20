@@ -133,7 +133,7 @@ fn test_transfer_scenarios() {
 
     // Same here
     testkit.checkpoint();
-    testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone(), tx_a_to_b.clone()]);
+    testkit.create_block_with_transactions(vec![next_tx_a_to_b, tx_a_to_b]);
     assert_eq!(get_balance(&api, &alice.public_key()), 4); // 3 + 1
     assert_eq!(get_balance(&api, &bob.public_key()), 16); // 15 + 1
     testkit.rollback();

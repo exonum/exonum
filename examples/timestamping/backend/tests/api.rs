@@ -120,7 +120,7 @@ fn test_api_get_timestamp_proof() {
     // Create timestamp
     let content = Timestamp::new(&Hash::zero(), "metadata");
     let tx = keypair.timestamp(SERVICE_ID, content);
-    testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx);
 
     // Get proof.
     let api = testkit.api();
@@ -162,8 +162,8 @@ fn test_api_cannot_add_same_content_hash() {
     let content_hash = hash(&[1]);
     let timestamp1 = Timestamp::new(&content_hash, "metadata");
     let timestamp2 = Timestamp::new(&content_hash, "other metadata");
-    let tx_ok = keypair.timestamp(SERVICE_ID, timestamp1.clone());
-    let tx_err = keypair.timestamp(SERVICE_ID, timestamp2.clone());
+    let tx_ok = keypair.timestamp(SERVICE_ID, timestamp1);
+    let tx_err = keypair.timestamp(SERVICE_ID, timestamp2);
 
     testkit.create_block_with_transaction(tx_ok.clone());
     assert_status(&api, &tx_ok, &json!({ "type": "success" }));
