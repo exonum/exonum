@@ -132,6 +132,10 @@ jobs:
   - name: unit-test
     script:
     - cargo test --all --lib --tests --benches
+
+  # Doc tests.
+  - name: doc-test
+    script:
     - cargo test --all --doc
 
   # Run examples and soak tests.
