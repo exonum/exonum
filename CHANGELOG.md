@@ -5,6 +5,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### exonum
+
+- `Runtime::deploy_artifact` longer returns `Box<dyn Future<...>>`. Instead a special
+  communication channel is used to send deployment status from the
+  runtime to the dispatcher. (#1788)
+
 ### Bug Fixes
 
 #### exonum-node
@@ -16,18 +24,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Switched off broadcasting of transactions which the node considers
   incorrect. (#1781)
 
+- Fixed incorrect invalidation of block proposals. (#1782)
+
 ### Breaking changes
 
 #### exonum-testkit
 
 - Testkit now does not include incorrect transactions into blocks or memory pool,
   similar to real Exonum nodes. (#1785)
-
-### Bug Fixes
-
-#### exonum-node
-
-- Fixed incorrect invalidation of block proposals. (#1782)
 
 ## 1.0.0-rc.1 - 2020-02-07
 
