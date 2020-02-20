@@ -10,8 +10,6 @@
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
-// limitations under the License.
-
 //! Private part of the node REST API.
 //!
 //! Private API includes requests that are available only to the blockchain
@@ -19,28 +17,27 @@
 //!
 //! # Table of Contents
 //!
-//! - [List peers](#list-peers)
-//! - [Add peer](#add-peer)
 //! - [Get node info](#get-node-info)
-//! - [Check if consensus is enabled](#check-if-consensus-is-enabled)
+//! - [Get node statistics](#get-node-statistics)
+//! - [Add peer](#add-peer)
 //! - [Change consensus status](#change-consensus-status)
 //! - [Node shutdown](#node-shutdown)
 //!
-//! # List Peers
+//! # Get Node Info
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/system/v1/peers` |
+//! | Path        | `/api/system/v1/info` |
 //! | Method      | GET   |
 //! | Query type  | - |
-//! | Return type | [`PeersInfo`] |
+//! | Return type | [`NodeInfo`] |
 //!
-//! Returns the list of incoming and outgoing connections for current node.
+//! Obtains information about node.
 //!
-//! [`PeersInfo`]: struct.PeersInfo.html
+//! [`NodeInfo`]: struct.NodeInfo.html
 //!
 //! ```
-//! use exonum_system_api::{private::PeersInfo, SystemApiPlugin};
+//! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # fn main() -> Result<(), failure::Error> {
@@ -48,7 +45,34 @@
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! let info: PeersInfo = api.private(ApiKind::System).get("v1/peers")?;
+//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info")?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Get Node Statistics
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/system/v1/stats` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`StatsInfo`] |
+//!
+//! Returns the statistics of the current node.
+//!
+//! [`PeersInfo`]: struct.StatsInfo.html
+//!
+//! ```
+//! use exonum_system_api::{private::StatsInfo, SystemApiPlugin};
+//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .build();
+//! let api = testkit.api();
+//! let info: StatsInfo = api.private(ApiKind::System).get("v1/stats")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -63,6 +87,7 @@
 //! | Return type | - |
 //!
 //! Adds a peer to the Exonum node. Node will attempt to connect to this peer.
+//! After adding a new peer the node config file will be rewritten.
 //!
 //! [`ConnectInfo`]: https://docs.rs/exonum-node/latest/exonum_node/struct.ConnectInfo.html
 //!
@@ -91,71 +116,11 @@
 //! # }
 //! ```
 //!
-//! # Get Node Info
-//!
-//! | Property    | Value |
-//! |-------------|-------|
-//! | Path        | `/api/system/v1/network` |
-//! | Method      | GET   |
-//! | Query type  | - |
-//! | Return type | [`NodeInfo`] |
-//!
-//! Obtains information about node.
-//!
-//! [`NodeInfo`]: struct.NodeInfo.html
-//!
-//! ```
-//! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
-//!
-//! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_plugin(SystemApiPlugin)
-//!     .build();
-//! let api = testkit.api();
-//! let info: NodeInfo = api.private(ApiKind::System).get("v1/network")?;
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! # Check if Consensus is Enabled
-//!
-//! | Property    | Value |
-//! |-------------|-------|
-//! | Path        | `/api/system/v1/consensus_enabled` |
-//! | Method      | GET   |
-//! | Query type  | - |
-//! | Return type | `bool` |
-//!
-//! Returns `true` if consensus is enabled on the node, and `false` otherwise.
-//!
-//! Note the difference between `consensus_enabled` and
-//! [public `healthcheck` endpoint](../public/index.html#node-health-info):
-//!
-//! This endpoint only reports the setting value (should the node participate in consensus
-//! or not), while `healthcheck` provides information about consensus status (since even
-//! with consensus setting turned on, node may not participate in consensus due to lack of
-//! peers).
-//!
-//! ```
-//! use exonum_system_api::SystemApiPlugin;
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
-//!
-//! # fn main() -> Result<(), failure::Error> {
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_plugin(SystemApiPlugin)
-//!     .build();
-//! let api = testkit.api();
-//! let consensus_enabled: bool = api.private(ApiKind::System).get("v1/consensus_enabled")?;
-//! # Ok(())
-//! # }
-//! ```
-//!
 //! # Change Consensus Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
-//! | Path        | `/api/system/v1/consensus_enabled` |
+//! | Path        | `/api/system/v1/consensus_status` |
 //! | Method      | POST   |
 //! | Query type  | [`ConsensusEnabledQuery`] |
 //! | Return type | - |
@@ -177,7 +142,7 @@
 //! let query = ConsensusEnabledQuery { enabled };
 //! api.private(ApiKind::System)
 //!     .query(&query)
-//!     .post("v1/consensus_enabled")?;
+//!     .post("v1/consensus_status")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -206,59 +171,80 @@
 //! # Ok(())
 //! # }
 //! ```
+// limitations under the License.
 
-use exonum::{blockchain::ApiSender, crypto::PublicKey, runtime::InstanceId};
+use exonum::{
+    blockchain::{ApiSender, Blockchain, Schema},
+    crypto::PublicKey,
+    helpers::{exonum_version, os_info, rust_version},
+};
 use exonum_api::{self as api, ApiBackend, ApiScope};
 use exonum_node::{ConnectInfo, ExternalMessage, SharedNodeState};
 use futures::Future;
 use serde::{Deserialize, Serialize};
+use std::{sync::Arc, time::SystemTime};
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+/// Information about the current state of the node.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct StatsInfo {
+    /// Height of the last committed block.
+    pub height: u64,
+    /// Total number of uncommitted transactions stored in persistent pool.
+    pub tx_pool_size: u64,
+    /// Total number of transactions in the blockchain.
+    pub tx_count: u64,
+    /// Size of the transaction cache.
+    pub tx_cache_size: usize,
+    /// Work duration of the node.
+    pub uptime: u64,
+}
 
-/// Short information about the service.
+/// Information about whether it is possible to achieve the consensus between
+/// validators in the current state.
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum ConsensusStatus {
+    /// Consensus disabled on this node.
+    Disabled,
+    /// Consensus enabled on this node.
+    Enabled,
+    /// Consensus enabled and the node has enough connected peers.
+    Active,
+}
+
+/// Info about connected peer.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct ServiceInfo {
-    /// Service name.
-    pub name: String,
-    /// Service identifier for the database schema and service messages.
-    pub id: InstanceId,
+pub struct ConnectedPeerInfo {
+    /// Address of the peer.
+    pub address: String,
+    /// Consensus public key of the peer.
+    pub public_key: PublicKey,
+    /// Connect direction.
+    pub direction: String,
+}
+
+impl ConnectedPeerInfo {
+    fn new(connect_info: &ConnectInfo, direction: impl Into<String>) -> Self {
+        Self {
+            address: connect_info.address.to_owned(),
+            public_key: connect_info.public_key,
+            direction: direction.into(),
+        }
+    }
 }
 
 /// Short information about the current node.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct NodeInfo {
+    /// Consensus status.
+    pub consensus_status: ConsensusStatus,
+    /// List of connected peers.
+    pub connected_peers: Vec<ConnectedPeerInfo>,
     /// Version of the `exonum` crate.
-    pub core_version: Option<String>,
-}
-
-impl NodeInfo {
-    /// Creates new `NodeInfo` from services list.
-    pub fn new() -> Self {
-        let core_version = option_env!("CARGO_PKG_VERSION").map(ToOwned::to_owned);
-        Self { core_version }
-    }
-}
-
-impl Default for NodeInfo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Information about the outgoing connection.
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct OutgoingConnection {
-    /// Public key of target node, if any.
-    pub public_key: Option<PublicKey>,
-}
-
-/// Information about connections of the node.
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PeersInfo {
-    /// Incoming connections.
-    pub incoming_connections: Vec<ConnectInfo>,
-    /// Outgoing connections.
-    pub outgoing_connections: HashMap<SocketAddr, OutgoingConnection>,
+    pub exonum_version: String,
+    /// Version of thr Rust.
+    pub rust_version: String,
+    /// OS info.
+    pub os_info: String,
 }
 
 /// Query for setting consensus enabled or disabled.
@@ -269,57 +255,85 @@ pub struct ConsensusEnabledQuery {
 }
 
 /// Private system API.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(super) struct SystemApi {
-    info: NodeInfo,
+    blockchain: Blockchain,
     shared_api_state: SharedNodeState,
     sender: ApiSender<ExternalMessage>,
+    start_time: SystemTime,
 }
 
 impl SystemApi {
     /// Create a new `private::SystemApi` instance.
-    pub fn new(sender: ApiSender<ExternalMessage>, shared_api_state: SharedNodeState) -> Self {
+    pub fn new(
+        blockchain: Blockchain,
+        sender: ApiSender<ExternalMessage>,
+        shared_api_state: SharedNodeState,
+    ) -> Self {
         Self {
+            blockchain,
             sender,
-            info: NodeInfo::new(),
             shared_api_state,
+            start_time: SystemTime::now(),
         }
     }
 
     /// Add private system API endpoints to the corresponding scope.
     pub fn wire(self, api_scope: &mut ApiScope) -> &mut ApiScope {
-        self.handle_peers_info("v1/peers", api_scope)
-            .handle_peer_add("v1/peers", api_scope)
-            .handle_network_info("v1/network", api_scope)
-            .handle_is_consensus_enabled("v1/consensus_enabled", api_scope)
-            .handle_set_consensus_enabled("v1/consensus_enabled", api_scope)
+        self.handle_info("v1/info", api_scope)
+            .handle_stats("v1/stats", api_scope)
+            .handle_peers("v1/peers", api_scope)
+            .handle_consensus_status("v1/consensus_status", api_scope)
             .handle_shutdown("v1/shutdown", api_scope);
         api_scope
     }
 
-    fn handle_peers_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+    fn handle_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        let self_ = self.clone();
         let shared_api_state = self.shared_api_state.clone();
         api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
-            let mut outgoing_connections: HashMap<SocketAddr, OutgoingConnection> = HashMap::new();
+            let mut connected_peers = Vec::new();
 
             for connect_info in shared_api_state.outgoing_connections() {
-                outgoing_connections.insert(
-                    connect_info.address.parse().unwrap(),
-                    OutgoingConnection {
-                        public_key: Some(connect_info.public_key),
-                    },
-                );
+                connected_peers.push(ConnectedPeerInfo::new(&connect_info, "outgoing"));
             }
 
-            Ok(PeersInfo {
-                incoming_connections: shared_api_state.incoming_connections(),
-                outgoing_connections,
+            for connect_info in shared_api_state.incoming_connections() {
+                connected_peers.push(ConnectedPeerInfo::new(&connect_info, "incoming"));
+            }
+
+            Ok(NodeInfo {
+                consensus_status: self.get_consensus_status(),
+                connected_peers,
+                exonum_version: exonum_version().unwrap_or_else(|| "unknown".to_owned()),
+                rust_version: rust_version().unwrap_or_else(|| "unknown".to_owned()),
+                os_info: os_info(),
             })
         });
-        self
+        self_
     }
 
-    fn handle_peer_add(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+    fn handle_stats(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+        let self_ = self.clone();
+        api_scope.endpoint(name, move |_query: ()| {
+            let snapshot = self.blockchain.snapshot();
+            let schema = Schema::new(&snapshot);
+            let uptime = SystemTime::now()
+                .duration_since(self.start_time)
+                .unwrap_or_default()
+                .as_secs();
+            Ok(StatsInfo {
+                height: schema.height().into(),
+                tx_pool_size: schema.transactions_pool_len(),
+                tx_count: schema.transactions_len(),
+                tx_cache_size: self.shared_api_state.tx_cache_size(),
+                uptime,
+            })
+        });
+        self_
+    }
+
+    fn handle_peers(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(
             name,
@@ -333,23 +347,7 @@ impl SystemApi {
         self
     }
 
-    fn handle_network_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let info = self.info.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
-            Ok(info.clone())
-        });
-        self
-    }
-
-    fn handle_is_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
-        let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
-            Ok(shared_api_state.is_enabled())
-        });
-        self
-    }
-
-    fn handle_set_consensus_enabled(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
+    fn handle_consensus_status(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(
             name,
@@ -390,5 +388,17 @@ impl SystemApi {
         api_scope.web_backend().raw_handler(handler);
 
         self
+    }
+
+    fn get_consensus_status(&self) -> ConsensusStatus {
+        if self.shared_api_state.is_enabled() {
+            if self.shared_api_state.consensus_status() {
+                ConsensusStatus::Active
+            } else {
+                ConsensusStatus::Enabled
+            }
+        } else {
+            ConsensusStatus::Disabled
+        }
     }
 }

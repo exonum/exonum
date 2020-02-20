@@ -22,6 +22,7 @@
 //!
 //!     - [Obtaining consensus configuration](#obtaining-consensus-configuration)
 //!     - [Obtaining pending configuration proposal](#obtaining-pending-configuration-proposal)
+//!     - [Obtaingin deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
 //!
 //! - Private API:
 //!
@@ -105,6 +106,40 @@
 //!
 //! // Will be none, since we did not send a proposal.
 //! assert!(pending_proposal.is_none());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Obtaining Deployed Artifacts And Services
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/services/supervisor/services` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`DispatcherInfo`] |
+//!
+//! Returns information about services available in the network.
+//!
+//! [`DispatcherInfo`]: struct.DispatcherInfo.html
+//!
+//! ```
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
+//! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .build();
+//!
+//! let services_info: DispatcherInfo = testkit
+//!     .api()
+//!     .public(ApiKind::Service("supervisor"))
+//!     .get("services")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -592,7 +627,13 @@
 //! # }
 //! ```
 
-use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height, runtime::ArtifactId};
+use exonum::{
+    blockchain::ConsensusConfig,
+    crypto::Hash,
+    helpers::Height,
+    merkledb::AsReadonly,
+    runtime::{ArtifactId, DispatcherSchema, InstanceState},
+};
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
@@ -709,6 +750,25 @@ impl From<MigrationRequest> for MigrationInfoQuery {
     }
 }
 
+/// Services info response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct DispatcherInfo {
+    /// List of deployed artifacts.
+    pub artifacts: Vec<ArtifactId>,
+    /// List of services.
+    pub services: Vec<InstanceState>,
+}
+
+impl DispatcherInfo {
+    /// Loads dispatcher information from database.
+    fn load<T: AsReadonly>(schema: &DispatcherSchema<T>) -> Self {
+        Self {
+            artifacts: schema.service_artifacts().keys().collect(),
+            services: schema.service_instances().values().collect(),
+        }
+    }
+}
+
 /// Private API specification of the supervisor service.
 trait PrivateApi {
     /// Error type for the current API implementation.
@@ -748,8 +808,10 @@ trait PublicApi {
     type Error: Fail;
     /// Returns an actual consensus configuration of the blockchain.
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
-    /// Returns an pending propose config change.
+    /// Returns a pending propose config change.
     fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
+    /// Returns a list of deployed artifacts and initialized services.
+    fn services(&self) -> Result<DispatcherInfo, Self::Error>;
 }
 
 struct ApiImpl<'a>(&'a ServiceApiState<'a>);
@@ -836,6 +898,10 @@ impl PublicApi for ApiImpl<'_> {
             .pending_proposal
             .get())
     }
+
+    fn services(&self) -> Result<DispatcherInfo, Self::Error> {
+        Ok(DispatcherInfo::load(&self.0.data().for_dispatcher()))
+    }
 }
 
 /// Wires Supervisor API endpoints.
@@ -871,5 +937,6 @@ pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
         })
         .endpoint("config-proposal", |state, _query: ()| {
             ApiImpl(state).config_proposal()
-        });
+        })
+        .endpoint("services", |state, _query: ()| ApiImpl(state).services());
 }

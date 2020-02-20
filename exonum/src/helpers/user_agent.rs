@@ -32,10 +32,29 @@ pub fn user_agent() -> String {
     format!("{}/{}", USER_AGENT, os)
 }
 
+/// Returns OS info of host on which run the node.
+#[doc(hidden)]
+pub fn os_info() -> String {
+    os_info::get().to_string()
+}
+
+/// Returns a version of the exonum framework.
+#[doc(hidden)]
+pub fn exonum_version() -> Option<String> {
+    let versions: Vec<_> = USER_AGENT.split('/').collect();
+    versions.get(0).map(|v| v.trim().to_owned())
+}
+
+/// Returns a version of the rust compiler.
+#[doc(hidden)]
+pub fn rust_version() -> Option<String> {
+    let versions: Vec<_> = USER_AGENT.split('/').collect();
+    versions.get(1).map(|v| v.trim().to_owned())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
 
     // Checks that user agent string contains three nonempty components.
     #[test]
@@ -47,5 +66,17 @@ mod tests {
         for val in components {
             assert!(!val.is_empty());
         }
+    }
+
+    #[test]
+    fn check_exonum_versions() {
+        let exonum_version = exonum_version().unwrap();
+        assert!(exonum_version.contains("exonum"));
+    }
+
+    #[test]
+    fn check_rust_versions() {
+        let rust_version = rust_version().unwrap();
+        assert!(rust_version.contains("rust"));
     }
 }

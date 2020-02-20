@@ -51,15 +51,15 @@
 //! Use with the testkit:
 //!
 //! ```
-//! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
+//! use exonum_system_api::{private::{ConsensusStatus, NodeInfo}, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
-//! assert!(info.core_version.is_some());
+//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info").unwrap();
+//! assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
 //! ```
 //!
 //! Note that the testkit does not emulate the functionality of the node completely; it does
@@ -73,13 +73,12 @@
 )]
 
 pub mod private;
-pub mod public;
 
 use exonum::blockchain::{ApiSender, Blockchain};
 use exonum_api::ApiBuilder;
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
-use crate::{private::SystemApi as PrivateSystemApi, public::SystemApi};
+use crate::private::SystemApi;
 
 fn system_api(
     blockchain: Blockchain,
@@ -87,8 +86,7 @@ fn system_api(
     shared_api_state: SharedNodeState,
 ) -> ApiBuilder {
     let mut builder = ApiBuilder::new();
-    PrivateSystemApi::new(sender, shared_api_state.clone()).wire(builder.private_scope());
-    SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
+    SystemApi::new(blockchain, sender, shared_api_state.clone()).wire(builder.private_scope());
     builder
 }
 
