@@ -38,6 +38,8 @@ pub enum CommonError {
     MalformedArguments = 3,
     /// Method with provided ID existed in the past, but now is removed.
     MethodRemoved = 4,
+    /// Transition between the provided service states is not supported by the runtime.
+    FeatureNotSupported = 5,
 
     /// Never actually generated.
     #[doc(hidden)]

@@ -5,17 +5,6 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-### Bug Fixes
-
-#### exonum-node
-
-- Fixed potential node hang-up if the node received a proposal and
-  a supermajority of transactions approving it before all transactions
-  in the proposal are known. (#1781)
-
-- Switched off broadcasting of transactions which the node considers
-  incorrect. (#1781)
-
 ### Breaking changes
 
 #### exonum-testkit
@@ -26,6 +15,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 ### Bug Fixes
 
 #### exonum-node
+
+- Fixed potential node hang-up if the node received a proposal and
+  a supermajority of transactions approving it before all transactions
+  in the proposal are known. (#1781)
+
+- Switched off broadcasting of transactions which the node considers
+  incorrect. (#1781)
 
 - Fixed incorrect invalidation of block proposals. (#1782)
 

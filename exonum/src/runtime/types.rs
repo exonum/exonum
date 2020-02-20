@@ -585,7 +585,7 @@ impl InstanceStatus {
     }
 
     /// Returns `true` if the service instance with this status can be resumed.
-    pub(super) fn can_be_resumed(&self) -> bool {
+    pub fn can_be_resumed(&self) -> bool {
         match self {
             InstanceStatus::Stopped | InstanceStatus::Frozen => true,
             _ => false,
@@ -593,7 +593,7 @@ impl InstanceStatus {
     }
 
     /// Returns `true` if the service instance with this status can be stopped.
-    pub(super) fn can_be_stopped(&self) -> bool {
+    pub fn can_be_stopped(&self) -> bool {
         match self {
             InstanceStatus::Active | InstanceStatus::Frozen => true,
             _ => false,
@@ -601,7 +601,7 @@ impl InstanceStatus {
     }
 
     /// Returns `true` if the service instance with this status can be frozen in all cases.
-    pub(super) fn can_be_frozen(&self) -> bool {
+    pub fn can_be_frozen(&self) -> bool {
         match self {
             InstanceStatus::Active => true,
             // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service

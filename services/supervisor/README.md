@@ -6,27 +6,29 @@
 
 `exonum-supervisor` is a main service of the [Exonum blockchain framework](https://exonum.com/).
 It is capable of deploying and starting new services,
-stopping existing services, and changing configuration of the started services.
+changing the state of existing services (such as stopping, freezing,
+or initiating a data migration), and changing configuration
+of the started services.
 
 ## Description
 
 Supervisor is an Exonum service capable of the following activities:
 
-- Service artifact deployment;
-- Service instances creation;
-- Changing consensus configuration;
-- Changing service instances configuration.
+- Deploying service artifacts
+- Instantiating services
+- Changing configuration of instantiated services
+- Changing a state of instantiated services: stopping, freezing, resuming,
+  and initiating data migrations
+- Changing consensus configuration
 
-More information on the artifact/service lifecycle can be found in the
-documentation for the Exonum [runtime module][runtime-docs].
+More information on the artifact / service lifecycle can be found in the
+documentation of [service lifecycle][docs:lifecycle] and the [supervisor][docs:supervisor].
 
 Supervisor service has two different operating modes: a "simple" mode and a
-"decentralized" mode.
-
-The difference between modes is in the decision making approach:
+"decentralized" mode. The difference between modes is in the decision making approach:
 
 - Within the decentralized mode, to deploy a service or apply a new
-  configuration, no less than (2/3)+1 validators should reach a consensus;
+  configuration, more than 2/3rds of validators should reach a consensus;
 - Within the simple mode, any decision is executed after a single validator
   approval.
 
@@ -62,10 +64,9 @@ For the "simple" mode no more actions are required. For the "decentralized"
 mode the majority of the nodes should also receive `ConfigVote` messages
 with a hash of the proposed configuration.
 
-The proposal initiator that receives the original `ConfigPropose` message
-must not vote for the configuration.
-
-This node votes for the configuration propose automatically.
+The proposal initiator that sends the original `ConfigPropose` message
+should not vote for the configuration; the supervisor considers that the initiator
+has voted by submitting a proposal.
 
 The operation of starting or resuming a service is treated similarly to a
 configuration change and follows the same rules.
@@ -87,9 +88,14 @@ exonum = "1.0.0-rc.1"
 exonum-supervisor = "1.0.0-rc.1"
 ```
 
+Note that the supervisor service is added to the blockchain automatically
+by the [`exonum-cli`] crate, so no actions are required if you use this crate.
+
 ## License
 
 `exonum-supervisor` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
 
-[runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
+[docs:supervisor]: https://exonum.com/doc/version/latest/advanced/supervisor/
+[docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
+[`exonum-cli`]: https://crates.io/crates/exonum-cli

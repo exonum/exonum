@@ -44,10 +44,30 @@
 //! Similar to other service lifecycle events, data migrations are managed by the [dispatcher],
 //! but are controlled by the [supervisor service].
 //!
-//! # Migration Workflow
+//! # Migration Types
 //!
-//! For a migration to start, the targeted service must be stopped, and a newer version of
+//! Exonum recognizes two kinds of migrations:
+//!
+//! - **Fast-forward migrations** synchronously change the version
+//!   of the artifact associated with the service. A fast-forward migration is performed
+//!   if the updated artifact signals that it is compatible with the old service data
+//!   by returning `Ok(None)` from [`Runtime::migrate()`].
+//! - Migrations that require changing data layout via [`MigrationScript`]s are referred to
+//!   as **async migrations**.
+//!
+//! For a migration to start, the targeted service must be stopped or frozen, and a newer version of
 //! the service artifact needs to be deployed across the network.
+//!
+//! # Fast-Forward Migration Workflow
+//!
+//! Fast-forward migrations do not require any special workflow to agree migration
+//! outcome among nodes; indeed, the outcome is agreed upon via the consensus algorithm.
+//! The artifact associated with the service instance is changed instantly.
+//! The service status is changed to stopped, regardless of the status before
+//! the migration. This is because a new artifact might want to prepare service data
+//! before the artifact can use it.
+//!
+//! # Async Migration Workflow
 //!
 //! 1. Migration is *initiated* by a call from a supervisor. Once a block with this call is merged,
 //!   all nodes in the network retrieve the migration script via [`Runtime::migrate()`]
@@ -94,6 +114,7 @@
 //! has reported an error during migration or there is divergence among reported migration results.
 //!
 //! [`Runtime`]: ../trait.Runtime.html
+//! [`Runtime::migrate()`]: ../trait.Runtime.html#method.migrate
 //! [dispatcher]: ../index.html
 //! [supervisor service]: ../index.html#supervisor-service
 //! [`MigrationScript`]: struct.MigrationScript.html
@@ -115,6 +136,19 @@ use std::{collections::BTreeMap, fmt};
 use crate::runtime::{CoreError, ExecutionError, ExecutionFail, InstanceSpec};
 
 type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
+
+/// Types of data migrations.
+#[derive(Debug)]
+pub enum MigrationType {
+    /// Fast-forward migration, that is, migration that does not actually change the data layout
+    /// of a service.
+    FastForward,
+    /// Asynchronous data migration that can change the data layout of a service.
+    Async,
+
+    #[doc(hidden)]
+    __NonExhaustive,
+}
 
 /// Errors that can occur in a migration script.
 ///

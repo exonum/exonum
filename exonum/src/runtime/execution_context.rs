@@ -18,9 +18,9 @@ use crate::{
     helpers::{Height, ValidateInput},
     merkledb::{access::Prefixed, BinaryValue, Fork},
     runtime::{
-        ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
-        DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId,
-        InstanceQuery, InstanceSpec, MethodId, SUPERVISOR_INSTANCE_ID,
+        migrations::MigrationType, ArtifactId, BlockchainData, CallSite, CallType, Caller,
+        CoreError, Dispatcher, DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor,
+        InstanceId, InstanceQuery, InstanceSpec, MethodId, RuntimeFeature, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -389,7 +389,9 @@ impl<'a> SupervisorExtensions<'a> {
     /// Note that this method **cannot** be used to transition service to frozen
     /// from the stopped state; this transition is not supported as of now.
     pub fn initiate_freezing_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
-        Dispatcher::initiate_freezing_service(self.0.fork, instance_id)
+        self.0
+            .dispatcher
+            .initiate_freezing_service(self.0.fork, instance_id)
     }
 
     /// Initiates resuming previously stopped service instance in the blockchain.
@@ -454,7 +456,7 @@ impl<'a> SupervisorExtensions<'a> {
         &self,
         new_artifact: ArtifactId,
         old_service: &str,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<MigrationType, ExecutionError> {
         self.0
             .dispatcher
             .initiate_migration(self.0.fork, new_artifact, old_service)
@@ -477,5 +479,21 @@ impl<'a> SupervisorExtensions<'a> {
     /// Flushes a committed migration.
     pub fn flush_migration(&mut self, service_name: &str) -> Result<(), ExecutionError> {
         Dispatcher::flush_migration(self.0.fork, service_name)
+    }
+
+    /// Checks if the runtime supports the specified optional feature.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the runtime with the given identifier does not exist. This will never happen
+    ///   if `runtime_id` is taken from a deployed artifact.
+    pub fn check_feature(&self, runtime_id: u32, feature: &RuntimeFeature) -> bool {
+        self.0
+            .dispatcher
+            .runtime_by_id(runtime_id)
+            .unwrap_or_else(|| {
+                panic!("Runtime with ID {} does not exist", runtime_id);
+            })
+            .is_supported(feature)
     }
 }
