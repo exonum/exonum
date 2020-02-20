@@ -478,8 +478,8 @@ impl Dispatcher {
     fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
             self.deploy_artifact(artifact, payload).unwrap_or_else(|e| {
-                // In this case artifact deployment error is fatal because there are
-                // confirmation that this node can deploy this artifact.
+                // In this case artifact deployment error is fatal because the deploy
+                // was committed on the network level.
                 panic!("Unable to deploy registered artifact. {}", e);
             });
         }

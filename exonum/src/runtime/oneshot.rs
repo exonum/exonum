@@ -42,12 +42,12 @@ impl Receiver {
     /// Attempts to wait for a value on this receiver, returning an error if the
     /// corresponding channel has hung up.
     pub(crate) fn wait(self) -> Result<(), ExecutionError> {
-        self.0.recv().map_err(|_| {
-            ExecutionError::new(
+        self.0.recv().unwrap_or_else(|_| {
+            Err(ExecutionError::new(
                 ErrorKind::Unexpected,
                 "An error during waiting for deployment status occurred",
-            )
-        })?
+            ))
+        })
     }
 }
 
