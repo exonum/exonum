@@ -16,7 +16,9 @@
 
 pub use self::{
     api_sender::{ApiSender, SendError},
-    block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
+    block::{
+        AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProofError, ProposerId,
+    },
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
     schema::{CallInBlock, Schema, TxLocation},
