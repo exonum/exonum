@@ -171,10 +171,10 @@ impl<'a> BlockInfo<'a> {
     /// proof will not contain entries. To distinguish between two cases, one can inspect
     /// the number of transactions in the block or IDs of the active services when the block
     /// was executed.
-    pub fn error_proof(&self, call_location: CallInBlock) -> CallProof {
+    pub fn call_proof(&self, call_location: CallInBlock) -> CallProof {
         self.explorer
             .schema
-            .call_errors(self.header.height)
+            .call_records(self.header.height)
             .unwrap() // safe: we know that the block exists
             .get_proof(call_location)
     }
@@ -205,10 +205,10 @@ impl<'a> BlockInfo<'a> {
         let errors = self
             .explorer
             .schema
-            .call_errors(header.height)
+            .call_records(header.height)
             .expect("No call record for a committed block");
         let errors: Vec<_> = errors
-            .iter()
+            .errors()
             .map(|(location, error)| ErrorWithLocation { location, error })
             .collect();
 
@@ -625,7 +625,7 @@ impl<'a> BlockchainExplorer<'a> {
         block_height: Height,
         call_location: CallInBlock,
     ) -> Result<(), ExecutionError> {
-        match self.schema.call_errors(block_height) {
+        match self.schema.call_records(block_height) {
             Some(errors) => errors.get(call_location),
             None => Ok(()),
         }
@@ -707,7 +707,7 @@ impl<'a> BlockchainExplorer<'a> {
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let txs_table = self.schema.block_transactions(height);
         let block_proof = self.schema.block_and_precommits(height)?;
-        let errors = self.schema.call_errors(height)?;
+        let errors = self.schema.call_records(height)?;
 
         Some(BlockWithTransactions {
             header: block_proof.block,
@@ -717,7 +717,7 @@ impl<'a> BlockchainExplorer<'a> {
                 .map(|tx_hash| self.committed_transaction(&tx_hash, None))
                 .collect(),
             errors: errors
-                .iter()
+                .errors()
                 .map(|(location, error)| ErrorWithLocation { location, error })
                 .collect(),
         })

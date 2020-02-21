@@ -183,7 +183,7 @@ fn main() {
 
     // It is possible to extract a proof of a transaction error using `BlockInfo`. The proof is tied
     // to the `error_hash` mentioned in the block header.
-    let proof: CallProof = block_info.error_proof(CallInBlock::transaction(1));
+    let proof: CallProof = block_info.call_proof(CallInBlock::transaction(1));
     // To verify a proof, we need to know public keys of current validators. In our case,
     // we have a single validator.
     let validator_keys = [consensus_keys().public_key()];

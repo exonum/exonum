@@ -22,7 +22,7 @@ pub use self::{
     },
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
-    schema::{CallInBlock, Schema, TxLocation},
+    schema::{CallErrorsIter, CallInBlock, CallRecords, Schema, TxLocation},
 };
 
 pub mod config;

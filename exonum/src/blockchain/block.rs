@@ -368,7 +368,42 @@ impl IndexProof {
     }
 }
 
-/// Proof of authenticity for a single call corresponding to the specified block.
+/// Proof of authenticity for a single top-level call in a block, such as a [transaction].
+///
+/// The proof consists of two parts:
+///
+/// - `block_proof`: block header with the proof of authenticity
+/// - `call_proof`: proof from the error aggregator (i.e., a `ProofMapIndex` the Merkle root
+///   of which is recorded in the block header as `error_hash`).
+///
+/// For an execution that resulted in an error, `call_proof` will be a proof of existence.
+/// If a transaction was executed successfully, `call_proof` will be a proof of absence.
+/// Since the number of transactions in a block is mentioned in the block header, the user
+/// will be able to distinguish absence of error (meaning successful execution) from
+/// the absence of a transaction with such an index. Indeed, if the index is less
+/// than amount of transactions in block, the proof denotes successful execution;
+/// otherwise, the transaction with the given index does not exist in the block.
+///
+/// Similarly, execution errors of the `before_transactions` / `after_transactions`
+/// hooks can be proven to external clients. Discerning successful execution
+/// from a non-existing service requires prior knowledge though.
+///
+/// `CallProof`s should not be mixed up with a proof of transaction commitment.
+/// To verify that a certain transaction was committed, use a proof from
+/// the `block_transactions` index of the [core schema].
+///
+/// # Verification
+///
+/// If you are implementing `CallProof` verification, bear in mind that `ExecutionError`
+/// need to be stripped off the non-hashed information before verifying `call_proof`.
+/// See [`ExecutionError`] docs for more details of what information is not hashed.
+///
+/// This also means that non-hashed information is not covered by the authenticity guarantees;
+/// it has purely diagnostic purpose.
+///
+/// [transaction]: ../runtime/struct.AnyTx.html
+/// [core schema]: struct.Schema.html
+/// [`ExecutionError`]: ../runtime/struct.ExecutionError.html
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CallProof {
     /// Proof of authenticity for the block header.
@@ -396,7 +431,10 @@ impl CallProof {
         }
     }
 
-    /// Verifies this proof.
+    /// Verifies this proof, returning the location of the proven call together with its status.
+    ///
+    /// Note that a successful status is indistinguishable from the point of view of a proof
+    /// from a non-existing one. It is up to caller to discern between these two possibilities.
     pub fn verify(
         &self,
         validator_keys: &[PublicKey],
@@ -410,6 +448,7 @@ impl CallProof {
             return Err(ProofError::AmbiguousEntry);
         }
 
+        // We create `call_status` before we've removed non-hashed info from the error.
         let call_status = match maybe_status {
             None => Ok(()),
             Some(e) => Err(e.to_owned()),

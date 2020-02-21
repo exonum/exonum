@@ -593,7 +593,7 @@ fn test_service_config_discard_single_apply_error() {
     let snapshot = testkit.snapshot();
     let err = snapshot
         .for_core()
-        .call_errors(testkit.height())
+        .call_records(testkit.height())
         .unwrap()
         .get(CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
         .unwrap_err();
@@ -630,7 +630,7 @@ fn test_service_config_discard_single_apply_panic() {
     let snapshot = testkit.snapshot();
     let err = snapshot
         .for_core()
-        .call_errors(testkit.height())
+        .call_records(testkit.height())
         .unwrap()
         .get(CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
         .unwrap_err();

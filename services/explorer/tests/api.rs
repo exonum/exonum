@@ -409,7 +409,7 @@ fn test_explorer_transaction_info() {
         .check_against_hash(block.header().tx_hash)
         .is_ok());
 
-    let proof = block.error_proof(CallInBlock::transaction(0));
+    let proof = block.call_proof(CallInBlock::transaction(0));
     let validator_keys = [testkit.us().public_keys().consensus_key];
     let (call_location, status) = proof.verify(&validator_keys).unwrap();
     assert_eq!(call_location, CallInBlock::transaction(0));
@@ -467,16 +467,16 @@ fn test_explorer_transaction_statuses() {
     let explorer = BlockchainExplorer::new(&snapshot);
     let block_info = explorer.block(testkit.height()).unwrap();
 
-    let proof = block_info.error_proof(CallInBlock::transaction(0));
+    let proof = block_info.call_proof(CallInBlock::transaction(0));
     let validator_keys = [testkit.us().public_keys().consensus_key];
     let (_, res) = proof.verify(&validator_keys).unwrap();
     assert!(res.is_ok());
 
-    let proof = block_info.error_proof(CallInBlock::transaction(1));
+    let proof = block_info.call_proof(CallInBlock::transaction(1));
     let (_, res) = proof.verify(&validator_keys).unwrap();
     assert_eq!(res.unwrap_err().description(), "Adding zero does nothing!");
 
-    let proof = block_info.error_proof(CallInBlock::transaction(2));
+    let proof = block_info.call_proof(CallInBlock::transaction(2));
     let (_, res) = proof.verify(&validator_keys).unwrap();
     assert_eq!(res.unwrap_err().kind(), ErrorKind::Unexpected);
 

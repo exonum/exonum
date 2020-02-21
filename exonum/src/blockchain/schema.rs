@@ -134,27 +134,10 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns a record of errors that occurred during execution of a particular block.
-    ///
-    /// This method can be used to build a proof that execution of a certain transaction
-    /// ended up with a particular status.
-    /// For an execution that resulted in an error, this will be an usual proof of existence.
-    /// If the transaction was executed successfully, such a proof will be a proof of absence.
-    /// Since the number of transactions in a block is mentioned in the block header, the user
-    /// will be able to distinguish absence of error (meaning successful execution) from
-    /// the absence of a transaction with such an index. Indeed, if the index is less
-    /// than amount of transactions in block, the proof denotes successful execution;
-    /// otherwise, the transaction with the given index does not exist in the block.
-    ///
-    /// Similarly, execution errors of the `before_transactions` / `after_transactions`
-    /// hooks can be proven to external clients. Discerning successful execution
-    /// from a non-existing service requires prior knowledge though.
-    ///
-    /// Proofs obtained with this method should not be mixed up with a proof of transaction
-    /// commitment. To verify that a certain transaction was committed, use a proof from
-    /// the `block_transactions` index.
-    pub fn call_errors(&self, block_height: Height) -> Option<CallErrors<T>> {
+    /// If the block is not committed, returns `None`.
+    pub fn call_records(&self, block_height: Height) -> Option<CallRecords<T>> {
         self.block_hash_by_height(block_height)?;
-        Some(CallErrors {
+        Some(CallRecords {
             height: block_height,
             errors: self.call_errors_map(block_height),
             errors_aux: self.call_errors_aux(block_height),
@@ -370,18 +353,21 @@ where
     }
 }
 
-/// Call errors within a specific block.
+/// Information about call errors within a specific block.
+///
+/// This data type can be used to get information or build proofs that execution
+/// of a certain call ended up with a particular status.
 #[derive(Debug)]
-pub struct CallErrors<T: Access> {
+pub struct CallRecords<T: Access> {
     height: Height,
     errors: ProofMapIndex<T::Base, CallInBlock, ExecutionError>,
     errors_aux: MapIndex<T::Base, CallInBlock, ExecutionErrorAux>,
     access: T,
 }
 
-impl<T: Access> CallErrors<T> {
+impl<T: Access> CallRecords<T> {
     /// Iterates over errors in a block.
-    pub fn iter(&self) -> CallErrorsIter<'_> {
+    pub fn errors(&self) -> CallErrorsIter<'_> {
         CallErrorsIter {
             errors_iter: self.errors.iter(),
             aux_iter: self.errors_aux.values(),
@@ -409,7 +395,6 @@ impl<T: Access> CallErrors<T> {
     }
 
     /// Returns a cryptographic proof of authenticity for a top-level call within a block.
-    /// If there is no block with the specified height in the blockchain, `None` is returned.
     pub fn get_proof(&self, call: CallInBlock) -> CallProof {
         let block_proof = Schema::new(self.access.clone())
             .block_and_precommits(self.height)
@@ -426,16 +411,7 @@ impl<T: Access> CallErrors<T> {
     }
 }
 
-impl<'a, T: Access> IntoIterator for &'a CallErrors<T> {
-    type Item = (CallInBlock, ExecutionError);
-    type IntoIter = CallErrorsIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-/// Iterator over errors in a block returned by `CallErrors::iter()`.
+/// Iterator over errors in a block returned by `CallRecords::errors()`.
 #[derive(Debug)]
 pub struct CallErrorsIter<'a> {
     errors_iter: Entries<'a, CallInBlock, ExecutionError>,
