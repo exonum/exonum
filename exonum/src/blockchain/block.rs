@@ -478,7 +478,7 @@ mod tests {
     use pretty_assertions::{assert_eq, assert_ne};
 
     use super::*;
-    use crate::{helpers::Round, runtime::InstanceId};
+    use crate::{blockchain::Schema as CoreSchema, helpers::Round, runtime::InstanceId};
 
     impl BlockHeaderKey for Hash {
         const NAME: &'static str = "HASH";
@@ -619,14 +619,14 @@ mod tests {
         assert!(services.is_err());
     }
 
-    fn create_block_proof(keys: &[KeyPair], state_hash: Hash) -> BlockProof {
+    fn create_block_proof(keys: &[KeyPair], state_hash: Hash, error_hash: Hash) -> BlockProof {
         let mut block = Block {
             height: Height(1),
             tx_count: 0,
             prev_hash: Hash::zero(),
             tx_hash: Hash::zero(),
             state_hash,
-            error_hash: Hash::zero(),
+            error_hash,
             additional_headers: AdditionalHeaders::default(),
         };
         block
@@ -654,7 +654,7 @@ mod tests {
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
 
-        let mut proof = create_block_proof(&keys, Hash::zero());
+        let mut proof = create_block_proof(&keys, Hash::zero(), Hash::zero());
         proof.verify(&public_keys).unwrap();
         // We can remove one `Precommit` without disturbing the proof integrity.
         proof.precommits.truncate(3);
@@ -667,7 +667,7 @@ mod tests {
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
 
         // Too many precommits.
-        let proof = create_block_proof(&keys, Hash::zero());
+        let proof = create_block_proof(&keys, Hash::zero(), Hash::zero());
         let mut mauled_proof = proof.clone();
         mauled_proof.precommits.push(proof.precommits[0].clone());
         assert_matches!(
@@ -757,7 +757,7 @@ mod tests {
         let (state_hash, index_proof) = create_index_proof();
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
-        let block_proof = create_block_proof(&keys, state_hash);
+        let block_proof = create_block_proof(&keys, state_hash, Hash::zero());
         let index_proof = IndexProof::new(block_proof, index_proof);
         let (index_name, index_hash) = index_proof.verify(&public_keys).unwrap();
         assert_eq!(index_name, "test.list");
@@ -770,7 +770,7 @@ mod tests {
         let (state_hash, index_proof) = create_index_proof();
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
-        let block_proof = create_block_proof(&keys, state_hash);
+        let block_proof = create_block_proof(&keys, state_hash, Hash::zero());
         let index_proof = IndexProof::new(block_proof, index_proof);
 
         let mut expected_public_keys = public_keys;
@@ -794,7 +794,7 @@ mod tests {
 
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
-        let block_proof = create_block_proof(&keys, state_hash);
+        let block_proof = create_block_proof(&keys, state_hash, Hash::zero());
         let index_proof = IndexProof::new(block_proof, index_proof);
 
         assert_matches!(
@@ -818,7 +818,7 @@ mod tests {
 
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
-        let block_proof = create_block_proof(&keys, state_hash);
+        let block_proof = create_block_proof(&keys, state_hash, Hash::zero());
         let index_proof = IndexProof::new(block_proof, index_proof);
 
         assert_matches!(
@@ -842,12 +842,99 @@ mod tests {
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
         let bogus_state_hash = Hash::zero();
-        let block_proof = create_block_proof(&keys, bogus_state_hash);
+        let block_proof = create_block_proof(&keys, bogus_state_hash, Hash::zero());
         let index_proof = IndexProof::new(block_proof, index_proof);
 
         assert_matches!(
             index_proof.verify(&public_keys).unwrap_err(),
             ProofError::IncorrectEntryProof(ValidationError::UnmatchedRootHash)
         );
+    }
+
+    #[derive(Clone, Copy)]
+    enum CallProofKind {
+        Ok,
+        Error,
+        Ambiguous,
+    }
+
+    fn create_error_proof(kind: CallProofKind) -> (Hash, MapProof<CallInBlock, ExecutionError>) {
+        let db = TemporaryDB::new();
+        let fork = db.fork();
+        let mut schema = CoreSchema::new(&fork);
+
+        let err = ExecutionError::service(5, "huh?");
+        let call = CallInBlock::transaction(2);
+        schema.save_error(Height(1), call, err.clone());
+        let other_call = CallInBlock::after_transactions(0);
+        schema.save_error(Height(1), other_call, ExecutionError::service(16, "oops"));
+
+        let error_map = schema.call_errors_map(Height(1));
+        let proof = match kind {
+            CallProofKind::Ok => error_map.get_proof(CallInBlock::before_transactions(0)),
+            CallProofKind::Error => error_map.get_proof(call).map_values(|_| err.clone()),
+            CallProofKind::Ambiguous => error_map.get_multiproof(vec![call, other_call]),
+        };
+        (error_map.object_hash(), proof)
+    }
+
+    #[test]
+    fn erroneous_call_proof() {
+        let (error_hash, call_proof) = create_error_proof(CallProofKind::Error);
+        let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
+        let mut call_proof = CallProof::new(block_proof, call_proof);
+        let (call, res) = call_proof.verify(&public_keys).unwrap();
+        assert_eq!(call, CallInBlock::transaction(2));
+        assert_eq!(res, Err(ExecutionError::service(5, "huh?")));
+
+        // Check that the proof remains valid if we remove or change the description.
+        call_proof.call_proof = call_proof
+            .call_proof
+            .map_values(|_| ExecutionError::service(5, ""));
+        let _ = call_proof.verify(&public_keys).unwrap();
+        call_proof.call_proof = call_proof
+            .call_proof
+            .map_values(|_| ExecutionError::service(5, "?huh"));
+        let _ = call_proof.verify(&public_keys).unwrap();
+
+        // ...but not if we change the hashed part of the error.
+        call_proof.call_proof = call_proof
+            .call_proof
+            .map_values(|_| ExecutionError::service(6, "huh?"));
+        let err = call_proof.verify(&public_keys).unwrap_err();
+        assert_matches!(
+            err,
+            ProofError::IncorrectEntryProof(ValidationError::UnmatchedRootHash)
+        );
+    }
+
+    #[test]
+    fn ok_call_proof() {
+        let (error_hash, call_proof) = create_error_proof(CallProofKind::Ok);
+        let keys: Vec<_> = (0..3).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
+        let mut call_proof = CallProof::new(block_proof, call_proof);
+        let (call, res) = call_proof.verify(&public_keys).unwrap();
+        assert_eq!(call, CallInBlock::before_transactions(0));
+        assert_eq!(res, Ok(()));
+
+        // Check proof invalidation if the block part is mangled.
+        call_proof.block_proof.block.height = Height(100);
+        let err = call_proof.verify(&public_keys).unwrap_err();
+        assert_matches!(err, ProofError::IncorrectHeight);
+    }
+
+    #[test]
+    fn ambiguous_call_proof() {
+        let (error_hash, call_proof) = create_error_proof(CallProofKind::Ambiguous);
+        let keys: Vec<_> = (0..3).map(|_| KeyPair::random()).collect();
+        let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
+        let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
+        let call_proof = CallProof::new(block_proof, call_proof);
+        let err = call_proof.verify(&public_keys).unwrap_err();
+        assert_matches!(err, ProofError::AmbiguousEntry);
     }
 }
