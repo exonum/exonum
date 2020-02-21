@@ -118,7 +118,8 @@ impl Service for ExplorerService {
             .public_scope();
         ExplorerApi::new(blockchain)
             .wire_rest(scope)
-            .wire_ws(self.shared_state.get_ref(), scope);
+            // .wire_ws(self.shared_state.get_ref(), scope)
+            ;
     }
 }
 

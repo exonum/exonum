@@ -22,12 +22,9 @@ use exonum::{
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures_01::{Future};
+use futures::future::{FutureExt, LocalBoxFuture};
 
-use std::{
-    borrow::Cow,
-    fmt::{self, Debug},
-};
+use std::fmt::{self, Debug};
 
 use super::{api::ServiceApiBuilder, ArtifactProtobufSpec, GenericCall, MethodDescriptor};
 
@@ -191,7 +188,7 @@ pub struct AfterCommitContext<'a> {
     /// Read-only snapshot of the current blockchain state.
     snapshot: &'a dyn Snapshot,
     /// Transaction broadcaster.
-    broadcaster: Broadcaster<'a>,
+    broadcaster: Broadcaster,
     /// ID of the node as a validator.
     validator_id: Option<ValidatorId>,
     /// Current status of the service.
@@ -220,7 +217,7 @@ impl<'a> AfterCommitContext<'a> {
             mailbox,
             snapshot,
             validator_id,
-            broadcaster: Broadcaster::new(instance, service_keypair, tx_sender),
+            broadcaster: Broadcaster::new(instance, service_keypair.clone(), tx_sender.clone()),
             status,
         }
     }
@@ -258,7 +255,7 @@ impl<'a> AfterCommitContext<'a> {
 
     /// Returns a transaction broadcaster if the current node is a validator and the service
     /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+    pub fn broadcaster(&self) -> Option<Broadcaster> {
         self.validator_id?;
         if self.status.is_active() {
             Some(self.broadcaster.clone())
@@ -274,7 +271,7 @@ impl<'a> AfterCommitContext<'a> {
     ///
     /// Transactions for non-active services will not be broadcast successfully; they will be
     /// filtered on the receiving nodes as ones that cannot (currently) be processed.
-    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
+    pub fn generic_broadcaster(&self) -> Broadcaster {
         self.broadcaster.clone()
     }
 
@@ -344,42 +341,32 @@ impl<'a> AfterCommitContext<'a> {
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct Broadcaster<'a> {
+pub struct Broadcaster {
     instance: InstanceDescriptor,
-    service_keypair: Cow<'a, KeyPair>,
-    tx_sender: Cow<'a, ApiSender>,
+    service_keypair: KeyPair,
+    tx_sender: ApiSender,
 }
 
-impl<'a> Broadcaster<'a> {
+impl Broadcaster {
     /// Creates a new broadcaster.
     pub(super) fn new(
         instance: InstanceDescriptor,
-        service_keypair: &'a KeyPair,
-        tx_sender: &'a ApiSender,
+        service_keypair: KeyPair,
+        tx_sender: ApiSender,
     ) -> Self {
         Self {
             instance,
-            service_keypair: Cow::Borrowed(service_keypair),
-            tx_sender: Cow::Borrowed(tx_sender),
+            service_keypair,
+            tx_sender,
         }
     }
 
     pub(super) fn keypair(&self) -> &KeyPair {
-        self.service_keypair.as_ref()
+        &self.service_keypair
     }
 
     pub(super) fn instance(&self) -> &InstanceDescriptor {
         &self.instance
-    }
-
-    /// Converts the broadcaster into the owned representation, which can be used to broadcast
-    /// transactions asynchronously.
-    pub fn into_owned(self) -> Broadcaster<'static> {
-        Broadcaster {
-            instance: self.instance,
-            service_keypair: Cow::Owned(self.service_keypair.into_owned()),
-            tx_sender: Cow::Owned(self.tx_sender.into_owned()),
-        }
     }
 }
 
@@ -393,18 +380,22 @@ impl<'a> Broadcaster<'a> {
 ///
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
-impl GenericCall<()> for Broadcaster<'_> {
-    type Output = Result<Hash, SendError>;
+impl GenericCall<()> for Broadcaster {
+    type Output = LocalBoxFuture<'static, Result<Hash, SendError>>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
         let msg = self
             .service_keypair
+            .clone()
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
-        self.tx_sender
-            .broadcast_transaction(msg)
-            .wait()
-            .map(|()| tx_hash)
+
+        let tx_sender = self.tx_sender.clone();
+        async move {
+            tx_sender.broadcast_transaction(msg).await?;
+            Ok(tx_hash)
+        }
+        .boxed_local()
     }
 }
 

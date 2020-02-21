@@ -35,9 +35,9 @@ use super::Broadcaster;
 /// This structure allows a service API handler to interact with the service instance
 /// and other parts of the blockchain.
 #[derive(Debug)]
-pub struct ServiceApiState<'a> {
+pub struct ServiceApiState {
     /// Transaction broadcaster.
-    broadcaster: Broadcaster<'a>,
+    broadcaster: Broadcaster,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
     /// Endpoint path relative to the service root.
@@ -46,10 +46,10 @@ pub struct ServiceApiState<'a> {
     status: InstanceStatus,
 }
 
-impl<'a> ServiceApiState<'a> {
+impl ServiceApiState {
     /// Creates service API context from the given blockchain and instance descriptor.
     fn new<S: Into<String>>(
-        blockchain: &'a Blockchain,
+        blockchain: &Blockchain,
         instance: InstanceDescriptor,
         expected_artifact: &ArtifactId,
         endpoint: S,
@@ -67,8 +67,8 @@ impl<'a> ServiceApiState<'a> {
         Ok(Self {
             broadcaster: Broadcaster::new(
                 instance,
-                blockchain.service_keypair(),
-                blockchain.sender(),
+                blockchain.service_keypair().clone(),
+                blockchain.sender().clone(),
             ),
             snapshot,
             endpoint: endpoint.into(),
@@ -88,12 +88,12 @@ impl<'a> ServiceApiState<'a> {
     }
 
     /// Returns readonly access to blockchain data.
-    pub fn data(&'a self) -> BlockchainData<&dyn Snapshot> {
+    pub fn data(&self) -> BlockchainData<&dyn Snapshot> {
         BlockchainData::new(&self.snapshot, &self.instance().name)
     }
 
     /// Returns readonly access to the data of the executing service.
-    pub fn service_data(&'a self) -> Prefixed<&dyn Snapshot> {
+    pub fn service_data(&self) -> Prefixed<&dyn Snapshot> {
         self.data().for_executing_service()
     }
 
@@ -120,7 +120,7 @@ impl<'a> ServiceApiState<'a> {
 
     /// Returns a transaction broadcaster if the current node is a validator and the service
     /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+    pub fn broadcaster(&self) -> Option<Broadcaster> {
         if self.status.is_active() {
             CoreSchema::new(&self.snapshot).validator_id(self.service_key())?;
             Some(self.broadcaster.clone())
@@ -136,7 +136,7 @@ impl<'a> ServiceApiState<'a> {
     ///
     /// Transactions for non-active services will not be broadcast successfully; they will be
     /// filtered on the receiving nodes as ones that cannot (currently) be processed.
-    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
+    pub fn generic_broadcaster(&self) -> Broadcaster {
         self.broadcaster.clone()
     }
 
@@ -213,7 +213,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static + Send,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = Result<I>> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -236,7 +236,7 @@ impl ServiceApiScope {
 
                     let descriptor = descriptor.clone();
 
-                    handler(&state, query)
+                    handler(state, query)
                         .await
                         .map_err(move |err| err.source(descriptor.to_string()))
                 }
@@ -252,7 +252,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = Result<I>> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -274,7 +274,7 @@ impl ServiceApiScope {
                     };
 
                     let descriptor = descriptor.clone();
-                    handler(&state, query)
+                    handler(state, query)
                         .await
                         .map_err(move |err| err.source(descriptor.to_string()))
                 }
@@ -294,7 +294,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = Result<I>> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -317,7 +317,7 @@ impl ServiceApiScope {
                 };
 
                 let descriptor = descriptor.clone();
-                inner(&state, query)
+                inner(state, query)
                     .await
                     .map_err(move |err| err.source(descriptor.to_string()))
             }
@@ -340,7 +340,7 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = Result<I>> + 'static,
     {
         let blockchain = self.blockchain.clone();
@@ -363,7 +363,7 @@ impl ServiceApiScope {
                 };
 
                 let descriptor = descriptor.clone();
-                inner(&state, query)
+                inner(state, query)
                     .await
                     .map_err(move |err| err.source(descriptor.to_string()))
             }

@@ -204,7 +204,7 @@ use exonum::{
     messages::{AnyTx, SignedMessage, Verified},
 };
 use exonum_explorer::api::{TransactionHex, TransactionResponse};
-use futures::{Future, IntoFuture};
+use futures_01::{Future, IntoFuture};
 use hex::FromHex;
 
 use std::{
@@ -214,7 +214,7 @@ use std::{
     time::Duration,
 };
 
-mod glue;
+// mod glue;
 
 #[derive(Debug, Default)]
 pub(crate) struct SharedState {
@@ -391,21 +391,21 @@ impl Server {
         Ok(verified)
     }
 
-    fn handle_transaction(
-        &self,
-        message: Transaction,
-    ) -> impl Future<Item = TransactionResponse, Error = failure::Error> {
-        let sender = self.blockchain.sender().to_owned();
-        self.check_transaction(message)
-            .into_future()
-            .and_then(move |verified| {
-                let tx_hash = verified.object_hash();
-                sender
-                    .broadcast_transaction(verified)
-                    .map(move |()| TransactionResponse { tx_hash })
-                    .from_err()
-            })
-    }
+    // fn handle_transaction(
+    //     &self,
+    //     message: Transaction,
+    // ) -> impl Future<Item = TransactionResponse, Error = failure::Error> {
+    //     let sender = self.blockchain.sender().to_owned();
+    //     self.check_transaction(message)
+    //         .into_future()
+    //         .and_then(move |verified| {
+    //             let tx_hash = verified.object_hash();
+    //             sender
+    //                 .broadcast_transaction(verified)
+    //                 .map(move |()| TransactionResponse { tx_hash })
+    //                 .from_err()
+    //         })
+    // }
 }
 
 impl Actor for Server {
@@ -523,7 +523,8 @@ impl Handler<Transaction> for Server {
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
-        Box::new(self.handle_transaction(message))
+        todo!()
+        // Box::new(self.handle_transaction(message))
     }
 }
 

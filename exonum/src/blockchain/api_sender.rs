@@ -13,7 +13,8 @@
 // limitations under the License.
 
 use failure::Fail;
-use futures::{sync::mpsc, Future, Sink};
+use futures::compat::Future01CompatExt;
+use futures_01::{sync::mpsc, Future, Sink};
 
 use std::fmt;
 
@@ -64,11 +65,11 @@ impl ApiSender {
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub fn broadcast_transaction(
+    pub async fn broadcast_transaction(
         &self,
         tx: Verified<AnyTx>,
-    ) -> impl Future<Item = (), Error = SendError> {
-        self.send_message(tx)
+    ) -> Result<(), SendError> {
+        self.send_message(tx).compat().await
     }
 }
 

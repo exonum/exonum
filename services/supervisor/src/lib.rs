@@ -154,7 +154,7 @@ use exonum::{
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
+    api::ServiceApiBuilder, AfterCommitContext, Service, ServiceFactory as _,
 };
 
 use crate::{configure::ConfigureMut, mode::Mode};
@@ -522,19 +522,19 @@ impl Supervisor {
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
+            let tx_sender = context.broadcaster();
 
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             // We should deploy the artifact for all nodes, but send confirmations only
             // if the node is a validator.
             extensions.start_deploy(artifact, spec, move |result| {
-                if let Some(tx_sender) = tx_sender {
-                    log::trace!("Sending deployment result report {:?}", unconfirmed_request);
-                    let confirmation = DeployResult::new(unconfirmed_request, result);
-                    if let Err(e) = tx_sender.report_deploy_result((), confirmation) {
-                        log::error!("Cannot send `DeployResult`: {}", e);
-                    }
-                }
+                // if let Some(tx_sender) = tx_sender {
+                //     log::trace!("Sending deployment result report {:?}", unconfirmed_request);
+                //     let confirmation = DeployResult::new(unconfirmed_request, result);
+                //     if let Err(e) = tx_sender.report_deploy_result((), confirmation) {
+                //         log::error!("Cannot send `DeployResult`: {}", e);
+                //     }
+                // }
                 Ok(())
             });
         }
@@ -664,16 +664,16 @@ impl Supervisor {
                 .for_dispatcher()
                 .local_migration_result(request.service.as_ref());
 
-            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
+            let tx_sender = context.broadcaster();
 
             if let Some(status) = local_migration_result {
                 // We've got a result, broadcast it if our node is a validator.
                 if let Some(tx_sender) = tx_sender {
-                    let confirmation = MigrationResult { request, status };
+                    // let confirmation = MigrationResult { request, status };
 
-                    if let Err(e) = tx_sender.report_migration_result((), confirmation) {
-                        log::error!("Cannot send `MigrationResult`: {}", e);
-                    }
+                    // if let Err(e) = tx_sender.report_migration_result((), confirmation) {
+                    //     log::error!("Cannot send `MigrationResult`: {}", e);
+                    // }
                 }
             }
         }

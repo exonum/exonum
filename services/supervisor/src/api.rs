@@ -752,10 +752,10 @@ trait PublicApi {
     fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
 }
 
-struct ApiImpl<'a>(&'a ServiceApiState<'a>);
+struct ApiImpl(ServiceApiState);
 
-impl ApiImpl<'_> {
-    fn broadcaster(&self) -> Result<Broadcaster<'_>, api::Error> {
+impl ApiImpl {
+    fn broadcaster(&self) -> Result<Broadcaster, api::Error> {
         self.0.broadcaster().ok_or_else(|| {
             api::Error::bad_request()
                 .title("Invalid broadcast request")
@@ -764,66 +764,66 @@ impl ApiImpl<'_> {
     }
 }
 
-impl PrivateApi for ApiImpl<'_> {
-    type Error = api::Error;
+// impl PrivateApi for ApiImpl {
+//     type Error = api::Error;
 
-    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
-            .request_artifact_deploy((), artifact)
-            .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
-    }
+//     fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
+//         self.broadcaster()?
+//             .request_artifact_deploy((), artifact)
+//             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
+//     }
 
-    fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
-            .request_migration((), request)
-            .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
-    }
+//     fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error> {
+//         self.broadcaster()?
+//             .request_migration((), request)
+//             .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
+//     }
 
-    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
-            .propose_config_change((), proposal)
-            .map_err(|err| api::Error::internal(err).title("Config propose failed"))
-    }
+//     fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
+//         self.broadcaster()?
+//             .propose_config_change((), proposal)
+//             .map_err(|err| api::Error::internal(err).title("Config propose failed"))
+//     }
 
-    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
-            .confirm_config_change((), vote)
-            .map_err(|err| api::Error::internal(err).title("Config vote failed"))
-    }
+//     fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
+//         self.broadcaster()?
+//             .confirm_config_change((), vote)
+//             .map_err(|err| api::Error::internal(err).title("Config vote failed"))
+//     }
 
-    fn configuration_number(&self) -> Result<u64, Self::Error> {
-        let configuration_number =
-            SchemaImpl::new(self.0.service_data()).get_configuration_number();
-        Ok(configuration_number)
-    }
+//     fn configuration_number(&self) -> Result<u64, Self::Error> {
+//         let configuration_number =
+//             SchemaImpl::new(self.0.service_data()).get_configuration_number();
+//         Ok(configuration_number)
+//     }
 
-    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
-        let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
-        Ok(config)
-    }
+//     fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
+//         let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
+//         Ok(config)
+//     }
 
-    fn deploy_status(&self, query: DeployInfoQuery) -> Result<AsyncEventState, Self::Error> {
-        let request = DeployRequest::try_from(query)?;
-        let schema = SchemaImpl::new(self.0.service_data());
-        let status = schema.deploy_states.get(&request).ok_or_else(|| {
-            Self::Error::not_found().title("No corresponding deploy request found")
-        })?;
+//     fn deploy_status(&self, query: DeployInfoQuery) -> Result<AsyncEventState, Self::Error> {
+//         let request = DeployRequest::try_from(query)?;
+//         let schema = SchemaImpl::new(self.0.service_data());
+//         let status = schema.deploy_states.get(&request).ok_or_else(|| {
+//             Self::Error::not_found().title("No corresponding deploy request found")
+//         })?;
 
-        Ok(status)
-    }
+//         Ok(status)
+//     }
 
-    fn migration_status(&self, query: MigrationInfoQuery) -> Result<MigrationState, Self::Error> {
-        let request = MigrationRequest::try_from(query)?;
-        let schema = SchemaImpl::new(self.0.service_data());
-        let status = schema.migration_states.get(&request).ok_or_else(|| {
-            api::Error::not_found().title("No corresponding migration request found")
-        })?;
+//     fn migration_status(&self, query: MigrationInfoQuery) -> Result<MigrationState, Self::Error> {
+//         let request = MigrationRequest::try_from(query)?;
+//         let schema = SchemaImpl::new(self.0.service_data());
+//         let status = schema.migration_states.get(&request).ok_or_else(|| {
+//             api::Error::not_found().title("No corresponding migration request found")
+//         })?;
 
-        Ok(status)
-    }
-}
+//         Ok(status)
+//     }
+// }
 
-impl PublicApi for ApiImpl<'_> {
+impl PublicApi for ApiImpl {
     type Error = api::Error;
 
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
@@ -840,36 +840,36 @@ impl PublicApi for ApiImpl<'_> {
 
 /// Wires Supervisor API endpoints.
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
-    builder
-        .private_scope()
-        .endpoint_mut("deploy-artifact", |state, query| {
-            ApiImpl(state).deploy_artifact(query)
-        })
-        .endpoint_mut("migrate", |state, query| ApiImpl(state).migrate(query))
-        .endpoint_mut("propose-config", |state, query| {
-            ApiImpl(state).propose_config(query)
-        })
-        .endpoint_mut("confirm-config", |state, query| {
-            ApiImpl(state).confirm_config(query)
-        })
-        .endpoint("configuration-number", |state, _query: ()| {
-            ApiImpl(state).configuration_number()
-        })
-        .endpoint("supervisor-config", |state, _query: ()| {
-            ApiImpl(state).supervisor_config()
-        })
-        .endpoint("deploy-status", |state, query| {
-            ApiImpl(state).deploy_status(query)
-        })
-        .endpoint("migration-status", |state, query| {
-            ApiImpl(state).migration_status(query)
-        });
-    builder
-        .public_scope()
-        .endpoint("consensus-config", |state, _query: ()| {
-            ApiImpl(state).consensus_config()
-        })
-        .endpoint("config-proposal", |state, _query: ()| {
-            ApiImpl(state).config_proposal()
-        });
+    // builder
+    //     .private_scope()
+    //     .endpoint_mut("deploy-artifact", |state, query| {
+    //         ApiImpl(state).deploy_artifact(query)
+    //     })
+    //     .endpoint_mut("migrate", |state, query| ApiImpl(state).migrate(query))
+    //     .endpoint_mut("propose-config", |state, query| {
+    //         ApiImpl(state).propose_config(query)
+    //     })
+    //     .endpoint_mut("confirm-config", |state, query| {
+    //         ApiImpl(state).confirm_config(query)
+    //     })
+    //     .endpoint("configuration-number", |state, _query: ()| {
+    //         ApiImpl(state).configuration_number()
+    //     })
+    //     .endpoint("supervisor-config", |state, _query: ()| {
+    //         ApiImpl(state).supervisor_config()
+    //     })
+    //     .endpoint("deploy-status", |state, query| {
+    //         ApiImpl(state).deploy_status(query)
+    //     })
+    //     .endpoint("migration-status", |state, query| {
+    //         ApiImpl(state).migration_status(query)
+    //     });
+    // builder
+    //     .public_scope()
+    //     .endpoint("consensus-config", |state, _query: ()| {
+    //         ApiImpl(state).consensus_config()
+    //     })
+    //     .endpoint("config-proposal", |state, _query: ()| {
+    //         ApiImpl(state).config_proposal()
+    //     });
 }

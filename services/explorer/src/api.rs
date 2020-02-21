@@ -396,8 +396,8 @@ use exonum::{
     runtime::ExecutionStatus,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::api::{self, ServiceApiScope};
-use futures::{Future, IntoFuture};
+use exonum_rust_runtime::api::{self, ServiceApiScope, ServiceApiState};
+use futures_01::Future;
 use hex::FromHex;
 use serde_json::json;
 
@@ -566,11 +566,11 @@ impl ExplorerApi {
         Ok(CallStatusResponse { status })
     }
 
-    fn add_transaction(
-        snapshot: &dyn Snapshot,
-        sender: &ApiSender,
+    async fn add_transaction(
+        state: ServiceApiState,
+        sender: ApiSender,
         query: TransactionHex,
-    ) -> api::FutureResult<TransactionResponse> {
+    ) -> api::Result<TransactionResponse> {
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
@@ -578,52 +578,48 @@ impl ExplorerApi {
             Blockchain::check_tx(snapshot, &verified)?;
             Ok((verified, tx_hash))
         };
+        
+        let (verified, tx_hash) = verify_message(state.snapshot(), query.tx_body).map_err(|e| {
+            api::Error::bad_request()
+                .title("Failed to add transaction to memory pool")
+                .detail(e.to_string())
+        })?;
 
-        let sender = sender.clone();
-        let send_transaction = move |(verified, tx_hash)| {
-            sender
-                .broadcast_transaction(verified)
-                .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))
-        };
-
-        Box::new(
-            verify_message(snapshot, query.tx_body)
-                .into_future()
-                .map_err(|e| {
-                    api::Error::bad_request()
-                        .title("Failed to add transaction to memory pool")
-                        .detail(e.to_string())
-                })
-                .and_then(send_transaction),
-        )
+        sender.broadcast_transaction(verified).await.map_err(|e| api::Error::internal(e).title("Failed to add transaction"))?;
+        Ok(TransactionResponse { tx_hash })
     }
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
-            .endpoint("v1/blocks", |state, query| {
+            .endpoint("v1/blocks", |state, query| async move {
                 Self::blocks(state.data().for_core(), query)
             })
-            .endpoint("v1/block", |state, query| {
+            .endpoint("v1/block", |state, query| async move {
                 Self::block(state.data().for_core(), query)
             })
-            .endpoint("v1/call_status/transaction", |state, query| {
+            .endpoint("v1/call_status/transaction", |state, query| async move {
                 Self::transaction_status(state.data().for_core(), query)
             })
-            .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(state.data().for_core(), query)
-            })
-            .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(state.data().for_core(), query)
-            })
-            .endpoint("v1/transactions", |state, query| {
+            .endpoint(
+                "v1/call_status/after_transactions",
+                |state, query| async move {
+                    Self::after_transactions_status(state.data().for_core(), query)
+                },
+            )
+            .endpoint(
+                "v1/call_status/before_transactions",
+                |state, query| async move {
+                    Self::before_transactions_status(state.data().for_core(), query)
+                },
+            )
+            .endpoint("v1/transactions", |state, query| async move {
                 Self::transaction_info(state.data().for_core(), query)
             });
 
         let tx_sender = self.blockchain.sender().to_owned();
         api_scope.endpoint_mut("v1/transactions", move |state, query| {
-            Self::add_transaction(state.snapshot(), &tx_sender, query)
+            Self::add_transaction(state, tx_sender.clone(), query)
         });
         self
     }
