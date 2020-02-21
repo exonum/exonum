@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::{compiler_version, framework_version, os_info};
+use exonum::helpers::{exonum_version, os_info, rust_version};
 use exonum_node::ExternalMessage;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
@@ -43,8 +43,8 @@ fn info() {
     let expected = NodeInfo {
         consensus_status: ConsensusStatus::Enabled,
         connected_peers: vec![],
-        exonum_version: framework_version(),
-        rust_version: compiler_version(),
+        exonum_version: exonum_version().unwrap(),
+        rust_version: rust_version().unwrap(),
         os_info: os_info(),
     };
     assert_eq!(info, expected);

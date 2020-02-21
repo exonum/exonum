@@ -178,11 +178,12 @@
 use exonum::{
     blockchain::{ApiSender, Blockchain, Schema},
     crypto::PublicKey,
-    helpers::{compiler_version, framework_version, os_info},
+    helpers::{exonum_version, os_info, rust_version},
 };
 use exonum_api::{self as api, ApiBackend, ApiScope};
 use exonum_node::{ConnectInfo, ExternalMessage, SharedNodeState};
 use futures::Future;
+use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::SystemTime};
 
@@ -252,9 +253,9 @@ pub struct NodeInfo {
     /// List of connected peers.
     pub connected_peers: Vec<ConnectedPeerInfo>,
     /// Version of the `exonum` crate.
-    pub exonum_version: String,
+    pub exonum_version: Version,
     /// Rust version.
-    pub rust_version: String,
+    pub rust_version: Version,
     /// OS info.
     pub os_info: String,
 }
@@ -322,8 +323,8 @@ impl SystemApi {
             Ok(NodeInfo {
                 consensus_status: Self::get_consensus_status(&shared_api_state),
                 connected_peers,
-                exonum_version: framework_version(),
-                rust_version: compiler_version(),
+                exonum_version: exonum_version().unwrap_or_else(|| Version::new(0, 0, 0)),
+                rust_version: rust_version().unwrap_or_else(|| Version::new(0, 0, 0)),
                 os_info: os_info(),
             })
         });

@@ -18,7 +18,7 @@ pub use self::types::{Height, Round, ValidatorId};
 
 // Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden
 // under `doc(hidden)`.
-pub use self::user_agent::{compiler_version, framework_version, os_info, user_agent};
+pub use self::user_agent::{exonum_version, os_info, rust_version, user_agent};
 
 pub(crate) use self::ordered_map::OrderedMap;
 // `Milliseconds` is just `u64`, but more readable within context.

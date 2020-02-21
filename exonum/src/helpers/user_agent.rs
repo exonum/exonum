@@ -14,6 +14,9 @@
 
 //! Information about current node including Exonum, Rust and OS versions.
 
+use semver::Version;
+use std::str::FromStr;
+
 static USER_AGENT: &str = include_str!(concat!(env!("OUT_DIR"), "/user_agent"));
 
 /// Returns "user agent" string containing information about Exonum, Rust and OS versions.
@@ -40,16 +43,16 @@ pub fn os_info() -> String {
 
 /// Returns a version of the exonum framework.
 #[doc(hidden)]
-pub fn framework_version() -> String {
-    let version = USER_AGENT.split('/').nth(0);
-    version.map_or_else(|| "unknown".to_owned(), ToOwned::to_owned)
+pub fn exonum_version() -> Option<Version> {
+    let version = USER_AGENT.split('/').nth(0)?;
+    Version::from_str(version).ok()
 }
 
 /// Returns a version of the rust compiler.
 #[doc(hidden)]
-pub fn compiler_version() -> String {
-    let version = USER_AGENT.split('/').nth(1);
-    version.map_or_else(|| "unknown".to_owned(), ToOwned::to_owned)
+pub fn rust_version() -> Option<Version> {
+    let version = USER_AGENT.split('/').nth(1)?;
+    Version::from_str(version).ok()
 }
 
 #[cfg(test)]
@@ -70,13 +73,11 @@ mod tests {
 
     #[test]
     fn check_exonum_versions() {
-        let exonum_version = framework_version();
-        assert!(exonum_version.contains("exonum"));
+        assert!(exonum_version().is_some());
     }
 
     #[test]
     fn check_rust_versions() {
-        let rust_version = compiler_version();
-        assert!(rust_version.contains("rust"));
+        assert!(rust_version().is_some());
     }
 }
