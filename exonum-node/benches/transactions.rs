@@ -168,7 +168,7 @@ impl MessageVerifier {
             let thread_pool = ThreadPoolBuilder::new().build();
             let verify_handle = thread_pool.sender().clone();
 
-            core.run(internal_part.run(handle, handler)).unwrap();
+            core.block_on(internal_part.run(handle.clone(), handle)).unwrap();
         });
 
         MessageVerifier {
@@ -223,12 +223,12 @@ fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
 
     let verifier = MessageVerifier::new();
-    let mut core = Core::new().unwrap();
+    let mut core = CompatRuntime::new().unwrap();
 
     b.iter_with_setup(
         || messages.clone(),
         |messages| {
-            core.run(verifier.send_all(messages)).unwrap();
+            core.block_on(verifier.send_all(messages)).unwrap();
         },
     );
     verifier.join();

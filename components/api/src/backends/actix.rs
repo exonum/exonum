@@ -19,7 +19,6 @@
 
 pub use actix_cors::{Cors, CorsFactory};
 
-use actix::{Actor, System};
 use actix_web::{
     body::Body,
     dev::Payload,
@@ -28,19 +27,16 @@ use actix_web::{
     web::{self, scope, Json, Query},
     FromRequest, HttpRequest, HttpResponse,
 };
-use failure::{ensure, format_err, Error};
 use futures::future::{FutureExt, LocalBoxFuture};
-use futures_01::{sync::mpsc, Stream};
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{
     fmt,
     sync::Arc,
-    thread::{self, JoinHandle},
 };
 
 use crate::{
-    manager::ApiManager, Actuality, AllowOrigin, ApiBackend, ApiScope,
+    Actuality, AllowOrigin, ApiBackend, ApiScope,
     EndpointMutability, Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
 };
 

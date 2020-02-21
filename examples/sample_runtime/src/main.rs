@@ -307,7 +307,6 @@ fn main() {
         blockchain_ref
             .sender()
             .broadcast_transaction(tx)
-            .wait()
             .unwrap();
 
         // Wait until the request is finished.
@@ -324,7 +323,6 @@ fn main() {
         blockchain_ref
             .sender()
             .broadcast_transaction(proposal)
-            .wait()
             .unwrap();
 
         // Wait until instance identifier is assigned.
@@ -345,7 +343,6 @@ fn main() {
         blockchain_ref
             .sender()
             .broadcast_transaction(tx)
-            .wait()
             .unwrap();
         thread::sleep(Duration::from_secs(2));
 
@@ -355,7 +352,6 @@ fn main() {
         blockchain_ref
             .sender()
             .broadcast_transaction(tx)
-            .wait()
             .unwrap();
 
         thread::sleep(Duration::from_secs(2));

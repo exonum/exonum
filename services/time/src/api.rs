@@ -158,7 +158,7 @@ pub(crate) struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
-    fn current_time(state: &api::ServiceApiState<'_>, _query: ()) -> Result<Option<DateTime<Utc>>> {
+    fn current_time(state: api::ServiceApiState, _query: ()) -> Result<Option<DateTime<Utc>>> {
         Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
@@ -176,7 +176,7 @@ pub(crate) struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
-    pub fn all_validators_times(state: &api::ServiceApiState<'_>) -> Result<Vec<ValidatorTime>> {
+    pub fn all_validators_times(state: api::ServiceApiState) -> Result<Vec<ValidatorTime>> {
         let schema = TimeSchema::new(state.service_data());
         // All available times of the validators.
         let validators_times = schema
@@ -191,7 +191,7 @@ impl PrivateApi {
     }
 
     /// Endpoint for getting time values for current validators.
-    pub fn current_validators_time(state: &api::ServiceApiState<'_>) -> Result<Vec<ValidatorTime>> {
+    pub fn current_validators_time(state: api::ServiceApiState) -> Result<Vec<ValidatorTime>> {
         let validator_keys = state.data().for_core().consensus_config().validator_keys;
         let schema = TimeSchema::new(state.service_data());
 
@@ -212,12 +212,12 @@ impl PrivateApi {
         builder
             .private_scope()
             .endpoint("v1/validators_times", {
-                move |state: &api::ServiceApiState<'_>, _query: ()| {
+                move |state: api::ServiceApiState, _query: ()| {
                     Self::current_validators_time(state)
                 }
             })
             .endpoint("v1/validators_times/all", {
-                move |state: &api::ServiceApiState<'_>, _query: ()| {
+                move |state: api::ServiceApiState, _query: ()| {
                     Self::all_validators_times(state)
                 }
             });
