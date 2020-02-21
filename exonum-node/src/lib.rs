@@ -1122,8 +1122,7 @@ impl Node {
                 pool_builder.pool_size(pool_size as usize);
             }
             let thread_pool = pool_builder.build();
-            let executor = thread_pool.sender().clone();
-            // TODO Rewrite on fair threadpool.
+            // TODO Rewrite on fair threadpool [ECR-4268].
             core.spawn(internal_part.run(handle.clone(), handle));
 
             let network_handler = network_part.run(&core.handle(), &handshake_params);

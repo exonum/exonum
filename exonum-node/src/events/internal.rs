@@ -14,17 +14,17 @@
 
 use exonum::{merkledb::BinaryValue, messages::SignedMessage};
 use futures::{
-    future::{self, Executor},
+    future::{self},
     sync::mpsc,
     Future, Sink, Stream,
 };
-use futures_03::{compat::Future01CompatExt, future::FutureExt};
+use futures_03::compat::Future01CompatExt;
 use tokio_02::time;
 use tokio_compat::runtime::current_thread::Handle;
 
 use std::time::{Duration, SystemTime};
 
-use super::{InternalEvent, InternalRequest, TimeoutRequest};
+use super::{error::log_error, InternalEvent, InternalRequest, TimeoutRequest};
 use crate::messages::{ExonumMessage, Message};
 
 #[derive(Debug)]
@@ -97,17 +97,21 @@ impl InternalPart {
                             .await
                             .expect("cannot send event");
                     };
-                    handle.spawn_std(fut);
+                    handle.spawn_std(fut).map_err(log_error)?;
                 }
 
                 InternalRequest::JumpToRound(height, round) => {
                     let event = InternalEvent::jump_to_round(height, round);
-                    handle.spawn(Self::send_event(internal_tx, event));
+                    handle
+                        .spawn(Self::send_event(internal_tx, event))
+                        .map_err(log_error)?;
                 }
 
                 InternalRequest::Shutdown => {
                     let event = InternalEvent::shutdown();
-                    handle.spawn(Self::send_event(internal_tx, event));
+                    handle
+                        .spawn(Self::send_event(internal_tx, event))
+                        .map_err(log_error)?;
                 }
             }
             Ok(())

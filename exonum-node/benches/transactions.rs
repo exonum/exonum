@@ -30,7 +30,7 @@ use exonum::{
     runtime::{AnyTx, CallInfo},
 };
 use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
-use tokio_core::reactor::Core;
+use tokio_compat::runtime::Runtime as CompatRuntime;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
@@ -161,13 +161,14 @@ impl MessageVerifier {
         };
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
+            let mut core = CompatRuntime::new().unwrap();
             let handle = core.handle();
 
+            // TODO use fair threadpool [ECR-4268].
             let thread_pool = ThreadPoolBuilder::new().build();
             let verify_handle = thread_pool.sender().clone();
 
-            core.run(internal_part.run(handle, verify_handle)).unwrap();
+            core.run(internal_part.run(handle, handler)).unwrap();
         });
 
         MessageVerifier {

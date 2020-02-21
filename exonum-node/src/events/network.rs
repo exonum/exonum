@@ -23,8 +23,8 @@ use failure::{bail, ensure, format_err};
 use futures::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
-    sync::{mpsc, self},
-    unsync, Future, IntoFuture, Sink, Stream,
+    sync::{self, mpsc},
+    Future, IntoFuture, Sink, Stream,
 };
 use log::{error, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
@@ -36,10 +36,8 @@ use tokio_retry::{
 };
 
 use std::{
-    cell::RefCell,
     collections::HashMap,
     net::SocketAddr,
-    rc::Rc,
     sync::{Arc, RwLock},
     time::Duration,
 };
@@ -336,8 +334,7 @@ impl NetworkHandler {
                     })
                     .map_err(log_error);
 
-                self.handle.spawn(listener);
-                Ok(())
+                self.handle.spawn(listener).map_err(into_failure)
             })
     }
 
@@ -389,7 +386,9 @@ impl NetworkHandler {
                                         "Couldn't take peer addr from socket = {}",
                                         e
                                     )))
-                                        as Box<dyn Future<Error = failure::Error, Item = ()> + Send>;
+                                        as Box<
+                                            dyn Future<Error = failure::Error, Item = ()> + Send,
+                                        >;
                                 }
                             };
                             let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
@@ -436,9 +435,8 @@ impl NetworkHandler {
 
         let outgoing = Self::process_outgoing_messages(sink, connection.receiver_rx);
 
-        handle.spawn(incoming);
-        handle.spawn(outgoing);
-        Ok(())
+        handle.spawn(incoming).map_err(into_failure)?;
+        handle.spawn(outgoing).map_err(into_failure)
     }
 
     fn process_outgoing_messages<S>(
@@ -548,8 +546,7 @@ impl NetworkHandler {
             }
             .map_err(log_error);
 
-            handle.spawn(fut);
-            Ok(())
+            handle.spawn(fut).map_err(log_error)
         });
 
         handler.map_err(|_| format_err!("Error while processing outgoing Network Requests"))

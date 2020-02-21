@@ -371,22 +371,27 @@ fn run_handshake_listener(
             .unwrap()
             .incoming()
             .for_each(move |stream| {
-                let peer = stream.peer_addr().expect("TODO: [ECR-4268]");
+                let peer = stream.peer_addr()?;
                 let err_sender = err_sender.clone();
 
-                handle.spawn({
-                    let handshake = match bogus_message {
-                        Some(message) => Either::A(
-                            NoiseErrorHandshake::responder(&params, &peer, message).listen(stream),
-                        ),
-                        None => Either::B(NoiseHandshake::responder(&params, &peer).listen(stream)),
-                    };
+                handle
+                    .spawn({
+                        let handshake = match bogus_message {
+                            Some(message) => Either::A(
+                                NoiseErrorHandshake::responder(&params, &peer, message)
+                                    .listen(stream),
+                            ),
+                            None => {
+                                Either::B(NoiseHandshake::responder(&params, &peer).listen(stream))
+                            }
+                        };
 
-                    handshake
-                        .map(|_| ())
-                        .or_else(|e| err_sender.send(e).map(|_| ()))
-                        .map_err(|e| panic!("{:?}", e))
-                });
+                        handshake
+                            .map(|_| ())
+                            .or_else(|e| err_sender.send(e).map(|_| ()))
+                            .map_err(|e| panic!("{:?}", e))
+                    })
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
                 Ok(())
             })
             .map_err(into_failure),
@@ -399,7 +404,6 @@ fn send_handshake(
     bogus_message: Option<BogusMessage>,
 ) -> Result<(), failure::Error> {
     let mut core = CompatRuntime::new().unwrap();
-    let handle = core.handle();
 
     let stream = TcpStream::connect(&addr)
         .map_err(into_failure)
