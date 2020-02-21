@@ -31,10 +31,10 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::{Block, CallInBlock, Schema, TxLocation},
+    blockchain::{Block, CallInBlock, CallProof, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
-    merkledb::{ListProof, MapProof, ObjectHash, Snapshot},
+    merkledb::{ListProof, ObjectHash, Snapshot},
     messages::{AnyTx, Precommit, Verified},
     runtime::{ExecutionError, ExecutionStatus},
 };
@@ -171,10 +171,11 @@ impl<'a> BlockInfo<'a> {
     /// proof will not contain entries. To distinguish between two cases, one can inspect
     /// the number of transactions in the block or IDs of the active services when the block
     /// was executed.
-    pub fn error_proof(&self, call_location: CallInBlock) -> MapProof<CallInBlock, ExecutionError> {
+    pub fn error_proof(&self, call_location: CallInBlock) -> CallProof {
         self.explorer
             .schema
             .call_errors(self.header.height)
+            .unwrap() // safe: we know that the block exists
             .get_proof(call_location)
     }
 
@@ -201,10 +202,12 @@ impl<'a> BlockInfo<'a> {
             .iter()
             .map(|tx_hash| explorer.committed_transaction(tx_hash, None))
             .collect();
-        let errors: Vec<_> = self
+        let errors = self
             .explorer
             .schema
             .call_errors(header.height)
+            .expect("No call record for a committed block");
+        let errors: Vec<_> = errors
             .iter()
             .map(|(location, error)| ErrorWithLocation { location, error })
             .collect();
@@ -622,9 +625,9 @@ impl<'a> BlockchainExplorer<'a> {
         block_height: Height,
         call_location: CallInBlock,
     ) -> Result<(), ExecutionError> {
-        match self.schema.call_errors(block_height).get(&call_location) {
+        match self.schema.call_errors(block_height) {
+            Some(errors) => errors.get(call_location),
             None => Ok(()),
-            Some(e) => Err(e),
         }
     }
 
@@ -703,12 +706,12 @@ impl<'a> BlockchainExplorer<'a> {
     /// if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let txs_table = self.schema.block_transactions(height);
-        let block_proof = self.schema.block_and_precommits(height);
-        let errors = self.schema.call_errors(height);
+        let block_proof = self.schema.block_and_precommits(height)?;
+        let errors = self.schema.call_errors(height)?;
 
-        block_proof.map(|proof| BlockWithTransactions {
-            header: proof.block,
-            precommits: proof.precommits,
+        Some(BlockWithTransactions {
+            header: block_proof.block,
+            precommits: block_proof.precommits,
             transactions: txs_table
                 .iter()
                 .map(|tx_hash| self.committed_transaction(&tx_hash, None))

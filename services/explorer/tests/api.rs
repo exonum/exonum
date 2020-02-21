@@ -410,10 +410,10 @@ fn test_explorer_transaction_info() {
         .is_ok());
 
     let proof = block.error_proof(CallInBlock::transaction(0));
-    let proof = proof.check_against_hash(block.header().error_hash).unwrap();
-    let (&call_location, status) = proof.all_entries().next().unwrap();
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+    let (call_location, status) = proof.verify(&validator_keys).unwrap();
     assert_eq!(call_location, CallInBlock::transaction(0));
-    assert!(status.is_none());
+    assert!(status.is_ok());
 }
 
 #[test]
@@ -466,23 +466,19 @@ fn test_explorer_transaction_statuses() {
     let snapshot = testkit.snapshot();
     let explorer = BlockchainExplorer::new(&snapshot);
     let block_info = explorer.block(testkit.height()).unwrap();
+
     let proof = block_info.error_proof(CallInBlock::transaction(0));
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 0);
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert!(res.is_ok());
+
     let proof = block_info.error_proof(CallInBlock::transaction(1));
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-    assert_eq!(
-        proof.entries().next().unwrap().1.description(),
-        "Adding zero does nothing!"
-    );
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert_eq!(res.unwrap_err().description(), "Adding zero does nothing!");
+
     let proof = block_info.error_proof(CallInBlock::transaction(2));
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-    assert_eq!(
-        proof.entries().next().unwrap().1.kind(),
-        ErrorKind::Unexpected
-    );
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert_eq!(res.unwrap_err().kind(), ErrorKind::Unexpected);
 
     // Now, the same statuses retrieved via explorer web API.
     let statuses: Vec<_> = [

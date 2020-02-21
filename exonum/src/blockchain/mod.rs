@@ -343,7 +343,7 @@ impl BlockchainMut {
         let prev_hash = self.inner.last_hash();
 
         let schema = Schema::new(&fork);
-        let error_hash = schema.call_errors(height).object_hash();
+        let error_hash = schema.call_errors_map(height).object_hash();
         let tx_hash = schema.block_transactions(height).object_hash();
         let patch = fork.into_patch();
         let state_hash = SystemSchema::new(&patch).state_hash();

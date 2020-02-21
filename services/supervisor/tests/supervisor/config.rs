@@ -594,8 +594,9 @@ fn test_service_config_discard_single_apply_error() {
     let err = snapshot
         .for_core()
         .call_errors(testkit.height())
-        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
-        .unwrap();
+        .unwrap()
+        .get(CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
+        .unwrap_err();
     assert!(err.description().contains("IncService: Configure error"));
 
     // Create one more block for supervisor to remove failed config.
@@ -630,8 +631,9 @@ fn test_service_config_discard_single_apply_panic() {
     let err = snapshot
         .for_core()
         .call_errors(testkit.height())
-        .get(&CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
-        .unwrap();
+        .unwrap()
+        .get(CallInBlock::after_transactions(SUPERVISOR_INSTANCE_ID))
+        .unwrap_err();
     assert!(err.description().contains("Configure panic"));
 
     // Create one more block for supervisor to remove failed config.

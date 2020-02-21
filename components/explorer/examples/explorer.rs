@@ -15,10 +15,10 @@
 //! Examples of usage of a blockchain explorer.
 
 use exonum::{
-    blockchain::{BlockchainMut, CallInBlock, ProposerId},
+    blockchain::{BlockchainMut, CallInBlock, CallProof, ProposerId},
     crypto::KeyPair,
     helpers::{Height, ValidatorId},
-    merkledb::{MapProof, ObjectHash},
+    merkledb::ObjectHash,
     messages::{AnyTx, Verified},
     runtime::ErrorKind as ExecutionErrorKind,
 };
@@ -183,12 +183,12 @@ fn main() {
 
     // It is possible to extract a proof of a transaction error using `BlockInfo`. The proof is tied
     // to the `error_hash` mentioned in the block header.
-    let proof: MapProof<_, _> = block_info.error_proof(CallInBlock::transaction(1));
-    let proof = proof
-        .check_against_hash(block_info.header().error_hash)
-        .unwrap();
-    let (_, error) = proof.entries().next().unwrap();
-    assert_eq!(error.description(), "Not allowed!");
+    let proof: CallProof = block_info.error_proof(CallInBlock::transaction(1));
+    // To verify a proof, we need to know public keys of current validators. In our case,
+    // we have a single validator.
+    let validator_keys = [consensus_keys().public_key()];
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert_eq!(res.unwrap_err().description(), "Not allowed!");
 
     // JSON for a transaction with a panic in service code (termed "unexpected errors"
     // for compatibility with other runtimes).

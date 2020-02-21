@@ -15,8 +15,9 @@
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
-    impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofEntry, ProofListIndex, ProofMapIndex,
+    impl_binary_key_for_binary_value,
+    indexes::{Entries, Values},
+    Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
 use failure::format_err;
@@ -117,6 +118,21 @@ impl<T: Access> Schema<T> {
         self.access.get_map(TRANSACTIONS)
     }
 
+    pub(crate) fn call_errors_map(
+        &self,
+        block_height: Height,
+    ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
+        self.access.get_proof_map((CALL_ERRORS, &block_height.0))
+    }
+
+    /// Returns auxiliary information about an error that does not influence blockchain state hash.
+    fn call_errors_aux(
+        &self,
+        block_height: Height,
+    ) -> MapIndex<T::Base, CallInBlock, ExecutionErrorAux> {
+        self.access.get_map((CALL_ERRORS_AUX, &block_height.0))
+    }
+
     /// Returns a record of errors that occurred during execution of a particular block.
     ///
     /// This method can be used to build a proof that execution of a certain transaction
@@ -136,20 +152,14 @@ impl<T: Access> Schema<T> {
     /// Proofs obtained with this method should not be mixed up with a proof of transaction
     /// commitment. To verify that a certain transaction was committed, use a proof from
     /// the `block_transactions` index.
-    // TODO: Retain historic information about services [ECR-3922]
-    pub fn call_errors(
-        &self,
-        block_height: Height,
-    ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
-        self.access.get_proof_map((CALL_ERRORS, &block_height.0))
-    }
-
-    /// Returns auxiliary information about an error that does not influence blockchain state hash.
-    fn call_errors_aux(
-        &self,
-        block_height: Height,
-    ) -> MapIndex<T::Base, CallInBlock, ExecutionErrorAux> {
-        self.access.get_map((CALL_ERRORS_AUX, &block_height.0))
+    pub fn call_errors(&self, block_height: Height) -> Option<CallErrors<T>> {
+        self.block_hash_by_height(block_height)?;
+        Some(CallErrors {
+            height: block_height,
+            errors: self.call_errors_map(block_height),
+            errors_aux: self.call_errors_aux(block_height),
+            access: self.access.clone(),
+        })
     }
 
     /// Returns the result of the execution for a transaction with the specified location.
@@ -162,7 +172,10 @@ impl<T: Access> Schema<T> {
         }
 
         let call_location = CallInBlock::transaction(location.position_in_block);
-        let call_result = match self.call_errors(location.block_height).get(&call_location) {
+        let call_result = match self
+            .call_errors_map(location.block_height)
+            .get(&call_location)
+        {
             None => Ok(()),
             Some(mut err) => {
                 let aux = self
@@ -174,28 +187,6 @@ impl<T: Access> Schema<T> {
             }
         };
         Some(call_result)
-    }
-
-    /// Returns a cryptographic proof of authenticity for a top-level call within a block.
-    /// If there is no block with the specified height in the blockchain, `None` is returned.
-    pub fn call_status_with_proof(
-        &self,
-        block_height: Height,
-        call: CallInBlock,
-    ) -> Option<CallProof> {
-        let block_proof = self.block_and_precommits(block_height)?;
-        let call_proof = self
-            .call_errors(block_height)
-            .get_proof(call)
-            .map_values(|mut err| {
-                let aux = self
-                    .call_errors_aux(block_height)
-                    .get(&call)
-                    .expect("BUG: Aux info is not saved for an error");
-                err.recombine_with_aux(aux);
-                err
-            });
-        Some(CallProof::new(block_proof, call_proof))
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -374,8 +365,94 @@ where
         mut err: ExecutionError,
     ) {
         let aux = err.split_aux();
-        self.call_errors(height).put(&call, err);
+        self.call_errors_map(height).put(&call, err);
         self.call_errors_aux(height).put(&call, aux);
+    }
+}
+
+/// Call errors within a specific block.
+#[derive(Debug)]
+pub struct CallErrors<T: Access> {
+    height: Height,
+    errors: ProofMapIndex<T::Base, CallInBlock, ExecutionError>,
+    errors_aux: MapIndex<T::Base, CallInBlock, ExecutionErrorAux>,
+    access: T,
+}
+
+impl<T: Access> CallErrors<T> {
+    /// Iterates over errors in a block.
+    pub fn iter(&self) -> CallErrorsIter<'_> {
+        CallErrorsIter {
+            errors_iter: self.errors.iter(),
+            aux_iter: self.errors_aux.values(),
+        }
+    }
+
+    /// Returns a result of a call execution.
+    ///
+    /// # Return value
+    ///
+    /// This method will return `Ok(())` both if the call completed successfully, or if
+    /// was not performed at all. The caller is responsible to distinguish these two outcomes.
+    pub fn get(&self, call: CallInBlock) -> Result<(), ExecutionError> {
+        match self.errors.get(&call) {
+            Some(mut err) => {
+                let aux = self
+                    .errors_aux
+                    .get(&call)
+                    .expect("BUG: Aux info is not saved for an error");
+                err.recombine_with_aux(aux);
+                Err(err)
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Returns a cryptographic proof of authenticity for a top-level call within a block.
+    /// If there is no block with the specified height in the blockchain, `None` is returned.
+    pub fn get_proof(&self, call: CallInBlock) -> CallProof {
+        let block_proof = Schema::new(self.access.clone())
+            .block_and_precommits(self.height)
+            .unwrap();
+        let call_proof = self.errors.get_proof(call).map_values(|mut err| {
+            let aux = self
+                .errors_aux
+                .get(&call)
+                .expect("BUG: Aux info is not saved for an error");
+            err.recombine_with_aux(aux);
+            err
+        });
+        CallProof::new(block_proof, call_proof)
+    }
+}
+
+impl<'a, T: Access> IntoIterator for &'a CallErrors<T> {
+    type Item = (CallInBlock, ExecutionError);
+    type IntoIter = CallErrorsIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+/// Iterator over errors in a block returned by `CallErrors::iter()`.
+#[derive(Debug)]
+pub struct CallErrorsIter<'a> {
+    errors_iter: Entries<'a, CallInBlock, ExecutionError>,
+    aux_iter: Values<'a, ExecutionErrorAux>,
+}
+
+impl Iterator for CallErrorsIter<'_> {
+    type Item = (CallInBlock, ExecutionError);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (call, mut error) = self.errors_iter.next()?;
+        let aux = self
+            .aux_iter
+            .next()
+            .expect("BUG: Aux info is not saved for an error");
+        error.recombine_with_aux(aux);
+        Some((call, error))
     }
 }
 
