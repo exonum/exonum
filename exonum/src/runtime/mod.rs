@@ -221,10 +221,10 @@ pub use self::{
 pub use error::execution_error::ExecutionErrorSerde;
 
 pub mod migrations;
+pub mod oneshot;
 pub mod versioning;
 
 use exonum_merkledb::Snapshot;
-use futures::Future;
 use semver::Version;
 
 use std::fmt;
@@ -408,11 +408,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
     /// a bug in core.
     // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>>;
+    fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> oneshot::Receiver;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;

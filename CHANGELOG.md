@@ -7,11 +7,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
-#### exonum-testkit
+#### exonum
 
 - Testkit now does not include incorrect transactions into blocks or memory pool,
   similar to real Exonum nodes. (#1785)
-  
+
+- `Runtime::deploy_artifact` no longer returns `Box<dyn Future<...>>`. Instead a
+  special communication channel is used to send deployment status from the
+  runtime to the dispatcher. (#1788)
+
 #### exonum-system-api
 
 - Public api module has been removed. List of endpoints from private api has
@@ -39,6 +43,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   incorrect. (#1781)
 
 - Fixed incorrect invalidation of block proposals. (#1782)
+
+#### exonum-testkit
+
+- Testkit now does not include incorrect transactions into blocks or memory pool,
+  similar to real Exonum nodes. (#1785)
 
 ## 1.0.0-rc.1 - 2020-02-07
 

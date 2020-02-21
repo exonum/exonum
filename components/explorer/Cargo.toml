@@ -30,5 +30,4 @@ exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 bincode = "1.2.1"
 failure = "0.1.5"
-futures = "0.1.29"
 serde_json = "1.0"

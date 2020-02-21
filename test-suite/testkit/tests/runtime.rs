@@ -16,6 +16,7 @@ use exonum::{
     blockchain::config::InstanceInitParams,
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        oneshot::Receiver,
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceState, Mailbox,
         MethodId, Runtime, WellKnownRuntime,
@@ -23,7 +24,6 @@ use exonum::{
 };
 use exonum_merkledb::Snapshot;
 use exonum_testkit::TestKitBuilder;
-use futures::{Future, IntoFuture};
 
 use std::{sync::Arc, sync::RwLock};
 
@@ -100,13 +100,10 @@ impl TestRuntime {
 }
 
 impl Runtime for TestRuntime {
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> Receiver {
         self.tester.deploy_artifact(artifact, deploy_spec);
-        Box::new(Ok(()).into_future())
+
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

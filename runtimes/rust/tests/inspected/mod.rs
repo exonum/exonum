@@ -25,6 +25,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        oneshot,
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceState,
         InstanceStatus, Mailbox, MethodId, Runtime, RuntimeFeature, SnapshotExt, WellKnownRuntime,
@@ -196,7 +197,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         test_service_artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> oneshot::Receiver {
         self.events.push(RuntimeEvent::DeployArtifact(
             test_service_artifact.clone(),
             deploy_spec.clone(),

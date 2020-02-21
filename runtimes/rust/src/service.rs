@@ -22,7 +22,7 @@ use exonum::{
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures::{Future, IntoFuture};
+use futures::Future;
 
 use std::{
     borrow::Cow,
@@ -417,19 +417,16 @@ pub struct SupervisorExtensions<'a> {
 impl SupervisorExtensions<'_> {
     /// Starts the deployment of an artifact. The provided callback is executed after
     /// the deployment is completed.
-    pub fn start_deploy<F>(
+    pub fn start_deploy(
         &mut self,
         artifact: ArtifactId,
         spec: impl BinaryValue,
-        then: impl FnOnce(Result<(), ExecutionError>) -> F + 'static + Send,
-    ) where
-        F: IntoFuture<Item = (), Error = ExecutionError>,
-        F::Future: 'static + Send,
-    {
+        then: impl FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send + 'static,
+    ) {
         let action = DispatcherAction::StartDeploy {
             artifact,
             spec: spec.into_bytes(),
-            then: Box::new(|res| Box::new(then(res).into_future())),
+            then: Box::new(|res| then(res)),
         };
         self.mailbox.push(action);
     }
