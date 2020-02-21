@@ -30,6 +30,29 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
 
+// TODO Avoid extra allocation. [ECR-4268]
+pub trait IntoFutureResult {
+    type Item;
+
+    fn into_future_result(self) -> FutureResult<Self::Item>;
+}
+
+impl<I: 'static> IntoFutureResult for Result<I> {
+    type Item = I;
+
+    fn into_future_result(self) -> FutureResult<Self::Item> {
+        async move { self }.boxed_local()
+    }
+}
+
+impl<I: 'static> IntoFutureResult for FutureResult<I> {
+    type Item = I;
+
+    fn into_future_result(self) -> FutureResult<Self::Item> {
+        self
+    }
+}
+
 /// Provide the current blockchain state snapshot to API handlers.
 ///
 /// This structure allows a service API handler to interact with the service instance
@@ -214,7 +237,7 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static + Send,
         I: Serialize + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = Result<I>> + 'static,
+        R: IntoFutureResult<Item = I>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
@@ -237,6 +260,7 @@ impl ServiceApiScope {
                     let descriptor = descriptor.clone();
 
                     handler(state, query)
+                        .into_future_result()
                         .await
                         .map_err(move |err| err.source(descriptor.to_string()))
                 }
@@ -253,7 +277,7 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = Result<I>> + 'static,
+        R: IntoFutureResult<Item = I>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
@@ -275,6 +299,7 @@ impl ServiceApiScope {
 
                     let descriptor = descriptor.clone();
                     handler(state, query)
+                        .into_future_result()
                         .await
                         .map_err(move |err| err.source(descriptor.to_string()))
                 }
@@ -295,7 +320,7 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = Result<I>> + 'static,
+        R: IntoFutureResult<Item = I>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
@@ -318,6 +343,7 @@ impl ServiceApiScope {
 
                 let descriptor = descriptor.clone();
                 inner(state, query)
+                    .into_future_result()
                     .await
                     .map_err(move |err| err.source(descriptor.to_string()))
             }
@@ -341,7 +367,7 @@ impl ServiceApiScope {
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = Result<I>> + 'static,
+        R: IntoFutureResult<Item = I>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
@@ -364,6 +390,7 @@ impl ServiceApiScope {
 
                 let descriptor = descriptor.clone();
                 inner(state, query)
+                    .into_future_result()
                     .await
                     .map_err(move |err| err.source(descriptor.to_string()))
             }

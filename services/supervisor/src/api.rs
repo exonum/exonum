@@ -842,36 +842,34 @@ impl PublicApi for ApiImpl {
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", |state, query| async move {
+        .endpoint_mut("deploy-artifact", |state, query| {
             ApiImpl(state).deploy_artifact(query)
         })
-        .endpoint_mut("migrate", |state, query| async move {
-            ApiImpl(state).migrate(query)
-        })
-        .endpoint_mut("propose-config", |state, query| async move {
+        .endpoint_mut("migrate", |state, query| ApiImpl(state).migrate(query))
+        .endpoint_mut("propose-config", |state, query| {
             ApiImpl(state).propose_config(query)
         })
-        .endpoint_mut("confirm-config", |state, query| async move {
+        .endpoint_mut("confirm-config", |state, query| {
             ApiImpl(state).confirm_config(query)
         })
-        .endpoint("configuration-number", |state, _query: ()| async move {
+        .endpoint("configuration-number", |state, _query: ()| {
             ApiImpl(state).configuration_number()
         })
-        .endpoint("supervisor-config", |state, _query: ()| async move {
+        .endpoint("supervisor-config", |state, _query: ()| {
             ApiImpl(state).supervisor_config()
         })
-        .endpoint("deploy-status", |state, query| async move {
+        .endpoint("deploy-status", |state, query| {
             ApiImpl(state).deploy_status(query)
         })
-        .endpoint("migration-status", |state, query| async move {
+        .endpoint("migration-status", |state, query| {
             ApiImpl(state).migration_status(query)
         });
     builder
         .public_scope()
-        .endpoint("consensus-config", |state, _query: ()| async move {
+        .endpoint("consensus-config", |state, _query: ()| {
             ApiImpl(state).consensus_config()
         })
-        .endpoint("config-proposal", |state, _query: ()| async move {
+        .endpoint("config-proposal", |state, _query: ()| {
             ApiImpl(state).config_proposal()
         });
 }

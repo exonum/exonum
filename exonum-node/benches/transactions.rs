@@ -30,7 +30,7 @@ use exonum::{
     runtime::{AnyTx, CallInfo},
 };
 use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
-use tokio_compat::runtime::Runtime as CompatRuntime;
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
@@ -151,8 +151,8 @@ impl MessageVerifier {
         };
 
         let handler_thread = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
-            core.run(handler_part.run()).unwrap();
+            let mut core = CompatRuntime::new().unwrap();
+            core.block_on(handler_part.run()).unwrap();
         });
 
         let internal_part = InternalPart {

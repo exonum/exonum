@@ -397,6 +397,7 @@ use exonum::{
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
 use exonum_rust_runtime::api::{self, ServiceApiScope, ServiceApiState};
+use futures::future::FutureExt;
 use hex::FromHex;
 use serde_json::json;
 
@@ -594,34 +595,28 @@ impl ExplorerApi {
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
-            .endpoint("v1/blocks", |state, query| async move {
+            .endpoint("v1/blocks", |state, query| {
                 Self::blocks(state.data().for_core(), query)
             })
-            .endpoint("v1/block", |state, query| async move {
+            .endpoint("v1/block", |state, query| {
                 Self::block(state.data().for_core(), query)
             })
-            .endpoint("v1/call_status/transaction", |state, query| async move {
+            .endpoint("v1/call_status/transaction", |state, query| {
                 Self::transaction_status(state.data().for_core(), query)
             })
-            .endpoint(
-                "v1/call_status/after_transactions",
-                |state, query| async move {
-                    Self::after_transactions_status(state.data().for_core(), query)
-                },
-            )
-            .endpoint(
-                "v1/call_status/before_transactions",
-                |state, query| async move {
-                    Self::before_transactions_status(state.data().for_core(), query)
-                },
-            )
-            .endpoint("v1/transactions", |state, query| async move {
+            .endpoint("v1/call_status/after_transactions", |state, query| {
+                Self::after_transactions_status(state.data().for_core(), query)
+            })
+            .endpoint("v1/call_status/before_transactions", |state, query| {
+                Self::before_transactions_status(state.data().for_core(), query)
+            })
+            .endpoint("v1/transactions", |state, query| {
                 Self::transaction_info(state.data().for_core(), query)
             });
 
         let tx_sender = self.blockchain.sender().to_owned();
         api_scope.endpoint_mut("v1/transactions", move |state, query| {
-            Self::add_transaction(state, tx_sender.clone(), query)
+            Self::add_transaction(state, tx_sender.clone(), query).boxed_local()
         });
         self
     }
