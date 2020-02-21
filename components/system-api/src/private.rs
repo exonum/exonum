@@ -324,10 +324,11 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |connect_info: ConnectInfo| -> api::FutureResult<()> {
-                let handler = sender
-                    .send_message(ExternalMessage::PeerAdd(connect_info))
-                    .map_err(|e| api::Error::internal(e).title("Failed to add peer"));
-                Box::new(handler)
+                todo!()
+                // let handler = sender
+                //     .send_message(ExternalMessage::PeerAdd(connect_info))
+                //     .map_err(|e| api::Error::internal(e).title("Failed to add peer"));
+                // Box::new(handler)
             },
         );
         self
@@ -354,10 +355,11 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |query: ConsensusEnabledQuery| -> api::FutureResult<()> {
-                let handler = sender
-                    .send_message(ExternalMessage::Enable(query.enabled))
-                    .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"));
-                Box::new(handler)
+                todo!()
+                // let handler = sender
+                //     .send_message(ExternalMessage::Enable(query.enabled))
+                //     .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"));
+                // Box::new(handler)
             },
         );
         self
@@ -368,26 +370,27 @@ impl SystemApi {
         // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
         use actix_web::{HttpRequest, HttpResponse};
-        use exonum_api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
+        use exonum_api::{backends::actix::{RawHandler, RequestHandler}};
 
         let sender = self.sender.clone();
-        let index = move |_: HttpRequest| -> FutureResponse {
-            let handler = sender
-                .send_message(ExternalMessage::Shutdown)
-                .map(|()| HttpResponse::Ok().json(()))
-                .map_err(|e| {
-                    let e = api::Error::internal(e).title("Failed to handle shutdown");
-                    actix_web::Error::from(e)
-                });
-            Box::new(handler)
+        let index = move |_: HttpRequest| {
+            todo!()
+            // let handler = sender
+            //     .send_message(ExternalMessage::Shutdown)
+            //     .map(|()| HttpResponse::Ok().json(()))
+            //     .map_err(|e| {
+            //         let e = api::Error::internal(e).title("Failed to handle shutdown");
+            //         actix_web::Error::from(e)
+            //     });
+            // Box::new(handler)
         };
 
-        let handler = RequestHandler {
-            name: name.to_owned(),
-            method: actix_web::http::Method::POST,
-            inner: Arc::new(index) as Arc<RawHandler>,
-        };
-        api_scope.web_backend().raw_handler(handler);
+        // let handler = RequestHandler {
+        //     name: name.to_owned(),
+        //     method: actix_web::http::Method::POST,
+        //     inner: Arc::new(index) as Arc<RawHandler>,
+        // };
+        // api_scope.web_backend().raw_handler(handler);
 
         self
     }

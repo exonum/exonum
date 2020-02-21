@@ -34,7 +34,7 @@ use exonum::{
 };
 use exonum_api::UpdateEndpoints;
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
-use futures::{future, sync::mpsc, Async, Future, Stream};
+use futures_01::{future, sync::mpsc, Async, Future, Stream};
 use serde_derive::*;
 
 use std::{

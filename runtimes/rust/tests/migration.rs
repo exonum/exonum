@@ -28,7 +28,7 @@ use exonum::{
 };
 use exonum_api::UpdateEndpoints;
 use exonum_derive::*;
-use futures::sync::mpsc;
+use futures_01::sync::mpsc;
 use pretty_assertions::assert_eq;
 
 use self::inspected::{

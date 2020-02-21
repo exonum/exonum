@@ -53,8 +53,8 @@ use exonum::{
     runtime::RuntimeInstance,
 };
 use exonum_api::{
-    backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiAggregator, ApiManager,
-    ApiManagerConfig, UpdateEndpoints, WebServerConfig,
+    AllowOrigin, ApiAccess, ApiAggregator, ApiManager2, ApiManagerConfig, UpdateEndpoints,
+    WebServerConfig,
 };
 use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
@@ -1157,8 +1157,12 @@ impl Node {
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list();
-        let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
-        SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
+
+        let mut api_manager = ApiManager2::new(self.api_manager_config);
+        thread::spawn(move || {
+            actix_rt::System::new("exonum-node").block_on(api_manager.start_servers())
+        });
+
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {

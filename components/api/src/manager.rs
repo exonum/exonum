@@ -210,7 +210,7 @@ impl StreamHandler<UpdateEndpoints> for ApiManager {
 
 /// Actor responsible for API management. The actor encapsulates endpoint handlers and
 /// is capable of updating them via `UpdateEndpoints`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ApiManager2 {
     config: ApiManagerConfig,
     server_addresses: HashMap<ApiAccess, Server>,
@@ -228,6 +228,7 @@ impl ApiManager2 {
         }
     }
 
+    /// TODO 
     pub fn start_servers(&mut self) -> impl std::future::Future<Output = Vec<io::Result<()>>> {
         self.server_addresses = self
             .config

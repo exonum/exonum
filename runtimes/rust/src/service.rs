@@ -22,7 +22,7 @@ use exonum::{
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures::Future;
+use futures_01::{Future};
 
 use std::{
     borrow::Cow,

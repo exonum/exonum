@@ -200,8 +200,8 @@ impl From<EndpointMutability> for actix_web::http::Method {
 impl<Q, I, F> From<NamedWith<Q, I, crate::Result<I>, F>> for RequestHandler
 where
     F: Fn(Q) -> crate::Result<I> + 'static + Send + Sync + Clone,
-    Q: DeserializeOwned + Send + 'static,
-    I: Serialize + 'static + Send,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
 {
     fn from(f: NamedWith<Q, I, crate::Result<I>, F>) -> Self {
         // Convert handler that returns a `Result` into handler that will return `FutureResult`.
@@ -243,8 +243,8 @@ where
 impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
 where
     F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
-    Q: DeserializeOwned + 'static + Send,
-    I: Serialize + 'static + Send,
+    Q: DeserializeOwned + 'static,
+    I: Serialize + 'static,
 {
     fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
         let handler = f.inner.handler;
