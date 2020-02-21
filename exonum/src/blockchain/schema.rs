@@ -23,13 +23,13 @@ use failure::format_err;
 
 use std::fmt;
 
-use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
+use super::{Block, BlockProof, CallProof, ConsensusConfig};
 use crate::{
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Precommit, Verified},
     proto::schema::blockchain as pb_blockchain,
-    runtime::InstanceId,
+    runtime::{ExecutionError, ExecutionErrorAux, InstanceId},
 };
 
 /// Defines `&str` constants with given name and value.
@@ -46,6 +46,7 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     CALL_ERRORS => "call_errors";
+    CALL_ERRORS_AUX => "call_errors_aux";
     TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
@@ -143,6 +144,14 @@ impl<T: Access> Schema<T> {
         self.access.get_proof_map((CALL_ERRORS, &block_height.0))
     }
 
+    /// Returns auxiliary information about an error that does not influence blockchain state hash.
+    fn call_errors_aux(
+        &self,
+        block_height: Height,
+    ) -> MapIndex<T::Base, CallInBlock, ExecutionErrorAux> {
+        self.access.get_map((CALL_ERRORS_AUX, &block_height.0))
+    }
+
     /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
@@ -155,9 +164,38 @@ impl<T: Access> Schema<T> {
         let call_location = CallInBlock::transaction(location.position_in_block);
         let call_result = match self.call_errors(location.block_height).get(&call_location) {
             None => Ok(()),
-            Some(e) => Err(e),
+            Some(mut err) => {
+                let aux = self
+                    .call_errors_aux(location.block_height)
+                    .get(&call_location)
+                    .expect("BUG: Aux info is not saved for an error");
+                err.recombine_with_aux(aux);
+                Err(err)
+            }
         };
         Some(call_result)
+    }
+
+    /// Returns a cryptographic proof of authenticity for a top-level call within a block.
+    /// If there is no block with the specified height in the blockchain, `None` is returned.
+    pub fn call_status_with_proof(
+        &self,
+        block_height: Height,
+        call: CallInBlock,
+    ) -> Option<CallProof> {
+        let block_proof = self.block_and_precommits(block_height)?;
+        let call_proof = self
+            .call_errors(block_height)
+            .get_proof(call)
+            .map_values(|mut err| {
+                let aux = self
+                    .call_errors_aux(block_height)
+                    .get(&call)
+                    .expect("BUG: Aux info is not saved for an error");
+                err.recombine_with_aux(aux);
+                err
+            });
+        Some(CallProof::new(block_proof, call_proof))
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -326,6 +364,18 @@ where
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
+    }
+
+    /// Saves an error to the blockchain.
+    pub(crate) fn save_error(
+        &mut self,
+        height: Height,
+        call: CallInBlock,
+        mut err: ExecutionError,
+    ) {
+        let aux = err.split_aux();
+        self.call_errors(height).put(&call, err);
+        self.call_errors_aux(height).put(&call, aux);
     }
 }
 

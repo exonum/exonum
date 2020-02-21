@@ -206,7 +206,7 @@ pub use self::{
     },
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
-        ExecutionError, ExecutionFail, ExecutionStatus,
+        ExecutionError, ExecutionErrorAux, ExecutionFail, ExecutionStatus,
     },
     execution_context::{ExecutionContext, ExecutionContextUnstable, SupervisorExtensions},
     types::{
@@ -215,10 +215,6 @@ pub use self::{
         MethodId, MigrationStatus,
     },
 };
-
-// Re-export for serializing `ExecutionError` via `serde`.
-#[doc(hidden)]
-pub use error::execution_error::ExecutionErrorSerde;
 
 pub mod migrations;
 pub mod oneshot;

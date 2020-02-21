@@ -122,6 +122,17 @@ pub struct ExecutionError {
     call_site: Option<CallSite>,
 }
 
+/// Additional details about an `ExecutionError` that do not influence blockchain state hash.
+#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "errors_proto::ExecutionErrorAux")]
+pub struct ExecutionErrorAux {
+    /// Human-readable error description.
+    pub description: String,
+    /// No-op field for forward compatibility.
+    #[protobuf_convert(skip)]
+    _non_exhaustive: (),
+}
+
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.
 ///
 /// This function will return the result of the closure if the closure does not panic.

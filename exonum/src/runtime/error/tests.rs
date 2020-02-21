@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{BinaryValue, ObjectHash};
+use exonum_crypto::Hash;
+use exonum_merkledb::{BinaryValue, Database, ObjectHash, TemporaryDB};
 use failure::format_err;
 use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
@@ -21,6 +22,10 @@ use serde_json::json;
 use std::{any::Any, panic};
 
 use super::*;
+use crate::{
+    blockchain::{CallInBlock, Schema},
+    helpers::Height,
+};
 
 fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
     panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
@@ -84,35 +89,44 @@ fn execution_error_binary_value_unexpected_with_code() {
     )
 }
 
+fn error_hash(db: &TemporaryDB, err: &ExecutionError) -> Hash {
+    let fork = db.fork();
+    let mut schema = Schema::new(&fork);
+    schema.save_error(Height(1), CallInBlock::transaction(1), err.to_owned());
+    let error_hash = schema.call_errors(Height(1)).object_hash();
+    error_hash
+}
+
 #[test]
 fn execution_error_object_hash_description() {
+    let db = TemporaryDB::new();
     let mut first_err = ExecutionError::new(ErrorKind::Service { code: 5 }, "foo".to_owned());
     let second_err = ExecutionError::new(ErrorKind::Service { code: 5 }, "foo bar".to_owned());
-    assert_eq!(first_err.object_hash(), second_err.object_hash());
+    assert_eq!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     let second_err = ExecutionError::new(ErrorKind::Service { code: 6 }, "foo".to_owned());
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     let mut second_err = first_err.clone();
     second_err.runtime_id = Some(0);
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
     first_err.runtime_id = Some(0);
-    assert_eq!(first_err.object_hash(), second_err.object_hash());
+    assert_eq!(error_hash(&db, &first_err), error_hash(&db, &second_err));
     first_err.runtime_id = Some(1);
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     let mut second_err = first_err.clone();
     second_err.call_site = Some(CallSite::new(100, CallType::Constructor));
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     first_err.call_site = Some(CallSite::new(100, CallType::Constructor));
-    assert_eq!(first_err.object_hash(), second_err.object_hash());
+    assert_eq!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     second_err.call_site = Some(CallSite::new(101, CallType::Constructor));
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     second_err.call_site = Some(CallSite::new(100, CallType::AfterTransactions));
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     second_err.call_site = Some(CallSite::new(
         100,
@@ -121,7 +135,7 @@ fn execution_error_object_hash_description() {
             id: 0,
         },
     ));
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     first_err.call_site = Some(CallSite::new(
         100,
@@ -130,7 +144,7 @@ fn execution_error_object_hash_description() {
             id: 0,
         },
     ));
-    assert_eq!(first_err.object_hash(), second_err.object_hash());
+    assert_eq!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     second_err.call_site = Some(CallSite::new(
         100,
@@ -139,7 +153,7 @@ fn execution_error_object_hash_description() {
             id: 1,
         },
     ));
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 
     second_err.call_site = Some(CallSite::new(
         100,
@@ -148,7 +162,7 @@ fn execution_error_object_hash_description() {
             id: 0,
         },
     ));
-    assert_ne!(first_err.object_hash(), second_err.object_hash());
+    assert_ne!(error_hash(&db, &first_err), error_hash(&db, &second_err));
 }
 
 #[test]

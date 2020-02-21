@@ -111,3 +111,10 @@ message ExecutionStatus {
     ExecutionError error = 2;
   }
 }
+
+// Additional details about an `ExecutionError` that do not influence
+// blockchain state hash.
+message ExecutionErrorAux {
+  // Human-readable error description.
+  string description = 1;
+}

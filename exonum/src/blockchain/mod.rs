@@ -17,7 +17,8 @@
 pub use self::{
     api_sender::{ApiSender, SendError},
     block::{
-        AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProofError, ProposerId,
+        AdditionalHeaders, Block, BlockHeaderKey, BlockProof, CallProof, IndexProof, ProofError,
+        ProposerId,
     },
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
@@ -298,9 +299,9 @@ impl BlockchainMut {
         // Skip execution for genesis block.
         if height > Height(0) {
             let errors = self.dispatcher.before_transactions(&mut fork);
-            let mut call_errors = Schema::new(&fork).call_errors(height);
+            let mut schema = Schema::new(&fork);
             for (location, error) in errors {
-                call_errors.put(&location, error);
+                schema.save_error(height, location, error);
             }
         }
 
@@ -312,9 +313,9 @@ impl BlockchainMut {
         // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
             let errors = self.dispatcher.after_transactions(&mut fork);
-            let mut call_errors = Schema::new(&fork).call_errors(height);
+            let mut schema = Schema::new(&fork);
             for (location, error) in errors {
-                call_errors.put(&location, error);
+                schema.save_error(height, location, error);
             }
         }
 
@@ -379,9 +380,7 @@ impl BlockchainMut {
         let mut schema = Schema::new(&*fork);
 
         if let Err(e) = tx_result {
-            schema
-                .call_errors(height)
-                .put(&CallInBlock::transaction(index), e);
+            schema.save_error(height, CallInBlock::transaction(index), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);
