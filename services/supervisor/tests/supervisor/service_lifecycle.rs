@@ -21,6 +21,7 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        oneshot::Receiver,
         versioning::Version,
         ArtifactId, ErrorMatch, ExecutionError, InstanceState, InstanceStatus, Mailbox, Runtime,
         SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
@@ -28,7 +29,6 @@ use exonum::{
 };
 use exonum_rust_runtime::{DefaultInstance, ExecutionContext, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
-use futures::{future, Future};
 
 use crate::inc::IncService;
 use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor, SupervisorInterface};
@@ -43,12 +43,8 @@ impl RuntimeWithoutFreeze {
 }
 
 impl Runtime for RuntimeWithoutFreeze {
-    fn deploy_artifact(
-        &mut self,
-        _artifact: ArtifactId,
-        _deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(future::ok(()))
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {

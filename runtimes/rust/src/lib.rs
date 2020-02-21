@@ -324,6 +324,7 @@ use exonum::{
     runtime::{
         catch_panic,
         migrations::{InitMigrationError, MigrateData, MigrationScript},
+        oneshot::Receiver,
         versioning::Version,
         ArtifactId, ExecutionError, ExecutionFail, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, RuntimeFeature,
@@ -331,7 +332,7 @@ use exonum::{
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
-use futures::{future, sync::mpsc, Future, IntoFuture, Sink};
+use futures::{sync::mpsc, Future, Sink};
 use log::trace;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -680,17 +681,15 @@ impl Runtime for RustRuntime {
         self.push_api_changes();
     }
 
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        if !spec.is_empty() {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> Receiver {
+        let result = if !spec.is_empty() {
             // Keep the spec for Rust artifacts empty.
-            Box::new(future::err(Error::IncorrectArtifactId.into()))
+            Err(Error::IncorrectArtifactId.into())
         } else {
-            Box::new(self.deploy(&artifact).into_future())
-        }
+            self.deploy(&artifact)
+        };
+
+        Receiver::with_result(result)
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

@@ -19,7 +19,6 @@ use exonum_merkledb::{
     migration::Migration,
     HashTag, ObjectHash, SystemSchema, TemporaryDB,
 };
-use futures::IntoFuture;
 
 use std::time::Duration;
 
@@ -27,8 +26,9 @@ use super::*;
 use crate::{
     blockchain::{ApiSender, Block, BlockchainMut},
     helpers::ValidatorId,
-    runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
+        migrations::{InitMigrationError, MigrationError},
+        oneshot::Receiver,
         BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier,
         SnapshotExt, WellKnownRuntime,
     },
@@ -55,20 +55,16 @@ impl WellKnownRuntime for MigrationRuntime {
 }
 
 impl Runtime for MigrationRuntime {
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
+    }
+
     // We use service freezing in some tests.
     fn is_supported(&self, feature: &RuntimeFeature) -> bool {
         match feature {
             RuntimeFeature::FreezingServices => true,
             _ => false,
         }
-    }
-
-    fn deploy_artifact(
-        &mut self,
-        _artifact: ArtifactId,
-        _deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(Ok(()).into_future())
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {

@@ -14,7 +14,6 @@
 
 use exonum_crypto::{gen_keypair, Hash};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
-use futures::{future, Future, IntoFuture};
 use pretty_assertions::assert_eq;
 use semver::Version;
 
@@ -36,6 +35,7 @@ use crate::{
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
+        oneshot::{self, Receiver},
         ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
         ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus, MethodId, Runtime, RuntimeFeature, RuntimeInstance,
@@ -193,17 +193,13 @@ impl Runtime for SampleRuntime {
         }
     }
 
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> Receiver {
         let res = if artifact.runtime_id == self.runtime_type {
             Ok(())
         } else {
             Err(CoreError::IncorrectRuntime.into())
         };
-        Box::new(res.into_future())
+        Receiver::with_result(res)
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -689,12 +685,8 @@ impl ShutdownRuntime {
 }
 
 impl Runtime for ShutdownRuntime {
-    fn deploy_artifact(
-        &mut self,
-        _artifact: ArtifactId,
-        _spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(Ok(()).into_future())
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
@@ -812,7 +804,7 @@ impl DeploymentRuntime {
             .push(Action::StartDeploy {
                 artifact: artifact.clone(),
                 spec: Self::SPEC.to_vec(),
-                then: Box::new(|_| Box::new(Ok(()).into_future())),
+                then: Box::new(|_| Ok(())),
             });
 
         let fork = db.fork();
@@ -824,11 +816,7 @@ impl DeploymentRuntime {
 }
 
 impl Runtime for DeploymentRuntime {
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> oneshot::Receiver {
         let delay = BinaryValue::from_bytes(spec.into()).unwrap();
         let delay = Duration::from_millis(delay);
 
@@ -854,24 +842,23 @@ impl Runtime for DeploymentRuntime {
         };
 
         let artifacts = Arc::clone(&self.artifacts);
-        let task = future::lazy(move || {
-            // This isn't a correct way to delay future completion, but the correct way
-            // (`tokio::timer::Delay`) cannot be used since the futures returned by
-            // `Runtime::deploy_artifact()` are not (yet?) run on the `tokio` runtime.
-            // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
+
+        let mut artifacts = artifacts.lock().unwrap();
+        let status = artifacts.entry(artifact.name).or_default();
+        status.attempts += 1;
+        if result.is_ok() {
+            status.is_deployed = true;
+        }
+
+        let (tx, rx) = oneshot::channel();
+
+        thread::spawn(move || {
+            // This isn't a correct way to delay deploy completion.
             thread::sleep(delay);
-            result
-        })
-        .then(move |res| {
-            let mut artifacts = artifacts.lock().unwrap();
-            let status = artifacts.entry(artifact.name).or_default();
-            status.attempts += 1;
-            if res.is_ok() {
-                status.is_deployed = true;
-            }
-            res
+            tx.send(result);
         });
-        Box::new(task)
+
+        rx
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

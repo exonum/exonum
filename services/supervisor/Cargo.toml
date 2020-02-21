@@ -30,7 +30,6 @@ exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 [dev-dependencies]
-futures = "0.1.25"
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 bincode = "1.2.1"
 
