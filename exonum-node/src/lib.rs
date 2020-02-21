@@ -60,8 +60,8 @@ use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio_core::reactor::Core;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -1114,7 +1114,7 @@ impl Node {
         let (handler_part, network_part, internal_part) = self.into_reactor();
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new().map_err(into_failure)?;
+            let mut core = CompatRuntime::new().map_err(into_failure)?;
             let handle = core.handle();
 
             let mut pool_builder = ThreadPoolBuilder::new();
@@ -1123,17 +1123,17 @@ impl Node {
             }
             let thread_pool = pool_builder.build();
             let executor = thread_pool.sender().clone();
-
-            core.handle().spawn(internal_part.run(handle, executor));
+            // TODO Rewrite on fair threadpool.
+            core.spawn(internal_part.run(handle.clone(), handle));
 
             let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler)
+            core.block_on(network_handler)
                 .map(drop)
                 .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
         });
 
-        let mut core = Core::new().map_err(into_failure)?;
-        core.run(handler_part.run())
+        let mut core = CompatRuntime::new().map_err(into_failure)?;
+        core.block_on(handler_part.run())
             .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
 
         network_thread.join().unwrap()

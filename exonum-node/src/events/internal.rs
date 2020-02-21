@@ -18,7 +18,9 @@ use futures::{
     sync::mpsc,
     Future, Sink, Stream,
 };
-use tokio_core::reactor::{Handle, Timeout};
+use futures_03::{compat::Future01CompatExt, future::FutureExt};
+use tokio_02::time;
+use tokio_compat::runtime::current_thread::Handle;
 
 use std::time::{Duration, SystemTime};
 
@@ -60,10 +62,11 @@ impl InternalPart {
     /// Represents a task that processes internal requests and produces internal events.
     /// `handle` is used to schedule additional tasks within this task.
     /// `verify_executor` is where transaction verification tasks are executed.
-    pub fn run<E>(self, handle: Handle, verify_executor: E) -> impl Future<Item = (), Error = ()>
-    where
-        E: Executor<Box<dyn Future<Item = (), Error = ()> + Send>>,
-    {
+    pub fn run(
+        self,
+        handle: Handle,
+        verify_executor: Handle,
+    ) -> impl Future<Item = (), Error = ()> {
         let internal_tx = self.internal_tx;
 
         let cycle = self.internal_requests_rx.for_each(move |request| {
@@ -78,7 +81,7 @@ impl InternalPart {
                 InternalRequest::VerifyMessage(tx) => {
                     let fut = Self::verify_message(tx, internal_tx);
                     verify_executor
-                        .execute(Box::new(fut))
+                        .spawn(Box::new(fut))
                         .expect("cannot schedule message verification");
                 }
 
@@ -87,13 +90,14 @@ impl InternalPart {
                         .duration_since(SystemTime::now())
                         .unwrap_or_else(|_| Duration::from_millis(0));
 
-                    let fut = Timeout::new(duration, &handle)
-                        .expect("Unable to create timeout")
-                        .map_err(drop)
-                        .and_then(|()| {
-                            Self::send_event(internal_tx, InternalEvent::timeout(timeout))
-                        });
-                    handle.spawn(fut);
+                    let fut = async move {
+                        time::delay_for(duration).await;
+                        Self::send_event(internal_tx, InternalEvent::timeout(timeout))
+                            .compat()
+                            .await
+                            .expect("cannot send event");
+                    };
+                    handle.spawn_std(fut);
                 }
 
                 InternalRequest::JumpToRound(height, round) => {
@@ -123,7 +127,7 @@ mod tests {
         messages::Verified,
     };
     use pretty_assertions::assert_eq;
-    use tokio_core::reactor::Core;
+    use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
     use std::thread;
 
@@ -140,7 +144,7 @@ mod tests {
         };
 
         let thread = thread::spawn(|| {
-            let mut core = Core::new().unwrap();
+            let mut core = CompatRuntime::new().unwrap();
             let handle = core.handle();
             let verifier = core.handle();
 
@@ -149,7 +153,7 @@ mod tests {
                 .map_err(drop)
                 .and_then(|()| internal_rx.into_future().map_err(drop))
                 .map(|(event, _)| event);
-            core.run(task).unwrap()
+            core.block_on(task).unwrap()
         });
 
         let request = InternalRequest::VerifyMessage(msg);

@@ -25,10 +25,8 @@ use futures::{
 };
 use pretty_assertions::assert_eq;
 use snow::{types::Dh, Builder};
-use tokio_core::{
-    net::{TcpListener, TcpStream},
-    reactor::Core,
-};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 use tokio_io::{AsyncRead, AsyncWrite};
 
 use std::{net::SocketAddr, thread, time::Duration};
@@ -365,14 +363,15 @@ fn run_handshake_listener(
     err_sender: Sender<failure::Error>,
     bogus_message: Option<BogusMessage>,
 ) -> Result<(), failure::Error> {
-    let mut core = Core::new().unwrap();
+    let mut core = CompatRuntime::new().unwrap();
     let handle = core.handle();
 
-    core.run(
-        TcpListener::bind(addr, &handle)
+    core.block_on(
+        TcpListener::bind(addr)
             .unwrap()
             .incoming()
-            .for_each(move |(stream, peer)| {
+            .for_each(move |stream| {
+                let peer = stream.peer_addr().expect("TODO: [ECR-4268]");
                 let err_sender = err_sender.clone();
 
                 handle.spawn({
@@ -399,10 +398,10 @@ fn send_handshake(
     params: &HandshakeParams,
     bogus_message: Option<BogusMessage>,
 ) -> Result<(), failure::Error> {
-    let mut core = Core::new().unwrap();
+    let mut core = CompatRuntime::new().unwrap();
     let handle = core.handle();
 
-    let stream = TcpStream::connect(&addr, &handle)
+    let stream = TcpStream::connect(&addr)
         .map_err(into_failure)
         .and_then(|sock| match bogus_message {
             None => NoiseHandshake::initiator(&params, addr).send(sock),
@@ -410,7 +409,7 @@ fn send_handshake(
         })
         .map(|_| ());
 
-    core.run(stream)
+    core.block_on(stream)
 }
 
 #[derive(Debug)]
@@ -500,7 +499,7 @@ impl NoiseErrorHandshake {
 impl Handshake for NoiseErrorHandshake {
     fn listen<S>(self, stream: S) -> HandshakeResult<S>
     where
-        S: AsyncRead + AsyncWrite + 'static,
+        S: AsyncRead + AsyncWrite + 'static + Send,
     {
         let framed = self
             .read_handshake_msg(stream)
@@ -512,7 +511,7 @@ impl Handshake for NoiseErrorHandshake {
 
     fn send<S>(self, stream: S) -> HandshakeResult<S>
     where
-        S: AsyncRead + AsyncWrite + 'static,
+        S: AsyncRead + AsyncWrite + 'static + Send,
     {
         let framed = self
             .write_handshake_msg(stream)
