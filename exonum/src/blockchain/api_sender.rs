@@ -65,11 +65,27 @@ impl ApiSender {
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub async fn broadcast_transaction(
+    pub async fn broadcast_transaction_async(
         &self,
         tx: Verified<AnyTx>,
     ) -> Result<(), SendError> {
         self.send_message(tx).compat().await
+    }
+
+    /// Sends a transaction over the channel. If this sender is connected to a node,
+    /// this will broadcast the transaction to all nodes in the blockchain network.
+    ///
+    /// This is an asynchronous operation that can take some time if the node is overloaded
+    /// with requests.
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub fn broadcast_transaction(
+        &self,
+        tx: Verified<AnyTx>,
+    ) -> Result<(), SendError> {
+        self.send_message(tx).wait()
     }
 }
 

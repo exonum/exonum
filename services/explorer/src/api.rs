@@ -397,7 +397,6 @@ use exonum::{
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
 use exonum_rust_runtime::api::{self, ServiceApiScope, ServiceApiState};
-use futures_01::Future;
 use hex::FromHex;
 use serde_json::json;
 
@@ -578,14 +577,17 @@ impl ExplorerApi {
             Blockchain::check_tx(snapshot, &verified)?;
             Ok((verified, tx_hash))
         };
-        
+
         let (verified, tx_hash) = verify_message(state.snapshot(), query.tx_body).map_err(|e| {
             api::Error::bad_request()
                 .title("Failed to add transaction to memory pool")
                 .detail(e.to_string())
         })?;
 
-        sender.broadcast_transaction(verified).await.map_err(|e| api::Error::internal(e).title("Failed to add transaction"))?;
+        sender
+            .broadcast_transaction_async(verified)
+            .await
+            .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))?;
         Ok(TransactionResponse { tx_hash })
     }
 

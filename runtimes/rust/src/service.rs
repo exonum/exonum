@@ -381,7 +381,7 @@ impl Broadcaster {
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
 impl GenericCall<()> for Broadcaster {
-    type Output = LocalBoxFuture<'static, Result<Hash, SendError>>;
+    type Output = Result<Hash, SendError>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
         let msg = self
@@ -389,13 +389,8 @@ impl GenericCall<()> for Broadcaster {
             .clone()
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
-
-        let tx_sender = self.tx_sender.clone();
-        async move {
-            tx_sender.broadcast_transaction(msg).await?;
-            Ok(tx_hash)
-        }
-        .boxed_local()
+        
+        self.tx_sender.broadcast_transaction(msg).map(|_| tx_hash)
     }
 }
 
