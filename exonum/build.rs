@@ -43,7 +43,7 @@ fn create_path_to_protobuf_schema_env() {
 
 fn write_user_agent_file() {
     let exonum_version = option_env!("CARGO_PKG_VERSION").unwrap_or("?");
-    let rust_version = rust_version().unwrap_or_else(|| "rust ?".to_string());
+    let rust_version = rust_version().unwrap_or_else(|| "0.0.0".to_string());
     let user_agent = format!("{}/{}\n", exonum_version, rust_version);
 
     let out_dir = env::var("OUT_DIR").expect("Unable to get OUT_DIR");
@@ -75,7 +75,7 @@ fn main() {
 fn rust_version() -> Option<String> {
     let rustc = option_env!("RUSTC").unwrap_or("rustc");
     let output = Command::new(rustc).arg("-V").output().ok()?.stdout;
-    std::str::from_utf8(&output)
-        .ok()
-        .map(|o| o.split_whitespace().nth(1).unwrap().to_owned())
+    let rustc_output = std::str::from_utf8(&output).ok()?;
+    let version = rustc_output.split_whitespace().nth(1)?;
+    Some(version.to_owned())
 }

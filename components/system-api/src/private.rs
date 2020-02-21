@@ -59,11 +59,11 @@
 //! | Path        | `/api/system/v1/stats` |
 //! | Method      | GET   |
 //! | Query type  | - |
-//! | Return type | [`StatsInfo`] |
+//! | Return type | [`NodeStats`] |
 //!
 //! Returns the statistics of the current node.
 //!
-//! [`PeersInfo`]: struct.StatsInfo.html
+//! [`PeersInfo`]: struct.NodeStats.html
 //!
 //! ```
 //! use exonum_system_api::{private::NodeStats, SystemApiPlugin};
