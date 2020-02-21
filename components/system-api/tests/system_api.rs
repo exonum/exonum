@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::{exonum_version, os_info, rust_version};
+use exonum::helpers::{compiler_version, framework_version, os_info};
 use exonum_node::ExternalMessage;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use exonum_system_api::{
-    private::{ConsensusStatus, NodeInfo, StatsInfo},
+    private::{ConsensusStatus, NodeInfo, NodeStats},
     SystemApiPlugin,
 };
 
@@ -43,8 +43,8 @@ fn info() {
     let expected = NodeInfo {
         consensus_status: ConsensusStatus::Enabled,
         connected_peers: vec![],
-        exonum_version: exonum_version().unwrap_or_default(),
-        rust_version: rust_version().unwrap_or_default(),
+        exonum_version: framework_version(),
+        rust_version: compiler_version(),
         os_info: os_info(),
     };
     assert_eq!(info, expected);
@@ -54,8 +54,8 @@ fn info() {
 fn stats() {
     let mut testkit = create_testkit();
     let api = testkit.api();
-    let info: StatsInfo = api.private(ApiKind::System).get("v1/stats").unwrap();
-    let expected = StatsInfo {
+    let info: NodeStats = api.private(ApiKind::System).get("v1/stats").unwrap();
+    let expected = NodeStats {
         height: 0,
         tx_pool_size: 0,
         tx_count: 0,

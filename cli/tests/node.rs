@@ -104,7 +104,7 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
     thread::sleep(Duration::from_secs(2));
 
     let client = reqwest::Client::new();
-    // Check info returned by the system API plugin.
+    // Check info about deployed artifacts returned via supervisor API.
     let info: DispatcherInfo = client
         .get(&format!("{}/services/supervisor/services", public_api_root))
         .send()?

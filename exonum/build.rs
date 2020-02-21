@@ -76,5 +76,7 @@ fn main() {
 fn rust_version() -> Option<String> {
     let rustc = option_env!("RUSTC").unwrap_or("rustc");
     let output = Command::new(rustc).arg("-V").output().ok()?.stdout;
-    String::from_utf8(output).ok()
+    std::str::from_utf8(&output)
+        .ok()
+        .map(|o| o.trim().to_owned())
 }

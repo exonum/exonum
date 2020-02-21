@@ -18,7 +18,6 @@
 //!
 //! REST API of the service is documented in the corresponding modules:
 //!
-//! - [public API](public/index.html)
 //! - [private API](private/index.html)
 //!
 //! # Examples

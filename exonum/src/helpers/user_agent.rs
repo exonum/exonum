@@ -40,16 +40,16 @@ pub fn os_info() -> String {
 
 /// Returns a version of the exonum framework.
 #[doc(hidden)]
-pub fn exonum_version() -> Option<String> {
-    let versions: Vec<_> = USER_AGENT.split('/').collect();
-    versions.get(0).map(|v| v.trim().to_owned())
+pub fn framework_version() -> String {
+    let version = USER_AGENT.split('/').nth(0);
+    version.map_or_else(|| "unknown".to_owned(), ToOwned::to_owned)
 }
 
 /// Returns a version of the rust compiler.
 #[doc(hidden)]
-pub fn rust_version() -> Option<String> {
-    let versions: Vec<_> = USER_AGENT.split('/').collect();
-    versions.get(1).map(|v| v.trim().to_owned())
+pub fn compiler_version() -> String {
+    let version = USER_AGENT.split('/').nth(1);
+    version.map_or_else(|| "unknown".to_owned(), ToOwned::to_owned)
 }
 
 #[cfg(test)]
@@ -70,13 +70,13 @@ mod tests {
 
     #[test]
     fn check_exonum_versions() {
-        let exonum_version = exonum_version().unwrap();
+        let exonum_version = framework_version();
         assert!(exonum_version.contains("exonum"));
     }
 
     #[test]
     fn check_rust_versions() {
-        let rust_version = rust_version().unwrap();
+        let rust_version = compiler_version();
         assert!(rust_version.contains("rust"));
     }
 }

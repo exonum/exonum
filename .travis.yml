@@ -45,12 +45,10 @@ cache:
   npm: true
   directories:
   - $HOME/.cache
-  - $HOME/.cargo
   - $HOME/.local
   - $HOME/.kcov
 
 dist: bionic
-sudo: required
 
 env:
   global:

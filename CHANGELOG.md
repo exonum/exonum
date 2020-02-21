@@ -24,8 +24,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 #### exonum-supervisor
 
-- `supervisor/services` has been added which obtains information about
-  deployed artifacts and available services. (#1790)
+- `supervisor/services` endpoint has been added which obtains information
+  about deployed artifacts and available services. (#1790)
 
 ### Bug Fixes
 
