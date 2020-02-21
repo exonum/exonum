@@ -21,7 +21,7 @@ use exonum::{
 use exonum_derive::*;
 use exonum_explorer_service::api::BlocksRange;
 use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service, ServiceFactory};
-use exonum_system_api::public::DispatcherInfo;
+use exonum_supervisor::api::DispatcherInfo;
 use futures::Future;
 use lazy_static::lazy_static;
 use tempfile::TempDir;
@@ -104,9 +104,9 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
     thread::sleep(Duration::from_secs(2));
 
     let client = reqwest::Client::new();
-    // Check info returned by the system API plugin.
+    // Check info about deployed artifacts returned via supervisor API.
     let info: DispatcherInfo = client
-        .get(&format!("{}/system/v1/services", public_api_root))
+        .get(&format!("{}/services/supervisor/services", public_api_root))
         .send()?
         .error_for_status()?
         .json()?;
