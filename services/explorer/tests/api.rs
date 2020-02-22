@@ -18,7 +18,7 @@ use exonum::{
     crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
     merkledb::{BinaryValue, HashTag, ObjectHash},
-    runtime::{ErrorKind, ExecutionError},
+    runtime::{ErrorKind, ExecutionError, ExecutionStatus},
 };
 use exonum_api as api;
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
@@ -545,49 +545,66 @@ fn test_explorer_api_with_before_transactions_error() {
 
     // This tx lead to error in before_transaction on the next transaction
     testkit.create_block_with_transaction(tx);
-    let response = api
+    let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
         .query(&CallStatusQuery {
             height: Height(1),
             service_id: SERVICE_ID,
+            with_proof: false,
         })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .get("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
+    assert!(response.0.is_ok());
 
     let tx = key_pair.increment(SERVICE_ID, 1);
     // So perform one more tx to check the error
     testkit.create_block_with_transaction(tx.clone());
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
         .query(&CallStatusQuery {
             height: Height(2),
             service_id: SERVICE_ID,
+            with_proof: true,
         })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .get("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
-    let execution_error = response.status.0.unwrap_err();
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    let execution_error = res.unwrap_err();
     assert!(execution_error.description().contains("Number 13"));
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
+        .query(&TransactionStatusQuery {
             hash: tx.object_hash(),
+            with_proof: true,
         })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
+        .get("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
 
-    let response = api
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert!(res.is_ok());
+
+    let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
         .query(&CallStatusQuery {
             height: Height(1),
             service_id: SERVICE_ID,
+            with_proof: false,
         })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .get("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
+    assert!(response.0.is_ok());
 }
 
 #[test]
@@ -597,37 +614,26 @@ fn test_explorer_api_with_transaction_error() {
 
     testkit.create_block_with_transaction(tx.clone());
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
+        .query(&TransactionStatusQuery {
             hash: tx.object_hash(),
+            with_proof: true,
         })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
+        .get("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
-    let execution_error = response.status.0.unwrap_err();
+
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    let execution_error = res.unwrap_err();
     assert!(execution_error
         .description()
         .contains("Adding zero does nothing!"));
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
 }
 
 #[test]
@@ -635,74 +641,41 @@ fn test_explorer_api_with_after_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 42);
 
-    testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx);
 
-    let response = api
+    let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
         .query(&CallStatusQuery {
             height: Height(1),
             service_id: SERVICE_ID,
+            with_proof: false,
         })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .get("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
-    let execution_error = response.status.0.unwrap_err();
+    let execution_error = response.0.unwrap_err();
     assert!(execution_error
         .description()
         .contains("What's the question?"));
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
         .query(&CallStatusQuery {
             height: Height(1),
             service_id: SERVICE_ID,
+            with_proof: true,
         })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .get("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
 
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx.object_hash(),
-        })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-}
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+    let validator_keys = [testkit.us().public_keys().consensus_key];
 
-#[test]
-fn test_explorer_api_without_error() {
-    let (mut testkit, api) = init_testkit();
-    let tx = KeyPair::random().increment(SERVICE_ID, 1);
-
-    testkit.create_block_with_transaction(tx.clone());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx.object_hash(),
-        })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    let execution_error = res.unwrap_err();
+    assert!(execution_error
+        .description()
+        .contains("What's the question?"));
 }
