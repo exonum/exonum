@@ -297,11 +297,11 @@ pub enum ProofError {
     #[fail(display = "Multiple precommits from the same validator")]
     DoubleEndorsement,
 
-    /// Index proof does not actually prove existence of any index.
-    #[fail(display = "Index proof does not actually prove existence of any entry")]
+    /// The proof does not actually prove existence of any index.
+    #[fail(display = "proof does not actually prove existence of any entry")]
     NoEntry,
 
-    /// Index proof purports to prove existence of more than one index.
+    /// The proof purports to prove existence of more than one index.
     #[fail(display = "proof purports to prove existence of more than one entry")]
     AmbiguousEntry,
 
@@ -441,7 +441,7 @@ impl CallProof {
     ) -> Result<(CallInBlock, Result<(), ExecutionError>), ProofError> {
         self.block_proof.verify(validator_keys)?;
 
-        // The index proof should feature exactly one present or absent entry.
+        // The proof should feature exactly one present or absent entry.
         let mut unchecked_entries = self.call_proof.all_entries_unchecked();
         let (call, maybe_status) = unchecked_entries.next().ok_or(ProofError::NoEntry)?;
         if unchecked_entries.next().is_some() {
