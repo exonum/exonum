@@ -197,7 +197,6 @@
 //! [docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
 //! [blog:lifecycle]: https://medium.com/meetbitfury/about-service-lifecycles-in-exonum-58c67678c6bb
 
-pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{
@@ -206,7 +205,7 @@ pub use self::{
     },
     error::{
         catch_panic, CallSite, CallType, CommonError, CoreError, ErrorKind, ErrorMatch,
-        ExecutionError, ExecutionErrorAux, ExecutionFail, ExecutionStatus,
+        ExecutionError, ExecutionFail, ExecutionStatus,
     },
     execution_context::{ExecutionContext, ExecutionContextUnstable, SupervisorExtensions},
     types::{
@@ -215,6 +214,7 @@ pub use self::{
         MethodId, MigrationStatus,
     },
 };
+pub(crate) use self::{dispatcher::Dispatcher, error::ExecutionErrorAux};
 
 pub mod migrations;
 pub mod oneshot;

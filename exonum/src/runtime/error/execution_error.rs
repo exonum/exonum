@@ -122,7 +122,6 @@ impl ExecutionError {
     pub(crate) fn split_aux(&mut self) -> ExecutionErrorAux {
         ExecutionErrorAux {
             description: mem::take(&mut self.description),
-            _non_exhaustive: (),
         }
     }
 
