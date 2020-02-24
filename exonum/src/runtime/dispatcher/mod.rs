@@ -299,12 +299,13 @@ impl Dispatcher {
         }
     }
 
-    /// Adds a built-in artifact to the dispatcher. Unlike other artifacts, this skips
-    /// artifact commitment; the artifact is immediately deployed and marked as `Active`.
+    /// Adds a built-in artifact to the dispatcher. Unlike artifacts added via `commit_artifact` +
+    /// `deploy_artifact`, this method skips artifact commitment; the artifact
+    /// is synchronously deployed and marked as `Active`.
     ///
     /// # Panics
     ///
-    /// This method treats errors during artifact deployment as fatal and panics.
+    /// This method treats errors during artifact deployment as fatal and panics on them.
     pub(crate) fn add_builtin_artifact(
         &mut self,
         fork: &Fork,
@@ -314,10 +315,10 @@ impl Dispatcher {
         Schema::new(fork)
             .add_active_artifact(&artifact, payload.clone())
             .unwrap_or_else(|err| {
-                panic!("Cannot deploy an artifact: {}", err);
+                panic!("Cannot deploy a built-in artifact: {}", err);
             });
         self.deploy_artifact(artifact, payload)
-            .unwrap_or_else(|err| panic!("Cannot deploy an artifact: {}", err));
+            .unwrap_or_else(|err| panic!("Cannot deploy a built-in artifact: {}", err));
     }
 
     /// Add a built-in service with the predefined identifier.
@@ -350,7 +351,6 @@ impl Dispatcher {
         if should_rollback && res.is_ok() {
             res = Err(CoreError::IncorrectCall.into());
         }
-
         res
     }
 
