@@ -16,11 +16,21 @@
 
 use actix::prelude::*;
 use actix_cors::{Cors, CorsFactory};
-use actix_web::{dev::Server, HttpServer, App};
+use actix_web::{dev::Server, App, HttpServer};
+use futures::{
+    compat::Stream01CompatExt,
+    future::{try_join_all, join_all, FutureExt},
+    stream::StreamExt,
+};
 use futures_01::{sync::mpsc, Future};
-use futures::{future::join_all};
 
-use std::{collections::HashMap, fmt, io, net::SocketAddr, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt, io,
+    net::SocketAddr,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
@@ -208,13 +218,18 @@ impl StreamHandler<UpdateEndpoints> for ApiManager {
     }
 }
 
+#[derive(Debug, Default)]
+struct ApiManagerInner {
+    servers: Vec<Server>,
+    endpoints: Vec<(String, ApiBuilder)>,
+}
+
 /// Actor responsible for API management. The actor encapsulates endpoint handlers and
 /// is capable of updating them via `UpdateEndpoints`.
 #[derive(Debug, Clone)]
 pub struct ApiManager2 {
     config: ApiManagerConfig,
-    server_addresses: HashMap<ApiAccess, Server>,
-    variable_endpoints: Vec<(String, ApiBuilder)>,
+    inner: Arc<Mutex<ApiManagerInner>>,
 }
 
 impl ApiManager2 {
@@ -223,25 +238,58 @@ impl ApiManager2 {
     pub fn new(config: ApiManagerConfig) -> Self {
         Self {
             config,
-            server_addresses: HashMap::new(),
-            variable_endpoints: vec![],
+            inner: Arc::default(),
         }
     }
 
-    /// TODO 
-    pub fn start_servers(&mut self) -> impl std::future::Future<Output = Vec<io::Result<()>>> {
-        self.server_addresses = self
-            .config
-            .servers
-            .iter()
-            .map(|(&access, server_config)| {
-                let server_address = self
-                    .start_server(access, server_config.to_owned())
-                    .expect("Failed to start API server");
-                (access, server_address)
-            }).collect();
+    /// TODO
+    async fn start_servers(&mut self) -> io::Result<()> {
+        log::trace!("Servers start requested.");
 
-        join_all(self.server_addresses.values().cloned())
+        let servers = self
+        .config
+        .servers
+        .iter()
+        .map(|(&access, server_config)| {
+            self.start_server(access, server_config.to_owned())
+                .expect("Failed to start API server")
+        })
+        .collect::<Vec<_>>();
+
+        try_join_all(servers.clone()).await?;
+
+        self.inner.lock().unwrap().servers = servers;
+        Ok(())
+    }
+
+    async fn stop_servers(&mut self) {
+        let mut inner = self.inner.lock().unwrap();
+
+        log::trace!("Servers stop requested.");
+
+        for server in inner.servers.drain(..) {
+            server.stop(true).await;
+        }
+    }
+
+    /// TODO
+    pub async fn run(self, endpoints_rx: mpsc::Receiver<UpdateEndpoints>) {
+        let endpoints_rx = endpoints_rx.compat();
+
+        endpoints_rx
+            .for_each(move |request| {
+                let mut manager = self.clone();
+                async move {
+                    log::info!("Server restart requested");
+
+                    manager.stop_servers().await;
+                    manager.inner.lock().unwrap().endpoints = request
+                        .expect("Unable to receive updated endpoints")
+                        .endpoints;
+                    manager.start_servers().await;
+                }
+            })
+            .await
     }
 
     fn start_server(
@@ -253,7 +301,7 @@ impl ApiManager2 {
         log::info!("Starting {} web api on {}", access, listen_address);
 
         let mut aggregator = self.config.api_aggregator.clone();
-        aggregator.extend(self.variable_endpoints.clone());
+        aggregator.extend(self.inner.lock().unwrap().endpoints.clone());
         let server = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())

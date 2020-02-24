@@ -21,7 +21,6 @@ pub use actix_cors::{Cors, CorsFactory};
 
 use actix_web::{
     body::Body,
-    dev::Payload,
     error::ResponseError,
     http::header,
     web::{self, scope, Json, Query},
@@ -30,19 +29,18 @@ use actix_web::{
 use futures::future::{FutureExt, LocalBoxFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{
-    fmt,
-    sync::Arc,
-};
+use std::{fmt, sync::Arc};
 
 use crate::{
-    Actuality, AllowOrigin, ApiBackend, ApiScope,
-    EndpointMutability, Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
+    Actuality, AllowOrigin, ApiBackend, ApiScope, EndpointMutability, Error as ApiError,
+    ExtendApiBackend, FutureResult, NamedWith,
 };
 
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler =
-    dyn Fn(HttpRequest) -> LocalBoxFuture<'static, HttpResponse> + 'static + Send + Sync;
+pub type RawHandler = dyn Fn(HttpRequest, web::Payload) -> LocalBoxFuture<'static, HttpResponse>
+    + 'static
+    + Send
+    + Sync;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -91,7 +89,8 @@ impl ApiBackend for ApiBuilder {
             let inner = handler.inner;
             output = output.route(
                 &handler.name,
-                web::method(handler.method.clone()).to(move |request| inner(request)),
+                web::method(handler.method.clone())
+                    .to(move |request, payload| inner(request, payload)),
             );
         }
         output
@@ -218,18 +217,19 @@ where
 /// - If request is mutable, the query is parsed from the request body as JSON.
 async fn extract_query<Q>(
     request: HttpRequest,
+    payload: web::Payload,
     mutability: EndpointMutability,
 ) -> Result<Q, actix_web::error::Error>
 where
     Q: DeserializeOwned + 'static,
 {
     match mutability {
-        EndpointMutability::Immutable => Query::from_request(&request, &mut Payload::None)
+        EndpointMutability::Immutable => Query::extract(&request)
             .await
             .map(Query::into_inner)
             .map_err(From::from),
 
-        EndpointMutability::Mutable => Json::from_request(&request, &mut Payload::None)
+        EndpointMutability::Mutable => Json::from_request(&request, &mut payload.into_inner())
             .await
             .map(Json::into_inner)
             .map_err(From::from),
@@ -246,13 +246,13 @@ where
         let handler = f.inner.handler;
         let actuality = f.inner.actuality;
         let mutability = f.mutability;
-        let index = move |request: HttpRequest| {
+        let index = move |request: HttpRequest, payload: web::Payload| {
             let handler = handler.clone();
             let actuality = actuality.clone();
 
             // TODO Rewrite without extra matcher [ECR-4268]
             async move {
-                let result = match extract_query(request, mutability).await {
+                let result = match extract_query(request, payload, mutability).await {
                     Ok(query) => handler(query).await.map_err(From::from),
                     Err(e) => Err(e),
                 };
@@ -272,64 +272,6 @@ where
         }
     }
 }
-
-// /// Actix system runtime handle.
-// pub struct SystemRuntime {
-//     system_thread: JoinHandle<Result<(), Error>>,
-//     system: System,
-// }
-
-// impl SystemRuntime {
-//     /// Starts actix system runtime along with all web runtimes.
-//     pub fn start(manager: ApiManager) -> Result<Self, Error> {
-//         // Creates a system thread.
-//         let (system_tx, system_rx) = mpsc::unbounded();
-//         let system_thread = thread::spawn(move || -> Result<(), Error> {
-//             let system = System::new("http-server");
-//             system_tx.unbounded_send(System::current())?;
-//             manager.start();
-
-//             // Starts actix-web runtime.
-//             let code = system.run();
-//             log::trace!("Actix runtime finished with code {:?}", code);
-//             ensure!(
-//                 code.is_ok(),
-//                 "Actix runtime finished with the non zero error code: {:?}",
-//                 code
-//             );
-//             Ok(())
-//         });
-
-//         // Receives addresses of runtime items.
-//         let system = system_rx
-//             .wait()
-//             .next()
-//             .ok_or_else(|| format_err!("Unable to receive actix system handle"))?
-//             .map_err(|()| format_err!("Unable to receive actix system handle"))?;
-//         Ok(SystemRuntime {
-//             system_thread,
-//             system,
-//         })
-//     }
-
-//     /// Stops the actix system runtime along with all web runtimes.
-//     pub fn stop(self) -> Result<(), Error> {
-//         // Stop actix system runtime.
-//         self.system.stop();
-//         self.system_thread.join().map_err(|e| {
-//             format_err!(
-//                 "Unable to join actix web api thread, an error occurred: {:?}",
-//                 e
-//             )
-//         })?
-//     }
-// }
-
-// impl fmt::Debug for SystemRuntime {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         f.debug_struct("SystemRuntime").finish()
-//     }
-// }
 
 impl From<&AllowOrigin> for CorsFactory {
     fn from(origin: &AllowOrigin) -> Self {

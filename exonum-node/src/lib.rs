@@ -60,8 +60,8 @@ use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
+use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -1157,9 +1157,10 @@ impl Node {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list();
 
-        let mut api_manager = ApiManager2::new(self.api_manager_config);
+        let api_manager = ApiManager2::new(self.api_manager_config);
+        let endpoints = self.channel.endpoints.1;
         thread::spawn(move || {
-            actix_rt::System::new("exonum-node").block_on(api_manager.start_servers())
+            actix_rt::System::new("exonum-node").block_on(api_manager.run(endpoints))
         });
 
         let (network_tx, network_rx) = self.channel.network_events;
