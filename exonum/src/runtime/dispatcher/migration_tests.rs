@@ -443,6 +443,34 @@ fn migration_workflow_with_frozen_service() {
     test_migration_workflow(true);
 }
 
+#[test]
+fn migration_after_artifact_unloading() {
+    let mut rig = Rig::new();
+    let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
+    let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
+    let service = rig.initialize_service(old_artifact, "good");
+
+    // Stop the service.
+    rig.stop_service(&service);
+
+    // Mark the new artifact for unload. This is valid because so far, no services are
+    // associated with it.
+    let fork = rig.blockchain.fork();
+    Dispatcher::unload_artifact(&fork, &new_artifact).unwrap();
+    // However, unloading means that we cannot initiate migration to the artifact.
+    let err = rig
+        .dispatcher()
+        .initiate_migration(&fork, new_artifact, &service.name)
+        .unwrap_err();
+    let expected_msg =
+        "artifact `2:good:0.5.2` for data migration of service `100:good` is not active";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed)
+            .with_description_containing(expected_msg)
+    );
+}
+
 fn test_fast_forward_migration(freeze_service: bool) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("none", "0.3.0".parse().unwrap());
@@ -1308,11 +1336,9 @@ fn two_part_migration() {
     // Second part of migration.
     let fork = rig.blockchain.fork();
     rig.dispatcher()
-        .initiate_migration(&fork, new_artifact, &service.name)
+        .initiate_migration(&fork, new_artifact.clone(), &service.name)
         .unwrap();
     rig.create_block(fork);
-
-    // TODO: check state
 
     let migration_hash = rig.migration_hash(&[("test.entry", 2_u32.object_hash())]);
     let fork = rig.blockchain.fork();
@@ -1332,6 +1358,11 @@ fn two_part_migration() {
     let schema = DispatcherSchema::new(&snapshot);
     let instance_state = schema.get_instance(service.id).unwrap();
     assert_eq!(instance_state.data_version, Some(Version::new(0, 3, 0)));
+
+    // Check that the new artifact can be unloaded.
+    let fork = rig.blockchain.fork();
+    Dispatcher::unload_artifact(&fork, &new_artifact).unwrap();
+    rig.create_block(fork);
 }
 
 #[test]

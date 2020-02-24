@@ -218,11 +218,10 @@ impl BlockchainMut {
             .set(genesis_config.consensus_config);
 
         for spec in genesis_config.artifacts {
-            Dispatcher::commit_artifact(&fork, &spec.artifact, spec.payload.clone());
             self.dispatcher
-                .deploy_artifact(spec.artifact, spec.payload)
-                .expect("Cannot deploy an artifact");
+                .add_builtin_artifact(&fork, spec.artifact, spec.payload);
         }
+
         // Add service instances.
         // Note that `before_transactions` will not be invoked for services, since
         // they are added within block (and don't appear from nowhere).

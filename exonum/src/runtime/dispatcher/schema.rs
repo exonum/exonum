@@ -259,6 +259,24 @@ impl Schema<&Fork> {
         Ok(())
     }
 
+    /// Adds artifact specification to the set of the active artifacts.
+    pub(super) fn add_active_artifact(
+        &mut self,
+        artifact: &ArtifactId,
+        deploy_spec: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        // Check that the artifact is absent among the deployed artifacts.
+        if self.artifacts().contains(artifact) {
+            return Err(CoreError::ArtifactAlreadyDeployed.into());
+        }
+
+        self.artifacts().put(
+            artifact,
+            ArtifactState::new(deploy_spec, ArtifactStatus::Active),
+        );
+        Ok(())
+    }
+
     /// Unloads the provided artifact.
     pub(super) fn unload_artifact(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
         let mut state = self.check_unloading_artifact(artifact)?;
