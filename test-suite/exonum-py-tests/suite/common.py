@@ -130,7 +130,7 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
         client = ExonumClient(host, public_port, private_port)
         for _ in range(RETRIES_AMOUNT):
             try:
-                client.public_api.health_info()
+                client.private_api.get_info()
                 break
             except ConnectionError:
                 time.sleep(0.5)
@@ -142,6 +142,7 @@ def generate_config(
     consensus: dict = None,
     artifact_name: str = ARTIFACT_NAME,
     instances: dict = None,
+    deploy: bool = True
 ) -> dict:
     if instances is None:
         instances = {}
@@ -154,6 +155,7 @@ def generate_config(
                 "runtime": "rust",
                 "name": artifact_name,
                 "version": ARTIFACT_VERSION,
+                "deploy": deploy
             }
         },
         "instances": instances,

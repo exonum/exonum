@@ -140,7 +140,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
         # it should contain 4 txs for wallet creation
-        self.assertEqual(client.public_api.stats().json()["tx_count"], 4)
+        self.assertEqual(client.private_api.get_stats().json()["tx_count"], 4)
 
     def test_create_wallet_unique_for_key_pair(self):
         """Tests the transaction with the same keys for different wallets is failed"""
