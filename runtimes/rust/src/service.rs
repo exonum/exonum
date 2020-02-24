@@ -15,7 +15,7 @@
 use exonum::{
     blockchain::{config::InstanceInitParams, ApiSender, SendError},
     crypto::{Hash, KeyPair, PublicKey},
-    helpers::{Height, ValidatorId},
+    helpers::{tokio::wait_for, Height, ValidatorId},
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
         ArtifactId, BlockchainData, DispatcherAction, ExecutionContext, ExecutionError,
@@ -388,8 +388,8 @@ impl GenericCall<()> for Broadcaster {
             .clone()
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
-        
-        self.tx_sender.broadcast_transaction(msg).map(|_| tx_hash)
+
+        wait_for(self.tx_sender.broadcast_transaction(msg)).map(|_| tx_hash)
     }
 }
 

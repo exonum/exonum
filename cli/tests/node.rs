@@ -15,14 +15,13 @@
 //! Tests node creation with the help of the `run-dev` command.
 
 use exonum::{
-    helpers::Height,
+    helpers::{Height, tokio::wait_for},
     runtime::{versioning::Version, InstanceStatus, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
 use exonum_explorer_service::api::BlocksRange;
 use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service, ServiceFactory};
 use exonum_system_api::public::DispatcherInfo;
-use futures::Future;
 use lazy_static::lazy_static;
 use tempfile::TempDir;
 
@@ -161,7 +160,7 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
         .json()?;
     assert_eq!(answer, 42);
 
-    shutdown_handle.shutdown().wait()?;
+    wait_for(shutdown_handle.shutdown())?;
     node_thread.join().ok();
     Ok(())
 }

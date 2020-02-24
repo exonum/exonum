@@ -122,3 +122,17 @@ pub mod pb_version {
         value.to_string()
     }
 }
+
+pub mod tokio {
+    use std::future::Future;
+
+    pub fn wait_for<F: Future>(f: F) -> F::Output {
+        let mut runtime = tokio::runtime::Builder::new()
+            .max_threads(1)
+            .basic_scheduler()
+            .build()
+            .expect("Unable to create tokio runtime");
+
+        runtime.block_on(f)
+    }
+}

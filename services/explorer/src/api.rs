@@ -586,7 +586,7 @@ impl ExplorerApi {
         })?;
 
         sender
-            .broadcast_transaction_async(verified)
+            .broadcast_transaction(verified)
             .await
             .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))?;
         Ok(TransactionResponse { tx_hash })

@@ -210,7 +210,7 @@
 use exonum::{blockchain::ApiSender, crypto::PublicKey, runtime::InstanceId};
 use exonum_api::{self as api, ApiBackend, ApiScope};
 use exonum_node::{ConnectInfo, ExternalMessage, SharedNodeState};
-use futures::Future;
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
@@ -324,11 +324,14 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |connect_info: ConnectInfo| -> api::FutureResult<()> {
-                todo!()
-                // let handler = sender
-                //     .send_message(ExternalMessage::PeerAdd(connect_info))
-                //     .map_err(|e| api::Error::internal(e).title("Failed to add peer"));
-                // Box::new(handler)
+                let sender = sender.clone();
+                async move {
+                    sender
+                        .send_message(ExternalMessage::PeerAdd(connect_info))
+                        .await
+                        .map_err(|e| api::Error::internal(e).title("Failed to add peer"))
+                }
+                .boxed_local()
             },
         );
         self
@@ -355,11 +358,16 @@ impl SystemApi {
         api_scope.endpoint_mut(
             name,
             move |query: ConsensusEnabledQuery| -> api::FutureResult<()> {
-                todo!()
-                // let handler = sender
-                //     .send_message(ExternalMessage::Enable(query.enabled))
-                //     .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"));
-                // Box::new(handler)
+                let sender = sender.clone();
+                async move {
+                    sender
+                        .send_message(ExternalMessage::Enable(query.enabled))
+                        .await
+                        .map_err(|e| {
+                            api::Error::internal(e).title("Failed to set consensus enabled")
+                        })
+                }
+                .boxed_local()
             },
         );
         self
@@ -369,28 +377,32 @@ impl SystemApi {
         // These backend-dependent uses are needed to provide realization of the support of empty
         // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
-        use actix_web::{HttpRequest, HttpResponse};
-        use exonum_api::{backends::actix::{RawHandler, RequestHandler}};
+        use actix_web::{web::Payload, HttpRequest, HttpResponse};
+        use exonum_api::backends::actix::{RawHandler, RequestHandler};
 
         let sender = self.sender.clone();
-        let index = move |_: HttpRequest| {
-            todo!()
-            // let handler = sender
-            //     .send_message(ExternalMessage::Shutdown)
-            //     .map(|()| HttpResponse::Ok().json(()))
-            //     .map_err(|e| {
-            //         let e = api::Error::internal(e).title("Failed to handle shutdown");
-            //         actix_web::Error::from(e)
-            //     });
-            // Box::new(handler)
+        let index = move |_: HttpRequest, _: Payload| {
+            let sender = sender.clone();
+            async move {
+                let result = sender.send_message(ExternalMessage::Shutdown).await;
+
+                match result {
+                    Ok(()) => HttpResponse::Ok().json(()),
+                    Err(e) => {
+                        let e = api::Error::internal(e).title("Failed to handle shutdown");
+                        actix_web::Error::from(e).into()
+                    }
+                }
+            }
+            .boxed_local()
         };
 
-        // let handler = RequestHandler {
-        //     name: name.to_owned(),
-        //     method: actix_web::http::Method::POST,
-        //     inner: Arc::new(index) as Arc<RawHandler>,
-        // };
-        // api_scope.web_backend().raw_handler(handler);
+        let handler = RequestHandler {
+            name: name.to_owned(),
+            method: actix_web::http::Method::POST,
+            inner: Arc::new(index) as Arc<RawHandler>,
+        };
+        api_scope.web_backend().raw_handler(handler);
 
         self
     }

@@ -21,7 +21,7 @@ exonum-api = { version = "1.0.0-rc.1", path = "../api" }
 exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
 
 actix-web = { version = "2.0.0", default-features = false }
-futures = "0.1.25"
+futures = "0.3.4"
 serde = "1.0"
 serde_derive = "1.0"
 

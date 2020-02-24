@@ -18,7 +18,7 @@ use bit_vec::BitVec;
 use exonum::{
     blockchain::ProposerId,
     crypto::Hash,
-    helpers::{Height, Round, ValidatorId},
+    helpers::{tokio::wait_for, Height, Round, ValidatorId},
     merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified},
 };
@@ -645,10 +645,7 @@ fn expedited_propose_on_transaction_pressure() {
 fn valid_txs_are_broadcast() {
     let sandbox = timestamping_sandbox();
     let tx = gen_timestamping_tx();
-    sandbox
-        .api_sender
-        .broadcast_transaction(tx.clone())
-        .unwrap();
+    wait_for(sandbox.api_sender.broadcast_transaction(tx.clone())).unwrap();
     sandbox.process_events();
     sandbox.broadcast(&tx);
 }
@@ -657,10 +654,7 @@ fn valid_txs_are_broadcast() {
 fn incorrect_txs_are_not_broadcast() {
     let sandbox = timestamping_sandbox();
     let incorrect_tx = gen_incorrect_tx();
-    sandbox
-        .api_sender
-        .broadcast_transaction(incorrect_tx)
-        .unwrap();
+    wait_for(sandbox.api_sender.broadcast_transaction(incorrect_tx)).unwrap();
     sandbox.process_events();
     // If the transaction is broadcast, the sandbox will panic on drop.
 }

@@ -801,8 +801,8 @@ impl ShutdownHandle {
     /// # Return value
     ///
     /// The failure means that the node is already being shut down.
-    pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
-        self.inner.send_message(ExternalMessage::Shutdown)
+    pub async fn shutdown(self) -> Result<(), SendError> {
+        self.inner.send_message(ExternalMessage::Shutdown).await
     }
 }
 

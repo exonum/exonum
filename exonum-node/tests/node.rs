@@ -16,6 +16,7 @@
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
+    helpers::tokio::wait_for,
     merkledb::{Database, TemporaryDB},
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
@@ -48,7 +49,7 @@ impl RunHandle {
     }
 
     fn join(self) {
-        self.shutdown_handle.shutdown().wait().unwrap();
+        wait_for(self.shutdown_handle.shutdown()).unwrap();
         self.node_thread.join().unwrap();
     }
 }

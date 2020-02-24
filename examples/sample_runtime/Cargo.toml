@@ -12,8 +12,6 @@ description = "Minimal Exonum blockchain example implementing a simple runtime."
 publish = false
 
 [dependencies]
-futures = "0.1.25"
-
 exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
 exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
 exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
