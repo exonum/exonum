@@ -348,7 +348,7 @@ fn test_migration_workflow(freeze_service: bool) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("good", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("good", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact, "good");
+    let service = rig.initialize_service(old_artifact.clone(), "good");
 
     // Since service is not stopped, the migration should fail.
     let fork = rig.blockchain.fork();
@@ -373,7 +373,7 @@ fn test_migration_workflow(freeze_service: bool) {
     let fork = rig.blockchain.fork();
     let ty = rig
         .dispatcher()
-        .initiate_migration(&fork, new_artifact, &service.name)
+        .initiate_migration(&fork, new_artifact.clone(), &service.name)
         .unwrap();
     assert_matches!(ty, MigrationType::Async);
     // Migration scripts should not start executing immediately, but only on block commit.
@@ -385,6 +385,21 @@ fn test_migration_workflow(freeze_service: bool) {
     // Check that the old service data can be accessed.
     let snapshot = rig.blockchain.snapshot();
     assert!(snapshot.for_service(service.id).is_some());
+
+    // Check that it is now impossible to unload either the old or the new artifact.
+    let fork = rig.blockchain.fork();
+    let err = Dispatcher::unload_artifact(&fork, &old_artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact)
+            .with_description_containing("`100:good` references it as the current artifact")
+    );
+    let err = Dispatcher::unload_artifact(&fork, &new_artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact)
+            .with_description_containing("`100:good` references it as the data migration target")
+    );
 
     // Create several more blocks before the migration is complete and check that
     // we don't spawn multiple migration scripts at once (this check is performed in `Migrations`).
@@ -432,7 +447,7 @@ fn test_fast_forward_migration(freeze_service: bool) {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("none", "0.3.0".parse().unwrap());
     let new_artifact = rig.deploy_artifact("none", "0.5.2".parse().unwrap());
-    let service = rig.initialize_service(old_artifact, "service");
+    let service = rig.initialize_service(old_artifact.clone(), "service");
     if freeze_service {
         rig.freeze_service(&service);
     } else {
@@ -455,6 +470,15 @@ fn test_fast_forward_migration(freeze_service: bool) {
     assert_eq!(state.pending_status, None);
     assert_eq!(state.spec.artifact, new_artifact);
     assert_eq!(state.data_version, None);
+
+    // Check that the old artifact can now be unloaded.
+    let fork = rig.blockchain.fork();
+    Dispatcher::unload_artifact(&fork, &old_artifact).unwrap();
+    rig.create_block(fork);
+    let snapshot = rig.blockchain.snapshot();
+    assert!(DispatcherSchema::new(&snapshot)
+        .get_artifact(&old_artifact)
+        .is_none());
 }
 
 /// Tests fast-forwarding a migration.

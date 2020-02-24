@@ -524,8 +524,17 @@ fn blockchain_with_frozen_service(rt: SampleRuntimes) -> Result<FreezingRig, Exe
     let instantiated_change = (rt as u32, vec![(SERVICE_ID, InstanceStatus::Active)]);
     assert_eq!(instantiated_change, changes_rx.iter().next().unwrap());
 
-    // Command service freeze.
+    // Check that it is impossible to unload the artifact for an active service.
     let mut fork = db.fork();
+    let err = Dispatcher::unload_artifact(&fork, &service.artifact).unwrap_err();
+    let expected_msg = "service `0:some-service` references it";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact)
+            .with_description_containing(expected_msg)
+    );
+
+    // Command service freeze.
     let mut context = ExecutionContext::for_block_call(
         &dispatcher,
         &mut fork,
@@ -541,6 +550,15 @@ fn blockchain_with_frozen_service(rt: SampleRuntimes) -> Result<FreezingRig, Exe
 
     let frozen_change = (rt as u32, vec![(SERVICE_ID, InstanceStatus::Frozen)]);
     assert_eq!(frozen_change, changes_rx.iter().next().unwrap());
+
+    // Check that it is impossible to unload the artifact for a frozen service.
+    let fork = db.fork();
+    let err = Dispatcher::unload_artifact(&fork, &service.artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact)
+            .with_description_containing(expected_msg)
+    );
 
     Ok(FreezingRig {
         dispatcher,
@@ -1139,7 +1157,14 @@ fn stopped_service_workflow() {
         .for_service(instance_name)
         .expect("Schema should be reachable");
 
-    // Commit service status
+    // Check that it is impossible to unload the artifact associated with a stopping service.
+    let err = Dispatcher::unload_artifact(&fork, &service.artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact).with_any_description()
+    );
+
+    // Commit service status.
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge_sync(patch).unwrap();
@@ -1156,6 +1181,13 @@ fn stopped_service_workflow() {
             .for_service(instance_name)
             .is_none(),
         "Schema should be unreachable for stopped service"
+    );
+
+    // Check that it is impossible to unload the artifact associated with a stopped service.
+    let err = Dispatcher::unload_artifact(&fork, &service.artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact).with_any_description()
     );
 
     // Emulate dispatcher restart.
@@ -1218,4 +1250,74 @@ fn stopped_service_workflow() {
         ErrorMatch::from_fail(&CoreError::ServiceNotActive)
     );
     assert!(!should_rollback);
+}
+
+#[test]
+fn unload_artifact_workflow() {
+    const RUNTIME_ID: u32 = 2;
+
+    let db = Arc::new(TemporaryDB::new());
+    let blockchain = Blockchain::new(
+        Arc::clone(&db) as Arc<dyn Database>,
+        gen_keypair(),
+        ApiSender::closed(),
+    );
+    let runtime = DeploymentRuntime::default();
+    let mut dispatcher = DispatcherBuilder::new()
+        .with_runtime(RUNTIME_ID, runtime.clone())
+        .finalize(&blockchain);
+
+    let patch = create_genesis_block(&mut dispatcher, db.fork());
+    db.merge_sync(patch).unwrap();
+
+    // Check that a non-deployed artifact cannot be unloaded.
+    let artifact = ArtifactId::new(RUNTIME_ID, "good", Version::new(1, 0, 0)).unwrap();
+    let fork = db.fork();
+    let err = Dispatcher::unload_artifact(&fork, &artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed)
+            .with_description_containing("artifact `2:good:1.0.0`, which is not deployed")
+    );
+
+    // Deploy the artifact.
+    let fork = db.fork();
+    let spec = DeploymentRuntime::SPEC.to_vec();
+    Dispatcher::commit_artifact(&fork, &artifact, spec);
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge_sync(patch).unwrap();
+    assert_eq!(runtime.deploy_attempts(&artifact), 1);
+
+    // Unload the artifact.
+    let mut fork = db.fork();
+    Dispatcher::unload_artifact(&fork, &artifact).unwrap();
+    // Check that a duplicate unload request fails.
+    let err = Dispatcher::unload_artifact(&fork, &artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed)
+            .with_description_containing("artifact `2:good:1.0.0`, which has non-active status")
+    );
+
+    // Check that a service cannot be instantiated from the artifact now that it's being unloaded.
+    let service = InstanceSpec::from_raw_parts(100, "some-service".into(), artifact.clone());
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        service.as_descriptor(),
+    );
+    let err = context
+        .initiate_adding_service(service, vec![])
+        .unwrap_err();
+    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed));
+
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge_sync(patch).unwrap();
+    let snapshot = db.snapshot();
+    let schema = DispatcherSchema::new(&snapshot);
+    assert!(schema.get_artifact(&artifact).is_none());
 }

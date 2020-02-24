@@ -359,6 +359,16 @@ impl<'a> SupervisorExtensions<'a> {
         Dispatcher::commit_artifact(self.0.fork, artifact, spec);
     }
 
+    /// Unloads the specified artifact, making it unavailable for service deployment and other
+    /// operations.
+    ///
+    /// # Return value
+    ///
+    /// If the artifact cannot be unloaded, an error is returned.
+    pub fn unload_artifact(&self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        Dispatcher::unload_artifact(self.0.fork, artifact)
+    }
+
     /// Initiates adding a service instance to the blockchain.
     ///
     /// The service is not immediately activated; it activates if / when the block containing

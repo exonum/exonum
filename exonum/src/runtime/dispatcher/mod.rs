@@ -39,7 +39,7 @@ use crate::{
     },
 };
 
-use self::schema::{MigrationTransition, ModifiedInstanceInfo};
+use self::schema::{ArtifactAction, MigrationTransition, ModifiedInstanceInfo};
 use super::{
     error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
     migrations::{
@@ -399,6 +399,13 @@ impl Dispatcher {
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
     }
 
+    pub(crate) fn unload_artifact(
+        fork: &Fork,
+        artifact: &ArtifactId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork).unload_artifact(artifact)
+    }
+
     /// Initiates migration of an existing stopped service to a newer artifact.
     /// The migration script is started once the block corresponding to `fork`
     /// is committed.
@@ -675,9 +682,16 @@ impl Dispatcher {
 
         let patch = fork.into_patch();
 
-        // Block futures with pending deployments.
-        for (artifact, deploy_spec) in pending_artifacts {
-            self.block_until_deployed(artifact, deploy_spec);
+        // Process changed artifacts, blocking on futures with pending deployments.
+        for (artifact, action) in pending_artifacts {
+            match action {
+                ArtifactAction::Deploy(deploy_spec) => {
+                    self.block_until_deployed(artifact, deploy_spec);
+                }
+                ArtifactAction::Unload => {
+                    // FIXME: notify the runtime.
+                }
+            }
         }
 
         // Notify runtime about changes in service instances.

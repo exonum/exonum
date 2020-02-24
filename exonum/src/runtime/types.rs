@@ -450,6 +450,8 @@ pub enum ArtifactStatus {
     Pending = 1,
     /// The artifact has been successfully deployed.
     Active = 2,
+    /// The artifact is pending unload.
+    Unloading = 3,
 
     /// Never actually generated.
     #[doc(hidden)]
@@ -461,6 +463,7 @@ impl Display for ArtifactStatus {
         match self {
             ArtifactStatus::Active => f.write_str("active"),
             ArtifactStatus::Pending => f.write_str("pending"),
+            ArtifactStatus::Unloading => f.write_str("unloading"),
             ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
@@ -470,20 +473,23 @@ impl ProtobufConvert for ArtifactStatus {
     type ProtoStruct = schema::lifecycle::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
+        use self::schema::lifecycle::ArtifactState_Status::*;
+
         match self {
-            ArtifactStatus::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
-            ArtifactStatus::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
+            ArtifactStatus::Active => ACTIVE,
+            ArtifactStatus::Pending => PENDING,
+            ArtifactStatus::Unloading => NONE,
             ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        use self::schema::lifecycle::ArtifactState_Status::*;
+
         Ok(match pb {
-            schema::lifecycle::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
-            schema::lifecycle::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
-            schema::lifecycle::ArtifactState_Status::NONE => {
-                bail!("Status `NONE` is reserved for the further usage.")
-            }
+            ACTIVE => ArtifactStatus::Active,
+            PENDING => ArtifactStatus::Pending,
+            NONE => ArtifactStatus::Unloading,
         })
     }
 }
