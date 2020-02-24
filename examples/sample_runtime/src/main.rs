@@ -17,7 +17,7 @@
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
-    helpers::{Height, tokio::wait_for},
+    helpers::{tokio::wait_for, Height},
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     runtime::{
@@ -305,10 +305,7 @@ fn main() {
             spec: Vec::default(),
         };
         let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
-        wait_for(blockchain_ref
-            .sender()
-            .broadcast_transaction(tx))
-            .unwrap();
+        wait_for(blockchain_ref.sender().broadcast_transaction(tx)).unwrap();
 
         // Wait until the request is finished.
         thread::sleep(Duration::from_secs(5));
@@ -321,10 +318,7 @@ fn main() {
             10_u64,
         );
         let proposal = service_keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, proposal);
-        wait_for(blockchain_ref
-            .sender()
-            .broadcast_transaction(proposal))
-            .unwrap();
+        wait_for(blockchain_ref.sender().broadcast_transaction(proposal)).unwrap();
 
         // Wait until instance identifier is assigned.
         thread::sleep(Duration::from_secs(1));
@@ -341,19 +335,13 @@ fn main() {
         // Send an update counter transaction.
         let tx = AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes());
         let tx = tx.sign_with_keypair(&service_keypair);
-        wait_for(blockchain_ref
-            .sender()
-            .broadcast_transaction(tx))
-            .unwrap();
+        wait_for(blockchain_ref.sender().broadcast_transaction(tx)).unwrap();
         thread::sleep(Duration::from_secs(2));
 
         // Send a reset counter transaction.
         let tx = AnyTx::new(CallInfo::new(instance_id, 1), vec![]);
         let tx = tx.sign_with_keypair(&service_keypair);
-        wait_for(blockchain_ref
-            .sender()
-            .broadcast_transaction(tx))
-            .unwrap();
+        wait_for(blockchain_ref.sender().broadcast_transaction(tx)).unwrap();
 
         thread::sleep(Duration::from_secs(2));
         wait_for(shutdown_handle.shutdown()).unwrap();

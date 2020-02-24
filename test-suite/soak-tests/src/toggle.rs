@@ -18,13 +18,12 @@
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     crypto::KeyPair,
-    helpers::Height,
+    helpers::{tokio::wait_for, Height},
     merkledb::{Database, ObjectHash, TemporaryDB},
     runtime::SnapshotExt,
 };
 use exonum_node::{generate_testnet_config, Node, NodeBuilder, ShutdownHandle};
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
-use futures::Future;
 use structopt::StructOpt;
 
 use std::{sync::Arc, thread, time::Duration};
@@ -51,10 +50,7 @@ impl RunHandle {
     }
 
     fn join(self) -> KeyPair {
-        self.shutdown_handle
-            .shutdown()
-            .wait()
-            .expect("Cannot shut down node");
+        wait_for(self.shutdown_handle.shutdown()).expect("Cannot shut down node");
         self.node_thread
             .join()
             .expect("Node panicked during shutdown");

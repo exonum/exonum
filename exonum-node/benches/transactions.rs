@@ -168,7 +168,8 @@ impl MessageVerifier {
             let thread_pool = ThreadPoolBuilder::new().build();
             let verify_handle = thread_pool.sender().clone();
 
-            core.block_on(internal_part.run(handle.clone(), handle)).unwrap();
+            core.block_on(internal_part.run(handle.clone(), handle))
+                .unwrap();
         });
 
         MessageVerifier {

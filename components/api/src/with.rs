@@ -15,7 +15,7 @@
 use chrono::{DateTime, Utc};
 use futures::future::LocalBoxFuture;
 
-use std::{marker::PhantomData};
+use std::marker::PhantomData;
 
 use super::{error, EndpointMutability};
 

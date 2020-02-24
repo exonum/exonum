@@ -25,7 +25,7 @@ use exonum::{
     },
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
-use futures::{future::FutureExt};
+use futures::future::FutureExt;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;

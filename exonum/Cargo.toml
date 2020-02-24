@@ -21,7 +21,7 @@ travis-ci = { repository = "exonum/exonum" }
 chrono = { version = "0.4.6", features = ["serde"] }
 env_logger = "0.6.0"
 failure = "0.1.5"
-futures = { version = "0.3.4", features = ["compat", "io-compat"] }
+futures = { version = "0.3.4", features = ["compat"] }
 futures-01 = { package = "futures", version = "0.1.24" }
 hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
 log = "0.4.6"

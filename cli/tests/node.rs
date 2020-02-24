@@ -15,7 +15,7 @@
 //! Tests node creation with the help of the `run-dev` command.
 
 use exonum::{
-    helpers::{Height, tokio::wait_for},
+    helpers::{tokio::wait_for, Height},
     runtime::{versioning::Version, InstanceStatus, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;

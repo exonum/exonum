@@ -39,7 +39,7 @@ impl Default for Error {
         Self {
             http_code: HttpStatusCode::default(),
             body: ErrorBody::default(),
-            headers: HeaderMap::new()
+            headers: HeaderMap::new(),
         }
     }
 }

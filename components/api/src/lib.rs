@@ -64,7 +64,7 @@
 pub use self::{
     cors::AllowOrigin,
     error::{Error, HttpStatusCode, MovedPermanentlyError},
-    manager::{ApiManager, ApiManager2, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
+    manager::{ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
     with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
 };
 

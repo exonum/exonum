@@ -20,6 +20,5 @@ exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
 exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
-futures = "0.1.29"
 log = "0.4.6"
 structopt = "0.3.9"

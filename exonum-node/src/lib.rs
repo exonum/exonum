@@ -53,11 +53,12 @@ use exonum::{
     runtime::RuntimeInstance,
 };
 use exonum_api::{
-    AllowOrigin, ApiAccess, ApiAggregator, ApiManager2, ApiManagerConfig, UpdateEndpoints,
+    AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
     WebServerConfig,
 };
 use failure::{ensure, format_err, Error};
-use futures::{sync::mpsc, Future, Sink};
+use futures::{sync::mpsc, Sink};
+use futures_03::{compat::Stream01CompatExt, stream::TryStreamExt};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
@@ -66,7 +67,7 @@ use tokio_threadpool::Builder as ThreadPoolBuilder;
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fmt,
+    fmt, io,
     net::SocketAddr,
     sync::Arc,
     thread,
@@ -1157,10 +1158,17 @@ impl Node {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list();
 
-        let api_manager = ApiManager2::new(self.api_manager_config);
+        let api_manager = ApiManager::new(self.api_manager_config);
         let endpoints = self.channel.endpoints.1;
         thread::spawn(move || {
-            actix_rt::System::new("exonum-node").block_on(api_manager.run(endpoints))
+            actix_rt::System::new("exonum-node").block_on(api_manager.run(
+                endpoints.compat().map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        "Unable to receive `UpdateEndpoints` event",
+                    )
+                }),
+            ))
         });
 
         let (network_tx, network_rx) = self.channel.network_events;

@@ -212,14 +212,10 @@ impl PrivateApi {
         builder
             .private_scope()
             .endpoint("v1/validators_times", {
-                move |state: api::ServiceApiState, _query: ()| {
-                    Self::current_validators_time(state)
-                }
+                move |state: api::ServiceApiState, _query: ()| Self::current_validators_time(state)
             })
             .endpoint("v1/validators_times/all", {
-                move |state: api::ServiceApiState, _query: ()| {
-                    Self::all_validators_times(state)
-                }
+                move |state: api::ServiceApiState, _query: ()| Self::all_validators_times(state)
             });
     }
 }

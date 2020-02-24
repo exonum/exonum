@@ -16,14 +16,12 @@ description = "HTTP API engine of the Exonum framework"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix = "0.9.0"
 actix-cors = "0.2.0"
 actix-service = "1.0.5"
 actix-web = { version = "2.0.0", default-features = false }
 chrono = { version = "0.4.6", features = ["serde"] }
 failure = "0.1.5"
-futures = "0.3.4"
-futures-01 = { package = "futures", version = "0.1.24" }
+futures = { version = "0.3.4", features = ["compat"] }
 log = "0.4.6"
 serde = { version = "1.0.101", features = ["derive"] }
 serde_json = "1.0.19"
