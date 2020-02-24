@@ -18,10 +18,6 @@ use exonum_merkledb::{
     migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
     Database, Fork, Patch, Snapshot,
 };
-use futures::{
-    future::{self, Either},
-    Future,
-};
 use log::{error, info};
 use semver::Version;
 
@@ -45,12 +41,14 @@ use crate::{
 
 use self::schema::{MigrationTransition, ModifiedInstanceInfo};
 use super::{
-    error::{CallSite, CallType, ErrorKind, ExecutionError},
+    error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
     migrations::{
         InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
+        MigrationType,
     },
-    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
+    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime, RuntimeFeature,
 };
+use crate::runtime::RuntimeIdentifier;
 
 #[cfg(test)]
 mod migration_tests;
@@ -270,7 +268,6 @@ impl Dispatcher {
                 "BUG: Artifact should not be in pending state."
             );
             self.deploy_artifact(artifact.clone(), state.deploy_spec)
-                .wait()
                 .unwrap_or_else(|err| {
                     panic!(
                         "BUG: Can't restore state, artifact {:?} has not been deployed now, \
@@ -365,21 +362,21 @@ impl Dispatcher {
         &mut self,
         artifact: ArtifactId,
         payload: Vec<u8>,
-    ) -> impl Future<Item = (), Error = ExecutionError> {
+    ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             let runtime_id = artifact.runtime_id;
-            let future = runtime
+            runtime
                 .deploy_artifact(artifact, payload)
+                .wait()
                 .map_err(move |mut err| {
                     err.set_runtime_id(runtime_id);
                     err
-                });
-            Either::A(future)
+                })
         } else {
-            Either::B(future::err(CoreError::IncorrectRuntime.into()))
+            Err(CoreError::IncorrectRuntime.into())
         }
     }
 
@@ -410,20 +407,22 @@ impl Dispatcher {
         fork: &Fork,
         new_artifact: ArtifactId,
         service_name: &str,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<MigrationType, ExecutionError> {
         let mut schema = Schema::new(fork);
         let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
         let maybe_script =
             self.get_migration_script(&new_artifact, instance_state.data_version())?;
-        if let Some(script) = maybe_script {
+        let migration_type = if let Some(script) = maybe_script {
             let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
             schema.add_pending_migration(instance_state, migration);
+            MigrationType::Async
         } else {
             // No migration script means that the service instance may be immediately updated to
             // the new artifact version.
             schema.fast_forward_migration(instance_state, new_artifact);
-        }
-        Ok(())
+            MigrationType::FastForward
+        };
+        Ok(migration_type)
     }
 
     /// Initiates migration rollback. The rollback will actually be performed once
@@ -472,23 +471,40 @@ impl Dispatcher {
     }
 
     pub(crate) fn initiate_freezing_service(
+        &self,
         fork: &Fork,
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
-        Schema::new(fork)
+        let mut schema = Schema::new(fork);
+        let instance_state = schema
+            .get_instance(instance_id)
+            .ok_or(CoreError::IncorrectInstanceId)?;
+        let runtime_id = instance_state.spec.artifact.runtime_id;
+        let runtime = self
+            .runtime_by_id(runtime_id)
+            .ok_or(CoreError::IncorrectRuntime)?;
+
+        if !runtime.is_supported(&RuntimeFeature::FreezingServices) {
+            let runtime_description = RuntimeIdentifier::transform(runtime_id).ok().map_or_else(
+                || format!("Runtime with ID {}", runtime_id),
+                |id| id.to_string(),
+            );
+            let msg = format!("{} does not support freezing services", runtime_description);
+            return Err(CommonError::FeatureNotSupported.with_description(msg));
+        }
+
+        schema
             .initiate_simple_service_transition(instance_id, InstanceStatus::Frozen)
             .map_err(From::from)
     }
 
     fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
-            self.deploy_artifact(artifact, payload)
-                .wait()
-                .unwrap_or_else(|e| {
-                    // In this case artifact deployment error is fatal because there are
-                    // confirmation that this node can deploy this artifact.
-                    panic!("Unable to deploy registered artifact. {}", e)
-                });
+            self.deploy_artifact(artifact, payload).unwrap_or_else(|e| {
+                // In this case artifact deployment error is fatal because the deploy
+                // was committed on the network level.
+                panic!("Unable to deploy registered artifact. {}", e);
+            });
         }
     }
 
@@ -930,7 +946,8 @@ impl Mailbox {
     }
 }
 
-type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError> + Send>;
+/// The actions that will be performed after the deployment is finished.
+pub type ThenFn = Box<dyn FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send>;
 
 /// Action to be performed by the dispatcher.
 ///
@@ -945,7 +962,7 @@ pub enum Action {
         spec: Vec<u8>,
         /// The actions that will be performed after the deployment is finished.
         /// For example, this closure may create a transaction with the deployment confirmation.
-        then: Box<dyn FnOnce(Result<(), ExecutionError>) -> ExecutionFuture + Send>,
+        then: ThenFn,
     },
 
     /// Never actually generated.
@@ -974,13 +991,9 @@ impl Action {
                 spec,
                 then,
             } => {
-                dispatcher
-                    .deploy_artifact(artifact.clone(), spec)
-                    .then(then)
-                    .wait()
-                    .unwrap_or_else(|e| {
-                        error!("Deploying artifact {:?} failed: {}", artifact, e);
-                    });
+                then(dispatcher.deploy_artifact(artifact.clone(), spec)).unwrap_or_else(|e| {
+                    error!("Deploying artifact {:?} failed: {}", artifact, e);
+                });
             }
 
             Action::__NonExhaustive => unreachable!(),

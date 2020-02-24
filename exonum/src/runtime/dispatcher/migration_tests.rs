@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use assert_matches::assert_matches;
 use exonum_crypto::KeyPair;
 use exonum_merkledb::{
     access::{AccessExt, CopyAccessExt},
     migration::Migration,
     HashTag, ObjectHash, SystemSchema, TemporaryDB,
 };
-use futures::IntoFuture;
 
 use std::time::Duration;
 
@@ -26,8 +26,9 @@ use super::*;
 use crate::{
     blockchain::{ApiSender, Block, BlockchainMut},
     helpers::ValidatorId,
-    runtime::migrations::{InitMigrationError, MigrationError},
     runtime::{
+        migrations::{InitMigrationError, MigrationError},
+        oneshot::Receiver,
         BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier,
         SnapshotExt, WellKnownRuntime,
     },
@@ -54,12 +55,16 @@ impl WellKnownRuntime for MigrationRuntime {
 }
 
 impl Runtime for MigrationRuntime {
-    fn deploy_artifact(
-        &mut self,
-        _artifact: ArtifactId,
-        _deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
-        Box::new(Ok(()).into_future())
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
+    }
+
+    // We use service freezing in some tests.
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        match feature {
+            RuntimeFeature::FreezingServices => true,
+            _ => false,
+        }
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
@@ -332,7 +337,9 @@ impl Rig {
 
     fn freeze_service(&mut self, spec: &InstanceSpec) {
         let fork = self.blockchain.fork();
-        Dispatcher::initiate_freezing_service(&fork, spec.id).unwrap();
+        self.dispatcher()
+            .initiate_freezing_service(&fork, spec.id)
+            .unwrap();
         self.create_block(fork);
     }
 }
@@ -364,9 +371,11 @@ fn test_migration_workflow(freeze_service: bool) {
 
     // Now, the migration start should succeed.
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
+    let ty = rig
+        .dispatcher()
         .initiate_migration(&fork, new_artifact, &service.name)
         .unwrap();
+    assert_matches!(ty, MigrationType::Async);
     // Migration scripts should not start executing immediately, but only on block commit.
     assert!(!rig.migration_threads().contains_key(&service.name));
     rig.create_block(fork);
@@ -431,9 +440,11 @@ fn test_fast_forward_migration(freeze_service: bool) {
     }
 
     let fork = rig.blockchain.fork();
-    rig.dispatcher()
+    let ty = rig
+        .dispatcher()
         .initiate_migration(&fork, new_artifact.clone(), &service.name)
         .unwrap();
+    assert_matches!(ty, MigrationType::FastForward);
     rig.create_block(fork);
 
     // Service version should be updated when the block is merged.

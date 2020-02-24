@@ -12,17 +12,98 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Tests for the phases of the service life cycle, including starting and stopping service instances.
+//! Tests for the phases of the service life cycle, including starting, freezing and stopping
+//! service instances.
 
 use exonum::{
+    helpers::Height,
+    merkledb::Snapshot,
     messages::{AnyTx, Verified},
-    runtime::{ErrorMatch, ExecutionError, InstanceState, SnapshotExt, SUPERVISOR_INSTANCE_ID},
+    runtime::{
+        migrations::{InitMigrationError, MigrationScript},
+        oneshot::Receiver,
+        versioning::Version,
+        ArtifactId, ErrorMatch, ExecutionError, InstanceState, InstanceStatus, Mailbox, Runtime,
+        SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+    },
 };
-use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
+use exonum_rust_runtime::{DefaultInstance, ExecutionContext, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use crate::inc::IncService;
 use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor, SupervisorInterface};
+
+#[derive(Debug, Clone, Copy)]
+struct RuntimeWithoutFreeze;
+
+impl RuntimeWithoutFreeze {
+    fn artifact() -> ArtifactId {
+        ArtifactId::from_raw_parts(Self::ID, "some-service".to_owned(), Version::new(1, 0, 0))
+    }
+}
+
+impl Runtime for RuntimeWithoutFreeze {
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
+    }
+
+    fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {
+        true
+    }
+
+    fn initiate_adding_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _artifact: &ArtifactId,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn initiate_resuming_service(
+        &self,
+        _context: ExecutionContext<'_>,
+        _artifact: &ArtifactId,
+        _parameters: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        unimplemented!("Outside the test scope")
+    }
+
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
+        assert_ne!(state.status, Some(InstanceStatus::Frozen));
+    }
+
+    fn migrate(
+        &self,
+        _new_artifact: &ArtifactId,
+        _data_version: &Version,
+    ) -> Result<Option<MigrationScript>, InitMigrationError> {
+        Err(InitMigrationError::NotSupported)
+    }
+
+    fn execute(
+        &self,
+        _context: ExecutionContext<'_>,
+        _method_id: u32,
+        _arguments: &[u8],
+    ) -> Result<(), ExecutionError> {
+        unimplemented!("Outside the test scope")
+    }
+
+    fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn after_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        Ok(())
+    }
+
+    fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
+}
+
+impl WellKnownRuntime for RuntimeWithoutFreeze {
+    const ID: u32 = 5;
+}
 
 /// Creates block with the specified transaction and returns its execution result.
 pub fn execute_transaction(
@@ -53,6 +134,18 @@ fn create_testkit() -> TestKit {
         .build()
 }
 
+fn create_testkit_with_additional_runtime() -> TestKit {
+    let artifact = RuntimeWithoutFreeze::artifact();
+    TestKitBuilder::validator()
+        .with_additional_runtime(RuntimeWithoutFreeze)
+        .with_rust_service(Supervisor)
+        .with_artifact(Supervisor.artifact_id())
+        .with_artifact(artifact.clone())
+        .with_instance(Supervisor::simple())
+        .with_instance(artifact.into_default_instance(100, "test"))
+        .build()
+}
+
 /// Starts service instance and gets its ID
 fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
     // Start `inc` service instance
@@ -76,6 +169,7 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
 #[test]
 fn start_stop_inc_service() {
     let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
     let instance_id = start_inc_service(&mut testkit).spec.id;
     assert!(
         is_inc_service_api_available(&mut testkit),
@@ -84,7 +178,44 @@ fn start_stop_inc_service() {
 
     // Stop service instance.
     let change = ConfigPropose::immediate(1).stop_service(instance_id);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change)
+        .expect("Stop service transaction should be processed");
+    assert!(
+        !is_inc_service_api_available(&mut testkit),
+        "Inc service API should not be available after stopping."
+    );
+
+    // Check that we cannot freeze service now.
+    let change = ConfigPropose::immediate(2).freeze_service(instance_id);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let err = execute_transaction(&mut testkit, change)
+        .expect_err("Freeze service transaction should not be processed");
+    let expected_err = ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+        .with_description_containing(
+            "Discarded an attempt to freeze service `inc` with inappropriate status (stopped)",
+        );
+    assert_eq!(err, expected_err);
+}
+
+#[test]
+fn start_freeze_and_stop_inc_service() {
+    let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
+    let instance_id = start_inc_service(&mut testkit).spec.id;
+
+    // Freeze service instance.
+    let change = ConfigPropose::immediate(1).freeze_service(instance_id);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change)
+        .expect("Freeze service transaction should be processed");
+    assert!(
+        is_inc_service_api_available(&mut testkit),
+        "Inc service API should be available after freezing."
+    );
+
+    // Stop the same service instance.
+    let change = ConfigPropose::immediate(2).stop_service(instance_id);
     let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     execute_transaction(&mut testkit, change)
         .expect("Stop service transaction should be processed");
@@ -132,9 +263,7 @@ fn duplicate_stop_service_request() {
         actual_err,
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing(
-                "Discarded multiple instances with the same name in one request."
-            )
+            .with_description_containing("Discarded several actions concerning service with ID 1")
     )
 }
 
@@ -160,7 +289,7 @@ fn stop_already_stopped_service() {
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
-                "Discarded an attempt to stop the already stopped service instance"
+                "Discarded an attempt to stop service `inc` with inappropriate status (stopped)"
             )
     )
 }
@@ -202,7 +331,7 @@ fn resume_active_service() {
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing(
-                "Discarded an attempt to resume not stopped service instance"
+                "Discarded an attempt to resume service `inc` with inappropriate status (active)"
             )
     )
 }
@@ -226,8 +355,22 @@ fn multiple_stop_resume_requests() {
         actual_err,
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing(
-                "Discarded multiple instances with the same name in one request"
-            )
+            .with_description_containing("Discarded several actions concerning service with ID 1")
     )
+}
+
+#[test]
+fn freeze_without_runtime_support() {
+    let mut testkit = create_testkit_with_additional_runtime();
+    let change = ConfigPropose::new(0, Height(5)).freeze_service(100);
+    let keypair = testkit.us().service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let actual_err =
+        execute_transaction(&mut testkit, change).expect_err("Transaction shouldn't be processed");
+
+    assert_eq!(
+        actual_err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing("Cannot freeze service `100:test`")
+    );
 }

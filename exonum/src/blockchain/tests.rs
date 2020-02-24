@@ -18,7 +18,6 @@ use exonum_merkledb::{
     access::{Access, FromAccess},
     BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot, SystemSchema,
 };
-use futures::{Future, IntoFuture};
 use pretty_assertions::assert_eq;
 use semver::Version;
 
@@ -38,6 +37,7 @@ use crate::{
     runtime::{
         catch_panic,
         migrations::{InitMigrationError, MigrationScript},
+        oneshot::Receiver,
         AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
         ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
@@ -255,16 +255,13 @@ impl Default for RuntimeInspector {
 }
 
 impl Runtime for RuntimeInspector {
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        _deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
         assert!(self.available.contains(&artifact));
         assert!(!self.deployed.contains(&artifact));
 
         self.deployed.push(artifact);
-        Box::new(Ok(()).into_future())
+
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {

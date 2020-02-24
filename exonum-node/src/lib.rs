@@ -1107,12 +1107,11 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
+    fn run_handler(mut self, handshake_params: HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
         let pool_size = self.thread_pool_size;
         let (handler_part, network_part, internal_part) = self.into_reactor();
-        let handshake_params = handshake_params.clone();
 
         let network_thread = thread::spawn(move || {
             let mut core = Core::new().map_err(into_failure)?;
@@ -1152,8 +1151,7 @@ impl Node {
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
-        self.run_handler(&handshake_params)?;
-        Ok(())
+        self.run_handler(handshake_params)
     }
 
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {

@@ -25,9 +25,10 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        oneshot,
         versioning::Version,
         ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceState,
-        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeFeature, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -183,6 +184,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.runtime.initialize(blockchain)
     }
 
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        self.runtime.is_supported(feature)
+    }
+
     fn on_resume(&mut self) {
         self.events.push(RuntimeEvent::ResumeRuntime);
         self.runtime.on_resume()
@@ -192,7 +197,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         test_service_artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> oneshot::Receiver {
         self.events.push(RuntimeEvent::DeployArtifact(
             test_service_artifact.clone(),
             deploy_spec.clone(),
@@ -426,6 +431,7 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         context
             .supervisor_extensions()
             .initiate_migration(request.artifact, &request.instance_name)
+            .map(drop)
     }
 
     fn commit_migration(
