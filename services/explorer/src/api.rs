@@ -255,7 +255,7 @@
 //! Note that the endpoint returns the normal execution status `Ok(())` if the queried service
 //! was not active at the specified height.
 //!
-//! [`CallStatusQuery`]: enum.CallStatusQuery.html
+//! [`CallStatusQuery`]: struct.CallStatusQuery.html
 //!
 //! ```
 //! # use exonum::{
