@@ -378,6 +378,13 @@ fn test_migration_workflow(freeze_service: bool) {
     assert_matches!(ty, MigrationType::Async);
     // Migration scripts should not start executing immediately, but only on block commit.
     assert!(!rig.migration_threads().contains_key(&service.name));
+    // Check that the migration target cannot be unloaded.
+    let err = Dispatcher::unload_artifact(&fork, &new_artifact).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::CannotUnloadArtifact)
+            .with_description_containing("`100:good` references it as the data migration target")
+    );
     rig.create_block(fork);
 
     // Check that the migration was initiated.
@@ -1304,7 +1311,7 @@ fn two_part_migration() {
     let mut rig = Rig::new();
     let old_artifact = rig.deploy_artifact("complex", "0.1.1".parse().unwrap());
     let new_artifact = rig.deploy_artifact("complex", "0.3.7".parse().unwrap());
-    let service = rig.initialize_service(old_artifact, "test");
+    let service = rig.initialize_service(old_artifact.clone(), "test");
     rig.stop_service(&service);
 
     // First part of migration.
@@ -1332,6 +1339,12 @@ fn two_part_migration() {
     let schema = DispatcherSchema::new(&snapshot);
     let instance_state = schema.get_instance(service.id).unwrap();
     assert_eq!(instance_state.data_version, Some(Version::new(0, 2, 0)));
+
+    // The old artifact can now be unloaded, since it's no longer associated with the service.
+    // In other words, the service cannot be started with the old artifact due to a different
+    // data layout, so it can be removed from the blockchain.
+    let fork = rig.blockchain.fork();
+    Dispatcher::unload_artifact(&fork, &old_artifact).unwrap();
 
     // Second part of migration.
     let fork = rig.blockchain.fork();

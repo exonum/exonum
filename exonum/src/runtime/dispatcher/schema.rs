@@ -198,7 +198,7 @@ impl<T: Access> Schema<T> {
         // Check that the artifact has no dependent services. A service is dependent on
         // the artifact if it references it as the current artifact, or its migration target.
         for instance in self.instances().values() {
-            if instance.spec.artifact == *artifact {
+            if instance.associated_artifact() == Some(artifact) {
                 let msg = format!(
                     "Cannot unload artifact `{}`: service `{}` references it \
                      as the current artifact",
@@ -208,7 +208,11 @@ impl<T: Access> Schema<T> {
                 return Err(CoreError::CannotUnloadArtifact.with_description(msg));
             }
 
-            if let Some(InstanceStatus::Migrating(migration)) = instance.status {
+            let status = instance
+                .pending_status
+                .as_ref()
+                .or_else(|| instance.status.as_ref());
+            if let Some(InstanceStatus::Migrating(migration)) = status {
                 if migration.target == *artifact {
                     let msg = format!(
                         "Cannot unload artifact `{}`: service `{}` references it \
