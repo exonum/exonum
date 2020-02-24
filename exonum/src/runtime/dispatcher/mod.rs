@@ -267,11 +267,12 @@ impl Dispatcher {
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
+
             self.deploy_artifact(artifact.clone(), state.deploy_spec)
                 .unwrap_or_else(|err| {
                     panic!(
-                        "BUG: Can't restore state, artifact {:?} has not been deployed now, \
-                         but was deployed previously. Reported error: {}",
+                        "BUG: Cannot restore blockchain state; artifact `{}` failed to deploy \
+                         after successful previous deployment. Reported error: {}",
                         artifact, err
                     );
                 });
