@@ -53,7 +53,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-merkledb
 
 - Index clearing now uses range deletions for RocksDB, providing
-  a significant performance boost for this operation. (#1791) 
+  a significant performance boost for this operation. (#1791)
 
 ### Bug Fixes
 
