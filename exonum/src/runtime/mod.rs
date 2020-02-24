@@ -329,11 +329,21 @@ impl fmt::Display for RuntimeFeature {
 ///
 /// ```text
 /// LIFE ::= initialize (GENESIS | RESUME) BLOCK* shutdown
-/// GENESIS ::= (deploy_artifact | initiate_adding_service update_service_status)* after_commit
-/// RESUME ::= (deploy_artifact | update_service_status)* on_resume
+/// GENESIS ::=
+///     deploy_artifact*
+///     (initiate_adding_service update_service_status)*
+///     after_commit
+/// RESUME ::= (deploy_artifact | update_service_status | migrate)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= before_transactions* (execute | initiate_adding_service)* after_transactions*
-/// COMMIT ::= deploy_artifact* update_service_status* after_commit
+/// PROPOSAL ::=
+///     (before_transactions CALL*)*
+///     (execute CALL*)*
+///     (after_transactions CALL*)*
+/// CALL ::= execute | initiate_adding_service | initiate_resuming_service | migrate
+/// COMMIT ::=
+///     (deploy_artifact | unload_artifact)*
+///     (update_service_status | migrate)*
+///     after_commit
 /// ```
 ///
 /// The ordering for the "read-only" methods `is_artifact_deployed` and `is_supported` in relation
@@ -395,7 +405,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The default implementation does nothing.
     fn on_resume(&mut self) {}
 
-    /// A request to deploy an artifact with the given identifier and an additional deploy
+    /// Requests to deploy an artifact with the given identifier and an additional deploy
     /// specification.
     ///
     /// This method is called *once* for a specific artifact during the `Runtime` lifetime:
@@ -407,11 +417,31 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Core guarantees that there will be no request to deploy an artifact which is already deployed,
     /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
     /// a bug in core.
-    // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
     fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> oneshot::Receiver;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
-    fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
+    fn is_artifact_deployed(&self, artifact: &ArtifactId) -> bool;
+
+    /// Requests to unload an artifact with the given identifier. Unloading may free resources
+    /// (e.g., RAM) associated with the artifact.
+    ///
+    /// The following invariants are guaranteed to hold when this call is performed:
+    ///
+    /// - The artifact is deployed
+    /// - There are no services with any status associated with the artifact, either as
+    ///   an artifact [responsible for service logic][assoc-artifact] or as a [migration target]
+    ///   of the data migration in a service.
+    ///
+    /// The default implementation does nothing. While this may be inefficient, this implementation
+    /// is logically accurate. Indeed, the runtime retains resources associated with the artifact
+    /// (until the node is restarted), but on the blockchain level, the artifact is considered
+    /// unloaded.
+    ///
+    /// [assoc-artifact]: struct.InstanceState.html#method.associated_artifact
+    /// [migration target]: migrations/struct.InstanceMigration.html#structfield.target
+    fn unload_artifact(&mut self, artifact: &ArtifactId) {
+        // The default implementation does nothing.
+    }
 
     /// Runs the constructor of a new service instance with the given specification
     /// and initial arguments. The constructor can initialize the storage of the service,

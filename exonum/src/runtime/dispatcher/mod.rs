@@ -710,7 +710,11 @@ impl Dispatcher {
                     self.block_until_deployed(artifact, deploy_spec);
                 }
                 ArtifactAction::Unload => {
-                    // FIXME: notify the runtime.
+                    let runtime = self
+                        .runtimes
+                        .get_mut(&artifact.runtime_id)
+                        .expect("BUG: Cannot obtain runtime for an unloaded artifact");
+                    runtime.unload_artifact(&artifact);
                 }
             }
         }
