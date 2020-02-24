@@ -31,6 +31,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `supervisor/services` endpoint has been added which obtains information
   about deployed artifacts and available services. (#1790)
 
+### Internal Improvements
+
+#### exonum-merkledb
+
+- Index clearing now uses range deletions for RocksDB, providing
+  a significant performance boost for this operation. (#1791) 
+
 ### Bug Fixes
 
 #### exonum-node
@@ -605,7 +612,7 @@ Key points:
 
 - #1345: Implement a new `Transaction` trait [ECR-3222]
 
-- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+- #1361: First step of persistent dynamic services implementation [ECR-3276]
 
 - #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
 
