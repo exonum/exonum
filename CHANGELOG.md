@@ -20,16 +20,40 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Public api module has been removed. List of endpoints from private api has
   been changed. (#1790) Current list of the endpoints:
+
   - `v1/info` - obtains information about the node;
   - `v1/stats` - obtains statistics of the node;
   - `v1/peers` - adds a peer to the Exonum node;
   - `v1/consensus_status` - enables or disables consensus on the node;
   - `v1/shutdown` - shuts down the node.
 
+### New Features
+
+#### exonum
+
+- Exonum now supports service freezing. A frozen service has fixed state (i.e.,
+  does not process transactions and service hooks), but, unlike stopped services,
+  the service HTTP API remains active. (#1780)
+
 #### exonum-supervisor
+
+- Supervisor service supports service freezing. (#1781)
 
 - `supervisor/services` endpoint has been added which obtains information
   about deployed artifacts and available services. (#1790)
+
+#### exonum-rust-runtime
+
+- Rust services support freezing. (#1780)
+
+- HTTP API of Rust services is now switched on during data migrations. (#1780)
+
+### Internal Improvements
+
+#### exonum-merkledb
+
+- Index clearing now uses range deletions for RocksDB, providing
+  a significant performance boost for this operation. (#1791)
 
 ### Bug Fixes
 
@@ -605,7 +629,7 @@ Key points:
 
 - #1345: Implement a new `Transaction` trait [ECR-3222]
 
-- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+- #1361: First step of persistent dynamic services implementation [ECR-3276]
 
 - #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
 
