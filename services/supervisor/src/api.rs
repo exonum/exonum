@@ -55,7 +55,8 @@
 //! use exonum_supervisor::Supervisor;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_rust_service(Supervisor)
 //!     .with_artifact(Supervisor.artifact_id())
@@ -65,7 +66,8 @@
 //! let consensus_config: ConsensusConfig = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("consensus-config")?;
+//!     .get("consensus-config")
+//!     .await?;
 //!
 //! # Ok(())
 //! # }
@@ -89,8 +91,9 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
-//!
-//! # fn main() -> Result<(), failure::Error> {
+//! 
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -101,7 +104,8 @@
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("config-proposal")?;
+//!     .get("config-proposal")
+//!     .await?;
 //!
 //! // Will be none, since we did not send a proposal.
 //! assert!(pending_proposal.is_none());
@@ -156,7 +160,8 @@
 //! #     Vec::new()
 //! # }
 //! #
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -176,7 +181,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&deploy_request)
-//!     .post("deploy-artifact")?;
+//!     .post("deploy-artifact")
+//!     .await?;
 //!
 //! let block = testkit.create_block();
 //! let result = block[tx_hash].status();
@@ -220,7 +226,8 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_rust_service(Supervisor)
 //!     .with_artifact(Supervisor.artifact_id())
@@ -242,7 +249,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&migration_request)
-//!     .post("migrate")?;
+//!     .post("migrate")
+//!     .await?;
 //!
 //! let block = testkit.create_block();
 //! let result = block[tx_hash].status();
@@ -293,7 +301,8 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -309,7 +318,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&proposal)
-//!     .post("propose-config")?;
+//!     .post("propose-config")
+//!     .await?;
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
@@ -357,7 +367,8 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
@@ -383,7 +394,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&config_vote)
-//!     .post("confirm-config")?;
+//!     .post("confirm-config")
+//!     .await?;
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
@@ -420,7 +432,8 @@
 //! use exonum_supervisor::Supervisor;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -431,7 +444,8 @@
 //! let configuration_number: u64 = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
-//!     .get("configuration-number")?;
+//!     .get("configuration-number")
+//!     .await?;
 //!
 //! // There was no configuration proposals, so configuration number is 0.
 //! assert_eq!(configuration_number, 0);
@@ -457,7 +471,8 @@
 //! use exonum_supervisor::{mode::Mode, Supervisor, SupervisorConfig};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -468,7 +483,8 @@
 //! let config: SupervisorConfig = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
-//!     .get("supervisor-config")?;
+//!     .get("supervisor-config")
+//!     .await?;
 //!
 //! assert_eq!(config.mode, Mode::Simple);
 //! # Ok(())
@@ -506,7 +522,8 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -526,7 +543,8 @@
 //! #     .api()
 //! #     .private(ApiKind::Service("supervisor"))
 //! #     .query(&deploy_request)
-//! #     .post("deploy-artifact")?;
+//! #     .post("deploy-artifact")
+//! #     .await?;
 //! # testkit.create_block();
 //! let query = DeployInfoQuery::from(deploy_request);
 //!
@@ -534,7 +552,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("deploy-status")?;
+//!     .get("deploy-status")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -561,7 +580,8 @@
 //! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -579,7 +599,7 @@
 //! #     .api()
 //! #     .private(ApiKind::Service("supervisor"))
 //! #     .query(&migration_request)
-//! #     .post("migrate")?;
+//! #     .post("migrate").await?;
 //! # testkit.create_block();
 //! let query = MigrationInfoQuery::from(migration_request);
 //!
@@ -587,7 +607,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("migration-status")?;
+//!     .get("migration-status")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
