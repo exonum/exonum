@@ -117,6 +117,7 @@ pub mod _bench_types {
 /// This enum is not intended to be exhaustively matched. New variants may be added to it
 /// without breaking semver compatibility.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
@@ -124,8 +125,6 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 /// Node timeout types.

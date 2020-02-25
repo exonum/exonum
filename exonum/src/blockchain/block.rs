@@ -259,6 +259,7 @@ impl BlockProof {
 
 /// Errors that can occur during verification of `BlockProof`s and `IndexProof`s.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum ProofError {
     /// The block is authorized by an insufficient number of precommits.
     #[fail(display = "Insufficient number of precommits")]
@@ -298,11 +299,6 @@ pub enum ProofError {
     /// Index proof is incorrect.
     #[fail(display = "index proof is incorrect: {}", _0)]
     IncorrectIndexProof(#[fail(cause)] ValidationError<MapProofError>),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[fail(display = "")]
-    __NonExhaustive,
 }
 
 /// Proof of authenticity for a single index within the database.

@@ -42,12 +42,10 @@ const EMPTY_MAP_HASH: [u8; HASH_SIZE] = [
 /// Different hashes for leaf and branch nodes of the list are used to secure Merkle tree
 /// from the pre-image attack. See more information [here][rfc6962].
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// [rfc6962]: https://tools.ietf.org/html/rfc6962#section-2.1
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum HashTag {
     /// Hash prefix of a blob (i.e., a type implementing [`BinaryValue`], which is stored in the DB
     /// as byte sequence).
@@ -64,10 +62,6 @@ pub enum HashTag {
     /// Hash prefix of a branch node in a Merkle Patricia tree built for
     /// a [Merkelized map](indexes/proof_map/struct.ProofMapIndex.html).
     MapBranchNode = 4,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive = 255,
 }
 
 impl HashTag {
@@ -264,10 +258,8 @@ impl ObjectHash for [u8] {
 
 /// Errors that can occur while validating a `ListProof` or `MapProof` against
 /// a trusted collection hash.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum ValidationError<E: Fail> {
     /// The hash of the proof is not equal to the trusted root hash.
     #[fail(display = "hash of the proof is not equal to the trusted hash of the index")]
@@ -276,11 +268,6 @@ pub enum ValidationError<E: Fail> {
     /// The proof is malformed.
     #[fail(display = "Malformed proof: {}", _0)]
     Malformed(#[fail(cause)] E),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[fail(display = "")]
-    __NonExhaustive,
 }
 
 #[cfg(test)]

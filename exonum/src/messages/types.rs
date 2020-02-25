@@ -129,20 +129,14 @@ impl Precommit {
 /// This type is intentionally kept as minimal as possible to ensure compatibility
 /// even if the consensus details change. Most of consensus messages are defined separately
 /// in the `exonum-node` crate; they are not public.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(BinaryValue, ObjectHash)]
+#[non_exhaustive]
 pub enum CoreMessage {
     /// Transaction message.
     AnyTx(AnyTx),
     /// Precommit message.
     Precommit(Precommit),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl ProtobufConvert for CoreMessage {
@@ -157,7 +151,6 @@ impl ProtobufConvert for CoreMessage {
             CoreMessage::Precommit(precommit) => {
                 pb.set_precommit(precommit.to_pb());
             }
-            CoreMessage::__NonExhaustive => unreachable!("Never actually constructed"),
         }
         pb
     }

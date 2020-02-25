@@ -149,8 +149,6 @@ impl<T: Access> Schema<T> {
                 .and_then(|instance_name| instances.get(&instance_name)),
 
             InstanceQuery::Name(instance_name) => instances.get(instance_name),
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 

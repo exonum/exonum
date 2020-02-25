@@ -320,10 +320,8 @@ pub trait RequireArtifact {
 }
 
 /// Artifact requirement error.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum ArtifactReqError {
     /// No service with the specified identifier exists.
     #[fail(display = "No service with the specified identifier exists")]
@@ -347,10 +345,6 @@ pub enum ArtifactReqError {
         /// Actual artifact version.
         actual: Version,
     },
-
-    #[doc(hidden)]
-    #[fail(display = "")] // Never actually generated.
-    __NonExhaustive,
 }
 
 impl From<ArtifactReqError> for ExecutionError {

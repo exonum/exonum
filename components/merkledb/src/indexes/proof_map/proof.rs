@@ -102,10 +102,8 @@ impl<'de> serde::Deserialize<'de> for ProofPath {
 }
 
 /// An error returned when a map proof is invalid.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
     #[fail(display = "non-terminal node as a single key in proof")]
@@ -127,11 +125,6 @@ pub enum MapProofError {
     /// Entries in the proof are not ordered by increasing path.
     #[fail(display = "invalid path ordering")]
     InvalidOrdering(ProofPath, ProofPath),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[fail(display = "")]
-    __NonExhaustive,
 }
 
 // Used instead of `(ProofPath, Hash)` only for the purpose of clearer (de)serialization.

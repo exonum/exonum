@@ -211,7 +211,6 @@ impl ProtobufConvert for CallSite {
             }
             CallType::BeforeTransactions => pb.set_call_type(BEFORE_TRANSACTIONS),
             CallType::AfterTransactions => pb.set_call_type(AFTER_TRANSACTIONS),
-            CallType::__NonExhaustive => unreachable!(),
         }
         pb
     }
@@ -234,11 +233,9 @@ impl ProtobufConvert for CallSite {
 }
 
 /// Type of a call to a service.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum CallType {
     /// Service initialization.
     Constructor,
@@ -258,11 +255,6 @@ pub enum CallType {
     BeforeTransactions,
     /// Hook executing after processing transactions in a block.
     AfterTransactions,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[serde(skip)]
-    __NonExhaustive,
 }
 
 impl fmt::Display for CallType {
@@ -278,7 +270,6 @@ impl fmt::Display for CallType {
             }
             CallType::BeforeTransactions => formatter.write_str("before_transactions hook"),
             CallType::AfterTransactions => formatter.write_str("after_transactions hook"),
-            CallType::__NonExhaustive => unreachable!(),
         }
     }
 }

@@ -98,8 +98,6 @@ impl CommittedServices {
                 let resolved_id = *self.instance_names.get(name)?;
                 (resolved_id, self.instances.get(&resolved_id)?)
             }
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
         Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
@@ -128,10 +126,8 @@ impl MigrationThread {
             Ok(Ok(hash)) => Ok(hash),
             Ok(Err(MigrationError::Custom(description))) => Err(description),
             Ok(Err(MigrationError::Helper(e))) => {
-                // TODO: Is panicking OK here?
                 panic!("Migration terminated with database error: {}", e);
             }
-            Ok(Err(MigrationError::__NonExhaustive)) => unreachable!("Never actually constructed"),
             Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
         MigrationStatus(result)
@@ -950,9 +946,7 @@ impl Mailbox {
 pub type ThenFn = Box<dyn FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send>;
 
 /// Action to be performed by the dispatcher.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
+#[non_exhaustive]
 pub enum Action {
     /// Start artifact deployment.
     StartDeploy {
@@ -964,10 +958,6 @@ pub enum Action {
         /// For example, this closure may create a transaction with the deployment confirmation.
         then: ThenFn,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl fmt::Debug for Action {
@@ -978,7 +968,6 @@ impl fmt::Debug for Action {
                 .field("artifact", artifact)
                 .field("spec", spec)
                 .finish(),
-            Action::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -995,8 +984,6 @@ impl Action {
                     error!("Deploying artifact {:?} failed: {}", artifact, e);
                 });
             }
-
-            Action::__NonExhaustive => unreachable!(),
         }
     }
 }

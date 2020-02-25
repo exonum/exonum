@@ -81,14 +81,12 @@ use crate::proto::schema::errors as errors_proto;
 /// continuing node operation is impossible. A panic will not be caught and will lead
 /// to the node termination.
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// [`ExecutionError`]: struct.ExecutionError.html
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
 /// [`CoreError`]: enum.CoreError.html
 /// [`CommonError`]: enum.CommonError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
     ///
@@ -126,10 +124,6 @@ pub enum ErrorKind {
         /// Error codes can have different meanings for different services.
         code: u8,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl ErrorKind {
@@ -140,7 +134,6 @@ impl ErrorKind {
             ErrorKind::Core { code } => (errors_proto::ErrorKind::CORE, code),
             ErrorKind::Runtime { code } => (errors_proto::ErrorKind::RUNTIME, code),
             ErrorKind::Service { code } => (errors_proto::ErrorKind::SERVICE, code),
-            ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 
@@ -171,7 +164,6 @@ impl Display for ErrorKind {
             ErrorKind::Core { code } => write!(f, "core:{}", code),
             ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
             ErrorKind::Service { code } => write!(f, "service:{}", code),
-            ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 }

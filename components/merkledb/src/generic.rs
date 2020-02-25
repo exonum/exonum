@@ -115,13 +115,11 @@ use crate::{
 /// (such as a `Snapshot`) is used as the base. The caller is advised to check
 /// mutability in advance with the help of [`is_mutable()`].
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// [`RawAccess`]: ../access/trait.RawAccess.html
 /// [`RawAccessMut`]: ../access/trait.RawAccessMut.html
 /// [`is_mutable()`]: #method.is_mutable
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum GenericRawAccess<'a> {
     /// Borrowed snapshot.
     Snapshot(&'a dyn Snapshot),
@@ -135,10 +133,6 @@ pub enum GenericRawAccess<'a> {
     ReadonlyFork(ReadonlyFork<'a>),
     /// Owned readonly fork.
     OwnedReadonlyFork(OwnedReadonlyFork),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl GenericRawAccess<'_> {
@@ -203,8 +197,6 @@ impl AsReadonly for GenericRawAccess<'_> {
             // Translate access to readonly for forks.
             Fork(fork) => ReadonlyFork(fork.readonly()),
             OwnedFork(fork) => OwnedReadonlyFork(fork.as_readonly()),
-
-            __NonExhaustive => unreachable!(),
         }
     }
 }
@@ -249,7 +241,6 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
             GenericRawAccess::OwnedFork(fork) => fork.snapshot(),
             GenericRawAccess::ReadonlyFork(ro_fork) => ro_fork.snapshot(),
             GenericRawAccess::OwnedReadonlyFork(ro_fork) => ro_fork.snapshot(),
-            GenericRawAccess::__NonExhaustive => unreachable!(),
         }
     }
 
@@ -266,7 +257,6 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
             GenericRawAccess::OwnedReadonlyFork(ro_fork) => {
                 GenericChanges::Ref(ro_fork.changes(address))
             }
-            GenericRawAccess::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -275,10 +265,8 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
 impl RawAccessMut for GenericRawAccess<'_> {}
 
 /// Generic access containing any kind of accesses supported by the database.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum GenericAccess<T> {
     /// Access to the entire database.
     Raw(T),
@@ -288,10 +276,6 @@ pub enum GenericAccess<T> {
     Migration(Migration<T>),
     /// Scratchpad for a migration.
     Scratchpad(Scratchpad<T>),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl<T: RawAccess> From<T> for GenericAccess<T> {
@@ -330,7 +314,6 @@ impl<T: RawAccess> Access for GenericAccess<T> {
             GenericAccess::Prefixed(access) => access.get_index_metadata(addr),
             GenericAccess::Migration(access) => access.get_index_metadata(addr),
             GenericAccess::Scratchpad(access) => access.get_index_metadata(addr),
-            GenericAccess::__NonExhaustive => unreachable!(),
         }
     }
 
@@ -344,7 +327,6 @@ impl<T: RawAccess> Access for GenericAccess<T> {
             GenericAccess::Prefixed(access) => access.get_or_create_view(addr, index_type),
             GenericAccess::Migration(access) => access.get_or_create_view(addr, index_type),
             GenericAccess::Scratchpad(access) => access.get_or_create_view(addr, index_type),
-            GenericAccess::__NonExhaustive => unreachable!(),
         }
     }
 
@@ -358,7 +340,6 @@ impl<T: RawAccess> Access for GenericAccess<T> {
             GenericAccess::Prefixed(access) => access.group_keys(base_addr),
             GenericAccess::Migration(access) => access.group_keys(base_addr),
             GenericAccess::Scratchpad(access) => access.group_keys(base_addr),
-            GenericAccess::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -375,7 +356,6 @@ impl ErasedAccess<'_> {
             GenericAccess::Prefixed(prefixed) => prefixed.access().is_mutable(),
             GenericAccess::Migration(migration) => migration.access().is_mutable(),
             GenericAccess::Scratchpad(scratchpad) => scratchpad.access().is_mutable(),
-            GenericAccess::__NonExhaustive => unreachable!(),
         }
     }
 }

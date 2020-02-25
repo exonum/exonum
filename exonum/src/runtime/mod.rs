@@ -244,20 +244,14 @@ mod types;
 pub const SUPERVISOR_INSTANCE_ID: InstanceId = 0;
 
 /// List of predefined runtimes.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
+#[non_exhaustive]
 pub enum RuntimeIdentifier {
     /// Built-in Rust runtime.
     Rust = 0,
     /// Exonum Java Binding runtime.
     Java = 1,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl From<RuntimeIdentifier> for u32 {
@@ -281,30 +275,23 @@ impl fmt::Display for RuntimeIdentifier {
         match self {
             RuntimeIdentifier::Rust => formatter.write_str("Rust runtime"),
             RuntimeIdentifier::Java => formatter.write_str("Java runtime"),
-            RuntimeIdentifier::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 }
 
 /// Optional features that may or may not be supported by a particular `Runtime`.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum RuntimeFeature {
     /// Freezing services: disabling APIs mutating service state (e.g., transactions)
     /// while leaving read-only APIs switched on.
     FreezingServices,
-
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl fmt::Display for RuntimeFeature {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RuntimeFeature::FreezingServices => formatter.write_str("freezing services"),
-            RuntimeFeature::__NonExhaustive => unreachable!(),
         }
     }
 }

@@ -180,7 +180,6 @@ impl Runtime for SampleRuntime {
     fn is_supported(&self, feature: &RuntimeFeature) -> bool {
         match feature {
             RuntimeFeature::FreezingServices => self.runtime_type == SampleRuntimes::First as u32,
-            _ => false,
         }
     }
 

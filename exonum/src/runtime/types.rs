@@ -384,19 +384,13 @@ impl Display for InstanceSpec {
 }
 
 /// Allows to query a service instance by either of the two identifiers.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum InstanceQuery<'a> {
     /// Query by an instance ID.
     Id(InstanceId),
     /// Query by an instance name.
     Name(&'a str),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl From<InstanceId> for InstanceQuery<'_> {
@@ -412,19 +406,13 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 }
 
 /// Status of an artifact deployment.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ArtifactStatus {
     /// The artifact is pending deployment.
     Pending = 1,
     /// The artifact has been successfully deployed.
     Active = 2,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl Display for ArtifactStatus {
@@ -432,7 +420,6 @@ impl Display for ArtifactStatus {
         match self {
             ArtifactStatus::Active => f.write_str("active"),
             ArtifactStatus::Pending => f.write_str("pending"),
-            ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 }
@@ -444,7 +431,6 @@ impl ProtobufConvert for ArtifactStatus {
         match self {
             ArtifactStatus::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
             ArtifactStatus::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
-            ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
 
@@ -508,12 +494,10 @@ impl InstanceMigration {
 }
 
 /// Status of a service instance.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(BinaryValue)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum InstanceStatus {
     /// The service instance is active.
     Active,
@@ -524,10 +508,6 @@ pub enum InstanceStatus {
     Frozen,
     /// The service instance is migrating to the specified artifact.
     Migrating(Box<InstanceMigration>),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl InstanceStatus {
@@ -601,7 +581,6 @@ impl Display for InstanceStatus {
             InstanceStatus::Stopped => "stopped",
             InstanceStatus::Frozen => "frozen",
             InstanceStatus::Migrating(..) => "migrating",
-            InstanceStatus::__NonExhaustive => unreachable!("Never actually constructed"),
         })
     }
 }
@@ -623,7 +602,6 @@ impl InstanceStatus {
             Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
             Some(InstanceStatus::Frozen) => pb.set_simple(FROZEN),
             Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
-            Some(InstanceStatus::__NonExhaustive) => unreachable!("Never actually constructed"),
         }
         pb
     }
@@ -875,6 +853,7 @@ impl ProtobufConvert for MigrationStatus {
 /// without breaking semver compatibility.
 #[derive(Debug, PartialEq, Clone)]
 #[derive(BinaryValue, ObjectHash)]
+#[non_exhaustive]
 pub enum Caller {
     /// A usual transaction from the Exonum client authorized by its key pair.
     Transaction {
@@ -893,10 +872,6 @@ pub enum Caller {
     /// This kind of authorization is used for `before_transactions` / `after_transactions`
     /// calls to the service instances, and for initialization of the built-in services.
     Blockchain,
-
-    // Hidden variant to prevent exhaustive matching.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl Caller {
@@ -946,7 +921,6 @@ impl ProtobufConvert for Caller {
             Caller::Transaction { author } => pb.set_transaction_author(author.to_pb()),
             Caller::Service { instance_id } => pb.set_instance_id(*instance_id),
             Caller::Blockchain => pb.set_blockchain(Default::default()),
-            Caller::__NonExhaustive => unreachable!("variant is never constructed"),
         }
         pb
     }
