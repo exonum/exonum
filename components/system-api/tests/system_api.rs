@@ -40,7 +40,11 @@ async fn healthcheck() {
     let mut testkit = create_testkit();
     let api = testkit.api();
 
-    let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").await.unwrap();
+    let info: HealthCheckInfo = api
+        .public(ApiKind::System)
+        .get("v1/healthcheck")
+        .await
+        .unwrap();
     let expected = HealthCheckInfo {
         consensus_status: ConsensusStatus::Enabled,
         connected_peers: 0,

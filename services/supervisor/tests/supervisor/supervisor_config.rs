@@ -78,8 +78,8 @@ fn incorrect_configuration() {
 }
 
 /// Checks that configuration of the supervisor can be changed via `Configure` interface.
-#[test]
-fn configure_call() {
+#[actix_rt::test]
+async fn configure_call() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
@@ -100,7 +100,7 @@ fn configure_call() {
     };
 
     // Apply it (in simple mode no confirmations required).
-    create_proposal(&testkit.api(), config_proposal);
+    create_proposal(&testkit.api(), config_proposal).await;
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
     // Check that supervisor now in the decentralized mode.
@@ -108,8 +108,8 @@ fn configure_call() {
 }
 
 /// Checks that `supervisor-config` works as expected.
-#[test]
-fn supervisor_config_api() {
+#[actix_rt::test]
+async fn supervisor_config_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
@@ -120,6 +120,7 @@ fn supervisor_config_api() {
             .api()
             .private(ApiKind::Service("supervisor"))
             .get::<SupervisorConfig>("supervisor-config")
+            .await
             .unwrap(),
         Supervisor::simple_config(),
     );
@@ -135,6 +136,7 @@ fn supervisor_config_api() {
             .api()
             .private(ApiKind::Service("supervisor"))
             .get::<SupervisorConfig>("supervisor-config")
+            .await
             .unwrap(),
         Supervisor::decentralized_config(),
     );

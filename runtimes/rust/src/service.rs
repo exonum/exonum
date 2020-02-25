@@ -22,7 +22,7 @@ use exonum::{
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures::future::{Future, FutureExt, BoxFuture};
+use futures::future::{BoxFuture, Future, FutureExt};
 
 use std::fmt::{self, Debug};
 

@@ -22,57 +22,62 @@ use exonum_testkit::{ApiKind, TestKit, TestKitApi};
 use crate::utils::*;
 use exonum_supervisor::{ConfigProposalWithHash, ConfigPropose, ConfigVote, SupervisorInterface};
 
-fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
+async fn actual_consensus_config(api: &TestKitApi) -> ConsensusConfig {
     api.public(ApiKind::Service("supervisor"))
         .get("consensus-config")
+        .await
         .unwrap()
 }
 
-fn current_config_proposal(api: &TestKitApi) -> Option<ConfigProposalWithHash> {
+async fn current_config_proposal(api: &TestKitApi) -> Option<ConfigProposalWithHash> {
     api.public(ApiKind::Service("supervisor"))
         .get("config-proposal")
+        .await
         .unwrap()
 }
 
-pub fn create_proposal(api: &TestKitApi, proposal: ConfigPropose) -> Hash {
+pub async fn create_proposal(api: &TestKitApi, proposal: ConfigPropose) -> Hash {
     let hash: Hash = api
         .private(ApiKind::Service("supervisor"))
         .query(&proposal)
         .post("propose-config")
+        .await
         .unwrap();
     hash
 }
 
-fn confirm_config(api: &TestKitApi, confirm: ConfigVote) -> Hash {
+async fn confirm_config(api: &TestKitApi, confirm: ConfigVote) -> Hash {
     let hash: Hash = api
         .private(ApiKind::Service("supervisor"))
         .query(&confirm)
         .post("confirm-config")
+        .await
         .unwrap();
     hash
 }
 
-fn configuration_number(api: &TestKitApi) -> u64 {
+async fn configuration_number(api: &TestKitApi) -> u64 {
     api.private(ApiKind::Service("supervisor"))
         .get("configuration-number")
+        .await
         .unwrap()
 }
 
-#[test]
-fn test_consensus_config_api() {
+#[actix_rt::test]
+async fn test_consensus_config_api() {
     let mut testkit = testkit_with_supervisor(1);
-    let consensus_config = actual_consensus_config(&testkit.api());
+    let consensus_config = actual_consensus_config(&testkit.api()).await;
     assert_eq!(testkit.consensus_config(), consensus_config);
 }
 
-#[test]
-fn test_config_proposal_api() {
+#[actix_rt::test]
+async fn test_config_proposal_api() {
     let mut testkit = testkit_with_supervisor(1);
-    assert_eq!(current_config_proposal(&testkit.api()), None);
+    assert_eq!(current_config_proposal(&testkit.api()).await, None);
 }
 
-#[test]
-fn test_confirm_proposal_with_api() {
+#[actix_rt::test]
+async fn test_confirm_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
@@ -91,8 +96,9 @@ fn test_confirm_proposal_with_api() {
         .expect("Transaction with change propose discarded.");
 
     // Get proposal info
-    let pending_config =
-        current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
+    let pending_config = current_config_proposal(&testkit.api())
+        .await
+        .expect("Config proposal was not registered.");
     let proposal_hash = config_proposal.object_hash();
     assert_eq!(proposal_hash, pending_config.propose_hash);
     assert_eq!(config_proposal, pending_config.config_propose);
@@ -103,17 +109,18 @@ fn test_confirm_proposal_with_api() {
         ConfigVote {
             propose_hash: pending_config.propose_hash,
         },
-    );
+    )
+    .await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
-    let consensus_config = actual_consensus_config(&testkit.api());
+    let consensus_config = actual_consensus_config(&testkit.api()).await;
     assert_eq!(consensus_proposal, consensus_config);
 }
 
-#[test]
-fn test_send_proposal_with_api() {
+#[actix_rt::test]
+async fn test_send_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
@@ -121,13 +128,14 @@ fn test_send_proposal_with_api() {
         .build();
 
     // Create proposal
-    let hash = create_proposal(&testkit.api(), config_proposal.clone());
+    let hash = create_proposal(&testkit.api(), config_proposal.clone()).await;
     let block = testkit.create_block();
     block[hash].status().unwrap();
 
     // Get proposal info
-    let pending_config =
-        current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
+    let pending_config = current_config_proposal(&testkit.api())
+        .await
+        .expect("Config proposal was not registered.");
     let proposal_hash = config_proposal.object_hash();
     assert_eq!(proposal_hash, pending_config.propose_hash);
     assert_eq!(config_proposal, pending_config.config_propose);
@@ -148,25 +156,26 @@ fn test_send_proposal_with_api() {
         .expect("Transaction with confirmations discarded.");
 
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
-    let consensus_config = actual_consensus_config(&testkit.api());
+    let consensus_config = actual_consensus_config(&testkit.api()).await;
     assert_eq!(consensus_proposal, consensus_config);
 }
 
 /// Applies some config via API.
 /// This function can be used when we need to apply any config and don't care about the process.
-fn apply_config(testkit: &mut TestKit) {
+async fn apply_config(testkit: &mut TestKit) {
     let consensus_proposal = consensus_config_propose_first_variant(testkit);
     let config_proposal = ConfigProposeBuilder::new(CFG_CHANGE_HEIGHT)
         .extend_consensus_config_propose(consensus_proposal)
         .build();
 
     // Create proposal.
-    create_proposal(&testkit.api(), config_proposal);
+    create_proposal(&testkit.api(), config_proposal).await;
     testkit.create_block();
 
     // Get proposal info.
-    let pending_config =
-        current_config_proposal(&testkit.api()).expect("Config proposal was not registered.");
+    let pending_config = current_config_proposal(&testkit.api())
+        .await
+        .expect("Config proposal was not registered.");
 
     // Sign confirmation transaction by second validator.
     let keypair = testkit.network().validators()[1].service_keypair();
@@ -188,18 +197,18 @@ fn apply_config(testkit: &mut TestKit) {
 }
 
 /// Checks that configuration number obtained via API is correct.
-#[test]
-fn test_configuration_number() {
+#[actix_rt::test]
+async fn test_configuration_number() {
     let mut testkit = testkit_with_supervisor(2);
 
     // Check that at the start configuration number is 0.
-    let initial_configuration_number = configuration_number(&testkit.api());
+    let initial_configuration_number = configuration_number(&testkit.api()).await;
     assert_eq!(initial_configuration_number, 0);
 
     // Apply some config.
-    apply_config(&mut testkit);
+    apply_config(&mut testkit).await;
 
     // Check that configuration number is increased.
-    let new_configuration_number = configuration_number(&testkit.api());
+    let new_configuration_number = configuration_number(&testkit.api()).await;
     assert_eq!(new_configuration_number, 1);
 }
