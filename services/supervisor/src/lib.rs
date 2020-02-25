@@ -531,9 +531,11 @@ impl Supervisor {
                 if let Some(tx_sender) = tx_sender {
                     log::trace!("Sending deployment result report {:?}", unconfirmed_request);
                     let confirmation = DeployResult::new(unconfirmed_request, result);
-                    if let Err(e) = tx_sender.report_deploy_result((), confirmation) {
-                        log::error!("Cannot send `DeployResult`: {}", e);
-                    }
+                    AfterCommitContext::spawn(async move {
+                        if let Err(e) = tx_sender.report_deploy_result((), confirmation).await {
+                            log::error!("Cannot send `DeployResult`: {}", e);
+                        }
+                    });
                 }
                 Ok(())
             });
@@ -671,9 +673,11 @@ impl Supervisor {
                 if let Some(tx_sender) = tx_sender {
                     let confirmation = MigrationResult { request, status };
 
-                    if let Err(e) = tx_sender.report_migration_result((), confirmation) {
-                        log::error!("Cannot send `MigrationResult`: {}", e);
-                    }
+                    AfterCommitContext::spawn(async move {
+                        if let Err(e) = tx_sender.report_migration_result((), confirmation).await {
+                            log::error!("Cannot send `MigrationResult`: {}", e);
+                        }
+                    });
                 }
             }
         }

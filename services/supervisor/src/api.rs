@@ -597,7 +597,7 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
 };
-use failure::Fail;
+use futures::FutureExt;
 use serde_derive::{Deserialize, Serialize};
 
 use std::convert::TryFrom;
@@ -709,51 +709,9 @@ impl From<MigrationRequest> for MigrationInfoQuery {
     }
 }
 
-/// Private API specification of the supervisor service.
-trait PrivateApi {
-    /// Error type for the current API implementation.
-    type Error: Fail;
-
-    /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `MigrationRequest` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `ConfigVote` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
-
-    /// Returns the number of processed configurations.
-    fn configuration_number(&self) -> Result<u64, Self::Error>;
-
-    /// Returns an actual supervisor config.
-    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
-
-    /// Returns the state of deployment for the given deploy request.
-    fn deploy_status(&self, request: DeployInfoQuery) -> Result<AsyncEventState, Self::Error>;
-
-    /// Returns the state of migration for the given migration request.
-    fn migration_status(&self, request: MigrationInfoQuery) -> Result<MigrationState, Self::Error>;
-}
-
-trait PublicApi {
-    /// Error type for the current API implementation.
-    type Error: Fail;
-    /// Returns an actual consensus configuration of the blockchain.
-    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
-    /// Returns an pending propose config change.
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
-}
-
 struct ApiImpl(ServiceApiState);
 
+// Private API implementation.
 impl ApiImpl {
     fn broadcaster(&self) -> Result<Broadcaster, api::Error> {
         self.0.broadcaster().ok_or_else(|| {
@@ -762,57 +720,57 @@ impl ApiImpl {
                 .detail("Nod is not a validator")
         })
     }
-}
 
-impl PrivateApi for ApiImpl {
-    type Error = api::Error;
-
-    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
+    async fn deploy_artifact(self, artifact: DeployRequest) -> Result<Hash, api::Error> {
         self.broadcaster()?
             .request_artifact_deploy((), artifact)
+            .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
 
-    fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error> {
+    async fn migrate(self, request: MigrationRequest) -> Result<Hash, api::Error> {
         self.broadcaster()?
             .request_migration((), request)
+            .await
             .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
     }
 
-    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
+    async fn propose_config(self, proposal: ConfigPropose) -> Result<Hash, api::Error> {
         self.broadcaster()?
             .propose_config_change((), proposal)
+            .await
             .map_err(|err| api::Error::internal(err).title("Config propose failed"))
     }
 
-    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
+    async fn confirm_config(self, vote: ConfigVote) -> Result<Hash, api::Error> {
         self.broadcaster()?
             .confirm_config_change((), vote)
+            .await
             .map_err(|err| api::Error::internal(err).title("Config vote failed"))
     }
 
-    fn configuration_number(&self) -> Result<u64, Self::Error> {
+    fn configuration_number(self) -> Result<u64, api::Error> {
         let configuration_number =
             SchemaImpl::new(self.0.service_data()).get_configuration_number();
         Ok(configuration_number)
     }
 
-    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
+    fn supervisor_config(self) -> Result<SupervisorConfig, api::Error> {
         let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
         Ok(config)
     }
 
-    fn deploy_status(&self, query: DeployInfoQuery) -> Result<AsyncEventState, Self::Error> {
+    fn deploy_status(self, query: DeployInfoQuery) -> Result<AsyncEventState, api::Error> {
         let request = DeployRequest::try_from(query)?;
         let schema = SchemaImpl::new(self.0.service_data());
         let status = schema.deploy_states.get(&request).ok_or_else(|| {
-            Self::Error::not_found().title("No corresponding deploy request found")
+            api::Error::not_found().title("No corresponding deploy request found")
         })?;
 
         Ok(status)
     }
 
-    fn migration_status(&self, query: MigrationInfoQuery) -> Result<MigrationState, Self::Error> {
+    fn migration_status(self, query: MigrationInfoQuery) -> Result<MigrationState, api::Error> {
         let request = MigrationRequest::try_from(query)?;
         let schema = SchemaImpl::new(self.0.service_data());
         let status = schema.migration_states.get(&request).ok_or_else(|| {
@@ -823,14 +781,13 @@ impl PrivateApi for ApiImpl {
     }
 }
 
-impl PublicApi for ApiImpl {
-    type Error = api::Error;
-
-    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
+// Public API implementation
+impl ApiImpl {
+    fn consensus_config(&self) -> Result<ConsensusConfig, api::Error> {
         Ok(self.0.data().for_core().consensus_config())
     }
 
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
+    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, api::Error> {
         Ok(SchemaImpl::new(self.0.service_data())
             .public
             .pending_proposal
@@ -843,14 +800,16 @@ pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
         .endpoint_mut("deploy-artifact", |state, query| {
-            ApiImpl(state).deploy_artifact(query)
+            ApiImpl(state).deploy_artifact(query).boxed_local()
         })
-        .endpoint_mut("migrate", |state, query| ApiImpl(state).migrate(query))
+        .endpoint_mut("migrate", |state, query| {
+            ApiImpl(state).migrate(query).boxed_local()
+        })
         .endpoint_mut("propose-config", |state, query| {
-            ApiImpl(state).propose_config(query)
+            ApiImpl(state).propose_config(query).boxed_local()
         })
         .endpoint_mut("confirm-config", |state, query| {
-            ApiImpl(state).confirm_config(query)
+            ApiImpl(state).confirm_config(query).boxed_local()
         })
         .endpoint("configuration-number", |state, _query: ()| {
             ApiImpl(state).configuration_number()

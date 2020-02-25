@@ -274,8 +274,8 @@ fn discard_config_propose_from_auditor() {
 }
 
 /// Checks that config proposal sent through api is executed correctly.
-#[test]
-fn test_send_proposal_with_api() {
+#[actix_rt::test]
+async fn test_send_proposal_with_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
         .with_rust_service(Supervisor)
@@ -302,6 +302,7 @@ fn test_send_proposal_with_api() {
         .private(ApiKind::Service("supervisor"))
         .query(&config_propose)
         .post("propose-config")
+        .await
         .unwrap();
     let block = testkit.create_block();
     block[hash].status().unwrap();
@@ -324,8 +325,8 @@ fn test_send_proposal_with_api() {
 }
 
 /// Tests that deploy request with only one approval (initial) is executed successfully.
-#[test]
-fn deploy_service() {
+#[actix_rt::test]
+async fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
         .with_artifact(Supervisor.artifact_id())
@@ -348,6 +349,7 @@ fn deploy_service() {
         .private(ApiKind::Service("supervisor"))
         .query(&deploy_request)
         .post("deploy-artifact")
+        .await
         .unwrap();
     let block = testkit.create_block();
     // Check that request was executed.
@@ -364,8 +366,8 @@ fn deploy_service() {
 
 /// Attempts to change config without `actual_from` height set.
 /// When `actual_from` is not set, it is expected to be treated as the next height.
-#[test]
-fn actual_from_is_zero() {
+#[actix_rt::test]
+async fn actual_from_is_zero() {
     let initial_validator_count = 4;
     let expected_new_validator_number = initial_validator_count;
 

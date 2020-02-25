@@ -15,13 +15,14 @@
 use exonum::{
     blockchain::{config::InstanceInitParams, ApiSender, SendError},
     crypto::{Hash, KeyPair, PublicKey},
-    helpers::{tokio::wait_for, Height, ValidatorId},
+    helpers::{Height, ValidatorId},
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
         ArtifactId, BlockchainData, DispatcherAction, ExecutionContext, ExecutionError,
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
+use futures::future::{Future, FutureExt, BoxFuture};
 
 use std::fmt::{self, Debug};
 
@@ -221,6 +222,16 @@ impl<'a> AfterCommitContext<'a> {
         }
     }
 
+    /// TODO [ECR-4268]
+    #[deprecated(note = "tokio::runtime::Handle::current() directly")]
+    pub fn spawn<F>(fut: F)
+    where
+        F: Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        futures::executor::block_on(fut);
+    }
+
     /// Returns blockchain data for the snapshot associated with this context.
     pub fn data(&self) -> BlockchainData<&'a dyn Snapshot> {
         BlockchainData::new(self.snapshot, &self.broadcaster.instance().name)
@@ -380,7 +391,7 @@ impl Broadcaster {
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
 impl GenericCall<()> for Broadcaster {
-    type Output = Result<Hash, SendError>;
+    type Output = BoxFuture<'static, Result<Hash, SendError>>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
         let msg = self
@@ -389,7 +400,12 @@ impl GenericCall<()> for Broadcaster {
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
 
-        wait_for(self.tx_sender.broadcast_transaction(msg)).map(|_| tx_hash)
+        let tx_sender = self.tx_sender.clone();
+        async move {
+            tx_sender.broadcast_transaction(msg).await?;
+            Ok(tx_hash)
+        }
+        .boxed()
     }
 }
 

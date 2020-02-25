@@ -26,6 +26,7 @@ use exonum_rust_runtime::{
     api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
+use futures::FutureExt;
 use serde_derive::{Deserialize, Serialize};
 
 pub const SERVICE_NAME: &str = "api-service";
@@ -49,10 +50,11 @@ impl Api {
     }
 
     /// Submits transaction to the service if it is active; otherwise, returns a 503 error.
-    fn submit_tx(state: ServiceApiState, ping: PingQuery) -> api::Result<()> {
+    async fn submit_tx(state: ServiceApiState, ping: PingQuery) -> api::Result<()> {
         if let Some(broadcaster) = state.broadcaster() {
             broadcaster
                 .do_nothing((), ping.value)
+                .await
                 .map(drop)
                 .map_err(api::Error::internal)
         } else {
@@ -72,7 +74,9 @@ impl Api {
         // Normal endpoint.
         public_scope
             .endpoint("ping-pong", Self::ping_pong)
-            .endpoint_mut("submit-tx", Self::submit_tx);
+            .endpoint_mut("submit-tx", |state, ping| {
+                Self::submit_tx(state, ping).boxed_local()
+            });
 
         // Deprecated endpoints.
         public_scope

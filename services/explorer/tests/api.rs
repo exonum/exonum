@@ -39,13 +39,14 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-#[test]
-fn test_explorer_blocks_basic() {
+#[actix_rt::test]
+async fn test_explorer_blocks_basic() {
     let (mut testkit, api) = init_testkit();
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(0));
@@ -57,6 +58,7 @@ fn test_explorer_blocks_basic() {
     let response: serde_json::Value = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
     assert_eq!(
         response,
@@ -80,6 +82,7 @@ fn test_explorer_blocks_basic() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
 
     let mut headers = AdditionalHeaders::new();
@@ -99,6 +102,7 @@ fn test_explorer_blocks_basic() {
     let response: serde_json::Value = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=1&add_precommits=true")
+        .await
         .unwrap();
 
     let snapshot = testkit.snapshot();
@@ -127,6 +131,7 @@ fn test_explorer_blocks_basic() {
     let response: serde_json::Value = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=1&add_blocks_time=true")
+        .await
         .unwrap();
     assert_eq!(
         response,
@@ -146,20 +151,22 @@ fn test_explorer_blocks_basic() {
     );
 }
 
-#[test]
-fn test_explorer_api_block_request() {
+#[actix_rt::test]
+async fn test_explorer_api_block_request() {
     let (mut testkit, api) = init_testkit();
     testkit.create_block();
 
     let response: Value = api
         .public(ApiKind::Explorer)
         .get("v1/block?height=1")
+        .await
         .unwrap();
     assert_eq!(response["height"], 1);
 
     let response = api
         .public(ApiKind::Explorer)
         .get::<Value>("v1/block?height=10")
+        .await
         .unwrap_err();
 
     assert_eq!(response.http_code, api::HttpStatusCode::NOT_FOUND);
@@ -171,33 +178,35 @@ fn test_explorer_api_block_request() {
     assert_eq!(response.body.source, "2:explorer");
 }
 
-fn create_sample_block(testkit: &mut TestKit) {
+async fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
         let tx = KeyPair::random().increment(SERVICE_ID, height);
-        testkit.api().send(tx);
+        testkit.api().send(tx).await;
     }
     testkit.create_block();
 }
 
-#[test]
-fn test_explorer_blocks_skip_empty_small() {
+#[actix_rt::test]
+async fn test_explorer_blocks_skip_empty_small() {
     let (mut testkit, api) = init_testkit();
-    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit).await;
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert!(blocks.is_empty());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
-    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit).await;
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].block.height, Height(2));
@@ -209,18 +218,20 @@ fn test_explorer_blocks_skip_empty_small() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    create_sample_block(&mut testkit);
-    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit).await;
+    create_sample_block(&mut testkit).await;
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(2));
@@ -228,16 +239,17 @@ fn test_explorer_blocks_skip_empty_small() {
     assert_eq!(range.end, Height(5));
 }
 
-#[test]
-fn test_explorer_blocks_skip_empty() {
+#[actix_rt::test]
+async fn test_explorer_blocks_skip_empty() {
     let (mut testkit, api) = init_testkit();
     for _ in 0..5 {
-        create_sample_block(&mut testkit);
+        create_sample_block(&mut testkit).await;
     }
 
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=1&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -247,6 +259,7 @@ fn test_explorer_blocks_skip_empty() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=3&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -255,17 +268,18 @@ fn test_explorer_blocks_skip_empty() {
     assert_eq!(range.end, Height(6));
 }
 
-#[test]
-fn test_explorer_blocks_bounds() {
+#[actix_rt::test]
+async fn test_explorer_blocks_bounds() {
     let (mut testkit, api) = init_testkit();
     for _ in 0..5 {
-        create_sample_block(&mut testkit);
+        create_sample_block(&mut testkit).await;
     }
 
     // Check `latest` param
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(2));
@@ -276,6 +290,7 @@ fn test_explorer_blocks_bounds() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=3")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -286,6 +301,7 @@ fn test_explorer_blocks_bounds() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&latest=4&earliest=3")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(4));
@@ -296,6 +312,7 @@ fn test_explorer_blocks_bounds() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=4&earliest=1")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(4));
@@ -306,6 +323,7 @@ fn test_explorer_blocks_bounds() {
     let BlocksRange { blocks, range } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=5")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -315,18 +333,20 @@ fn test_explorer_blocks_bounds() {
     // Check `latest` param is exceed the height.
     let result: Result<BlocksRange, api::Error> = api
         .public(ApiKind::Explorer)
-        .get("v1/blocks?count=2&latest=6");
+        .get("v1/blocks?count=2&latest=6")
+        .await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_explorer_blocks_loaded_info() {
+#[actix_rt::test]
+async fn test_explorer_blocks_loaded_info() {
     let (mut testkit, api) = init_testkit();
     testkit.create_blocks_until(Height(6));
 
     let BlocksRange { blocks, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=4")
+        .await
         .unwrap();
     assert!(blocks
         .iter()
@@ -335,6 +355,7 @@ fn test_explorer_blocks_loaded_info() {
     let BlocksRange { blocks, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=4&add_blocks_time=true")
+        .await
         .unwrap();
     assert!(blocks
         .iter()
@@ -343,14 +364,15 @@ fn test_explorer_blocks_loaded_info() {
     let BlocksRange { blocks, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=4&add_precommits=true")
+        .await
         .unwrap();
     assert!(blocks
         .iter()
         .all(|info| info.time.is_none() && info.precommits.is_some()));
 }
 
-#[test]
-fn test_explorer_transaction_info() {
+#[actix_rt::test]
+async fn test_explorer_transaction_info() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
 
@@ -360,6 +382,7 @@ fn test_explorer_transaction_info() {
             "v1/transactions?hash={}",
             &tx.object_hash().to_hex()
         ))
+        .await
         .unwrap_err();
 
     assert_eq!(info.http_code, api::HttpStatusCode::NOT_FOUND);
@@ -370,7 +393,7 @@ fn test_explorer_transaction_info() {
     );
     assert_eq!(info.body.source, "2:explorer");
 
-    api.send(tx.clone());
+    api.send(tx.clone()).await;
     testkit.poll_events();
 
     let info: Value = api
@@ -379,6 +402,7 @@ fn test_explorer_transaction_info() {
             "v1/transactions?hash={}",
             &tx.object_hash().to_hex()
         ))
+        .await
         .unwrap();
     assert_eq!(
         info,
@@ -395,6 +419,7 @@ fn test_explorer_transaction_info() {
             "v1/transactions?hash={}",
             &tx.object_hash().to_hex()
         ))
+        .await
         .unwrap();
     assert!(info.is_committed());
     let committed = info.as_committed().unwrap();
@@ -416,8 +441,8 @@ fn test_explorer_transaction_info() {
     assert!(status.is_none());
 }
 
-#[test]
-fn test_explorer_transaction_statuses() {
+#[actix_rt::test]
+async fn test_explorer_transaction_statuses() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
     let error_tx = KeyPair::random().increment(SERVICE_ID, 0);
@@ -485,28 +510,31 @@ fn test_explorer_transaction_statuses() {
     );
 
     // Now, the same statuses retrieved via explorer web API.
-    let statuses: Vec<_> = [
-        tx.object_hash(),
-        error_tx.object_hash(),
-        panicking_tx.object_hash(),
-    ]
-    .iter()
-    .map(|hash| {
-        let info: TransactionInfo = api
-            .public(ApiKind::Explorer)
-            .query(&TransactionQuery::new(*hash))
-            .get("v1/transactions")
-            .unwrap();
-        info.as_committed().unwrap().status().map_err(Clone::clone)
-    })
-    .collect();
+    let statuses = {
+        let mut output = Vec::new();
+
+        for &hash in &[
+            tx.object_hash(),
+            error_tx.object_hash(),
+            panicking_tx.object_hash(),
+        ] {
+            let info: TransactionInfo = api
+                .public(ApiKind::Explorer)
+                .query(&TransactionQuery::new(hash))
+                .get("v1/transactions")
+                .await
+                .unwrap();
+            output.push(info.as_committed().unwrap().status().map_err(Clone::clone));
+        }
+        output
+    };
     check_statuses(&statuses);
 }
 
 /// Checks that `ExplorerApi` accepts valid transactions and discards transactions with
 /// the incorrect instance ID.
-#[test]
-fn test_explorer_add_invalid_transaction() {
+#[actix_rt::test]
+async fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
 
     // Send valid transaction.
@@ -517,6 +545,7 @@ fn test_explorer_add_invalid_transaction() {
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
+        .await
         .expect("Failed to send valid transaction.");
     assert_eq!(response.tx_hash, tx.object_hash());
 
@@ -527,6 +556,7 @@ fn test_explorer_add_invalid_transaction() {
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
+        .await
         .expect_err("Expected transaction send to finish with error.");
 
     assert_eq!(response.http_code, api::HttpStatusCode::BAD_REQUEST);
@@ -541,8 +571,8 @@ fn test_explorer_add_invalid_transaction() {
     assert_eq!(response.body.source, "2:explorer");
 }
 
-#[test]
-fn test_explorer_api_with_before_transactions_error() {
+#[actix_rt::test]
+async fn test_explorer_api_with_before_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let key_pair = KeyPair::random();
     let tx = key_pair.increment(SERVICE_ID, 13);
@@ -556,6 +586,7 @@ fn test_explorer_api_with_before_transactions_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
@@ -570,6 +601,7 @@ fn test_explorer_api_with_before_transactions_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     let execution_error = response.status.0.unwrap_err();
     assert!(execution_error.description().contains("Number 13"));
@@ -580,6 +612,7 @@ fn test_explorer_api_with_before_transactions_error() {
             hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status/transaction")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
@@ -590,12 +623,13 @@ fn test_explorer_api_with_before_transactions_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }
 
-#[test]
-fn test_explorer_api_with_transaction_error() {
+#[actix_rt::test]
+async fn test_explorer_api_with_transaction_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 0);
 
@@ -607,6 +641,7 @@ fn test_explorer_api_with_transaction_error() {
             hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status/transaction")
+        .await
         .expect("Explorer Api unexpectedly failed");
     let execution_error = response.status.0.unwrap_err();
     assert!(execution_error
@@ -620,6 +655,7 @@ fn test_explorer_api_with_transaction_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
@@ -630,12 +666,13 @@ fn test_explorer_api_with_transaction_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }
 
-#[test]
-fn test_explorer_api_with_after_transactions_error() {
+#[actix_rt::test]
+async fn test_explorer_api_with_after_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 42);
 
@@ -648,6 +685,7 @@ fn test_explorer_api_with_after_transactions_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     let execution_error = response.status.0.unwrap_err();
     assert!(execution_error
@@ -661,6 +699,7 @@ fn test_explorer_api_with_after_transactions_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
@@ -670,12 +709,13 @@ fn test_explorer_api_with_after_transactions_error() {
             hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status/transaction")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }
 
-#[test]
-fn test_explorer_api_without_error() {
+#[actix_rt::test]
+async fn test_explorer_api_without_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 1);
 
@@ -688,6 +728,7 @@ fn test_explorer_api_without_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
@@ -697,6 +738,7 @@ fn test_explorer_api_without_error() {
             hash: tx.object_hash(),
         })
         .get::<CallStatusResponse>("v1/call_status/transaction")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 
@@ -707,6 +749,7 @@ fn test_explorer_api_without_error() {
             service_id: SERVICE_ID,
         })
         .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
     assert!(response.status.0.is_ok());
 }

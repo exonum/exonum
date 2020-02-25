@@ -86,7 +86,7 @@ fn test_inc_add_tx_incorrect_transaction() {
     testkit.add_tx(incorrect_tx);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
     let keypair = KeyPair::random();
@@ -129,7 +129,7 @@ async fn test_inc_count_create_block() {
     assert_eq!(counter_with_proof.verify(&validator_keys), Some(10));
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 #[should_panic(expected = "Transaction is already committed")]
 async fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
@@ -140,7 +140,7 @@ async fn test_inc_count_create_block_with_committed_transaction() {
     testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 #[should_panic(expected = "Cannot create block with incorrect transaction")]
 async fn test_inc_count_create_block_with_transaction_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
@@ -148,7 +148,7 @@ async fn test_inc_count_create_block_with_transaction_incorrect_transaction() {
     testkit.create_block_with_transaction(incorrect_tx);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_inc_count_api() {
     let (mut testkit, api) = init_testkit();
     inc_count(&api, 5).await;
@@ -163,7 +163,7 @@ async fn test_inc_count_api() {
     assert_eq!(counter, 5);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_inc_count_with_multiple_transactions() {
     let (mut testkit, api) = init_testkit();
     let validator_keys = get_validator_keys(&testkit);
@@ -192,7 +192,7 @@ async fn test_inc_count_with_multiple_transactions() {
     assert_eq!(counter, 10);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_inc_count_with_manual_tx_control() {
     let (mut testkit, api) = init_testkit();
     let tx_a = inc_count(&api, 5).await;
@@ -232,7 +232,7 @@ async fn test_inc_count_with_manual_tx_control() {
     assert_eq!(counter, 8);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_private_api() {
     let (mut testkit, api) = init_testkit();
     inc_count(&api, 5).await;
@@ -264,7 +264,7 @@ async fn test_private_api() {
     assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(0));
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 #[should_panic(expected = "Insufficient number of precommits")]
 async fn counter_proof_without_precommits() {
     let (mut testkit, api) = init_testkit();
@@ -280,7 +280,7 @@ async fn counter_proof_without_precommits() {
     counter.verify(&get_validator_keys(&testkit));
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 #[should_panic(expected = "Invalid counter value in proof")]
 async fn counter_proof_with_mauled_value() {
     let (mut testkit, api) = init_testkit();
@@ -296,7 +296,7 @@ async fn counter_proof_with_mauled_value() {
     counter.verify(&get_validator_keys(&testkit));
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_duplicate_tx() {
     let (mut testkit, api) = init_testkit();
 
@@ -313,7 +313,7 @@ async fn test_duplicate_tx() {
     assert_eq!(counter, 5);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_explorer_with_after_transactions_error() {
     let (mut testkit, _) = init_testkit();
     let tx1 = KeyPair::random().increment(SERVICE_ID, 21);
@@ -355,7 +355,7 @@ fn test_explorer_with_before_transactions_error() {
     // ^-- The changes in `before_transactions` should be reverted.
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_explorer_single_block() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
@@ -401,7 +401,7 @@ async fn test_explorer_single_block() {
     assert!(validators.len() >= testkit.majority_count());
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn submitting_incorrect_tx_via_sender() {
     exonum::helpers::init_logger().ok();
 

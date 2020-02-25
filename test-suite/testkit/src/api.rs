@@ -27,9 +27,8 @@ use exonum::{
 use exonum_api::{self as api, ApiAggregator};
 use log::{info, trace};
 use reqwest::{
-    Client, ClientBuilder, RequestBuilder as ReqwestBuilder, Response,
-    redirect::Policy as RedirectPolicy,
-    StatusCode,
+    redirect::Policy as RedirectPolicy, Client, ClientBuilder, RequestBuilder as ReqwestBuilder,
+    Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -119,7 +118,9 @@ impl TestKitApi {
     where
         T: Into<Verified<AnyTx>>,
     {
-        self.api_sender.broadcast_transaction(transaction.into()).await
+        self.api_sender
+            .broadcast_transaction(transaction.into())
+            .await
             .expect("Cannot broadcast transaction");
     }
 

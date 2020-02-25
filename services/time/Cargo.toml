@@ -35,6 +35,7 @@ exonum-cli = { version = "1.0.0-rc.1", path = "../../cli" }
 exonum-supervisor = { version = "1.0.0-rc.1", path = "../supervisor" }
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
+actix-rt = "1.0.0"
 bincode = "1.2.1"
 pretty_assertions = "0.6.1"
 

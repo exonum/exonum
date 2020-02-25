@@ -35,8 +35,8 @@ mod supervisor;
 
 const SUPERVISOR_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
-#[test]
-fn test_after_commit() {
+#[actix_rt::test]
+async fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(service.clone())
@@ -67,8 +67,8 @@ fn test_after_commit() {
 }
 
 /// An auditor should not broadcast transactions.
-#[test]
-fn test_after_commit_with_auditor() {
+#[actix_rt::test]
+async fn test_after_commit_with_auditor() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
@@ -94,8 +94,8 @@ fn test_after_commit_with_auditor() {
     }
 }
 
-#[test]
-fn after_commit_not_called_after_service_stop() {
+#[actix_rt::test]
+async fn after_commit_not_called_after_service_stop() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(Supervisor)
@@ -124,8 +124,8 @@ fn after_commit_not_called_after_service_stop() {
     }
 }
 
-#[test]
-fn after_commit_during_service_freeze() {
+#[actix_rt::test]
+async fn after_commit_during_service_freeze() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(Supervisor)
@@ -152,8 +152,8 @@ fn after_commit_during_service_freeze() {
     }
 }
 
-#[test]
-fn after_commit_during_migration() {
+#[actix_rt::test]
+async fn after_commit_during_migration() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(Supervisor)
@@ -205,8 +205,8 @@ fn after_commit_during_migration() {
     assert_matches!(service_state.status, Some(InstanceStatus::Stopped));
 }
 
-#[test]
-fn incorrect_txs_are_not_included_into_blocks() {
+#[actix_rt::test]
+async fn incorrect_txs_are_not_included_into_blocks() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with_default_rust_service(Supervisor)
@@ -240,8 +240,8 @@ fn incorrect_txs_are_not_included_into_blocks() {
     assert_eq!(block.len(), 6); // 5 old transactions + 1 generated after resume
 }
 
-#[test]
-fn restart_testkit() {
+#[actix_rt::test]
+async fn restart_testkit() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with_default_rust_service(AfterCommitService::new())

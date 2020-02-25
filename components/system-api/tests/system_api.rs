@@ -30,8 +30,8 @@ fn create_testkit() -> TestKit {
         .build()
 }
 
-#[test]
-fn healthcheck() {
+#[actix_rt::test]
+async fn healthcheck() {
     // This test checks whether the endpoint returns expected result and correctness of
     // serialize. Expected results:
     //
@@ -40,7 +40,7 @@ fn healthcheck() {
     let mut testkit = create_testkit();
     let api = testkit.api();
 
-    let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").unwrap();
+    let info: HealthCheckInfo = api.public(ApiKind::System).get("v1/healthcheck").await.unwrap();
     let expected = HealthCheckInfo {
         consensus_status: ConsensusStatus::Enabled,
         connected_peers: 0,
@@ -48,11 +48,11 @@ fn healthcheck() {
     assert_eq!(info, expected);
 }
 
-#[test]
-fn stats() {
+#[actix_rt::test]
+async fn stats() {
     let mut testkit = create_testkit();
     let api = testkit.api();
-    let info: StatsInfo = api.public(ApiKind::System).get("v1/stats").unwrap();
+    let info: StatsInfo = api.public(ApiKind::System).get("v1/stats").await.unwrap();
     let expected = StatsInfo {
         tx_pool_size: 0,
         tx_count: 0,
@@ -61,29 +61,38 @@ fn stats() {
     assert_eq!(info, expected);
 }
 
-#[test]
-fn user_agent_info() {
+#[actix_rt::test]
+async fn user_agent_info() {
     let mut testkit = create_testkit();
     let api = testkit.api();
-    let info: String = api.public(ApiKind::System).get("v1/user_agent").unwrap();
+    let info: String = api
+        .public(ApiKind::System)
+        .get("v1/user_agent")
+        .await
+        .unwrap();
     let expected = user_agent();
     assert_eq!(info, expected);
 }
 
-#[test]
-fn network() {
+#[actix_rt::test]
+async fn network() {
     let mut testkit = create_testkit();
     let api = testkit.api();
-    let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
+    let info: NodeInfo = api
+        .private(ApiKind::System)
+        .get("v1/network")
+        .await
+        .unwrap();
     assert!(info.core_version.is_some());
 }
 
-#[test]
-fn shutdown() {
+#[actix_rt::test]
+async fn shutdown() {
     let mut testkit = create_testkit();
     let api = testkit.api();
     api.private(ApiKind::System)
         .post::<()>("v1/shutdown")
+        .await
         .unwrap();
     let control_messages = testkit.poll_control_messages();
     match control_messages.as_slice() {

@@ -158,11 +158,12 @@ impl CounterWithProof {
 struct CounterApi;
 
 impl CounterApi {
-    fn increment(state: ServiceApiState, value: u64) -> api::Result<TransactionResponse> {
+    async fn increment(state: ServiceApiState, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
+            .await
             .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
@@ -184,12 +185,13 @@ impl CounterApi {
         })
     }
 
-    fn reset(state: ServiceApiState) -> api::Result<TransactionResponse> {
+    async fn reset(state: ServiceApiState) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
         // The first `()` is the empty context, the second one is the `reset` arg.
         let tx_hash = state
             .generic_broadcaster()
             .reset((), ())
+            .await
             .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
@@ -200,19 +202,25 @@ impl CounterApi {
             .endpoint("count", |state, _query: ()| {
                 Self::count(state.service_data())
             })
-            .endpoint_mut("reset", |state, _query: ()| Self::reset(state));
+            .endpoint_mut("reset", |state, _query: ()| {
+                Self::reset(state).boxed_local()
+            });
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {
                 Self::count(state.service_data())
             })
-            .endpoint_mut("count", Self::increment);
+            .endpoint_mut("count", |state, query| {
+                Self::increment(state, query).boxed_local()
+            });
         builder
             .public_scope()
             .endpoint("count-with-proof", |state, _query: ()| {
                 Self::count_with_proof(state)
             })
-            .endpoint_mut("count", Self::increment);
+            .endpoint_mut("count", |state, query| {
+                Self::increment(state, query).boxed_local()
+            });
 
         // Check sending incorrect transactions via `ApiSender`. Testkit should not include
         // such transactions to the transaction pool.

@@ -57,7 +57,7 @@ async fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
         .unwrap()
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_inflation() {
     let mut testkit = init_testkit();
     let alice = create_wallet(&mut testkit, "Alice");
@@ -68,7 +68,7 @@ async fn test_inflation() {
     assert_eq!(get_balance(&api, &alice.public_key()).await, 10);
 }
 
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_transfer_scenarios() {
     let mut testkit = init_testkit();
     let api = testkit.api();
@@ -145,7 +145,7 @@ async fn test_transfer_scenarios() {
 }
 
 /// Test randomly generated transfers among users without blockchain rollbacks.
-#[exonum_testkit::api_test]
+#[actix_rt::test]
 async fn test_fuzz_transfers() {
     const USERS: usize = 10;
 

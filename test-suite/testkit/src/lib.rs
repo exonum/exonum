@@ -103,7 +103,6 @@ pub use crate::{
     network::{TestNetwork, TestNode},
 };
 pub use exonum_explorer as explorer;
-pub use actix_rt::test as api_test;
 
 use exonum::{
     blockchain::{
