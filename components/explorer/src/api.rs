@@ -148,7 +148,7 @@ impl BlockQuery {
     }
 }
 
-/// Raw Transaction in hex representation.
+/// Raw transaction in hex representation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TransactionHex {
     /// The hex value of the transaction to be broadcasted.
@@ -156,6 +156,7 @@ pub struct TransactionHex {
 }
 
 impl TransactionHex {
+    /// Creates hex representation from the provided transaction.
     pub fn new(transaction: &Verified<AnyTx>) -> Self {
         Self {
             tx_body: hex::encode(transaction.to_bytes()),
