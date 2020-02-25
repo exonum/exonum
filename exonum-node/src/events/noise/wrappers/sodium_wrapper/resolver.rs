@@ -315,7 +315,7 @@ mod tests {
     #[test]
     fn test_curve25519() {
         // Values are cited from RFC-7748: 5.2.  Test Vectors.
-        let mut keypair: SodiumDh25519 = Default::default();
+        let mut keypair = SodiumDh25519::default();
         let scalar =
             Vec::<u8>::from_hex("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")
                 .unwrap();

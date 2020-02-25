@@ -535,7 +535,7 @@ impl State {
             .map_or(false, |validator| self.leader(self.round()) == validator.id)
     }
 
-    /// Returns node's ConnectList.
+    /// Returns a connect list of the node.
     pub fn connect_list(&self) -> SharedConnectList {
         self.connect_list.clone()
     }
@@ -700,8 +700,13 @@ impl State {
     pub(super) fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
         self.nodes_max_height
             .iter()
-            .filter(|&(_, h)| *h > self.height())
-            .map(|(v, _)| v)
+            .filter_map(|(key, height)| {
+                if *height > self.height() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 

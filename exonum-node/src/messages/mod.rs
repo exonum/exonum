@@ -28,11 +28,15 @@ mod types;
 /// Size of an empty `TransactionsResponse`.
 pub const TX_RES_EMPTY_SIZE: usize = SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH + 8;
 
-/// When we add transaction to TransactionResponse message we will add some overhead
-/// to the message size due to protobuf.
-/// This is higher bound on this overhead.
-/// Tx response message size <= TX_RES_EMPTY_SIZE + (tx1 size + TX_RES_PB_OVERHEAD_PAYLOAD) +
-///                             + (tx2 size + TX_RES_PB_OVERHEAD_PAYLOAD) + ...
+/// When we add transaction to `TransactionResponse` message we will add some overhead
+/// to the message size due to Protobuf. This is the higher bound on this overhead.
+///
+/// ```text
+/// Tx response message size <= TX_RES_EMPTY_SIZE
+///    + (tx1 size + TX_RES_PB_OVERHEAD_PAYLOAD)
+///    + (tx2 size + TX_RES_PB_OVERHEAD_PAYLOAD)
+///    + ...
+/// ```
 pub const TX_RES_PB_OVERHEAD_PAYLOAD: usize = 8;
 
 /// Service messages.
@@ -161,7 +165,7 @@ impl Message {
         SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
     }
 
-    /// Get inner SignedMessage.
+    /// Get inner `SignedMessage`.
     pub fn as_raw(&self) -> &SignedMessage {
         match self {
             Message::Service(ref msg) => msg.as_raw(),

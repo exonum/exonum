@@ -31,7 +31,9 @@ use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
 use crate::{
     messages::{PrevotesRequest, TransactionsRequest},
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder},
+    sandbox::{
+        sandbox_tests_helper::*, timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
+    },
     state::{PREVOTES_REQUEST_TIMEOUT, PROPOSE_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
 };
 
@@ -92,7 +94,7 @@ fn request_propose_when_get_prevote() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_propose_request(
+        &Sandbox::create_propose_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             Height(1),
@@ -119,7 +121,7 @@ fn request_prevotes_when_get_prevote_message() {
     sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout() - 1));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_propose_request(
+        &Sandbox::create_propose_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             Height(1),
@@ -133,7 +135,7 @@ fn request_prevotes_when_get_prevote_message() {
 
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_prevote_request(
+        &Sandbox::create_prevote_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             Height(1),
@@ -150,7 +152,7 @@ fn request_prevotes_when_get_prevote_message() {
 ///     - only if round > locked round
 /// &
 /// - Send prevote
-//     - round > locked + 1
+///     - round > locked + 1
 /// scenario:
 /// - at 0 time:
 ///  - receive Propose
@@ -1807,7 +1809,7 @@ fn handle_tx_handle_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             vec![tx.object_hash()],
@@ -1815,16 +1817,13 @@ fn handle_tx_handle_full_propose() {
         ),
     );
 
-    // !! here handle_tx()->handle_full_propose() is called => broadcast(Prevote) is observed
+    // here handle_tx() -> handle_full_propose() is called => broadcast(Prevote) is observed
     sandbox.recv(&tx);
-
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
-
     sandbox.add_time(Duration::from_millis(0));
 }
 
-// - ignore existed transaction (in both blockchain and pool)
-/// - idea of test is to receive propose with unknown tx
+/// - receive propose with unknown tx
 /// - receive that tx
 /// - broadcast prevote
 #[test]
@@ -1858,8 +1857,7 @@ fn broadcast_prevote_with_tx_positive() {
     ));
 }
 
-// - ignore existed transaction (in both pool)
-/// - idea of test is to receive propose with unknown tx
+/// - receive propose with unknown tx
 /// - receive that tx
 /// - broadcast prevote
 #[test]
@@ -1933,13 +1931,11 @@ fn handle_tx_ignore_invalid_tx() {
 #[test]
 fn handle_precommit_remove_propose_request() {
     let sandbox = timestamping_sandbox_builder().build();
-
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)
         .with_tx_hashes(&[tx.object_hash()])
         .build();
-
     let block = BlockBuilder::new(&sandbox)
         .with_tx_hash(&tx.object_hash())
         .build();
@@ -1962,7 +1958,7 @@ fn handle_precommit_remove_propose_request() {
 
     sandbox.send(
         sandbox.public_key(propose.payload().validator),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(propose.payload().validator),
             vec![tx.object_hash()],
@@ -1975,7 +1971,7 @@ fn handle_precommit_remove_propose_request() {
 
     sandbox.send(
         sandbox.public_key(propose.payload().validator),
-        &sandbox.create_prevote_request(
+        &Sandbox::create_prevote_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(propose.payload().validator),
             Height(1),
@@ -2003,7 +1999,6 @@ fn handle_precommit_remove_propose_request() {
 #[test]
 fn handle_receive_multiple_proposals_same_round() {
     let sandbox = timestamping_sandbox_builder().build();
-
     let tx_1 = gen_timestamping_tx();
     let tx_2 = gen_timestamping_tx();
 
@@ -2089,7 +2084,7 @@ fn handle_receive_multiple_proposals_same_round() {
     ));
 
     // Block should be applied.
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block_hash,
@@ -2160,7 +2155,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
         if i == 1 {
             sandbox.send(
                 sandbox.public_key(propose.payload().validator),
-                &sandbox.create_prevote_request(
+                &Sandbox::create_prevote_request(
                     sandbox.public_key(ValidatorId(0)),
                     sandbox.public_key(propose.payload().validator),
                     Height(1),

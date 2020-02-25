@@ -132,17 +132,17 @@ mod test {
         responder
             .read_message(&buffer_msg[..len], &mut buffer_out)
             .unwrap();
-        let len = responder
+        let second_len = responder
             .write_message(&[0_u8; 0], &mut buffer_msg)
             .unwrap();
         initiator
-            .read_message(&buffer_msg[..len], &mut buffer_out)
+            .read_message(&buffer_msg[..second_len], &mut buffer_out)
             .unwrap();
-        let len = initiator
+        let third_len = initiator
             .write_message(&[0_u8; 0], &mut buffer_msg)
             .unwrap();
         responder
-            .read_message(&buffer_msg[..len], &mut buffer_out)
+            .read_message(&buffer_msg[..third_len], &mut buffer_out)
             .unwrap();
 
         let responder = TransportWrapper {

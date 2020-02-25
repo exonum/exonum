@@ -201,7 +201,7 @@ pub fn connect_message(addr: SocketAddr, keypair: &KeyPair) -> Verified<Connect>
 }
 
 pub fn raw_message(payload_len: usize) -> SignedMessage {
-    let buffer = vec![0u8; payload_len];
+    let buffer = vec![0_u8; payload_len];
     let keys = KeyPair::random();
     SignedMessage::new(buffer, keys.public_key(), keys.secret_key())
 }

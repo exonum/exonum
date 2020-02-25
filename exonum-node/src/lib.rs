@@ -35,6 +35,25 @@
 
 // spell-checker:ignore cors
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc
+)]
+
 pub use crate::{
     connect_list::{ConnectInfo, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
@@ -217,7 +236,7 @@ impl Default for NodeApiConfig {
             private_api_address: None,
             public_allow_origin: None,
             private_allow_origin: None,
-            server_restart: Default::default(),
+            server_restart: ServerRestartPolicy::default(),
         }
     }
 }
@@ -420,7 +439,7 @@ impl Default for NodeRole {
 }
 
 impl NodeRole {
-    /// Constructs new NodeRole from `validator_id`.
+    /// Constructs new `NodeRole` from `validator_id`.
     pub fn new(validator_id: Option<ValidatorId>) -> Self {
         match validator_id {
             Some(validator_id) => NodeRole::Validator(validator_id),
@@ -1228,15 +1247,15 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, 
             let config = NodeConfig {
                 listen_address: peers[idx].parse().unwrap(),
                 external_address: peers[idx].clone(),
-                network: Default::default(),
+                network: NetworkConfiguration::default(),
                 consensus: consensus.clone(),
                 connect_list: ConnectListConfig::from_validator_keys(
                     &consensus.validator_keys,
                     &peers,
                 ),
-                api: Default::default(),
-                mempool: Default::default(),
-                thread_pool_size: Default::default(),
+                api: NodeApiConfig::default(),
+                mempool: MemoryPoolConfig::default(),
+                thread_pool_size: None,
             };
             (config, keys)
         })

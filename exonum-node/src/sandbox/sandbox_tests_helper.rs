@@ -39,8 +39,8 @@ pub const NOT_LOCKED: Round = Round(0);
 type Milliseconds = u64;
 pub const PROPOSE_TIMEOUT: Milliseconds = 200;
 
-/// Idea of ProposeBuilder is to implement Builder pattern in order to get Block with
-/// default data from sandbox and, possibly, update few fields with custom data.
+/// Idea of `BlockBuilder` is to implement the builder pattern in order to get `Block` with
+/// default data from the sandbox and, possibly, update few fields with custom data.
 #[derive(Debug)]
 pub struct BlockBuilder<'a> {
     proposer_id: Option<ValidatorId>,
@@ -301,19 +301,18 @@ where
     I: IntoIterator<Item = &'a Verified<AnyTx>>,
 {
     // sort transaction in order accordingly their hashes
-    let txs = sandbox.filter_present_transactions(txs);
+    let absent_txs = sandbox.filter_present_transactions(txs);
     let mut tx_pool = BTreeMap::new();
-    tx_pool.extend(txs.into_iter().map(|tx| (tx.object_hash(), tx)));
+    tx_pool.extend(absent_txs.into_iter().map(|tx| (tx.object_hash(), tx)));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[Verified<AnyTx>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
     sandbox.assert_state(initial_height, Round(1));
 
-    let mut hashes = Vec::new();
-    for tx in txs.iter() {
+    let mut hashes = Vec::with_capacity(raw_txs.len());
+    for tx in &raw_txs {
         sandbox.recv(tx);
         hashes.push(tx.object_hash());
     }
@@ -343,7 +342,7 @@ where
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             *sandbox_state.accepted_propose_hash.borrow_mut() = propose.object_hash();
 
-            for val_idx in 1..sandbox.majority_count(n_validators) {
+            for val_idx in 1..Sandbox::majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(&sandbox.create_prevote(
                     val_idx,
@@ -385,7 +384,7 @@ where
             ));
             sandbox.assert_lock(round, Some(propose.object_hash()));
 
-            for val_idx in 1..sandbox.majority_count(n_validators) {
+            for val_idx in 1..Sandbox::majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(&sandbox.create_precommit(
                     val_idx,
@@ -397,7 +396,7 @@ where
                     sandbox.secret_key(val_idx),
                 ));
 
-                if val_idx.0 as usize != sandbox.majority_count(n_validators) - 1 {
+                if val_idx.0 as usize != Sandbox::majority_count(n_validators) - 1 {
                     sandbox.assert_state(initial_height, round);
                 }
             }
@@ -422,15 +421,14 @@ pub fn add_one_height_with_transactions_from_other_validator(
     let mut tx_pool = BTreeMap::new();
     tx_pool.extend(txs.iter().map(|tx| (tx.object_hash(), tx.clone())));
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
-    let txs: &[Verified<AnyTx>] = raw_txs.as_ref();
 
     trace!("=========================add_one_height_with_timeout started=========================");
     let initial_height = sandbox.current_height();
     // assert 1st round
     sandbox.assert_state(initial_height, Round(1));
 
-    let mut hashes = Vec::new();
-    for tx in txs.iter() {
+    let mut hashes = Vec::with_capacity(raw_txs.len());
+    for tx in &raw_txs {
         sandbox.recv(tx);
         hashes.push(tx.object_hash());
     }
@@ -452,7 +450,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
             trace!("propose.hash: {:?}", propose.object_hash());
             trace!("sandbox.last_hash(): {:?}", sandbox.last_hash());
             sandbox.recv(&propose);
-            for val_idx in 0..sandbox.majority_count(n_validators) {
+            for val_idx in 0..Sandbox::majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(&sandbox.create_prevote(
                     val_idx,
@@ -478,7 +476,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
             sandbox.assert_lock(round, Some(propose.object_hash()));
             sandbox.assert_state(initial_height, round);
 
-            for val_idx in 0..sandbox.majority_count(n_validators) {
+            for val_idx in 0..Sandbox::majority_count(n_validators) {
                 let val_idx = ValidatorId(val_idx as u16);
                 sandbox.recv(&sandbox.create_precommit(
                     val_idx,
@@ -610,7 +608,7 @@ pub fn make_request_propose_from_precommit(
     sandbox: &TimestampingSandbox,
     precommit: &Precommit,
 ) -> Verified<ProposeRequest> {
-    sandbox.create_propose_request(
+    Sandbox::create_propose_request(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(precommit.validator()),
         precommit.height,
@@ -624,7 +622,7 @@ pub fn make_request_prevote_from_precommit(
     precommit: &Precommit,
 ) -> Verified<PrevotesRequest> {
     let validators = BitVec::from_elem(sandbox.validators().len(), false);
-    sandbox.create_prevote_request(
+    Sandbox::create_prevote_request(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(precommit.validator()),
         precommit.height,

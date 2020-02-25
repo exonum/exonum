@@ -22,7 +22,7 @@ use exonum::{
 use std::time::Duration;
 
 use crate::{
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{sandbox_tests_helper::*, timestamping_sandbox, Sandbox},
     state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
 };
 
@@ -71,7 +71,7 @@ fn handle_block_response_tx_in_pool() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -82,7 +82,7 @@ fn handle_block_response_tx_in_pool() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -91,7 +91,7 @@ fn handle_block_response_tx_in_pool() {
     );
     sandbox.recv(&tx);
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -101,7 +101,7 @@ fn handle_block_response_tx_in_pool() {
     ));
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
@@ -110,14 +110,10 @@ fn handle_block_response_tx_in_pool() {
     ));
 }
 
-/// HANDLE block response
-
-/// - should process block if tx is unknown
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with unknown tx A
-/// - send TransactionsRequest with unknown tx A
-/// - receive TransactionsResponse with tx A
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with unknown tx A
+/// - send `TransactionsRequest` with unknown tx A
+/// - receive `TransactionsResponse` with tx A
 /// - Block should be executed and committed
 #[test]
 fn handle_block_response_with_unknown_tx() {
@@ -154,7 +150,7 @@ fn handle_block_response_with_unknown_tx() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -165,7 +161,7 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -173,7 +169,7 @@ fn handle_block_response_with_unknown_tx() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -185,7 +181,7 @@ fn handle_block_response_with_unknown_tx() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             vec![tx.object_hash()],
@@ -193,7 +189,7 @@ fn handle_block_response_with_unknown_tx() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_transactions_response(
+    sandbox.recv(&Sandbox::create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         vec![tx],
@@ -201,7 +197,7 @@ fn handle_block_response_with_unknown_tx() {
     ));
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
@@ -232,7 +228,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
         })
         .collect();
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -248,7 +244,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -256,7 +252,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block,
@@ -270,7 +266,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
         sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
         sandbox.send(
             sandbox.public_key(ValidatorId(3)),
-            &sandbox.create_transactions_request(
+            &Sandbox::create_transactions_request(
                 sandbox.public_key(ValidatorId(0)),
                 sandbox.public_key(ValidatorId(3)),
                 vec![incorrect_tx.object_hash()],
@@ -278,7 +274,7 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
             ),
         );
 
-        sandbox.recv(&sandbox.create_transactions_response(
+        sandbox.recv(&Sandbox::create_transactions_response(
             sandbox.public_key(ValidatorId(3)),
             sandbox.public_key(ValidatorId(0)),
             vec![incorrect_tx],
@@ -290,12 +286,12 @@ fn test_handle_block_response_with_incorrect_tx(known_before_block: bool) {
     // an incorrect tx, node should panic.
 }
 
-/// - should **NOT** process block if tx is incorrect
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with unknown tx A
-/// - send TransactionsRequest with unknown tx A
-/// - receive TransactionsResponse with tx A
+/// Node should **NOT** process block if tx is incorrect.
+///
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with unknown tx A
+/// - send `TransactionsRequest` with unknown tx A
+/// - receive `TransactionsResponse` with tx A
 /// - Figure out that tx A is incorrect
 /// - Node should panic because of committed block with incorrect tx.
 #[test]
@@ -304,25 +300,16 @@ fn handle_block_response_with_incorrect_tx() {
     test_handle_block_response_with_incorrect_tx(false);
 }
 
-/// - should **NOT** process block if tx is incorrect
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive incorrect tx
-/// - receive BlockResponse with known tx A
-/// - Figure out that block is incorrect
-/// - Node should panic because of committed block with incorrect tx.
 #[test]
 #[should_panic(expected = "Received a block with transaction known as invalid")]
 fn handle_block_response_with_known_incorrect_tx() {
     test_handle_block_response_with_incorrect_tx(true);
 }
 
-/// HANDLE block response
-
-/// - A block with an incorrect transactions order should not be processed
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with unknown txs A and B in invalid order
+/// A block with an incorrect transactions order should not be processed.
+///
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with unknown txs A and B in invalid order
 /// - the processing of the block must be interrupted
 #[test]
 fn handle_block_response_with_invalid_txs_order() {
@@ -361,7 +348,7 @@ fn handle_block_response_with_invalid_txs_order() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -372,7 +359,7 @@ fn handle_block_response_with_invalid_txs_order() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -381,7 +368,7 @@ fn handle_block_response_with_invalid_txs_order() {
     );
 
     // Invalid transactions order.
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block,
@@ -393,12 +380,10 @@ fn handle_block_response_with_invalid_txs_order() {
     sandbox.assert_state(Height(1), Round(1));
 }
 
-/// HANDLE block response
-
-/// - A block with an invalid precommit should not be processed
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with one invalid precommit
+/// A block with an invalid precommit should not be processed.
+///
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with one invalid `Precommit`
 /// - the processing of the block must be interrupted
 #[test]
 fn handle_block_response_with_invalid_precommits() {
@@ -438,7 +423,7 @@ fn handle_block_response_with_invalid_precommits() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block1.object_hash(),
@@ -449,7 +434,7 @@ fn handle_block_response_with_invalid_precommits() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -458,7 +443,7 @@ fn handle_block_response_with_invalid_precommits() {
     );
     sandbox.recv(&tx);
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block1,
@@ -470,15 +455,13 @@ fn handle_block_response_with_invalid_precommits() {
     sandbox.assert_state(Height(1), Round(1));
 }
 
-/// HANDLE block response
-
-/// - the block with some already known transactions should be processed
-/// idea of test is:
+/// The block with some already known transactions should be processed.
+///
 /// - receive some tx A
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with one known tx A and unknown tx B
-/// - send TransactionsRequest with txs A and B
-/// - receive TransactionsResponse with txs A and B
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with one known tx A and unknown tx B
+/// - send `TransactionsRequest` with txs A and B
+/// - receive `TransactionsResponse` with txs A and B
 /// - Block should be executed and committed
 #[test]
 fn handle_block_response_with_known_transaction() {
@@ -518,7 +501,7 @@ fn handle_block_response_with_known_transaction() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -529,7 +512,7 @@ fn handle_block_response_with_known_transaction() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -537,7 +520,7 @@ fn handle_block_response_with_known_transaction() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -549,7 +532,7 @@ fn handle_block_response_with_known_transaction() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             vec![tx2.object_hash()],
@@ -557,7 +540,7 @@ fn handle_block_response_with_known_transaction() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_transactions_response(
+    sandbox.recv(&Sandbox::create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         vec![tx2],
@@ -565,7 +548,7 @@ fn handle_block_response_with_known_transaction() {
     ));
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
@@ -574,13 +557,11 @@ fn handle_block_response_with_known_transaction() {
     ));
 }
 
-/// HANDLE block response
-
-/// - the block with already known transactions should be processed
-/// idea of test is:
+/// The block with already known transactions should be processed.
+///
 /// - receive some txs A and B
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with known txs A and B
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with known txs A and B
 /// - Block should be executed and committed
 #[test]
 fn handle_block_response_with_all_known_transactions() {
@@ -621,7 +602,7 @@ fn handle_block_response_with_all_known_transactions() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -632,7 +613,7 @@ fn handle_block_response_with_all_known_transactions() {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -640,7 +621,7 @@ fn handle_block_response_with_all_known_transactions() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -650,7 +631,7 @@ fn handle_block_response_with_all_known_transactions() {
     ));
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
@@ -659,16 +640,14 @@ fn handle_block_response_with_all_known_transactions() {
     ));
 }
 
-/// HANDLE block response
-
-/// - the block should be processed even if there is a pending full propose
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with unknown tx A
-/// - receive Propose with unknown tx A
-/// - send TransactionsRequest with unknown tx A for Propose
-/// - send TransactionsRequest with unknown tx A for Block
-/// - receive TransactionsResponse with tx A
+/// The block should be processed even if there is a pending full propose.
+///
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with unknown tx A
+/// - receive `Propose` with unknown tx A
+/// - send `TransactionsRequest` with unknown tx A for `Propose`
+/// - send `TransactionsRequest` with unknown tx A for `Block`
+/// - receive `TransactionsResponse` with tx A
 /// - Block should be executed and committed
 #[test]
 fn received_block_while_there_is_full_propose() {
@@ -682,7 +661,7 @@ fn received_block_while_there_is_full_propose() {
         .build();
     let block = sandbox.create_block(&[tx.clone()]);
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -722,7 +701,7 @@ fn received_block_while_there_is_full_propose() {
 
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -730,7 +709,7 @@ fn received_block_while_there_is_full_propose() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -743,7 +722,7 @@ fn received_block_while_there_is_full_propose() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             vec![tx.object_hash()],
@@ -753,7 +732,7 @@ fn received_block_while_there_is_full_propose() {
 
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             vec![tx.object_hash()],
@@ -761,7 +740,7 @@ fn received_block_while_there_is_full_propose() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_transactions_response(
+    sandbox.recv(&Sandbox::create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         vec![tx],
@@ -770,7 +749,7 @@ fn received_block_while_there_is_full_propose() {
 
     sandbox.broadcast(&make_prevote_from_propose(&sandbox, &propose));
 
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
@@ -779,15 +758,13 @@ fn received_block_while_there_is_full_propose() {
     ));
 }
 
-/// HANDLE block response
-
-/// - the block should be processed even if there is a pending incomplete block
-/// idea of test is:
-/// - getting Status from other node with later height, send BlockRequest to this node
-/// - receive BlockResponse with unknown tx A
-/// - receive one more BlockResponse with unknown tx A
-/// - send TransactionsRequest with unknown tx A
-/// - receive TransactionsResponse with tx A
+/// The block should be processed even if there is a pending incomplete block.
+///
+/// - get `Status` from other node with later height, send `BlockRequest` to this node
+/// - receive `BlockResponse` with unknown tx A
+/// - receive one more `BlockResponse` with unknown tx A
+/// - send `TransactionsRequest` with unknown tx A
+/// - receive `TransactionsResponse` with tx A
 /// - Block should be executed and committed
 #[test]
 fn received_block_while_there_is_pending_block() {
@@ -796,7 +773,7 @@ fn received_block_while_there_is_pending_block() {
     let propose = ProposeBuilder::new(&sandbox).build();
     let block = sandbox.create_block(&[tx.clone()]);
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -836,7 +813,7 @@ fn received_block_while_there_is_pending_block() {
 
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             Height(1),
@@ -844,7 +821,7 @@ fn received_block_while_there_is_pending_block() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -857,7 +834,7 @@ fn received_block_while_there_is_pending_block() {
         sandbox.secret_key(ValidatorId(3)),
     ));
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -869,7 +846,7 @@ fn received_block_while_there_is_pending_block() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             vec![tx.object_hash()],
@@ -877,7 +854,7 @@ fn received_block_while_there_is_pending_block() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_transactions_response(
+    sandbox.recv(&Sandbox::create_transactions_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         vec![tx],
@@ -885,7 +862,7 @@ fn received_block_while_there_is_pending_block() {
     ));
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),
@@ -894,20 +871,15 @@ fn received_block_while_there_is_pending_block() {
     ));
 }
 
-// TODO: Rewrite sandbox methods so that you can receive/send messages in batches.
-// Now the same messages are sent to the validators in a random order. (ECR-376)
-
-/// HANDLE block response
-
-/// - the block should be processed by requesting unknown transactions in several validators
-/// idea of test is:
-/// - getting Status from second node with later height
-/// - getting Status from third node with later height
-/// - send BlockResponse to second node
-/// - receive BlockResponse with unknown tx A from third node
-/// - send TransactionsRequest with unknown tx A to second node
-/// - send TransactionsRequest with unknown tx A to third node
-/// - receive TransactionsResponse with tx A from second node
+/// The block should be processed by requesting unknown transactions in several validators.
+///
+/// - get `Status` from second node with later height
+/// - get `Status` from third node with later height
+/// - send `BlockResponse` to second node
+/// - receive `BlockResponse` with unknown tx A from third node
+/// - send `TransactionsRequest` with unknown tx A to second node
+/// - send `TransactionsRequest` with unknown tx A to third node
+/// - receive `TransactionsResponse` with tx A from second node
 /// - Block should be executed and committed
 #[test]
 #[ignore]
@@ -917,7 +889,7 @@ fn transactions_request_to_multiple_nodes() {
     let propose = ProposeBuilder::new(&sandbox).build();
     let block = sandbox.create_block(&[tx.clone()]);
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(2)),
         Height(2),
         block.object_hash(),
@@ -925,7 +897,7 @@ fn transactions_request_to_multiple_nodes() {
         sandbox.secret_key(ValidatorId(2)),
     ));
 
-    sandbox.recv(&sandbox.create_status(
+    sandbox.recv(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(3)),
         Height(2),
         block.object_hash(),
@@ -965,7 +937,7 @@ fn transactions_request_to_multiple_nodes() {
 
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_block_request(
+        &Sandbox::create_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             Height(1),
@@ -973,7 +945,7 @@ fn transactions_request_to_multiple_nodes() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_block_response(
+    sandbox.recv(&Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(3)),
         sandbox.public_key(ValidatorId(0)),
         block.clone(),
@@ -985,7 +957,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(2)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             vec![tx.object_hash()],
@@ -996,7 +968,7 @@ fn transactions_request_to_multiple_nodes() {
     sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &sandbox.create_transactions_request(
+        &Sandbox::create_transactions_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
             vec![tx.object_hash()],
@@ -1004,7 +976,7 @@ fn transactions_request_to_multiple_nodes() {
         ),
     );
 
-    sandbox.recv(&sandbox.create_transactions_response(
+    sandbox.recv(&Sandbox::create_transactions_response(
         sandbox.public_key(ValidatorId(2)),
         sandbox.public_key(ValidatorId(0)),
         vec![tx],
@@ -1012,7 +984,7 @@ fn transactions_request_to_multiple_nodes() {
     ));
 
     sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
         block.object_hash(),

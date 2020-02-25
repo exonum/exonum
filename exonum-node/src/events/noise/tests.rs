@@ -57,12 +57,12 @@ fn noise_convert_ed_to_curve_dh() {
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
     // Do DH.
-    let mut keypair_i: SodiumDh25519 = Default::default();
+    let mut keypair_i = SodiumDh25519::default();
     keypair_i.set(secret_key_i.as_ref());
     let mut output_i = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_i.dh(public_key_r.as_ref(), &mut output_i).unwrap();
 
-    let mut keypair_r: SodiumDh25519 = Default::default();
+    let mut keypair_r = SodiumDh25519::default();
     keypair_r.set(secret_key_r.as_ref());
     let mut output_r = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_r.dh(public_key_i.as_ref(), &mut output_r).unwrap();
@@ -87,13 +87,13 @@ fn noise_converted_keys_handshake() {
     let (_, secret_key_i) = into_x25519_keypair(public_key_i, secret_key_i).unwrap();
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
-    let mut h_i = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
+    let mut initiator = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
         .local_private_key(secret_key_i.as_ref())
         .remote_public_key(public_key_r.as_ref())
         .build_initiator()
         .expect("Unable to create initiator");
 
-    let mut h_r = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
+    let mut responder = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
         .local_private_key(secret_key_r.as_ref())
         .build_responder()
         .expect("Unable to create responder");
@@ -101,17 +101,27 @@ fn noise_converted_keys_handshake() {
     let mut buffer_msg = [0_u8; MSG_SIZE * 2];
     let mut buffer_out = [0_u8; MSG_SIZE * 2];
 
-    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
-    h_r.read_message(&buffer_msg[..len], &mut buffer_out)
+    let len = initiator
+        .write_message(&[0_u8; 0], &mut buffer_msg)
         .unwrap();
-    let len = h_r.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
-    h_i.read_message(&buffer_msg[..len], &mut buffer_out)
+    responder
+        .read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
-    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
-    h_r.read_message(&buffer_msg[..len], &mut buffer_out)
+    let second_len = responder
+        .write_message(&[0_u8; 0], &mut buffer_msg)
+        .unwrap();
+    initiator
+        .read_message(&buffer_msg[..second_len], &mut buffer_out)
+        .unwrap();
+    let third_len = initiator
+        .write_message(&[0_u8; 0], &mut buffer_msg)
+        .unwrap();
+    responder
+        .read_message(&buffer_msg[..third_len], &mut buffer_out)
         .unwrap();
 
-    h_r.into_transport_mode()
+    responder
+        .into_transport_mode()
         .expect("Unable to transition session into transport mode");
 }
 
