@@ -109,7 +109,7 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
@@ -119,7 +119,7 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub mod api;

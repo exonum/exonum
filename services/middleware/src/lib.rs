@@ -39,7 +39,7 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
@@ -49,7 +49,7 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub use self::transactions::{
@@ -110,7 +110,7 @@ pub struct ArtifactReq(pub versioning::ArtifactReq);
 
 impl From<versioning::ArtifactReq> for ArtifactReq {
     fn from(value: versioning::ArtifactReq) -> Self {
-        ArtifactReq(value)
+        Self(value)
     }
 }
 
@@ -136,6 +136,6 @@ impl FromStr for ArtifactReq {
     type Err = <versioning::ArtifactReq as FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        versioning::ArtifactReq::from_str(s).map(ArtifactReq)
+        versioning::ArtifactReq::from_str(s).map(Self)
     }
 }

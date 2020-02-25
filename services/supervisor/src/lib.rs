@@ -129,7 +129,7 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
@@ -139,7 +139,7 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub use self::{
@@ -383,8 +383,7 @@ impl Supervisor {
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
     pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
-        Supervisor
-            .artifact_id()
+        Self.artifact_id()
             .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
             .with_constructor(config)
     }
@@ -517,12 +516,12 @@ impl Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
+                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(request) {
                         // From all pending requests we are interested only in ones not
                         // confirmed by us.
                         !schema
                             .deploy_confirmations
-                            .confirmed_by(&request, &service_key)
+                            .confirmed_by(request, &service_key)
                     } else {
                         false
                     }
@@ -584,7 +583,7 @@ impl Supervisor {
 
             // Update the state of a migration.
             let mut state = schema.migration_state_unchecked(&request);
-            let instance = transactions::get_instance_by_name(&context, request.service.as_ref())
+            let instance = transactions::get_instance_by_name(context, request.service.as_ref())
                 .expect("BUG: Migration succeed, but there is no such instance in core");
             state.update(AsyncEventState::Succeed, instance.data_version().clone());
             schema.migration_states.put(&request, state);
