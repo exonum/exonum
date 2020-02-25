@@ -15,7 +15,7 @@
 //! Tests node creation with the help of the `run-dev` command.
 
 use exonum::{
-    helpers::{tokio::wait_for, Height},
+    helpers::Height,
     runtime::{versioning::Version, InstanceStatus, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_derive::*;
@@ -160,7 +160,7 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
         .json()?;
     assert_eq!(answer, 42);
 
-    wait_for(shutdown_handle.shutdown())?;
+    futures::executor::block_on(shutdown_handle.shutdown())?;
     node_thread.join().ok();
     Ok(())
 }

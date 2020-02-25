@@ -19,4 +19,4 @@ exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
 exonum-supervisor = { version = "1.0.0-rc.1", path = "../../services/supervisor" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
-futures = { version = "0.3.4", features = ["executor"] }
+futures = "0.3.4"

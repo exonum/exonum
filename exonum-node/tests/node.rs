@@ -16,12 +16,11 @@
 
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
-    helpers::tokio::wait_for,
     merkledb::{Database, TemporaryDB},
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
-use futures::{sync::mpsc, Future, Stream};
+use futures_01::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
@@ -49,7 +48,7 @@ impl RunHandle {
     }
 
     fn join(self) {
-        wait_for(self.shutdown_handle.shutdown()).unwrap();
+        futures::executor::block_on(self.shutdown_handle.shutdown()).unwrap();
         self.node_thread.join().unwrap();
     }
 }

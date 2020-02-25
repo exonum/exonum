@@ -18,16 +18,18 @@ use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::TestKitBuilder;
 
 fn main() {
-    exonum::helpers::init_logger().unwrap();
+    todo!()
 
-    let artifact = CryptocurrencyService.artifact_id();
-    TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(101, "cryptocurrency"))
-        .with_rust_service(CryptocurrencyService)
-        .serve(
-            "0.0.0.0:8000".parse().unwrap(),
-            "0.0.0.0:9000".parse().unwrap(),
-        );
+    // exonum::helpers::init_logger().unwrap();
+
+    // let artifact = CryptocurrencyService.artifact_id();
+    // TestKitBuilder::validator()
+    //     .with_default_rust_service(ExplorerFactory)
+    //     .with_artifact(artifact.clone())
+    //     .with_instance(artifact.into_default_instance(101, "cryptocurrency"))
+    //     .with_rust_service(CryptocurrencyService)
+    //     .serve(
+    //         "0.0.0.0:8000".parse().unwrap(),
+    //         "0.0.0.0:9000".parse().unwrap(),
+    //     );
 }
