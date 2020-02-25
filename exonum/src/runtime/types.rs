@@ -446,12 +446,12 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 /// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArtifactStatus {
-    /// The artifact is pending deployment.
-    Pending = 1,
-    /// The artifact has been successfully deployed.
-    Active = 2,
     /// The artifact is pending unload.
-    Unloading = 3,
+    Unloading,
+    /// The artifact is pending deployment.
+    Pending,
+    /// The artifact has been successfully deployed.
+    Active,
 
     /// Never actually generated.
     #[doc(hidden)]
@@ -476,9 +476,9 @@ impl ProtobufConvert for ArtifactStatus {
         use self::schema::lifecycle::ArtifactState_Status::*;
 
         match self {
+            ArtifactStatus::Unloading => UNLOADING,
             ArtifactStatus::Active => ACTIVE,
             ArtifactStatus::Pending => PENDING,
-            ArtifactStatus::Unloading => NONE,
             ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
@@ -487,9 +487,9 @@ impl ProtobufConvert for ArtifactStatus {
         use self::schema::lifecycle::ArtifactState_Status::*;
 
         Ok(match pb {
+            UNLOADING => ArtifactStatus::Unloading,
             ACTIVE => ArtifactStatus::Active,
             PENDING => ArtifactStatus::Pending,
-            NONE => ArtifactStatus::Unloading,
         })
     }
 }

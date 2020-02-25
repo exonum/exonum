@@ -47,8 +47,8 @@ message GenesisConfig {
 message ArtifactState {
   // Status of an artifact deployment.
   enum Status {
-    // Reserved for the further usage.
-    NONE = 0;
+    // The artifact is pending unload.
+    UNLOADING = 0;
     // The artifact is pending deployment.
     PENDING = 1;
     // The artifact has been successfully deployed.
