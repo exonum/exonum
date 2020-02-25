@@ -702,7 +702,7 @@ impl InstanceDescriptor {
 }
 
 impl fmt::Display for InstanceDescriptor {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}:{}", self.id, self.name)
     }
 }

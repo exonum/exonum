@@ -390,7 +390,7 @@ where
 {
     fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
-        let access: GenericRawAccess = access.into();
+        let access: GenericRawAccess<'_> = access.into();
         GenericAccess::Prefixed(Prefixed::new(prefix, access))
     }
 }
@@ -401,7 +401,7 @@ where
 {
     fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
-        let access: GenericRawAccess = access.into();
+        let access: GenericRawAccess<'_> = access.into();
         GenericAccess::Migration(Migration::new(prefix, access))
     }
 }
@@ -412,7 +412,7 @@ where
 {
     fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
-        let access: GenericRawAccess = access.into();
+        let access: GenericRawAccess<'_> = access.into();
         GenericAccess::Scratchpad(Scratchpad::new(prefix, access))
     }
 }

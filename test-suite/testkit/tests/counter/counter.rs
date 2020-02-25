@@ -220,7 +220,7 @@ impl CounterApi {
         let service_keys = builder.blockchain().service_keypair().to_owned();
         builder.public_scope().endpoint_mut(
             "incorrect-tx",
-            move |_state: &ServiceApiState, by: u64| {
+            move |_state: &ServiceApiState<'_>, by: u64| {
                 let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
                 let hash = incorrect_tx.object_hash();
                 api_sender
