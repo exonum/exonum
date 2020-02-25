@@ -25,7 +25,7 @@ use exonum::{
 #[cfg(feature = "exonum-node")]
 use exonum_node::NodePlugin;
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory};
-use futures::sync::mpsc;
+use futures_01::sync::mpsc;
 
 use std::{collections::HashMap, net::SocketAddr};
 

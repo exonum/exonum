@@ -16,21 +16,21 @@
 
 pub use exonum_api::ApiAccess;
 
-use actix::{Addr, System};
-use actix_net::server::{Server, StopServer};
 use actix_web::{
-    server::{HttpServer, IntoHttpHandler},
+    test::{self, TestServer},
     App,
 };
 use exonum::{
     blockchain::ApiSender,
+    helpers::tokio::wait_for,
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
-use futures::Future;
 use log::{info, trace};
 use reqwest::{
-    Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response, StatusCode,
+    blocking::{Client, ClientBuilder, RequestBuilder as ReqwestBuilder, Response},
+    redirect::Policy as RedirectPolicy,
+    StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -123,9 +123,7 @@ impl TestKitApi {
     where
         T: Into<Verified<AnyTx>>,
     {
-        self.api_sender
-            .broadcast_transaction(transaction.into())
-            .wait()
+        wait_for(self.api_sender.broadcast_transaction(transaction.into()))
             .expect("Cannot broadcast transaction");
     }
 
@@ -345,89 +343,16 @@ where
 
 /// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
-    let server = TestServer::with_factory(move || {
+    let server = test::start(move || {
         App::new()
-            .scope("public/api", |scope| {
-                trace!("Create public/api");
-                aggregator.extend_backend(ApiAccess::Public, scope)
-            })
-            .scope("private/api", |scope| {
-                trace!("Create private/api");
-                aggregator.extend_backend(ApiAccess::Private, scope)
-            })
+            .service(
+                aggregator.extend_backend(ApiAccess::Public, actix_web::web::scope("public/api")),
+            )
+            .service(
+                aggregator.extend_backend(ApiAccess::Private, actix_web::web::scope("private/api")),
+            )
     });
 
     info!("Test server created on {}", server.addr());
     server
-}
-
-/// The custom implementation of the test server, because there is an error in the default
-/// implementation. It does not wait for the http server thread to complete during drop.
-struct TestServer {
-    addr: net::SocketAddr,
-    backend: Addr<Server>,
-    system: System,
-    handle: Option<JoinHandle<()>>,
-}
-
-impl TestServer {
-    /// Start new test server with application factory
-    fn with_factory<F, H>(factory: F) -> Self
-    where
-        F: Fn() -> H + Send + Clone + 'static,
-        H: IntoHttpHandler + 'static,
-    {
-        let (tx, rx) = mpsc::channel();
-
-        // run server in separate thread
-        let handle = thread::spawn(move || {
-            let sys = System::new("actix-test-server");
-            let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let local_addr = tcp.local_addr().unwrap();
-
-            let srv = HttpServer::new(factory)
-                .disable_signals()
-                .listen(tcp)
-                .keep_alive(5)
-                .client_shutdown(100) // Decreases waiting interval during server shutdown
-                .workers(1)
-                .start();
-
-            tx.send((System::current(), local_addr, srv)).unwrap();
-            sys.run();
-        });
-
-        let (system, addr, backend) = rx.recv().unwrap();
-
-        Self {
-            addr,
-            backend,
-            handle: Some(handle),
-            system,
-        }
-    }
-
-    /// Construct test server url.
-    fn url(&self, uri: &str) -> String {
-        if uri.starts_with('/') {
-            format!("http://localhost:{}{}", self.addr.port(), uri)
-        } else {
-            format!("http://localhost:{}/{}", self.addr.port(), uri)
-        }
-    }
-
-    /// Construct test server url.
-    fn addr(&self) -> net::SocketAddr {
-        self.addr
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        // Stop the HTTP server dropping all current connections.
-        let _ = self.backend.send(StopServer { graceful: false }).wait();
-        self.system.stop();
-        // Wait server thread.
-        let _ = self.handle.take().unwrap().join();
-    }
 }

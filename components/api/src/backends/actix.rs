@@ -18,13 +18,14 @@
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
 pub use actix_cors::{Cors, CorsFactory};
+pub use actix_web::{HttpRequest, web::Payload};
 
 use actix_web::{
     body::Body,
     error::ResponseError,
     http::header,
     web::{self, scope, Json, Query},
-    FromRequest, HttpRequest, HttpResponse,
+    FromRequest, HttpResponse,
 };
 use futures::future::{FutureExt, LocalBoxFuture};
 use serde::{de::DeserializeOwned, Serialize};
@@ -37,7 +38,7 @@ use crate::{
 };
 
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler = dyn Fn(HttpRequest, web::Payload) -> LocalBoxFuture<'static, HttpResponse>
+pub type RawHandler = dyn Fn(HttpRequest, Payload) -> LocalBoxFuture<'static, Result<HttpResponse, actix_web::Error>>
     + 'static
     + Send
     + Sync;
@@ -217,7 +218,7 @@ where
 /// - If request is mutable, the query is parsed from the request body as JSON.
 async fn extract_query<Q>(
     request: HttpRequest,
-    payload: web::Payload,
+    payload: Payload,
     mutability: EndpointMutability,
 ) -> Result<Q, actix_web::error::Error>
 where
@@ -246,21 +247,15 @@ where
         let handler = f.inner.handler;
         let actuality = f.inner.actuality;
         let mutability = f.mutability;
-        let index = move |request: HttpRequest, payload: web::Payload| {
+        let index = move |request: HttpRequest, payload: Payload| {
             let handler = handler.clone();
             let actuality = actuality.clone();
 
             // TODO Rewrite without extra matcher [ECR-4268]
             async move {
-                let result = match extract_query(request, payload, mutability).await {
-                    Ok(query) => handler(query).await.map_err(From::from),
-                    Err(e) => Err(e),
-                };
-
-                match result {
-                    Ok(value) => json_response(actuality, value),
-                    Err(e) => HttpResponse::from_error(e),
-                }
+                let query = extract_query(request, payload, mutability).await?;
+                let response = handler(query).await.map_err(actix_web::Error::from)?;
+                Ok(json_response(actuality, response))
             }
             .boxed_local()
         };

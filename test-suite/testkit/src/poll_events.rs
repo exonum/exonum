@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use futures::{Async, Future, Poll, Stream};
+use futures_01::{Async, Future, Poll, Stream};
 
 use std::fmt;
 
@@ -89,12 +89,14 @@ pub(crate) fn poll_all<S: Stream<Error = ()>>(stream: &mut S) -> Vec<S::Item> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::{executor, sync::mpsc};
+    use futures_01::{executor, sync::mpsc};
 
     #[test]
     fn test_take_while_ready() {
-        use futures::stream::{iter_ok, poll_fn};
-        use futures::Async;
+        use futures_01::{
+            stream::{iter_ok, poll_fn},
+            Async,
+        };
 
         let mut waiting = false;
         let stream = iter_ok::<_, ()>(1..4).chain(poll_fn(move || {

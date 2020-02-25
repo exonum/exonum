@@ -384,15 +384,15 @@ impl SystemApi {
         let index = move |_: HttpRequest, _: Payload| {
             let sender = sender.clone();
             async move {
-                let result = sender.send_message(ExternalMessage::Shutdown).await;
-
-                match result {
-                    Ok(()) => HttpResponse::Ok().json(()),
-                    Err(e) => {
+                sender
+                    .send_message(ExternalMessage::Shutdown)
+                    .await
+                    .map_err(|e| {
                         let e = api::Error::internal(e).title("Failed to handle shutdown");
-                        actix_web::Error::from(e).into()
-                    }
-                }
+                        actix_web::Error::from(e)
+                    })?;
+
+                Ok(HttpResponse::Ok().json(()))
             }
             .boxed_local()
         };

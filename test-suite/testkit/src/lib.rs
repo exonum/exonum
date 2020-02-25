@@ -116,13 +116,12 @@ use exonum::{
     runtime::{InstanceId, RuntimeInstance, SnapshotExt},
 };
 use exonum_api::{
-    backends::actix::SystemRuntime, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
+    ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
     UpdateEndpoints, WebServerConfig,
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
-use futures::{sync::mpsc, Future, Stream};
-use tokio_core::reactor::Core;
+use futures_01::{sync::mpsc, Future, Stream};
 
 #[cfg(feature = "exonum-node")]
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
@@ -137,7 +136,6 @@ use std::{
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
-    server::TestKitActor,
 };
 
 mod api;
@@ -146,7 +144,7 @@ mod checkpoint_db;
 pub mod migrations;
 mod network;
 mod poll_events;
-pub mod server;
+// pub mod server;
 
 type ApiNotifierChannel = (
     mpsc::Sender<UpdateEndpoints>,
@@ -721,32 +719,34 @@ impl TestKit {
     }
 
     fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let events_stream = self.remove_events_stream();
-        let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
+        todo!();
 
-        let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
-        let mut servers = HashMap::new();
-        servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
-        servers.insert(
-            ApiAccess::Private,
-            WebServerConfig::new(private_api_address),
-        );
-        let api_manager_config = ApiManagerConfig {
-            servers,
-            api_aggregator,
-            server_restart_max_retries: 5,
-            server_restart_retry_timeout: 500,
-        };
-        let api_manager = ApiManager::new(api_manager_config, endpoints_rx);
-        let system_runtime = SystemRuntime::start(api_manager).unwrap();
+        // let events_stream = self.remove_events_stream();
+        // let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
 
-        // Run the event stream in a separate thread in order to put transactions to mempool
-        // when they are received. Otherwise, a client would need to call a `poll_events` analogue
-        // each time after a transaction is posted.
-        let mut core = Core::new().unwrap();
-        core.run(events_stream).unwrap();
-        system_runtime.stop().unwrap();
-        actor_handle.join().unwrap();
+        // let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
+        // let mut servers = HashMap::new();
+        // servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
+        // servers.insert(
+        //     ApiAccess::Private,
+        //     WebServerConfig::new(private_api_address),
+        // );
+        // let api_manager_config = ApiManagerConfig {
+        //     servers,
+        //     api_aggregator,
+        //     server_restart_max_retries: 5,
+        //     server_restart_retry_timeout: 500,
+        // };
+        // let api_manager = ApiManager::new(api_manager_config, endpoints_rx);
+        // let system_runtime = SystemRuntime::start(api_manager).unwrap();
+
+        // // Run the event stream in a separate thread in order to put transactions to mempool
+        // // when they are received. Otherwise, a client would need to call a `poll_events` analogue
+        // // each time after a transaction is posted.
+        // let mut core = Core::new().unwrap();
+        // core.run(events_stream).unwrap();
+        // system_runtime.stop().unwrap();
+        // actor_handle.join().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -758,7 +758,7 @@ impl TestKit {
     ///
     /// Future that runs the event stream of this testkit to completion.
     pub(crate) fn remove_events_stream(&mut self) -> impl Future<Item = (), Error = ()> {
-        let stream = mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
+        let stream = mem::replace(&mut self.events_stream, Box::new(futures_01::stream::empty()));
         stream.for_each(|_| Ok(()))
     }
 
