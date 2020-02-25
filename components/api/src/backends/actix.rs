@@ -18,7 +18,7 @@
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
 pub use actix_cors::{Cors, CorsFactory};
-pub use actix_web::{HttpRequest, web::Payload};
+pub use actix_web::{web::Payload, HttpRequest};
 
 use actix_web::{
     body::Body,

@@ -22,13 +22,12 @@ use actix_web::{
 };
 use exonum::{
     blockchain::ApiSender,
-    helpers::tokio::wait_for,
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
 use log::{info, trace};
 use reqwest::{
-    blocking::{Client, ClientBuilder, RequestBuilder as ReqwestBuilder, Response},
+    Client, ClientBuilder, RequestBuilder as ReqwestBuilder, Response,
     redirect::Policy as RedirectPolicy,
     StatusCode,
 };
@@ -37,9 +36,6 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::{
     collections::HashMap,
     fmt::{self, Display},
-    net,
-    sync::mpsc,
-    thread::{self, JoinHandle},
 };
 
 use crate::TestKit;
@@ -119,11 +115,11 @@ impl TestKitApi {
     }
 
     /// Sends a transaction to the node.
-    pub fn send<T>(&self, transaction: T)
+    pub async fn send<T>(&self, transaction: T)
     where
         T: Into<Verified<AnyTx>>,
     {
-        wait_for(self.api_sender.broadcast_transaction(transaction.into()))
+        self.api_sender.broadcast_transaction(transaction.into()).await
             .expect("Cannot broadcast transaction");
     }
 
@@ -237,7 +233,7 @@ where
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a query string parameters.
-    pub fn get<R>(self, endpoint: &str) -> api::Result<R>
+    pub async fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -266,16 +262,16 @@ where
         if let Some(modifier) = self.modifier {
             builder = modifier(builder);
         }
-        let response = builder.send().expect("Unable to send request");
+        let response = builder.send().await.expect("Unable to send request");
         Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result(response)
+        Self::response_to_api_result(response).await
     }
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a JSON in the request body.
-    pub fn post<R>(self, endpoint: &str) -> api::Result<R>
+    pub async fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -299,9 +295,9 @@ where
         if let Some(modifier) = self.modifier {
             builder = modifier(builder);
         }
-        let response = builder.send().expect("Unable to send request");
+        let response = builder.send().await.expect("Unable to send request");
         Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result(response)
+        Self::response_to_api_result(response).await
     }
 
     // Checks that response contains headers expected by the request author.
@@ -324,12 +320,12 @@ where
     }
 
     /// Converts reqwest Response to `api::ApiResult`.
-    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
+    async fn response_to_api_result<R>(response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
         let code = response.status();
-        let body = response.text().expect("Unable to get response text");
+        let body = response.text().await.expect("Unable to get response text");
         trace!("Body: {}", body);
         if code == StatusCode::OK {
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");

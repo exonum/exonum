@@ -103,6 +103,7 @@ pub use crate::{
     network::{TestNetwork, TestNode},
 };
 pub use exonum_explorer as explorer;
+pub use actix_rt::test as api_test;
 
 use exonum::{
     blockchain::{
@@ -116,8 +117,7 @@ use exonum::{
     runtime::{InstanceId, RuntimeInstance, SnapshotExt},
 };
 use exonum_api::{
-    ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
-    UpdateEndpoints, WebServerConfig,
+    ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig,
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
@@ -758,7 +758,10 @@ impl TestKit {
     ///
     /// Future that runs the event stream of this testkit to completion.
     pub(crate) fn remove_events_stream(&mut self) -> impl Future<Item = (), Error = ()> {
-        let stream = mem::replace(&mut self.events_stream, Box::new(futures_01::stream::empty()));
+        let stream = mem::replace(
+            &mut self.events_stream,
+            Box::new(futures_01::stream::empty()),
+        );
         stream.for_each(|_| Ok(()))
     }
 
