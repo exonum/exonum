@@ -132,7 +132,7 @@ impl TestNetwork {
 
     /// Updates the test network with a new consensus configuration.
     // TODO Optimize O(n^2) [ECR-3222]
-    pub fn update_consensus_config(&mut self, config: ConsensusConfig) {
+    pub fn update_consensus_config(&mut self, config: &ConsensusConfig) {
         // Assign new node roles.
         for node in &mut self.nodes {
             node.validator_id = config

@@ -269,7 +269,7 @@ where
             builder = modifier(builder);
         }
         let response = builder.send().expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
+        Self::verify_headers(&self.expected_headers, &response);
         Self::response_to_api_result(response)
     }
 
@@ -302,14 +302,14 @@ where
             builder = modifier(builder);
         }
         let response = builder.send().expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
+        Self::verify_headers(&self.expected_headers, &response);
         Self::response_to_api_result(response)
     }
 
     // Checks that response contains headers expected by the request author.
-    fn verify_headers(expected_headers: HashMap<String, String>, response: &Response) {
+    fn verify_headers(expected_headers: &HashMap<String, String>, response: &Response) {
         let headers = response.headers();
-        for (header, expected_value) in expected_headers.iter() {
+        for (header, expected_value) in expected_headers {
             let header_value = headers.get(header).unwrap_or_else(|| {
                 panic!(
                     "Response {:?} was expected to have header {}, but it isn't present",

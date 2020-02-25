@@ -238,7 +238,7 @@ impl TestKitBuilder {
 
         let genesis_config_builder = self.instances.into_iter().fold(
             GenesisConfigBuilder::with_consensus_config(genesis),
-            |builder, instance| builder.with_instance(instance),
+            GenesisConfigBuilder::with_instance,
         );
 
         let genesis_config = self

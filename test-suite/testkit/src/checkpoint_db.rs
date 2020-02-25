@@ -221,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
     fn interleaved_rollbacks() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();
