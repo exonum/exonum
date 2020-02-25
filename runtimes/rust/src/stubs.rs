@@ -213,7 +213,7 @@ mod explanation {
     where
         T: GenericCall<Ctx>,
     {
-        type Output = <T as GenericCall<Ctx>>::Output;
+        type Output = <Self as GenericCall<Ctx>>::Output;
 
         fn create_wallet(&self, context: Ctx, wallet: CreateWallet) -> Self::Output {
             const DESCRIPTOR: MethodDescriptor<'static> = MethodDescriptor {

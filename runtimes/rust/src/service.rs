@@ -161,6 +161,7 @@ pub trait ServiceFactory: Send + Debug + 'static {
     fn create_instance(&self) -> Box<dyn Service>;
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T> From<T> for Box<dyn ServiceFactory>
 where
     T: ServiceFactory,

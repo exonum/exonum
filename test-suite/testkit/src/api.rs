@@ -66,10 +66,10 @@ pub enum ApiKind {
 impl fmt::Display for ApiKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApiKind::System => write!(formatter, "api/system"),
-            ApiKind::Explorer => write!(formatter, "api/explorer"),
-            ApiKind::RustRuntime => write!(formatter, "api/runtimes/rust"),
-            ApiKind::Service(name) => write!(formatter, "api/services/{}", name),
+            Self::System => write!(formatter, "api/system"),
+            Self::Explorer => write!(formatter, "api/explorer"),
+            Self::RustRuntime => write!(formatter, "api/runtimes/rust"),
+            Self::Service(name) => write!(formatter, "api/services/{}", name),
         }
     }
 }
@@ -106,7 +106,7 @@ impl TestKitApi {
             .redirect(RedirectPolicy::none())
             .build()
             .unwrap();
-        TestKitApi {
+        Self {
             test_server: create_test_server(aggregator),
             test_client,
             api_sender,
@@ -292,7 +292,7 @@ where
         trace!("POST {}", url);
 
         let builder = self.test_client.post(&url);
-        let mut builder = if let Some(ref query) = self.query.as_ref() {
+        let mut builder = if let Some(query) = self.query.as_ref() {
             trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
             builder.json(query)
         } else {

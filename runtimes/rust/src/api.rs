@@ -110,7 +110,7 @@ impl<'a> ServiceApiState<'a> {
 
     /// Returns information about the executing service.
     pub fn instance(&self) -> &InstanceDescriptor {
-        &self.broadcaster.instance()
+        self.broadcaster.instance()
     }
 
     /// Returns the current status of the service.
