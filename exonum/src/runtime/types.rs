@@ -22,6 +22,7 @@ use exonum_merkledb::{
 };
 use exonum_proto::ProtobufConvert;
 use failure::{bail, ensure, format_err};
+use protobuf::well_known_types::Empty;
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 
@@ -920,7 +921,7 @@ impl ProtobufConvert for Caller {
         match self {
             Caller::Transaction { author } => pb.set_transaction_author(author.to_pb()),
             Caller::Service { instance_id } => pb.set_instance_id(*instance_id),
-            Caller::Blockchain => pb.set_blockchain(Default::default()),
+            Caller::Blockchain => pb.set_blockchain(Empty::new()),
         }
         pb
     }

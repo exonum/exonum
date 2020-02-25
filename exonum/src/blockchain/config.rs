@@ -186,7 +186,7 @@ impl ConsensusConfig {
             .collect();
         let config = Self {
             validator_keys,
-            ..Default::default()
+            ..Self::default()
         };
         (config, node_keys.unwrap())
     }

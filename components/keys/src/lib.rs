@@ -45,17 +45,12 @@
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // `filter(..).map(..)` often looks more shorter and readable.
-    clippy::filter_map,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // Variant name ends with the enum name. Similar behavior to similar_names.
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
-    clippy::use_self,
-    clippy::default_trait_access,
-    // Too much work to fix this issues.
+    // Too much work to fix.
     clippy::missing_errors_doc
 )]
 

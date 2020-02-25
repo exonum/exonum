@@ -226,7 +226,7 @@ impl RuntimeInspector {
     fn new(available: Vec<ArtifactId>) -> Self {
         Self {
             available,
-            ..Default::default()
+            ..Self::default()
         }
     }
 
