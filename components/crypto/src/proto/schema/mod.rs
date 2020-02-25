@@ -15,7 +15,7 @@
 //! Module of the rust-protobuf generated files.
 
 // For protobuf generated files.
-#![allow(bare_trait_objects, clippy::pedantic)]
+#![allow(bare_trait_objects, clippy::pedantic, clippy::nursery)]
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 

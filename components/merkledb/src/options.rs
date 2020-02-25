@@ -84,13 +84,13 @@ pub enum CompressionType {
 impl From<CompressionType> for DBCompressionType {
     fn from(compression_type: CompressionType) -> Self {
         match compression_type {
-            CompressionType::Bz2 => DBCompressionType::Bz2,
-            CompressionType::Lz4 => DBCompressionType::Lz4,
-            CompressionType::Lz4hc => DBCompressionType::Lz4hc,
-            CompressionType::Snappy => DBCompressionType::Snappy,
-            CompressionType::Zlib => DBCompressionType::Zlib,
-            CompressionType::Zstd => DBCompressionType::Zstd,
-            CompressionType::None => DBCompressionType::None,
+            CompressionType::Bz2 => Self::Bz2,
+            CompressionType::Lz4 => Self::Lz4,
+            CompressionType::Lz4hc => Self::Lz4hc,
+            CompressionType::Snappy => Self::Snappy,
+            CompressionType::Zlib => Self::Zlib,
+            CompressionType::Zstd => Self::Zstd,
+            CompressionType::None => Self::None,
         }
     }
 }

@@ -610,7 +610,7 @@ pub fn make_request_propose_from_precommit(
 ) -> Verified<ProposeRequest> {
     Sandbox::create_propose_request(
         sandbox.public_key(ValidatorId(0)),
-        sandbox.public_key(precommit.validator()),
+        sandbox.public_key(precommit.validator),
         precommit.height,
         precommit.propose_hash,
         sandbox.secret_key(ValidatorId(0)),
@@ -624,7 +624,7 @@ pub fn make_request_prevote_from_precommit(
     let validators = BitVec::from_elem(sandbox.validators().len(), false);
     Sandbox::create_prevote_request(
         sandbox.public_key(ValidatorId(0)),
-        sandbox.public_key(precommit.validator()),
+        sandbox.public_key(precommit.validator),
         precommit.height,
         precommit.round,
         precommit.propose_hash,

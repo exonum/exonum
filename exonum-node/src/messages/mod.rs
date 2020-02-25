@@ -284,25 +284,25 @@ impl Consensus {
         match *self {
             Consensus::Propose(ref msg) => msg.payload().validator(),
             Consensus::Prevote(ref msg) => msg.payload().validator(),
-            Consensus::Precommit(ref msg) => msg.payload().validator(),
+            Consensus::Precommit(ref msg) => msg.payload().validator,
         }
     }
 
     /// Returns height of the message.
     pub fn height(&self) -> Height {
-        match *self {
-            Consensus::Propose(ref msg) => msg.payload().height(),
-            Consensus::Prevote(ref msg) => msg.payload().height(),
-            Consensus::Precommit(ref msg) => msg.payload().height(),
+        match self {
+            Consensus::Propose(msg) => msg.payload().height(),
+            Consensus::Prevote(msg) => msg.payload().height(),
+            Consensus::Precommit(msg) => msg.payload().height,
         }
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
-        match *self {
-            Consensus::Propose(ref msg) => msg.payload().round(),
-            Consensus::Prevote(ref msg) => msg.payload().round(),
-            Consensus::Precommit(ref msg) => msg.payload().round(),
+        match self {
+            Consensus::Propose(msg) => msg.payload().round(),
+            Consensus::Prevote(msg) => msg.payload().round(),
+            Consensus::Precommit(msg) => msg.payload().round,
         }
     }
 }

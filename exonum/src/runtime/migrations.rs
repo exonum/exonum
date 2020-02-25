@@ -167,13 +167,13 @@ pub enum MigrationError {
 impl MigrationError {
     /// Creates a new migration error.
     pub fn new(cause: impl fmt::Display) -> Self {
-        MigrationError::Custom(cause.to_string())
+        Self::Custom(cause.to_string())
     }
 }
 
 impl From<db_migration::MigrationError> for MigrationError {
     fn from(err: db_migration::MigrationError) -> Self {
-        MigrationError::Helper(err)
+        Self::Helper(err)
     }
 }
 

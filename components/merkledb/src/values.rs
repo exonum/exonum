@@ -95,6 +95,7 @@ macro_rules! impl_binary_value_scalar {
         impl_object_hash_for_binary_value! { $type }
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
+        #[allow(clippy::use_self)]
         impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
                 let mut v = vec![0; $len];
@@ -136,6 +137,7 @@ impl BinaryValue for () {
     }
 }
 
+#[allow(clippy::use_self)] // false positives
 impl BinaryValue for bool {
     fn to_bytes(&self) -> Vec<u8> {
         vec![*self as u8]

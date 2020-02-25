@@ -963,7 +963,7 @@ pub enum Action {
 impl fmt::Debug for Action {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Action::StartDeploy { artifact, spec, .. } => formatter
+            Self::StartDeploy { artifact, spec, .. } => formatter
                 .debug_struct("StartDeploy")
                 .field("artifact", artifact)
                 .field("spec", spec)
@@ -975,7 +975,7 @@ impl fmt::Debug for Action {
 impl Action {
     fn execute(self, dispatcher: &mut Dispatcher) {
         match self {
-            Action::StartDeploy {
+            Self::StartDeploy {
                 artifact,
                 spec,
                 then,

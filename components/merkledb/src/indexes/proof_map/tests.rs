@@ -1369,7 +1369,7 @@ where
     }
 
     for key in nonexisting_keys {
-        if !table.contains(&key) {
+        if !table.contains(key) {
             // The check is largely redundant, but better be here anyway
             let proof = table.get_proof(key.to_owned());
             check_map_proof(&proof, None, &table);
@@ -1665,7 +1665,7 @@ fn test_tree_with_hashed_key() {
     }
 
     fn hash_isolated_node(key: &ProofPath, h: &Hash) -> Hash {
-        HashTag::hash_map_node(HashTag::hash_single_entry_map(&key, &h))
+        HashTag::hash_map_node(HashTag::hash_single_entry_map(key, h))
     }
 
     let db = TemporaryDB::default();

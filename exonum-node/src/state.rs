@@ -182,7 +182,7 @@ pub trait VoteMessage: Clone {
 
 impl VoteMessage for Verified<Precommit> {
     fn validator(&self) -> ValidatorId {
-        self.payload().validator()
+        self.payload().validator
     }
 }
 

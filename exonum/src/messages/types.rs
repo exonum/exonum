@@ -98,30 +98,6 @@ impl Precommit {
             time,
         }
     }
-    /// The validator id.
-    pub fn validator(&self) -> ValidatorId {
-        self.validator
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the corresponding `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
-    /// Hash of the new block.
-    pub fn block_hash(&self) -> &Hash {
-        &self.block_hash
-    }
-    /// Time of the `Precommit`.
-    pub fn time(&self) -> DateTime<Utc> {
-        self.time
-    }
 }
 
 /// Subset of Exonum messages defined in the Exonum core.
@@ -145,10 +121,10 @@ impl ProtobufConvert for CoreMessage {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            CoreMessage::AnyTx(any_tx) => {
+            Self::AnyTx(any_tx) => {
                 pb.set_any_tx(any_tx.to_pb());
             }
-            CoreMessage::Precommit(precommit) => {
+            Self::Precommit(precommit) => {
                 pb.set_precommit(precommit.to_pb());
             }
         }
@@ -158,10 +134,10 @@ impl ProtobufConvert for CoreMessage {
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let msg = if pb.has_any_tx() {
             let tx = AnyTx::from_pb(pb.take_any_tx())?;
-            CoreMessage::AnyTx(tx)
+            Self::AnyTx(tx)
         } else if pb.has_precommit() {
             let precommit = Precommit::from_pb(pb.take_precommit())?;
-            CoreMessage::Precommit(precommit)
+            Self::Precommit(precommit)
         } else {
             failure::bail!("Incorrect protobuf representation of CoreMessage")
         };
@@ -172,13 +148,13 @@ impl ProtobufConvert for CoreMessage {
 
 impl From<AnyTx> for CoreMessage {
     fn from(tx: AnyTx) -> Self {
-        CoreMessage::AnyTx(tx)
+        Self::AnyTx(tx)
     }
 }
 
 impl From<Precommit> for CoreMessage {
     fn from(precommit: Precommit) -> Self {
-        CoreMessage::Precommit(precommit)
+        Self::Precommit(precommit)
     }
 }
 

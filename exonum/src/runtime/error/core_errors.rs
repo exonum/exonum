@@ -16,7 +16,7 @@
 
 use exonum_derive::ExecutionFail;
 
-use crate::runtime::{ErrorKind, ExecutionError};
+use crate::runtime::{ExecutionError, ExecutionFail};
 
 /// List of possible core errors.
 ///
@@ -67,11 +67,6 @@ impl CoreError {
             "Maximum depth of call stack ({}) has been reached.",
             max_depth
         );
-        ExecutionError::new(
-            ErrorKind::Core {
-                code: CoreError::StackOverflow as u8,
-            },
-            description,
-        )
+        Self::StackOverflow.with_description(description)
     }
 }

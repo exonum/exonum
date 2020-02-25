@@ -130,6 +130,7 @@ impl BlockchainData<&dyn Snapshot> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<'a, T> BlockchainData<T>
 where
     T: Into<GenericRawAccess<'a>>,

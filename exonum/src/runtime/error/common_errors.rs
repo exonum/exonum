@@ -49,6 +49,6 @@ impl CommonError {
             "Malformed arguments for calling a service interface method: {}",
             cause
         );
-        CommonError::MalformedArguments.with_description(description)
+        Self::MalformedArguments.with_description(description)
     }
 }

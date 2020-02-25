@@ -260,16 +260,14 @@ pub enum CallType {
 impl fmt::Display for CallType {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CallType::Constructor => formatter.write_str("constructor"),
-            CallType::Resume => formatter.write_str("resuming routine"),
-            CallType::Method { interface, id } if interface.is_empty() => {
+            Self::Constructor => formatter.write_str("constructor"),
+            Self::Resume => formatter.write_str("resuming routine"),
+            Self::Method { interface, id } if interface.is_empty() => {
                 write!(formatter, "method {}", id)
             }
-            CallType::Method { interface, id } => {
-                write!(formatter, "{}::(method {})", interface, id)
-            }
-            CallType::BeforeTransactions => formatter.write_str("before_transactions hook"),
-            CallType::AfterTransactions => formatter.write_str("after_transactions hook"),
+            Self::Method { interface, id } => write!(formatter, "{}::(method {})", interface, id),
+            Self::BeforeTransactions => formatter.write_str("before_transactions hook"),
+            Self::AfterTransactions => formatter.write_str("after_transactions hook"),
         }
     }
 }

@@ -505,15 +505,15 @@ impl InstanceInitParams {
         artifact: ArtifactId,
         constructor: impl BinaryValue,
     ) -> Self {
-        InstanceInitParams {
+        Self {
             instance_spec: InstanceSpec::from_raw_parts(id, name.into(), artifact),
             constructor: constructor.into_bytes(),
         }
     }
 
     /// Converts into `InstanceInitParams` with specific constructor.
-    pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
-        InstanceInitParams {
+    pub fn with_constructor(self, constructor: impl BinaryValue) -> Self {
+        Self {
             instance_spec: self.instance_spec,
             constructor: constructor.into_bytes(),
         }
@@ -521,7 +521,7 @@ impl InstanceInitParams {
 }
 
 impl From<InstanceSpec> for InstanceInitParams {
-    fn from(instance_spec: InstanceSpec) -> InstanceInitParams {
+    fn from(instance_spec: InstanceSpec) -> Self {
         Self {
             instance_spec,
             constructor: Vec::new(),

@@ -123,7 +123,7 @@ pub mod serde {
                     ErrorKind::Service { code } => (ExecutionType::ServiceError, Some(code)),
                 };
 
-                ExecutionStatus {
+                Self {
                     typ,
                     description: err.description.clone(),
                     code,
@@ -131,7 +131,7 @@ pub mod serde {
                     call_site: err.call_site.clone(),
                 }
             } else {
-                ExecutionStatus {
+                Self {
                     typ: ExecutionType::Success,
                     description: String::new(),
                     code: None,

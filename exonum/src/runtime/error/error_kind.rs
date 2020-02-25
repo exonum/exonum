@@ -129,11 +129,11 @@ pub enum ErrorKind {
 impl ErrorKind {
     pub(super) fn into_raw(self) -> (errors_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Unexpected => (errors_proto::ErrorKind::UNEXPECTED, 0),
-            ErrorKind::Common { code } => (errors_proto::ErrorKind::COMMON, code),
-            ErrorKind::Core { code } => (errors_proto::ErrorKind::CORE, code),
-            ErrorKind::Runtime { code } => (errors_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (errors_proto::ErrorKind::SERVICE, code),
+            Self::Unexpected => (errors_proto::ErrorKind::UNEXPECTED, 0),
+            Self::Common { code } => (errors_proto::ErrorKind::COMMON, code),
+            Self::Core { code } => (errors_proto::ErrorKind::CORE, code),
+            Self::Runtime { code } => (errors_proto::ErrorKind::RUNTIME, code),
+            Self::Service { code } => (errors_proto::ErrorKind::SERVICE, code),
         }
     }
 
@@ -145,12 +145,12 @@ impl ErrorKind {
         let kind = match kind {
             UNEXPECTED => {
                 ensure!(code == 0, "Error code for panic should be zero");
-                ErrorKind::Unexpected
+                Self::Unexpected
             }
-            COMMON => ErrorKind::Common { code },
-            CORE => ErrorKind::Core { code },
-            RUNTIME => ErrorKind::Runtime { code },
-            SERVICE => ErrorKind::Service { code },
+            COMMON => Self::Common { code },
+            CORE => Self::Core { code },
+            RUNTIME => Self::Runtime { code },
+            SERVICE => Self::Service { code },
         };
         Ok(kind)
     }
@@ -159,11 +159,11 @@ impl ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Unexpected => f.write_str("unexpected"),
-            ErrorKind::Common { code } => write!(f, "common:{}", code),
-            ErrorKind::Core { code } => write!(f, "core:{}", code),
-            ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
-            ErrorKind::Service { code } => write!(f, "service:{}", code),
+            Self::Unexpected => f.write_str("unexpected"),
+            Self::Common { code } => write!(f, "common:{}", code),
+            Self::Core { code } => write!(f, "core:{}", code),
+            Self::Runtime { code } => write!(f, "runtime:{}", code),
+            Self::Service { code } => write!(f, "service:{}", code),
         }
     }
 }

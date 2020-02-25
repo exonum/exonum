@@ -40,7 +40,7 @@ impl ProtobufConvert for crate::Hash {
     fn from_pb(pb: schema::Hash) -> Result<Self, Error> {
         let data = pb.get_data();
         ensure!(data.len() == HASH_SIZE, "Wrong Hash size");
-        crate::Hash::from_slice(data).ok_or_else(|| format_err!("Cannot convert Hash from bytes"))
+        Self::from_slice(data).ok_or_else(|| format_err!("Cannot convert Hash from bytes"))
     }
 }
 
@@ -56,8 +56,7 @@ impl ProtobufConvert for crate::PublicKey {
     fn from_pb(pb: schema::PublicKey) -> Result<Self, Error> {
         let data = pb.get_data();
         ensure!(data.len() == PUBLIC_KEY_LENGTH, "Wrong PublicKey size");
-        crate::PublicKey::from_slice(data)
-            .ok_or_else(|| format_err!("Cannot convert PublicKey from bytes"))
+        Self::from_slice(data).ok_or_else(|| format_err!("Cannot convert PublicKey from bytes"))
     }
 }
 
@@ -73,7 +72,6 @@ impl ProtobufConvert for crate::Signature {
     fn from_pb(pb: schema::Signature) -> Result<Self, Error> {
         let data = pb.get_data();
         ensure!(data.len() == SIGNATURE_LENGTH, "Wrong Signature size");
-        crate::Signature::from_slice(data)
-            .ok_or_else(|| format_err!("Cannot convert Signature from bytes"))
+        Self::from_slice(data).ok_or_else(|| format_err!("Cannot convert Signature from bytes"))
     }
 }

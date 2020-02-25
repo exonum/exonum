@@ -263,8 +263,8 @@ impl From<RuntimeIdentifier> for u32 {
 impl RuntimeIdentifier {
     fn transform(id: u32) -> Result<Self, ()> {
         match id {
-            0 => Ok(RuntimeIdentifier::Rust),
-            1 => Ok(RuntimeIdentifier::Java),
+            0 => Ok(Self::Rust),
+            1 => Ok(Self::Java),
             _ => Err(()),
         }
     }
@@ -273,8 +273,8 @@ impl RuntimeIdentifier {
 impl fmt::Display for RuntimeIdentifier {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RuntimeIdentifier::Rust => formatter.write_str("Rust runtime"),
-            RuntimeIdentifier::Java => formatter.write_str("Java runtime"),
+            Self::Rust => formatter.write_str("Rust runtime"),
+            Self::Java => formatter.write_str("Java runtime"),
         }
     }
 }
@@ -291,7 +291,7 @@ pub enum RuntimeFeature {
 impl fmt::Display for RuntimeFeature {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RuntimeFeature::FreezingServices => formatter.write_str("freezing services"),
+            Self::FreezingServices => formatter.write_str("freezing services"),
         }
     }
 }
@@ -639,6 +639,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     fn shutdown(&mut self) {}
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T: Runtime> From<T> for Box<dyn Runtime> {
     fn from(value: T) -> Self {
         Box::new(value)
@@ -675,7 +676,7 @@ impl RuntimeInstance {
 
 impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
     fn from(runtime: T) -> Self {
-        RuntimeInstance::new(T::ID, runtime.into())
+        Self::new(T::ID, runtime.into())
     }
 }
 

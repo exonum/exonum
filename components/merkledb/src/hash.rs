@@ -72,12 +72,12 @@ impl HashTag {
 
     /// Obtains a hashed value of a leaf in a Merkle tree.
     pub fn hash_leaf(value: &[u8]) -> Hash {
-        HashTag::Blob.hash_stream().update(value).hash()
+        Self::Blob.hash_stream().update(value).hash()
     }
 
     /// Obtains a hashed value of a branch in a Merkle tree.
     pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
-        HashTag::ListBranchNode
+        Self::ListBranchNode
             .hash_stream()
             .update(left_hash.as_ref())
             .update(right_hash.as_ref())
@@ -86,7 +86,7 @@ impl HashTag {
 
     /// Obtains a hashed value of a Merkle tree branch with one child.
     pub fn hash_single_node(hash: &Hash) -> Hash {
-        HashTag::ListBranchNode
+        Self::ListBranchNode
             .hash_stream()
             .update(hash.as_ref())
             .hash()
@@ -103,7 +103,7 @@ impl HashTag {
         LittleEndian::write_u64(&mut len_bytes, len);
 
         HashStream::new()
-            .update(&[HashTag::ListNode as u8])
+            .update(&[Self::ListNode as u8])
             .update(&len_bytes)
             .update(root.as_ref())
             .hash()
@@ -131,7 +131,7 @@ impl HashTag {
     /// ```
     pub fn hash_map_node(root: Hash) -> Hash {
         HashStream::new()
-            .update(&[HashTag::MapNode as u8])
+            .update(&[Self::MapNode as u8])
             .update(root.as_ref())
             .hash()
     }
@@ -148,7 +148,7 @@ impl HashTag {
     /// [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html#impl-ObjectHash
     pub fn hash_map_branch(branch_node: &[u8]) -> Hash {
         HashStream::new()
-            .update(&[HashTag::MapBranchNode as u8])
+            .update(&[Self::MapBranchNode as u8])
             .update(branch_node)
             .hash()
     }
@@ -169,7 +169,7 @@ impl HashTag {
         path.write_compressed(&mut path_buffer);
 
         HashStream::new()
-            .update(&[HashTag::MapBranchNode as u8])
+            .update(&[Self::MapBranchNode as u8])
             .update(&path_buffer[..])
             .update(child_hash.as_ref())
             .hash()

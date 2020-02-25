@@ -139,7 +139,7 @@ fn test_explorer_blocks_basic() {
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
-                "time": precommit.payload().time(),
+                "time": precommit.payload().time,
                 "additional_headers": blocks[0].block.additional_headers,
             }],
         })

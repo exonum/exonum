@@ -828,7 +828,7 @@ pub fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Ut
     if precommits.is_empty() {
         UNIX_EPOCH.into()
     } else {
-        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time()).collect();
+        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time).collect();
         times.sort();
         times[times.len() / 2]
     }

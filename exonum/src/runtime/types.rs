@@ -419,8 +419,8 @@ pub enum ArtifactStatus {
 impl Display for ArtifactStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArtifactStatus::Active => f.write_str("active"),
-            ArtifactStatus::Pending => f.write_str("pending"),
+            Self::Active => f.write_str("active"),
+            Self::Pending => f.write_str("pending"),
         }
     }
 }
@@ -430,15 +430,15 @@ impl ProtobufConvert for ArtifactStatus {
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            ArtifactStatus::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
-            ArtifactStatus::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
+            Self::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
+            Self::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(match pb {
-            schema::lifecycle::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
-            schema::lifecycle::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
+            schema::lifecycle::ArtifactState_Status::ACTIVE => Self::Active,
+            schema::lifecycle::ArtifactState_Status::PENDING => Self::Pending,
             schema::lifecycle::ArtifactState_Status::NONE => {
                 bail!("Status `NONE` is reserved for the further usage.")
             }
@@ -513,12 +513,12 @@ pub enum InstanceStatus {
 
 impl InstanceStatus {
     pub(super) fn migrating(migration: InstanceMigration) -> Self {
-        InstanceStatus::Migrating(Box::new(migration))
+        Self::Migrating(Box::new(migration))
     }
 
     /// Indicates whether the service instance status is active.
     pub fn is_active(&self) -> bool {
-        *self == InstanceStatus::Active
+        *self == Self::Active
     }
 
     /// Returns `true` if a service with this status provides at least read access to its data.
@@ -526,7 +526,7 @@ impl InstanceStatus {
         match self {
             // Migrations are non-destructive currently; i.e., the old service data is consistent
             // during migration.
-            InstanceStatus::Active | InstanceStatus::Frozen | InstanceStatus::Migrating(_) => true,
+            Self::Active | Self::Frozen | Self::Migrating(_) => true,
             _ => false,
         }
     }
@@ -534,7 +534,7 @@ impl InstanceStatus {
     /// Returns `true` if the service instance with this status can be resumed.
     pub fn can_be_resumed(&self) -> bool {
         match self {
-            InstanceStatus::Stopped | InstanceStatus::Frozen => true,
+            Self::Stopped | Self::Frozen => true,
             _ => false,
         }
     }
@@ -542,7 +542,7 @@ impl InstanceStatus {
     /// Returns `true` if the service instance with this status can be stopped.
     pub fn can_be_stopped(&self) -> bool {
         match self {
-            InstanceStatus::Active | InstanceStatus::Frozen => true,
+            Self::Active | Self::Frozen => true,
             _ => false,
         }
     }
@@ -550,7 +550,7 @@ impl InstanceStatus {
     /// Returns `true` if the service instance with this status can be frozen in all cases.
     pub fn can_be_frozen(&self) -> bool {
         match self {
-            InstanceStatus::Active => true,
+            Self::Active => true,
             // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service
             // may have a data version differing from the artifact recorded in service spec,
             // or, more generally, from any of deployed artifacts.
@@ -560,16 +560,14 @@ impl InstanceStatus {
 
     pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
         match self {
-            InstanceStatus::Migrating(migration) if !migration.is_completed() => {
-                Some(&migration.target)
-            }
+            Self::Migrating(migration) if !migration.is_completed() => Some(&migration.target),
             _ => None,
         }
     }
 
     pub(super) fn completed_migration_hash(&self) -> Option<Hash> {
         match self {
-            InstanceStatus::Migrating(migration) => migration.completed_hash,
+            Self::Migrating(migration) => migration.completed_hash,
             _ => None,
         }
     }
@@ -578,10 +576,10 @@ impl InstanceStatus {
 impl Display for InstanceStatus {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            InstanceStatus::Active => "active",
-            InstanceStatus::Stopped => "stopped",
-            InstanceStatus::Frozen => "frozen",
-            InstanceStatus::Migrating(..) => "migrating",
+            Self::Active => "active",
+            Self::Stopped => "stopped",
+            Self::Frozen => "frozen",
+            Self::Migrating(..) => "migrating",
         })
     }
 }
@@ -599,10 +597,10 @@ impl InstanceStatus {
         let mut pb = schema::lifecycle::InstanceStatus::new();
         match status {
             None => pb.set_simple(NONE),
-            Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
-            Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
-            Some(InstanceStatus::Frozen) => pb.set_simple(FROZEN),
-            Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
+            Some(Self::Active) => pb.set_simple(ACTIVE),
+            Some(Self::Stopped) => pb.set_simple(STOPPED),
+            Some(Self::Frozen) => pb.set_simple(FROZEN),
+            Some(Self::Migrating(migration)) => pb.set_migration(migration.to_pb()),
         }
         pb
     }
@@ -615,13 +613,13 @@ impl InstanceStatus {
         if pb.has_simple() {
             Ok(match pb.get_simple() {
                 NONE => None,
-                ACTIVE => Some(InstanceStatus::Active),
-                STOPPED => Some(InstanceStatus::Stopped),
-                FROZEN => Some(InstanceStatus::Frozen),
+                ACTIVE => Some(Self::Active),
+                STOPPED => Some(Self::Stopped),
+                FROZEN => Some(Self::Frozen),
             })
         } else if pb.has_migration() {
             InstanceMigration::from_pb(pb.take_migration())
-                .map(|migration| Some(InstanceStatus::migrating(migration)))
+                .map(|migration| Some(Self::migrating(migration)))
         } else {
             Err(format_err!("No variant specified for `InstanceStatus`"))
         }
@@ -825,7 +823,7 @@ impl ProtobufConvert for MigrationStatus {
                 "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"
             ));
         };
-        Ok(MigrationStatus(inner))
+        Ok(Self(inner))
     }
 }
 
@@ -878,7 +876,7 @@ pub enum Caller {
 impl Caller {
     /// Returns the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
-        if let Caller::Transaction { author } = self {
+        if let Self::Transaction { author } = self {
             Some(*author)
         } else {
             None
@@ -887,7 +885,7 @@ impl Caller {
 
     /// Tries to reinterpret the caller as a service.
     pub fn as_service(&self) -> Option<InstanceId> {
-        if let Caller::Service { instance_id } = self {
+        if let Self::Service { instance_id } = self {
             Some(*instance_id)
         } else {
             None
@@ -919,9 +917,9 @@ impl ProtobufConvert for Caller {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            Caller::Transaction { author } => pb.set_transaction_author(author.to_pb()),
-            Caller::Service { instance_id } => pb.set_instance_id(*instance_id),
-            Caller::Blockchain => pb.set_blockchain(Empty::new()),
+            Self::Transaction { author } => pb.set_transaction_author(author.to_pb()),
+            Self::Service { instance_id } => pb.set_instance_id(*instance_id),
+            Self::Blockchain => pb.set_blockchain(Empty::new()),
         }
         pb
     }
@@ -929,13 +927,13 @@ impl ProtobufConvert for Caller {
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         Ok(if pb.has_transaction_author() {
             let author = PublicKey::from_pb(pb.take_transaction_author())?;
-            Caller::Transaction { author }
+            Self::Transaction { author }
         } else if pb.has_instance_id() {
-            Caller::Service {
+            Self::Service {
                 instance_id: pb.get_instance_id(),
             }
         } else if pb.has_blockchain() {
-            Caller::Blockchain
+            Self::Blockchain
         } else {
             bail!("No variant specified for `Caller`");
         })
@@ -991,7 +989,7 @@ impl ProtobufConvert for CallerAddress {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        Hash::from_pb(pb).map(CallerAddress)
+        Hash::from_pb(pb).map(Self)
     }
 }
 
@@ -1005,7 +1003,7 @@ impl BinaryKey for CallerAddress {
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        CallerAddress(Hash::read(buffer))
+        Self(Hash::read(buffer))
     }
 }
 

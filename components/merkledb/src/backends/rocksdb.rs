@@ -147,7 +147,7 @@ impl RocksDB {
                 if key.len() < LARGER_KEY.len() {
                     batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY)?;
                 } else {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], &key)?;
+                    batch.delete_range_cf::<&[u8]>(cf, &[], key)?;
                     batch.delete_cf(cf, &key)?;
                 }
             }

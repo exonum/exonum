@@ -148,8 +148,8 @@ impl ops::Not for ChildKind {
 
     fn not(self) -> Self {
         match self {
-            ChildKind::Left => ChildKind::Right,
-            ChildKind::Right => ChildKind::Left,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
         }
     }
 }
@@ -476,7 +476,7 @@ impl ProofPath {
         let bytes_written = {
             let mut writer = Cursor::new(&mut *buffer);
             let mut bytes_written = leb128::write::unsigned(&mut writer, bits_len).unwrap();
-            bytes_written += writer.write(&key).unwrap();
+            bytes_written += writer.write(key).unwrap();
             bytes_written
         };
         // Trims insignificant bits in the last byte.

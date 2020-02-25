@@ -144,38 +144,38 @@ enum OptionalEntry<K, V> {
 
 impl<K, V> OptionalEntry<K, V> {
     fn missing(key: K) -> Self {
-        OptionalEntry::Missing { missing: key }
+        Self::Missing { missing: key }
     }
 
     fn value(key: K, value: V) -> Self {
-        OptionalEntry::KV { key, value }
+        Self::KV { key, value }
     }
 
     fn key(&self) -> &K {
         match self {
-            OptionalEntry::Missing { missing } => missing,
-            OptionalEntry::KV { key, .. } => key,
+            Self::Missing { missing } => missing,
+            Self::KV { key, .. } => key,
         }
     }
 
     fn as_missing(&self) -> Option<&K> {
         match self {
-            OptionalEntry::Missing { missing } => Some(missing),
+            Self::Missing { missing } => Some(missing),
             _ => None,
         }
     }
 
     fn as_kv(&self) -> Option<(&K, &V)> {
         match self {
-            OptionalEntry::KV { key, value } => Some((key, value)),
+            Self::KV { key, value } => Some((key, value)),
             _ => None,
         }
     }
 
     fn as_tuple(&self) -> (&K, Option<&V>) {
         match self {
-            OptionalEntry::Missing { missing } => (missing, None),
-            OptionalEntry::KV { key, value } => (key, Some(value)),
+            Self::Missing { missing } => (missing, None),
+            Self::KV { key, value } => (key, Some(value)),
         }
     }
 }
@@ -544,10 +544,10 @@ where
 
         let mut proof: Vec<_> = self.proof.iter().map(Cow::Borrowed).collect();
         proof.extend(self.entries.iter().filter_map(|e| {
-            e.as_kv().map(|(k, v)| {
+            e.as_kv().map(|(key, value)| {
                 Cow::Owned(MapProofEntry {
-                    path: KeyMode::transform_key(&k),
-                    hash: HashTag::hash_leaf(&v.to_bytes()),
+                    path: KeyMode::transform_key(key),
+                    hash: HashTag::hash_leaf(&value.to_bytes()),
                 })
             })
         }));
