@@ -63,6 +63,7 @@ impl SignedMessage {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "messages::Precommit")]
+#[non_exhaustive]
 pub struct Precommit {
     /// ID of the validator endorsing the block.
     pub validator: ValidatorId,
@@ -76,10 +77,6 @@ pub struct Precommit {
     pub block_hash: Hash,
     /// Local time of the validator node when the `Precommit` was created.
     pub time: DateTime<Utc>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    non_exhaustive: (),
 }
 
 impl Precommit {
@@ -99,7 +96,6 @@ impl Precommit {
             propose_hash,
             block_hash,
             time,
-            non_exhaustive: (),
         }
     }
     /// The validator id.

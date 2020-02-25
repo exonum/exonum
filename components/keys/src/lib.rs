@@ -87,13 +87,12 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 
 /// Container for all key pairs held by an Exonum node.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Keys {
     /// Consensus keypair.
     pub consensus: KeyPair,
     /// Service keypair.
     pub service: KeyPair,
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl Keys {
@@ -103,7 +102,6 @@ impl Keys {
         Self {
             consensus: KeyPair::random(),
             service: KeyPair::random(),
-            non_exhaustive: (),
         }
     }
 
@@ -121,7 +119,6 @@ impl Keys {
         Self {
             consensus: consensus_keys.into(),
             service: service_keys.into(),
-            non_exhaustive: (),
         }
     }
 }

@@ -155,15 +155,13 @@ where
 /// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
 /// or in the service code, depending on the `kind` of the error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
+#[non_exhaustive]
 pub struct CallSite {
     /// ID of the service instance handling the call.
     pub instance_id: InstanceId,
     /// Type of a call.
     #[serde(flatten)]
     pub call_type: CallType,
-
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl CallSite {
@@ -171,7 +169,6 @@ impl CallSite {
         Self {
             instance_id,
             call_type,
-            non_exhaustive: (),
         }
     }
 
@@ -182,7 +179,6 @@ impl CallSite {
                 interface: interface.into(),
                 id: call_info.method_id,
             },
-            non_exhaustive: (),
         }
     }
 }

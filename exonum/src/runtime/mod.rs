@@ -671,24 +671,18 @@ pub trait WellKnownRuntime: Runtime {
 ///
 /// [`Runtime`]: trait.Runtime.html
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct RuntimeInstance {
     /// Identifier of the enclosed runtime.
     pub id: u32,
     /// Enclosed `Runtime` object.
     pub instance: Box<dyn Runtime>,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl RuntimeInstance {
     /// Constructs a new `RuntimeInstance` object.
     pub fn new(id: u32, instance: Box<dyn Runtime>) -> Self {
-        Self {
-            id,
-            instance,
-            non_exhaustive: (),
-        }
+        Self { id, instance }
     }
 }
 
@@ -700,6 +694,7 @@ impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
 
 /// Instance descriptor contains information to access the running service instance.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct InstanceDescriptor {
     /// A unique numeric ID of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.id)
@@ -707,9 +702,6 @@ pub struct InstanceDescriptor {
     /// A unique name of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.name)
     pub name: String,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl InstanceDescriptor {
@@ -718,7 +710,6 @@ impl InstanceDescriptor {
         Self {
             id,
             name: name.into(),
-            non_exhaustive: (),
         }
     }
 }

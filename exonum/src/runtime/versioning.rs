@@ -207,14 +207,12 @@ use crate::runtime::{ArtifactId, CoreError, ExecutionError, ExecutionFail};
 /// # }
 /// ```
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct ArtifactReq {
     /// Artifact name.
     pub name: String,
     /// Allowed artifact versions.
     pub version: VersionReq,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl ArtifactReq {
@@ -223,7 +221,6 @@ impl ArtifactReq {
         Self {
             name: name.into(),
             version,
-            non_exhaustive: (),
         }
     }
 

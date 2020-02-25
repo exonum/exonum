@@ -187,6 +187,7 @@ impl Block {
 /// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
 #[protobuf_convert(source = "schema::proofs::BlockProof")]
+#[non_exhaustive]
 pub struct BlockProof {
     /// Block header containing such information as the ID of the node which
     /// proposed the block, the height of the block, the number of transactions
@@ -194,21 +195,12 @@ pub struct BlockProof {
     pub block: Block,
     /// List of `Precommit` messages for the block.
     pub precommits: Vec<Verified<Precommit>>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl BlockProof {
     /// Creates a new `BlockProof` object.
     pub fn new(block: Block, precommits: Vec<Verified<Precommit>>) -> Self {
-        Self {
-            block,
-            precommits,
-            non_exhaustive: (),
-        }
+        Self { block, precommits }
     }
 
     /// Verifies that the block in this proof is endorsed by the Byzantine majority of provided
@@ -316,6 +308,7 @@ pub enum ProofError {
 /// Proof of authenticity for a single index within the database.
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 #[protobuf_convert(source = "schema::proofs::IndexProof")]
+#[non_exhaustive]
 pub struct IndexProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]
@@ -325,11 +318,6 @@ pub struct IndexProof {
     /// in the form `$service_name.$name_within_service`, e.g., `cryptocurrency.wallets`.
     /// The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
     pub index_proof: MapProof<String, Hash>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl IndexProof {
@@ -338,7 +326,6 @@ impl IndexProof {
         Self {
             block_proof,
             index_proof,
-            non_exhaustive: (),
         }
     }
 

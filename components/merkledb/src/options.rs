@@ -21,6 +21,7 @@ use serde_derive::{Deserialize, Serialize};
 ///
 /// These parameters apply to the underlying database of Exonum, currently `RocksDB`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct DbOptions {
     /// Number of open files that can be used by the database.
     ///
@@ -45,10 +46,6 @@ pub struct DbOptions {
     ///
     /// Defaults to `CompressionType::None`, meaning there is no compression.
     pub compression_type: CompressionType,
-
-    /// No-op field for forward compatibility.
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl DbOptions {
@@ -62,7 +59,6 @@ impl DbOptions {
             max_open_files,
             create_if_missing,
             compression_type,
-            non_exhaustive: (),
         }
     }
 }

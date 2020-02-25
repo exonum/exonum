@@ -270,6 +270,7 @@ impl MigrationScript {
 
 /// Context of a migration.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MigrationContext {
     /// The migration helper allowing to access service data and prepare migrated data.
     pub helper: MigrationHelper,
@@ -288,9 +289,6 @@ pub struct MigrationContext {
     /// [`MigrationScript`]: struct.MigrationScript.html
     /// [`MigrateData`]: trait.MigrateData.html
     pub data_version: Version,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl MigrationContext {
@@ -305,7 +303,6 @@ impl MigrationContext {
             helper,
             instance_spec,
             data_version,
-            non_exhaustive: (),
         }
     }
 }

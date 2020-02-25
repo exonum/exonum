@@ -52,17 +52,13 @@ pub type MethodId = u32;
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "schema::base::CallInfo")]
+#[non_exhaustive]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// runtime to execute a transaction.
     pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl CallInfo {
@@ -71,7 +67,6 @@ impl CallInfo {
         Self {
             instance_id,
             method_id,
-            non_exhaustive: (),
         }
     }
 }
@@ -105,16 +100,12 @@ impl CallInfo {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::base::AnyTx")]
+#[non_exhaustive]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
     /// Serialized transaction arguments.
     pub arguments: Vec<u8>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl AnyTx {
@@ -123,7 +114,6 @@ impl AnyTx {
         Self {
             call_info,
             arguments,
-            non_exhaustive: (),
         }
     }
 
@@ -179,6 +169,7 @@ impl AnyTx {
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "schema::base::ArtifactId")]
+#[non_exhaustive]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
@@ -187,11 +178,6 @@ pub struct ArtifactId {
     /// Semantic version of the artifact.
     #[protobuf_convert(with = "crate::helpers::pb_version")]
     pub version: Version,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
@@ -221,7 +207,6 @@ impl ArtifactId {
             runtime_id,
             name,
             version,
-            non_exhaustive: (),
         }
     }
 
@@ -302,16 +287,12 @@ impl FromStr for ArtifactId {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::base::ArtifactSpec")]
+#[non_exhaustive]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
     pub artifact: ArtifactId,
     /// Runtime-specific artifact payload.
     pub payload: Vec<u8>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl ArtifactSpec {
@@ -320,7 +301,6 @@ impl ArtifactSpec {
         Self {
             artifact,
             payload: deploy_spec.into_bytes(),
-            non_exhaustive: (),
         }
     }
 }
@@ -330,6 +310,7 @@ impl ArtifactSpec {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::base::InstanceSpec")]
+#[non_exhaustive]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///
@@ -347,11 +328,6 @@ pub struct InstanceSpec {
 
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl InstanceSpec {
@@ -369,12 +345,7 @@ impl InstanceSpec {
 
     /// Creates a new instance specification from prepared parts without any checks.
     pub fn from_raw_parts(id: InstanceId, name: String, artifact: ArtifactId) -> Self {
-        Self {
-            id,
-            name,
-            artifact,
-            non_exhaustive: (),
-        }
+        Self { id, name, artifact }
     }
 
     /// Checks that the instance name contains only allowed characters and is not empty.
@@ -492,6 +463,7 @@ impl ProtobufConvert for ArtifactStatus {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceMigration")]
+#[non_exhaustive]
 pub struct InstanceMigration {
     /// Migration target to obtain migration scripts from. This artifact
     /// must be deployed on the blockchain.
@@ -509,11 +481,6 @@ pub struct InstanceMigration {
     #[protobuf_convert(with = "crate::helpers::pb_optional_hash")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl InstanceMigration {
@@ -530,7 +497,6 @@ impl InstanceMigration {
             target,
             end_version,
             completed_hash,
-            non_exhaustive: (),
         }
     }
 
@@ -702,16 +668,12 @@ impl ProtobufConvert for InstanceStatus {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::ArtifactState")]
+#[non_exhaustive]
 pub struct ArtifactState {
     /// Runtime-specific deployment specification.
     pub deploy_spec: Vec<u8>,
     /// Artifact deployment status.
     pub status: ArtifactStatus,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl ArtifactState {
@@ -720,7 +682,6 @@ impl ArtifactState {
         Self {
             deploy_spec,
             status,
-            non_exhaustive: (),
         }
     }
 }
@@ -730,6 +691,7 @@ impl ArtifactState {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceState")]
+#[non_exhaustive]
 pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
@@ -767,11 +729,6 @@ pub struct InstanceState {
     /// block will be committed.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 mod pb_optional_version {
@@ -807,7 +764,6 @@ impl InstanceState {
             data_version,
             status,
             pending_status,
-            non_exhaustive: (),
         }
     }
 
