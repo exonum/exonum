@@ -85,7 +85,24 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
-#![deny(missing_docs)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc
+)]
 
 pub use crate::config_manager::DefaultConfigManager;
 pub use structopt;
@@ -154,9 +171,7 @@ impl NodeBuilder {
         I::Item: Into<OsString>,
     {
         let mut this = Self::new();
-        let executable = env::current_exe()
-            .map(PathBuf::into_os_string)
-            .unwrap_or_else(|_| "node".into());
+        let executable = env::current_exe().map_or_else(|_| "node".into(), PathBuf::into_os_string);
         let all_args = iter::once(executable)
             .chain(args.into_iter().map(Into::into))
             .collect();

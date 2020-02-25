@@ -122,7 +122,7 @@ impl FromStr for PassInputMethod {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {
-            return Ok(Default::default());
+            return Ok(Self::default());
         }
 
         if s == "stdin" {

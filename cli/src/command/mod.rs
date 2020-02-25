@@ -88,7 +88,7 @@ impl ExonumCommand for Command {
 }
 
 /// Output of any of the standard Exonum Core configuration commands.
-#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum StandardResult {
     /// `generate-template` command output.
     GenerateTemplate {
@@ -110,7 +110,7 @@ pub enum StandardResult {
         node_config_path: PathBuf,
     },
     /// `run` command output.
-    Run(NodeRunConfig),
+    Run(Box<NodeRunConfig>),
     /// `maintenance` command output.
     Maintenance {
         /// Path to a node configuration file.
