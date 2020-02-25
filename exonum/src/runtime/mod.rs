@@ -72,6 +72,10 @@
 //!   to assume that a deployment failure at this stage is local to the node and
 //!   could be fixed by the node admin.
 //!
+//! 6. If the artifact is not associated with any services, it can be *unloaded*. Unloading
+//!   the artifact may free resources associated with in in the corresponding runtime.
+//!   Like other lifecycle events, unloading an artifact is controlled by the supervisor service.
+//!
 //! # Service Lifecycle
 //!
 //! 1. Once the artifact is committed, it is possible to instantiate the corresponding service.
