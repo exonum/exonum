@@ -21,7 +21,7 @@ use exonum::{
     messages::Verified,
 };
 use failure::bail;
-use futures::future::{done, Future};
+use futures_01::future::{done, Future};
 use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 

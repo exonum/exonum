@@ -19,7 +19,7 @@ use exonum::{
     merkledb::BinaryValue,
     messages::{SignedMessage, Verified},
 };
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures_01::{sync::mpsc, Future, Sink, Stream};
 use pretty_assertions::assert_eq;
 use tokio::util::FutureExt;
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;

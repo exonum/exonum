@@ -91,7 +91,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
-//! 
+//!
 //! # #[actix_rt::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...

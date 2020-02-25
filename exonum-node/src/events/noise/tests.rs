@@ -18,7 +18,7 @@ use exonum::{
     crypto::{gen_keypair_from_seed, Seed, PUBLIC_KEY_LENGTH, SEED_LENGTH},
     merkledb::BinaryValue,
 };
-use futures::{
+use futures_01::{
     future::Either,
     sync::{mpsc, mpsc::Sender},
     Future, Sink, Stream,

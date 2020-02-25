@@ -29,7 +29,7 @@ use exonum::{
     messages::Verified,
     runtime::{AnyTx, CallInfo},
 };
-use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
+use futures_01::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 use tokio_threadpool::Builder as ThreadPoolBuilder;
 

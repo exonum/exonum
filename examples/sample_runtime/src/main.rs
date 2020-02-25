@@ -17,7 +17,7 @@
 
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, ConsensusConfig, ValidatorKeys},
-    helpers::{tokio::wait_for, Height},
+    helpers::Height,
     keys::Keys,
     merkledb::{BinaryValue, Snapshot, TemporaryDB},
     runtime::{
@@ -295,56 +295,72 @@ fn main() {
     println!("Blockchain is ready for transactions!");
 
     let handle = thread::spawn(move || {
-        // TODO Use tokio runtime instead of `wait_for`.
+        futures::executor::block_on(async move {
+            let deploy_height = Height(50);
+            // Send an artifact `DeployRequest` to the sample runtime.
+            let request = DeployRequest {
+                artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
+                deadline_height: deploy_height,
+                spec: Vec::default(),
+            };
+            let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
+            blockchain_ref
+                .sender()
+                .broadcast_transaction(tx)
+                .await
+                .unwrap();
 
-        let deploy_height = Height(50);
-        // Send an artifact `DeployRequest` to the sample runtime.
-        let request = DeployRequest {
-            artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
-            deadline_height: deploy_height,
-            spec: Vec::default(),
-        };
-        let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
-        wait_for(blockchain_ref.sender().broadcast_transaction(tx)).unwrap();
+            // Wait until the request is finished.
+            thread::sleep(Duration::from_secs(5));
 
-        // Wait until the request is finished.
-        thread::sleep(Duration::from_secs(5));
+            // Send a `StartService` request to the sample runtime.
+            let instance_name = "instance";
+            let proposal = ConfigPropose::immediate(0).start_service(
+                "255:sample_artifact:0.1.0".parse().unwrap(),
+                instance_name,
+                10_u64,
+            );
+            let proposal = service_keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, proposal);
+            blockchain_ref
+                .sender()
+                .broadcast_transaction(proposal)
+                .await
+                .unwrap();
 
-        // Send a `StartService` request to the sample runtime.
-        let instance_name = "instance";
-        let proposal = ConfigPropose::immediate(0).start_service(
-            "255:sample_artifact:0.1.0".parse().unwrap(),
-            instance_name,
-            10_u64,
-        );
-        let proposal = service_keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, proposal);
-        wait_for(blockchain_ref.sender().broadcast_transaction(proposal)).unwrap();
+            // Wait until instance identifier is assigned.
+            thread::sleep(Duration::from_secs(1));
 
-        // Wait until instance identifier is assigned.
-        thread::sleep(Duration::from_secs(1));
+            // Get an instance identifier.
+            let snapshot = blockchain_ref.snapshot();
+            let state = snapshot
+                .for_dispatcher()
+                .get_instance(instance_name)
+                .unwrap();
+            assert_eq!(state.status.unwrap(), InstanceStatus::Active);
+            let instance_id = state.spec.id;
 
-        // Get an instance identifier.
-        let snapshot = blockchain_ref.snapshot();
-        let state = snapshot
-            .for_dispatcher()
-            .get_instance(instance_name)
-            .unwrap();
-        assert_eq!(state.status.unwrap(), InstanceStatus::Active);
-        let instance_id = state.spec.id;
+            // Send an update counter transaction.
+            let tx = AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes());
+            let tx = tx.sign_with_keypair(&service_keypair);
+            blockchain_ref
+                .sender()
+                .broadcast_transaction(tx)
+                .await
+                .unwrap();
+            thread::sleep(Duration::from_secs(2));
 
-        // Send an update counter transaction.
-        let tx = AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes());
-        let tx = tx.sign_with_keypair(&service_keypair);
-        wait_for(blockchain_ref.sender().broadcast_transaction(tx)).unwrap();
-        thread::sleep(Duration::from_secs(2));
+            // Send a reset counter transaction.
+            let tx = AnyTx::new(CallInfo::new(instance_id, 1), vec![]);
+            let tx = tx.sign_with_keypair(&service_keypair);
+            blockchain_ref
+                .sender()
+                .broadcast_transaction(tx)
+                .await
+                .unwrap();
 
-        // Send a reset counter transaction.
-        let tx = AnyTx::new(CallInfo::new(instance_id, 1), vec![]);
-        let tx = tx.sign_with_keypair(&service_keypair);
-        wait_for(blockchain_ref.sender().broadcast_transaction(tx)).unwrap();
-
-        thread::sleep(Duration::from_secs(2));
-        wait_for(shutdown_handle.shutdown()).unwrap();
+            thread::sleep(Duration::from_secs(2));
+            shutdown_handle.shutdown().await.unwrap();
+        });
     });
 
     node.run().unwrap();

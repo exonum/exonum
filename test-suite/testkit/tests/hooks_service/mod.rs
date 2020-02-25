@@ -81,13 +81,13 @@ impl Service for AfterCommitService {
         let height = context.height().0;
         if counter < 10_000 {
             if let Some(broadcast) = context.broadcaster() {
-                AfterCommitContext::spawn(async move {
+                futures::executor::block_on(async move {
                     broadcast.after_commit((), height).await.ok();
                 });
             }
         } else {
             let broadcast = context.generic_broadcaster();
-            AfterCommitContext::spawn(async move {
+            futures::executor::block_on(async move {
                 broadcast.after_commit((), height).await.ok();
             });
         }
@@ -116,9 +116,9 @@ impl Service for AfterCommitServiceV2 {
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         if let Some(broadcast) = context.broadcaster() {
             let height = context.height().0;
-            AfterCommitContext::spawn(async move {
+            futures::executor::block_on(async move {
                 broadcast.after_commit((), height).await.ok();
-            })
+            });
         }
     }
 }

@@ -57,8 +57,8 @@ use exonum_api::{
     WebServerConfig,
 };
 use failure::{ensure, format_err, Error};
-use futures::{sync::mpsc, Sink};
-use futures_03::{compat::Stream01CompatExt, stream::TryStreamExt};
+use futures::{compat::Stream01CompatExt, stream::TryStreamExt};
+use futures_01::{sync::mpsc, Sink};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;

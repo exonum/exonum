@@ -18,7 +18,7 @@
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     crypto::KeyPair,
-    helpers::{tokio::wait_for, Height},
+    helpers::Height,
     merkledb::{Database, ObjectHash, TemporaryDB},
     runtime::SnapshotExt,
 };
@@ -50,7 +50,8 @@ impl RunHandle {
     }
 
     fn join(self) -> KeyPair {
-        wait_for(self.shutdown_handle.shutdown()).expect("Cannot shut down node");
+        futures::executor::block_on(self.shutdown_handle.shutdown())
+            .expect("Cannot shut down node");
         self.node_thread
             .join()
             .expect("Node panicked during shutdown");

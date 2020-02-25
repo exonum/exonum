@@ -27,7 +27,7 @@ use exonum::{
     helpers::{Height, Round},
     messages::{AnyTx, Verified},
 };
-use futures::{
+use futures_01::{
     sink::Wait,
     sync::mpsc::{self, Sender},
     Async, Future, Poll, Stream,

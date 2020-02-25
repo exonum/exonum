@@ -13,12 +13,12 @@
 // limitations under the License.
 
 use exonum::{merkledb::BinaryValue, messages::SignedMessage};
-use futures::{
+use futures::compat::Future01CompatExt;
+use futures_01::{
     future::{self},
     sync::mpsc,
     Future, Sink, Stream,
 };
-use futures_03::compat::Future01CompatExt;
 use tokio_02::time;
 use tokio_compat::runtime::current_thread::Handle;
 

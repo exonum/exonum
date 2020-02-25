@@ -26,7 +26,7 @@ pub use self::wrappers::sodium_wrapper::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum::crypto::x25519;
-use futures::future::Future;
+use futures_01::future::Future;
 use tokio_codec::Framed;
 use tokio_io::{
     io::{read_exact, write_all},

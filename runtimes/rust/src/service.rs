@@ -22,7 +22,7 @@ use exonum::{
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures::future::{BoxFuture, Future, FutureExt};
+use futures::future::{BoxFuture, FutureExt};
 
 use std::fmt::{self, Debug};
 
@@ -220,16 +220,6 @@ impl<'a> AfterCommitContext<'a> {
             broadcaster: Broadcaster::new(instance, service_keypair.clone(), tx_sender.clone()),
             status,
         }
-    }
-
-    /// TODO [ECR-4268]
-    #[deprecated(note = "tokio::runtime::Handle::current() directly")]
-    pub fn spawn<F>(fut: F)
-    where
-        F: Future + Send + 'static,
-        F::Output: Send + 'static,
-    {
-        futures::executor::block_on(fut);
     }
 
     /// Returns blockchain data for the snapshot associated with this context.

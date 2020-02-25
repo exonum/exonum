@@ -20,7 +20,7 @@ use exonum::{
     messages::{SignedMessage, Verified},
 };
 use failure::{bail, ensure, format_err};
-use futures::{
+use futures_01::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
     sync::{self, mpsc},

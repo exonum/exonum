@@ -33,7 +33,7 @@ use exonum::{
     runtime::{ArtifactId, SnapshotExt},
 };
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
-use futures::{sync::mpsc, Async, Future, Sink, Stream};
+use futures_01::{sync::mpsc, Async, Future, Sink, Stream};
 
 use std::{
     cell::{Ref, RefCell, RefMut},
@@ -117,7 +117,7 @@ impl SandboxInner {
     }
 
     fn process_network_requests(&mut self) {
-        let network_getter = futures::lazy(|| -> Result<(), ()> {
+        let network_getter = futures_01::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
                 match network {
                     NetworkRequest::SendMessage(peer, msg) => {
@@ -133,7 +133,7 @@ impl SandboxInner {
     }
 
     fn process_internal_requests(&mut self) {
-        let internal_getter = futures::lazy(|| -> Result<(), ()> {
+        let internal_getter = futures_01::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
                 match internal {
                     InternalRequest::Timeout(t) => self.timers.push(t),
@@ -161,7 +161,7 @@ impl SandboxInner {
     }
 
     fn process_api_requests(&mut self) {
-        let api_getter = futures::lazy(|| -> Result<(), ()> {
+        let api_getter = futures_01::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
                 self.handler.handle_event(api.into());
             }
@@ -169,7 +169,7 @@ impl SandboxInner {
         });
         api_getter.wait().unwrap();
 
-        let tx_getter = futures::lazy(|| -> Result<(), ()> {
+        let tx_getter = futures_01::lazy(|| -> Result<(), ()> {
             while let Async::Ready(Some(tx)) = self.transactions_rx.poll()? {
                 self.handler.handle_event(tx.into());
             }

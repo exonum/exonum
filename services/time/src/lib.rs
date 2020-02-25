@@ -143,7 +143,7 @@ impl Service for TimeService {
         // the transaction with the current time.
         if let Some(broadcast) = context.broadcaster() {
             let time = TxTime::new(self.time.current_time());
-            AfterCommitContext::spawn(async move { broadcast.report_time((), time).await.ok() })
+            futures::executor::block_on(async move { broadcast.report_time((), time).await.ok() });
         }
     }
 
