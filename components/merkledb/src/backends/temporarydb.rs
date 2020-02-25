@@ -53,8 +53,6 @@ impl TemporaryDB {
     pub fn clear(&self) -> crate::Result<()> {
         /// Name of the default column family.
         const DEFAULT_CF: &str = "default";
-        /// Some lexicographically large key.
-        const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
 
         let opts = rocksdb::Options::default();
         let names = rocksdb::DB::list_cf(&opts, self.dir.path())?;
@@ -65,27 +63,11 @@ impl TemporaryDB {
         let db_reader = self.inner.get_lock_guard();
         for name in &names {
             if name != DEFAULT_CF && name != DB_METADATA {
-                let cf_handle = db_reader.cf_handle(name).ok_or_else(|| {
+                let cf = db_reader.cf_handle(name).ok_or_else(|| {
                     let message = format!("Cannot access column family {}", name);
                     crate::Error::new(message)
                 })?;
-                let mut iter = db_reader.raw_iterator_cf(cf_handle)?;
-                iter.seek_to_last();
-                if iter.valid() {
-                    if let Some(key) = iter.key() {
-                        // For some reason, removing a range to a very large key is
-                        // significantly faster than removing the exact range.
-                        // This is specific to the debug mode, but since `TemporaryDB`
-                        // is mostly used for testing, this optimization leads to practical
-                        // performance improvement.
-                        if key.len() < LARGER_KEY.len() {
-                            batch.delete_range_cf::<&[u8]>(cf_handle, &[], LARGER_KEY)?;
-                        } else {
-                            batch.delete_range_cf::<&[u8]>(cf_handle, &[], &key)?;
-                            batch.delete_cf(cf_handle, &key)?;
-                        }
-                    }
-                }
+                self.inner.clear_column_family(&mut batch, cf)?;
             }
         }
 
