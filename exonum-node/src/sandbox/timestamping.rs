@@ -77,7 +77,7 @@ pub struct TimestampingTxGenerator {
 impl TimestampingTxGenerator {
     pub fn new(data_size: usize) -> Self {
         let keypair = KeyPair::random();
-        TimestampingTxGenerator::with_keypair(data_size, keypair)
+        Self::with_keypair(data_size, keypair)
     }
 
     /// Creates a generator of transactions for a service not instantiated on the blockchain.
@@ -87,10 +87,9 @@ impl TimestampingTxGenerator {
         this
     }
 
-    pub fn with_keypair(data_size: usize, keypair: KeyPair) -> TimestampingTxGenerator {
+    pub fn with_keypair(data_size: usize, keypair: KeyPair) -> Self {
         let rand = thread_rng();
-
-        TimestampingTxGenerator {
+        Self {
             rand,
             data_size,
             keypair,
@@ -110,6 +109,6 @@ impl Iterator for TimestampingTxGenerator {
 }
 
 impl DefaultInstance for TimestampingService {
-    const INSTANCE_ID: InstanceId = TimestampingService::ID;
+    const INSTANCE_ID: InstanceId = Self::ID;
     const INSTANCE_NAME: &'static str = "timestamping";
 }

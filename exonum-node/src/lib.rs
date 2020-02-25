@@ -41,7 +41,7 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
@@ -51,7 +51,7 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub use crate::{
@@ -434,7 +434,7 @@ pub(crate) enum NodeRole {
 
 impl Default for NodeRole {
     fn default() -> Self {
-        NodeRole::Auditor
+        Self::Auditor
     }
 }
 
@@ -442,15 +442,15 @@ impl NodeRole {
     /// Constructs new `NodeRole` from `validator_id`.
     pub fn new(validator_id: Option<ValidatorId>) -> Self {
         match validator_id {
-            Some(validator_id) => NodeRole::Validator(validator_id),
-            None => NodeRole::Auditor,
+            Some(validator_id) => Self::Validator(validator_id),
+            None => Self::Auditor,
         }
     }
 
     /// Checks if node is validator.
     pub fn is_validator(self) -> bool {
         match self {
-            NodeRole::Validator(_) => true,
+            Self::Validator(_) => true,
             _ => false,
         }
     }
@@ -489,7 +489,7 @@ impl NodeHandler {
                 &user_agent(),
             ),
             config.keys.consensus_pk(),
-            &config.keys.consensus_sk(),
+            config.keys.consensus_sk(),
         );
 
         let connect_list = config.connect_list;

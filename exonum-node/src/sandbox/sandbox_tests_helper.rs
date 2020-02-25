@@ -197,13 +197,13 @@ pub struct SandboxState {
 
 impl SandboxState {
     pub fn new() -> Self {
-        SandboxState::default()
+        Self::default()
     }
 }
 
 impl Default for SandboxState {
     fn default() -> Self {
-        SandboxState {
+        Self {
             accepted_block_hash: RefCell::new(Hash::zero()),
             accepted_propose_hash: RefCell::new(Hash::zero()),
             committed_transaction_hashes: RefCell::new(Vec::new()),

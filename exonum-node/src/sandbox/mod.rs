@@ -517,22 +517,23 @@ impl Sandbox {
     pub fn send_peers_request(&self) {
         self.process_events();
 
-        if let Some((addr, msg)) = self.pop_sent_message() {
-            let peers_request = Verified::<PeersRequest>::try_from(msg)
-                .expect("Incorrect message. PeersRequest was expected");
+        let (addr, msg) = self
+            .pop_sent_message()
+            .expect("Expected to send the PeersRequest message but nothing happened");
+        let peers_request = Verified::<PeersRequest>::try_from(msg)
+            .expect("Incorrect message. PeersRequest was expected");
 
-            let id = self.addresses.iter().position(|ref a| a.public_key == addr);
-            if let Some(id) = id {
-                assert_eq!(
-                    &self.public_key(ValidatorId(id as u16)),
-                    peers_request.payload().to()
-                );
-            } else {
+        let id = self
+            .addresses
+            .iter()
+            .position(|connect_info| connect_info.public_key == addr)
+            .unwrap_or_else(|| {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
-            }
-        } else {
-            panic!("Expected to send the PeersRequest message but nothing happened");
-        }
+            });
+        assert_eq!(
+            &self.public_key(ValidatorId(id as u16)),
+            peers_request.payload().to()
+        );
     }
 
     pub fn broadcast<T>(&self, msg: &Verified<T>)
@@ -847,13 +848,13 @@ impl Sandbox {
 
     /// Constructs a new uninitialized instance of a `Sandbox` preserving database and
     /// configuration.
-    pub fn restart_uninitialized(self) -> Sandbox {
+    pub fn restart_uninitialized(self) -> Self {
         self.restart_uninitialized_with_time(UNIX_EPOCH + Duration::new(INITIAL_TIME_IN_SECS, 0))
     }
 
     /// Constructs a new uninitialized instance of a `Sandbox` preserving database and
     /// configuration.
-    pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Sandbox {
+    pub fn restart_uninitialized_with_time(self, time: SystemTime) -> Self {
         let network_channel = mpsc::channel(100);
         let internal_channel = mpsc::channel(100);
         let tx_channel = mpsc::channel(100);
@@ -916,7 +917,7 @@ impl Sandbox {
             handler,
             time: Arc::clone(&inner.time),
         };
-        let sandbox = Sandbox {
+        let sandbox = Self {
             inner: RefCell::new(inner),
             validators_map: self.validators_map,
             services_map: self.services_map,

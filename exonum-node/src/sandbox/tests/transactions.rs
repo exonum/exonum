@@ -223,7 +223,7 @@ fn duplicate_tx_in_pool() {
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(2)),
             vec![tx1.object_hash()],
-            &sandbox.secret_key(ValidatorId(0)),
+            sandbox.secret_key(ValidatorId(0)),
         ),
     );
     sandbox.recv(&tx1);

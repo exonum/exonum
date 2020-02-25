@@ -53,9 +53,9 @@ pub enum Service {
 impl Service {
     fn as_raw(&self) -> &SignedMessage {
         match self {
-            Service::AnyTx(ref msg) => msg.as_raw(),
-            Service::Connect(ref msg) => msg.as_raw(),
-            Service::Status(ref msg) => msg.as_raw(),
+            Self::AnyTx(ref msg) => msg.as_raw(),
+            Self::Connect(ref msg) => msg.as_raw(),
+            Self::Status(ref msg) => msg.as_raw(),
         }
     }
 }
@@ -74,9 +74,9 @@ pub enum Consensus {
 impl Consensus {
     fn as_raw(&self) -> &SignedMessage {
         match self {
-            Consensus::Precommit(ref msg) => msg.as_raw(),
-            Consensus::Propose(ref msg) => msg.as_raw(),
-            Consensus::Prevote(ref msg) => msg.as_raw(),
+            Self::Precommit(msg) => msg.as_raw(),
+            Self::Propose(msg) => msg.as_raw(),
+            Self::Prevote(msg) => msg.as_raw(),
         }
     }
 }
@@ -93,21 +93,21 @@ pub enum Responses {
 impl Responses {
     fn as_raw(&self) -> &SignedMessage {
         match self {
-            Responses::TransactionsResponse(ref msg) => msg.as_raw(),
-            Responses::BlockResponse(ref msg) => msg.as_raw(),
+            Self::TransactionsResponse(msg) => msg.as_raw(),
+            Self::BlockResponse(msg) => msg.as_raw(),
         }
     }
 }
 
 impl From<Verified<TransactionsResponse>> for Responses {
     fn from(msg: Verified<TransactionsResponse>) -> Self {
-        Responses::TransactionsResponse(msg)
+        Self::TransactionsResponse(msg)
     }
 }
 
 impl From<Verified<BlockResponse>> for Responses {
     fn from(msg: Verified<BlockResponse>) -> Self {
-        Responses::BlockResponse(msg)
+        Self::BlockResponse(msg)
     }
 }
 
@@ -131,12 +131,12 @@ pub enum Requests {
 impl Requests {
     fn as_raw(&self) -> &SignedMessage {
         match self {
-            Requests::ProposeRequest(ref msg) => msg.as_raw(),
-            Requests::TransactionsRequest(ref msg) => msg.as_raw(),
-            Requests::PrevotesRequest(ref msg) => msg.as_raw(),
-            Requests::PeersRequest(ref msg) => msg.as_raw(),
-            Requests::BlockRequest(ref msg) => msg.as_raw(),
-            Requests::PoolTransactionsRequest(ref msg) => msg.as_raw(),
+            Self::ProposeRequest(msg) => msg.as_raw(),
+            Self::TransactionsRequest(msg) => msg.as_raw(),
+            Self::PrevotesRequest(msg) => msg.as_raw(),
+            Self::PeersRequest(msg) => msg.as_raw(),
+            Self::BlockRequest(msg) => msg.as_raw(),
+            Self::PoolTransactionsRequest(msg) => msg.as_raw(),
         }
     }
 }
@@ -168,10 +168,10 @@ impl Message {
     /// Get inner `SignedMessage`.
     pub fn as_raw(&self) -> &SignedMessage {
         match self {
-            Message::Service(ref msg) => msg.as_raw(),
-            Message::Consensus(ref msg) => msg.as_raw(),
-            Message::Requests(ref msg) => msg.as_raw(),
-            Message::Responses(ref msg) => msg.as_raw(),
+            Self::Service(ref msg) => msg.as_raw(),
+            Self::Consensus(ref msg) => msg.as_raw(),
+            Self::Requests(ref msg) => msg.as_raw(),
+            Self::Responses(ref msg) => msg.as_raw(),
         }
     }
 }
@@ -187,7 +187,7 @@ macro_rules! impl_message_from_verified {
         $(
             impl From<Verified<$concrete>> for Message {
                 fn from(msg: Verified<$concrete>) -> Self {
-                    Message::$category($category::$concrete(msg))
+                    Self::$category($category::$concrete(msg))
                 }
             }
 
@@ -246,25 +246,25 @@ impl_message_from_verified! {
 impl Requests {
     /// Returns public key of the message recipient.
     pub fn to(&self) -> PublicKey {
-        match *self {
-            Requests::ProposeRequest(ref msg) => msg.payload().to,
-            Requests::TransactionsRequest(ref msg) => msg.payload().to,
-            Requests::PrevotesRequest(ref msg) => msg.payload().to,
-            Requests::PeersRequest(ref msg) => msg.payload().to,
-            Requests::BlockRequest(ref msg) => msg.payload().to,
-            Requests::PoolTransactionsRequest(ref msg) => msg.payload().to,
+        match self {
+            Self::ProposeRequest(msg) => msg.payload().to,
+            Self::TransactionsRequest(msg) => msg.payload().to,
+            Self::PrevotesRequest(msg) => msg.payload().to,
+            Self::PeersRequest(msg) => msg.payload().to,
+            Self::BlockRequest(msg) => msg.payload().to,
+            Self::PoolTransactionsRequest(msg) => msg.payload().to,
         }
     }
 
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
-        match *self {
-            Requests::ProposeRequest(ref msg) => msg.author(),
-            Requests::TransactionsRequest(ref msg) => msg.author(),
-            Requests::PrevotesRequest(ref msg) => msg.author(),
-            Requests::PeersRequest(ref msg) => msg.author(),
-            Requests::BlockRequest(ref msg) => msg.author(),
-            Requests::PoolTransactionsRequest(ref msg) => msg.author(),
+        match self {
+            Self::ProposeRequest(msg) => msg.author(),
+            Self::TransactionsRequest(msg) => msg.author(),
+            Self::PrevotesRequest(msg) => msg.author(),
+            Self::PeersRequest(msg) => msg.author(),
+            Self::BlockRequest(msg) => msg.author(),
+            Self::PoolTransactionsRequest(msg) => msg.author(),
         }
     }
 }
@@ -272,37 +272,37 @@ impl Requests {
 impl Consensus {
     /// Returns author public key of the message sender.
     pub fn author(&self) -> PublicKey {
-        match *self {
-            Consensus::Propose(ref msg) => msg.author(),
-            Consensus::Prevote(ref msg) => msg.author(),
-            Consensus::Precommit(ref msg) => msg.author(),
+        match self {
+            Self::Propose(msg) => msg.author(),
+            Self::Prevote(msg) => msg.author(),
+            Self::Precommit(msg) => msg.author(),
         }
     }
 
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
-        match *self {
-            Consensus::Propose(ref msg) => msg.payload().validator(),
-            Consensus::Prevote(ref msg) => msg.payload().validator(),
-            Consensus::Precommit(ref msg) => msg.payload().validator,
+        match self {
+            Self::Propose(msg) => msg.payload().validator(),
+            Self::Prevote(msg) => msg.payload().validator(),
+            Self::Precommit(msg) => msg.payload().validator,
         }
     }
 
     /// Returns height of the message.
     pub fn height(&self) -> Height {
         match self {
-            Consensus::Propose(msg) => msg.payload().height(),
-            Consensus::Prevote(msg) => msg.payload().height(),
-            Consensus::Precommit(msg) => msg.payload().height,
+            Self::Propose(msg) => msg.payload().height(),
+            Self::Prevote(msg) => msg.payload().height(),
+            Self::Precommit(msg) => msg.payload().height,
         }
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
         match self {
-            Consensus::Propose(msg) => msg.payload().round(),
-            Consensus::Prevote(msg) => msg.payload().round(),
-            Consensus::Precommit(msg) => msg.payload().round,
+            Self::Propose(msg) => msg.payload().round(),
+            Self::Prevote(msg) => msg.payload().round(),
+            Self::Precommit(msg) => msg.payload().round,
         }
     }
 }

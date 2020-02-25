@@ -25,7 +25,7 @@ pub enum NoiseError {
 }
 
 impl From<Error> for NoiseError {
-    fn from(err: Error) -> NoiseError {
-        NoiseError::Snow(err)
+    fn from(err: Error) -> Self {
+        Self::Snow(err)
     }
 }

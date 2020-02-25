@@ -220,7 +220,7 @@ struct BogusMessage {
 
 impl BogusMessage {
     fn new(step: HandshakeStep, message: &'static [u8]) -> Self {
-        BogusMessage { step, message }
+        Self { step, message }
     }
 }
 
@@ -232,7 +232,7 @@ enum HandshakeStep {
 }
 
 impl HandshakeStep {
-    fn next(self) -> Option<HandshakeStep> {
+    fn next(self) -> Option<Self> {
         use self::HandshakeStep::*;
 
         match self {
@@ -360,7 +360,7 @@ fn wait_for_handshake_result(
     //TODO: very likely will be removed in [ECR-1664].
     thread::sleep(Duration::from_millis(500));
 
-    let sender_err = send_handshake(&addr, &params, sender_message);
+    let sender_err = send_handshake(&addr, params, sender_message);
     let listener_err = err_rx
         .wait()
         .next()
@@ -388,9 +388,9 @@ fn run_handshake_listener(
                 handle.spawn({
                     let handshake = match bogus_message {
                         Some(message) => Either::A(
-                            NoiseErrorHandshake::responder(&params, &peer, message).listen(stream),
+                            NoiseErrorHandshake::responder(params, &peer, message).listen(stream),
                         ),
-                        None => Either::B(NoiseHandshake::responder(&params, &peer).listen(stream)),
+                        None => Either::B(NoiseHandshake::responder(params, &peer).listen(stream)),
                     };
 
                     handshake
@@ -412,11 +412,11 @@ fn send_handshake(
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let stream = TcpStream::connect(&addr, &handle)
+    let stream = TcpStream::connect(addr, &handle)
         .map_err(into_failure)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params, addr).send(sock),
-            Some(message) => NoiseErrorHandshake::initiator(&params, addr, message).send(sock),
+            None => NoiseHandshake::initiator(params, addr).send(sock),
+            Some(message) => NoiseErrorHandshake::initiator(params, addr, message).send(sock),
         })
         .map(|_| ());
 
@@ -437,7 +437,7 @@ impl NoiseErrorHandshake {
         peer_address: &SocketAddr,
         bogus_message: BogusMessage,
     ) -> Self {
-        NoiseErrorHandshake {
+        Self {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
             inner: Some(NoiseHandshake::initiator(params, peer_address)),
@@ -449,7 +449,7 @@ impl NoiseErrorHandshake {
         peer_address: &SocketAddr,
         bogus_message: BogusMessage,
     ) -> Self {
-        NoiseErrorHandshake {
+        Self {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
             inner: Some(NoiseHandshake::responder(params, peer_address)),

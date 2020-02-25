@@ -2089,7 +2089,7 @@ fn handle_receive_multiple_proposals_same_round() {
         Height(2),
         block_hash,
         txs_in_pool,
-        &sandbox.secret_key(ValidatorId(0)),
+        sandbox.secret_key(ValidatorId(0)),
     ));
 }
 

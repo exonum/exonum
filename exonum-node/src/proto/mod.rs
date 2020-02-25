@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(clippy::pedantic)]
+#![allow(clippy::pedantic, clippy::nursery)]
 
 use exonum::{crypto::proto::*, proto::schema::*};
 use exonum_proto::proto::*;

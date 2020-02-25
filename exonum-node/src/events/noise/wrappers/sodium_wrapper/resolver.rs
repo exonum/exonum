@@ -144,7 +144,7 @@ impl Dh for SodiumDh25519 {
     }
 
     fn privkey(&self) -> &[u8] {
-        &self.privkey.as_ref()
+        self.privkey.as_ref()
     }
 
     fn dh(&self, pubkey: &[u8], out: &mut [u8]) -> Result<(), ()> {
@@ -234,7 +234,7 @@ impl Cipher for SodiumChaChaPoly {
 
         match result {
             Ok(ref buf) => {
-                out[..buf.len()].copy_from_slice(&buf);
+                out[..buf.len()].copy_from_slice(buf);
                 Ok(buf.len())
             }
             Err(_) => Err(()),
@@ -307,8 +307,8 @@ mod tests {
     }
 
     impl Default for MockRandom {
-        fn default() -> MockRandom {
-            MockRandom(0)
+        fn default() -> Self {
+            Self(0)
         }
     }
 

@@ -89,12 +89,8 @@ pub(crate) enum HandleTxError {
 impl fmt::Display for HandleTxError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HandleTxError::AlreadyProcessed => {
-                formatter.write_str("Transaction is already processed")
-            }
-            HandleTxError::Invalid(e) => {
-                write!(formatter, "Transaction failed preliminary checks: {}", e)
-            }
+            Self::AlreadyProcessed => formatter.write_str("Transaction is already processed"),
+            Self::Invalid(e) => write!(formatter, "Transaction failed preliminary checks: {}", e),
         }
     }
 }

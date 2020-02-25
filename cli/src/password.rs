@@ -74,7 +74,7 @@ pub enum PassInputMethod {
 
 impl Default for PassInputMethod {
     fn default() -> Self {
-        PassInputMethod::Terminal
+        Self::Terminal
     }
 }
 
@@ -95,14 +95,14 @@ impl PassInputMethod {
     /// or generate config files.
     pub fn get_passphrase(self, usage: PassphraseUsage) -> Result<Passphrase, Error> {
         match self {
-            PassInputMethod::Terminal => {
+            Self::Terminal => {
                 let prompt = "Enter master key passphrase: ";
                 match usage {
                     PassphraseUsage::SettingUp => prompt_passphrase(prompt),
                     PassphraseUsage::Using => Passphrase::read_from_tty(prompt),
                 }
             }
-            PassInputMethod::EnvVariable(name) => {
+            Self::EnvVariable(name) => {
                 let variable_name = name.unwrap_or_else(|| DEFAULT_MASTER_PASS_ENV_VAR.to_string());
                 let passphrase = env::var(&variable_name).with_context(|e| {
                     format!(
@@ -112,7 +112,7 @@ impl PassInputMethod {
                 })?;
                 Ok(Passphrase(passphrase))
             }
-            PassInputMethod::CmdLineParameter(pass) => Ok(pass),
+            Self::CmdLineParameter(pass) => Ok(pass),
         }
     }
 }
@@ -126,19 +126,17 @@ impl FromStr for PassInputMethod {
         }
 
         if s == "stdin" {
-            return Ok(PassInputMethod::Terminal);
+            return Ok(Self::Terminal);
         }
 
         if s.starts_with("env") {
             let env_var = s.split(':').nth(1).map(String::from);
-            return Ok(PassInputMethod::EnvVariable(env_var));
+            return Ok(Self::EnvVariable(env_var));
         }
 
         if s.starts_with("pass") {
             let pass = s.split(':').nth(1).unwrap_or_default();
-            return Ok(PassInputMethod::CmdLineParameter(Passphrase(
-                pass.to_owned(),
-            )));
+            return Ok(Self::CmdLineParameter(Passphrase(pass.to_owned())));
         }
 
         bail!("Failed to parse passphrase input method")
