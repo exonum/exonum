@@ -192,9 +192,7 @@ impl ResumeService {
             let err = ConfigurationError::MalformedConfigPropose.with_description(format!(
                 "Discarded an attempt to resume service `{}` with inappropriate status ({})",
                 instance.spec.name,
-                status
-                    .map(ToString::to_string)
-                    .unwrap_or_else(|| "none".to_owned())
+                status.map_or_else(|| "none".to_owned(), ToString::to_string)
             ));
             return Err(err);
         }
@@ -265,9 +263,7 @@ fn validate_status(
             "Discarded an attempt to {} service `{}` with inappropriate status ({})",
             action,
             instance.spec.name,
-            status
-                .map(ToString::to_string)
-                .unwrap_or_else(|| "none".to_owned())
+            status.map_or_else(|| "none".to_owned(), ToString::to_string)
         ));
         Err(err)
     }
@@ -326,7 +322,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         drop(schema);
 
         // Verify changes in the proposal.
-        self.verify_config_changeset(&mut context, &propose.changes)?;
+        Self::verify_config_changes(&mut context, &propose.changes)?;
         let mut schema = SchemaImpl::new(context.service_data());
 
         // After all the checks verify that configuration number is expected one.
@@ -495,8 +491,8 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
         drop(schema);
         match deploy_result.result.0 {
-            Ok(()) => self.confirm_deploy(context, deploy_request, author)?,
-            Err(error) => self.fail_deploy(context, deploy_request, error),
+            Ok(()) => Self::confirm_deploy(context, deploy_request, author)?,
+            Err(error) => Self::fail_deploy(&context, &deploy_request, error),
         }
         Ok(())
     }
@@ -558,7 +554,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 Err(error) => {
                     // Migration failed even before start, softly mark it as failed.
                     let initiate_rollback = false;
-                    return self.fail_migration(context, request, error, initiate_rollback);
+                    return Self::fail_migration(context, &request, error, initiate_rollback);
                 }
             };
 
@@ -614,7 +610,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         drop(schema);
 
         match result.status.0 {
-            Ok(hash) => self.confirm_migration(context, result.request, hash, author)?,
+            Ok(hash) => Self::confirm_migration(context, &result.request, hash, author)?,
             Err(error) => {
                 // Since the migration process error is represented as a string rather than
                 // `ExecutionError`, we use our service error code, but set the description
@@ -622,7 +618,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 let fail_cause =
                     ExecutionError::service(MigrationError::MigrationFailed as u8, error);
                 let initiate_rollback = true;
-                self.fail_migration(context, result.request, fail_cause, initiate_rollback)?;
+                Self::fail_migration(context, &result.request, fail_cause, initiate_rollback)?;
             }
         }
         Ok(())
@@ -631,8 +627,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
 impl Supervisor {
     /// Verifies that each change introduced within config proposal is valid.
-    fn verify_config_changeset(
-        &self,
+    fn verify_config_changes(
         context: &mut ExecutionContext<'_>,
         changes: &[ConfigChange],
     ) -> Result<(), ExecutionError> {
@@ -704,7 +699,6 @@ impl Supervisor {
     /// Confirms a deploy by the given author's public key and checks
     /// if all the confirmations are collected. If so, starts the artifact registration.
     fn confirm_deploy(
-        &self,
         mut context: ExecutionContext<'_>,
         deploy_request: DeployRequest,
         author: PublicKey,
@@ -742,9 +736,8 @@ impl Supervisor {
 
     /// Marks deployment as failed, discarding the further deployment steps.
     fn fail_deploy(
-        &self,
-        context: ExecutionContext<'_>,
-        deploy_request: DeployRequest,
+        context: &ExecutionContext<'_>,
+        deploy_request: &DeployRequest,
         error: ExecutionError,
     ) {
         let height = context.data().for_core().height();
@@ -766,9 +759,8 @@ impl Supervisor {
     /// If migration state hash differs from the expected one, migration fails though,
     /// and `fail_migration` method is invoked.
     fn confirm_migration(
-        &self,
         mut context: ExecutionContext<'_>,
-        request: MigrationRequest,
+        request: &MigrationRequest,
         state_hash: Hash,
         author: PublicKey,
     ) -> Result<(), ExecutionError> {
@@ -781,7 +773,7 @@ impl Supervisor {
             // Hashes do not match, rollback the migration.
             drop(schema); // Required for the context reborrow in `fail_migration`.
             let initiate_rollback = true;
-            return self.fail_migration(context, request, error, initiate_rollback);
+            return Self::fail_migration(context, &request, error, initiate_rollback);
         }
 
         // Hash is OK, process further.
@@ -828,9 +820,8 @@ impl Supervisor {
     /// be rolled back after the invocation of this method.
     /// This argument is required, since migration can fail on the init step.
     fn fail_migration(
-        &self,
         mut context: ExecutionContext<'_>,
-        request: MigrationRequest,
+        request: &MigrationRequest,
         error: ExecutionError,
         initiate_rollback: bool,
     ) -> Result<(), ExecutionError> {

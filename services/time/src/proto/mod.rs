@@ -14,7 +14,7 @@
 
 //! Module of the rust-protobuf generated files.
 
-#![allow(bare_trait_objects)]
+#![allow(bare_trait_objects, clippy::pedantic)]
 
 pub use self::service::TxTime;
 

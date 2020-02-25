@@ -359,14 +359,14 @@ impl Server {
     fn set_subscriptions(
         &mut self,
         id: u64,
-        addr: Recipient<Message>,
+        addr: &Recipient<Message>,
         subscriptions: Vec<SubscriptionType>,
     ) {
         for sub_type in subscriptions {
             self.subscribers
                 .entry(sub_type)
                 .or_insert_with(HashMap::new)
-                .insert(id, addr.clone());
+                .insert(id, addr.to_owned());
         }
     }
 
@@ -384,7 +384,7 @@ impl Server {
         }
     }
 
-    fn check_transaction(&self, message: Transaction) -> Result<Verified<AnyTx>, failure::Error> {
+    fn check_transaction(&self, message: &Transaction) -> Result<Verified<AnyTx>, failure::Error> {
         let signed = SignedMessage::from_hex(message.0.tx_body.as_bytes())?;
         let verified = signed.into_verified()?;
         Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
@@ -393,7 +393,7 @@ impl Server {
 
     fn handle_transaction(
         &self,
-        message: Transaction,
+        message: &Transaction,
     ) -> impl Future<Item = TransactionResponse, Error = failure::Error> {
         let sender = self.blockchain.sender().to_owned();
         self.check_transaction(message)
@@ -423,7 +423,7 @@ impl Handler<Subscribe> for Server {
     fn handle(&mut self, message: Subscribe, _ctx: &mut Self::Context) -> u64 {
         let id = self.next_id;
         self.next_id += 1;
-        self.set_subscriptions(id, message.address, message.subscriptions);
+        self.set_subscriptions(id, &message.address, message.subscriptions);
         id
     }
 }
@@ -459,7 +459,7 @@ impl Handler<UpdateSubscriptions> for Server {
             return;
         };
         self.remove_subscriber(message.id);
-        self.set_subscriptions(message.id, addr, message.subscriptions);
+        self.set_subscriptions(message.id, &addr, message.subscriptions);
     }
 }
 
@@ -469,14 +469,13 @@ impl Handler<Broadcast> for Server {
     fn handle(&mut self, message: Broadcast, ctx: &mut Self::Context) {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let block = match schema.blocks().get(&message.block_hash) {
-            Some(block) => block,
-            None => {
-                // The block is not yet merged into the database, which can happen since
-                // `after_commit` is called before the merge. Try again with a slight delay.
-                ctx.notify_later(message, Self::MERGE_WAIT);
-                return;
-            }
+        let block = if let Some(block) = schema.blocks().get(&message.block_hash) {
+            block
+        } else {
+            // The block is not yet merged into the database, which can happen since
+            // `after_commit` is called before the merge. Try again with a slight delay.
+            ctx.notify_later(message, Self::MERGE_WAIT);
+            return;
         };
         let height = block.height;
         let block_header = Notification::Block(block);
@@ -523,7 +522,7 @@ impl Handler<Transaction> for Server {
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
-        Box::new(self.handle_transaction(message))
+        Box::new(self.handle_transaction(&message))
     }
 }
 
@@ -582,8 +581,7 @@ impl Session {
                 id: self.id,
                 subscriptions,
             })
-            .map(|_| Response::success(()))
-            .unwrap_or_else(Response::error);
+            .map_or_else(Response::error, |_| Response::success(()));
         serde_json::to_string(&response).unwrap()
     }
 
@@ -592,11 +590,10 @@ impl Session {
             .server_address
             .send(Transaction(tx))
             .wait()
-            .map(|res| {
+            .map_or_else(Response::error, |res| {
                 let res = res.map_err(|e| e.to_string());
                 Response::from(res)
-            })
-            .unwrap_or_else(Response::error);
+            });
         serde_json::to_string(&response).unwrap()
     }
 }
@@ -654,12 +651,13 @@ impl StreamHandler<ws::Message, ws::ProtocolError> for Session {
             ws::Message::Ping(msg) => ctx.pong(&msg),
             ws::Message::Close(_) => ctx.stop(),
             ws::Message::Text(ref text) => {
-                let response = serde_json::from_str(text)
-                    .map(|msg| self.process_incoming_message(msg))
-                    .unwrap_or_else(|err| {
+                let response = serde_json::from_str(text).map_or_else(
+                    |err| {
                         let err = Response::<()>::error(err);
                         serde_json::to_string(&err).unwrap()
-                    });
+                    },
+                    |msg| self.process_incoming_message(msg),
+                );
                 ctx.text(response);
             }
             _ => {}

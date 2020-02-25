@@ -547,7 +547,7 @@ impl ExplorerApi {
     /// Returns call status of `before_transactions` hook.
     fn before_transactions_status(
         schema: Schema<&dyn Snapshot>,
-        query: CallStatusQuery,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::before_transactions(query.service_id);
@@ -558,7 +558,7 @@ impl ExplorerApi {
     /// Returns call status of `after_transactions` hook.
     fn after_transactions_status(
         schema: Schema<&dyn Snapshot>,
-        query: CallStatusQuery,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::after_transactions(query.service_id);
@@ -612,10 +612,10 @@ impl ExplorerApi {
                 Self::transaction_status(state.data().for_core(), query)
             })
             .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(state.data().for_core(), query)
+                Self::after_transactions_status(state.data().for_core(), &query)
             })
             .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(state.data().for_core(), query)
+                Self::before_transactions_status(state.data().for_core(), &query)
             })
             .endpoint("v1/transactions", |state, query| {
                 Self::transaction_info(state.data().for_core(), query)

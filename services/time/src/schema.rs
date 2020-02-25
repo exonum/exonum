@@ -64,10 +64,13 @@ where
                 .validators_times
                 .iter()
                 .filter_map(|(public_key, time)| {
-                    validator_keys
-                        .iter()
-                        .find(|validator| validator.service_key == public_key)
-                        .map(|_| time)
+                    validator_keys.iter().find_map(|validator| {
+                        if validator.service_key == public_key {
+                            Some(time)
+                        } else {
+                            None
+                        }
+                    })
                 })
                 .collect::<Vec<_>>();
             // Ordering time from highest to lowest.

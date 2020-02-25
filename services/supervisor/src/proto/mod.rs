@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(bare_trait_objects)]
+#![allow(bare_trait_objects, clippy::pedantic)]
 
 pub use self::{schema::*, service::*};
 

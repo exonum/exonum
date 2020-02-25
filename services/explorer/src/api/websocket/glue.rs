@@ -14,7 +14,10 @@
 
 //! Glue between WebSocket server and `actix-web` HTTP server.
 
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse, Query};
+use actix_web::{
+    dev::QueryConfig, http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse,
+    Query,
+};
 use exonum::blockchain::Blockchain;
 use exonum_api::{
     self as api,
@@ -48,12 +51,12 @@ impl ExplorerApi {
             let query = extract_query(&request)?;
             ws::start(&request, Session::new(address, vec![query]))
         };
-        let index = move |req| index(req).into_future().responder();
+        let handler = move |req| index(req).into_future().responder();
 
         backend.raw_handler(RequestHandler {
             name: name.to_owned(),
             method: http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(handler) as Arc<RawHandler>,
         });
     }
 
@@ -77,7 +80,7 @@ impl ExplorerApi {
                     return Ok(SubscriptionType::Transactions { filter: None });
                 }
 
-                Query::from_request(request, &Default::default())
+                Query::from_request(request, &QueryConfig::default())
                     .map(|query: Query<TransactionFilter>| {
                         Ok(SubscriptionType::Transactions {
                             filter: Some(query.into_inner()),

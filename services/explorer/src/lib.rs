@@ -55,11 +55,25 @@
 //!
 //! [`exonum-explorer`]: https://docs.rs/exonum-explorer
 
-#![deny(
-    unsafe_code,
-    bare_trait_objects,
+#![warn(
+    missing_debug_implementations,
     missing_docs,
-    missing_debug_implementations
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc,
+    // False positive: WebSocket
+    clippy::doc_markdown
 )]
 
 use exonum::{
@@ -127,6 +141,7 @@ impl Service for ExplorerService {
 #[service_factory(service_constructor = "Self::new_instance")]
 pub struct ExplorerFactory;
 
+#[allow(clippy::unused_self)]
 impl ExplorerFactory {
     #[allow(clippy::trivially_copy_pass_by_ref)]
     fn new_instance(&self) -> Box<dyn Service> {
