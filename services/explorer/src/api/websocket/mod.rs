@@ -221,6 +221,7 @@ pub(crate) struct SharedState {
     inner: Arc<Mutex<SharedStateInner>>,
 }
 
+// FIXME This code leads to crashes in api tests. [ECR-4268]
 impl Drop for SharedState {
     fn drop(&mut self) {
         // If this is the last instance of the `SharedState`, send termination message
