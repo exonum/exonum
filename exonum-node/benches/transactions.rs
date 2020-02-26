@@ -31,7 +31,6 @@ use exonum::{
 };
 use futures_01::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     sync::{Arc, RwLock},
@@ -164,11 +163,7 @@ impl MessageVerifier {
             let mut core = CompatRuntime::new().unwrap();
             let handle = core.handle();
 
-            // TODO use fair threadpool [ECR-4268].
-            let thread_pool = ThreadPoolBuilder::new().build();
-            let verify_handle = thread_pool.sender().clone();
-
-            core.block_on(internal_part.run(handle.clone(), handle))
+            core.block_on(internal_part.run(handle))
                 .unwrap();
         });
 

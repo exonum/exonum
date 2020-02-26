@@ -62,7 +62,6 @@ use futures_01::{sync::mpsc, Sink};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
 use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -1111,20 +1110,13 @@ impl Node {
     fn run_handler(mut self, handshake_params: HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
-        let pool_size = self.thread_pool_size;
         let (handler_part, network_part, internal_part) = self.into_reactor();
 
         let network_thread = thread::spawn(move || {
             let mut core = CompatRuntime::new().map_err(into_failure)?;
             let handle = core.handle();
 
-            let mut pool_builder = ThreadPoolBuilder::new();
-            if let Some(pool_size) = pool_size {
-                pool_builder.pool_size(pool_size as usize);
-            }
-            let thread_pool = pool_builder.build();
-            // TODO Rewrite on fair threadpool [ECR-4268].
-            core.spawn(internal_part.run(handle.clone(), handle));
+            core.spawn(internal_part.run(handle));
 
             let network_handler = network_part.run(&core.handle(), &handshake_params);
             core.block_on(network_handler)

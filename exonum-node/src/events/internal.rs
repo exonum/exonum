@@ -62,11 +62,7 @@ impl InternalPart {
     /// Represents a task that processes internal requests and produces internal events.
     /// `handle` is used to schedule additional tasks within this task.
     /// `verify_executor` is where transaction verification tasks are executed.
-    pub fn run(
-        self,
-        handle: Handle,
-        verify_executor: Handle,
-    ) -> impl Future<Item = (), Error = ()> {
+    pub fn run(self, handle: Handle) -> impl Future<Item = (), Error = ()> {
         let internal_tx = self.internal_tx;
 
         let cycle = self.internal_requests_rx.for_each(move |request| {
@@ -79,9 +75,17 @@ impl InternalPart {
 
             match request {
                 InternalRequest::VerifyMessage(tx) => {
-                    let fut = Self::verify_message(tx, internal_tx);
-                    verify_executor
-                        .spawn(Box::new(fut))
+                    // TODO Use separate thread pool for messages verification [ECR-4268]
+                    let fut = Self::verify_message(tx, internal_tx).compat();
+                    handle
+                        .spawn_std(async {
+                            tokio_02::runtime::Handle::current()
+                                .spawn(fut)
+                                .await
+                                .expect("cannot spawn message verification future")
+                                .map_err(|_| log_error("message verification failed"))
+                                .ok();
+                        })
                         .expect("cannot schedule message verification");
                 }
 
@@ -150,10 +154,9 @@ mod tests {
         let thread = thread::spawn(|| {
             let mut core = CompatRuntime::new().unwrap();
             let handle = core.handle();
-            let verifier = core.handle();
 
             let task = internal_part
-                .run(handle, verifier)
+                .run(handle)
                 .map_err(drop)
                 .and_then(|()| internal_rx.into_future().map_err(drop))
                 .map(|(event, _)| event);
