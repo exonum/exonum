@@ -14,7 +14,12 @@
 
 //! Glue between WebSocket server and `actix-web` HTTP server.
 
-use actix_web::{http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse, Query};
+use actix_web::{
+    http,
+    web::{Payload, Query},
+    Error as ActixError, FromRequest,
+};
+use actix_web_actors::ws;
 use exonum::blockchain::Blockchain;
 use exonum_api::{
     self as api,
@@ -22,7 +27,7 @@ use exonum_api::{
     ApiBackend,
 };
 use exonum_rust_runtime::api::ServiceApiScope;
-use futures::IntoFuture;
+use futures::{Future, FutureExt};
 
 use std::sync::Arc;
 
@@ -31,24 +36,32 @@ use crate::api::ExplorerApi;
 
 impl ExplorerApi {
     /// Subscribes to events.
-    fn handle_ws<Q>(
+    fn handle_ws<Q, R>(
         name: &str,
         backend: &mut actix_backend::ApiBuilder,
         blockchain: Blockchain,
         shared_state: SharedStateRef,
         extract_query: Q,
     ) where
-        Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
+        Q: Fn(&HttpRequest) -> R + 'static + Clone + Send + Sync,
+        R: Future<Output = Result<SubscriptionType, ActixError>> + 'static,
     {
-        let index = move |request: HttpRequest| -> Result<HttpResponse, ActixError> {
-            let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
-                let msg = "Server shut down".to_owned();
-                api::Error::not_found().title(msg)
-            })?;
-            let query = extract_query(&request)?;
-            ws::start(&request, Session::new(address, vec![query]))
+        let index = move |request: HttpRequest, stream: Payload| {
+            {
+                let blockchain = blockchain.clone();
+                let shared_state = shared_state.clone();
+                let extract_query = extract_query.clone();
+                async move {
+                    let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
+                        let msg = "Server shut down".to_owned();
+                        api::Error::not_found().title(msg)
+                    })?;
+                    let query = extract_query(&request).await?;
+                    ws::start(Session::new(address, vec![query]), &request, stream)
+                }
+            }
+            .boxed_local()
         };
-        let index = move |req| index(req).into_future().responder();
 
         backend.raw_handler(RequestHandler {
             name: name.to_owned(),
@@ -64,7 +77,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             self.blockchain.clone(),
             shared_state.clone(),
-            |_| Ok(SubscriptionType::Blocks),
+            |_| async { Ok(SubscriptionType::Blocks) },
         );
         // Default subscription for transactions.
         Self::handle_ws(
@@ -73,17 +86,23 @@ impl ExplorerApi {
             self.blockchain.clone(),
             shared_state.clone(),
             |request| {
-                if request.query().is_empty() {
-                    return Ok(SubscriptionType::Transactions { filter: None });
-                }
+                let is_empty_query = request.query_string().is_empty();
+                let extract = Query::extract(request);
 
-                Query::from_request(request, &Default::default())
-                    .map(|query: Query<TransactionFilter>| {
-                        Ok(SubscriptionType::Transactions {
-                            filter: Some(query.into_inner()),
+                async move {
+                    if is_empty_query {
+                        return Ok(SubscriptionType::Transactions { filter: None });
+                    }
+
+                    extract
+                        .await
+                        .map(|query: Query<TransactionFilter>| {
+                            Ok(SubscriptionType::Transactions {
+                                filter: Some(query.into_inner()),
+                            })
                         })
-                    })
-                    .unwrap_or(Ok(SubscriptionType::None))
+                        .unwrap_or(Ok(SubscriptionType::None))
+                }
             },
         );
         // Default websocket connection.
@@ -92,7 +111,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             self.blockchain.clone(),
             shared_state,
-            |_| Ok(SubscriptionType::None),
+            |_| async { Ok(SubscriptionType::None) },
         );
         self
     }
