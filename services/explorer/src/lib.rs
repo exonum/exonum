@@ -47,7 +47,7 @@
 //!     .build();
 //! // The explorer endpoints can be accessed via `api()`:
 //! let api = testkit.api();
-//! let BlocksRange { blocks, range } = api
+//! let BlocksRange { blocks, range, .. } = api
 //!     .public(ApiKind::Explorer)
 //!     .get("v1/blocks?count=10")
 //!     .unwrap();
@@ -89,6 +89,7 @@ use crate::api::{websocket::SharedState, ExplorerApi};
 
 /// Errors that can occur during explorer service operation.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
+#[non_exhaustive]
 pub enum Error {
     /// An explorer service is already instantiated on the blockchain.
     DuplicateExplorer = 0,

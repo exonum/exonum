@@ -40,6 +40,7 @@ pub const MAX_BLOCKS_PER_REQUEST: usize = 1000;
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct BlocksRange {
     /// Exclusive range of blocks.
     pub range: Range<Height>,
@@ -47,8 +48,17 @@ pub struct BlocksRange {
     pub blocks: Vec<BlockInfo>,
 }
 
+impl BlocksRange {
+    /// Creates a new range of blocks.
+    #[doc(hidden)] // not stabilized; used in the explorer service
+    pub fn new(range: Range<Height>, blocks: Vec<BlockInfo>) -> Self {
+        Self { range, blocks }
+    }
+}
+
 /// Information about a transaction included in the block.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TxInfo {
     /// Transaction hash.
     pub tx_hash: Hash,
@@ -58,6 +68,7 @@ pub struct TxInfo {
 
 /// Information about a block in the blockchain.
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
     #[serde(flatten)]
@@ -76,8 +87,8 @@ pub struct BlockInfo {
     pub time: Option<DateTime<Utc>>,
 }
 
-impl<'a> From<crate::BlockInfo<'a>> for BlockInfo {
-    fn from(inner: crate::BlockInfo<'a>) -> Self {
+impl From<crate::BlockInfo<'_>> for BlockInfo {
+    fn from(inner: crate::BlockInfo<'_>) -> Self {
         Self {
             block: inner.header().clone(),
             precommits: Some(inner.precommits().to_vec()),
@@ -103,8 +114,33 @@ impl<'a> From<crate::BlockInfo<'a>> for BlockInfo {
     }
 }
 
+impl BlockInfo {
+    /// Creates a summary of the block.
+    #[doc(hidden)] // not stabilized; intended for use in explorer service
+    pub fn summary(block: crate::BlockInfo<'_>, query: &BlocksQuery) -> Self {
+        BlockInfo {
+            txs: None,
+
+            time: if query.add_blocks_time {
+                Some(median_precommits_time(&block.precommits()))
+            } else {
+                None
+            },
+
+            precommits: if query.add_precommits {
+                Some(block.precommits().to_vec())
+            } else {
+                None
+            },
+
+            block: block.into_header(),
+        }
+    }
+}
+
 /// Blocks in range parameters.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[non_exhaustive]
 pub struct BlocksQuery {
     /// The number of blocks to return. Should not be greater than `MAX_BLOCKS_PER_REQUEST`.
     pub count: usize,
@@ -135,7 +171,8 @@ pub struct BlocksQuery {
 }
 
 /// Block query parameters.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct BlockQuery {
     /// The height of the desired block.
     pub height: Height,
@@ -150,6 +187,7 @@ impl BlockQuery {
 
 /// Raw transaction in hex representation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct TransactionHex {
     /// The hex value of the transaction to be broadcasted.
     pub tx_body: String,
@@ -165,14 +203,23 @@ impl TransactionHex {
 }
 
 /// Response to a request to broadcast a transaction over the blockchain network.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct TransactionResponse {
     /// The hash digest of the transaction.
     pub tx_hash: Hash,
 }
 
+impl TransactionResponse {
+    /// Creates a response based on provided transaction hash.
+    pub fn new(tx_hash: Hash) -> Self {
+        Self { tx_hash }
+    }
+}
+
 /// Transaction query parameters.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct TransactionQuery {
     /// The hash of the transaction to be searched.
     pub hash: Hash,
@@ -187,6 +234,7 @@ impl TransactionQuery {
 
 /// Query parameters to check the execution status of a transaction.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[non_exhaustive]
 pub struct TransactionStatusQuery {
     /// The hash of the transaction to be searched.
     pub hash: Hash,
@@ -195,9 +243,26 @@ pub struct TransactionStatusQuery {
     pub with_proof: bool,
 }
 
+impl TransactionStatusQuery {
+    /// Creates a new query.
+    pub fn new(hash: Hash) -> Self {
+        Self {
+            hash,
+            with_proof: false,
+        }
+    }
+
+    /// Requests to return a call status with a cryptographic proof of authenticity.
+    pub fn with_proof(mut self) -> Self {
+        self.with_proof = true;
+        self
+    }
+}
+
 /// Query parameters to check the execution status of a `before_transactions` or
 /// `after_transactions` call.
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[non_exhaustive]
 pub struct CallStatusQuery {
     /// Height of a block.
     pub height: Height,
@@ -206,6 +271,23 @@ pub struct CallStatusQuery {
     /// Whether to return the status with a cryptographic proof of authenticity.
     #[serde(default)]
     pub with_proof: bool,
+}
+
+impl CallStatusQuery {
+    /// Creates a new query.
+    pub fn new(height: Height, service_id: InstanceId) -> Self {
+        Self {
+            height,
+            service_id,
+            with_proof: false,
+        }
+    }
+
+    /// Requests to return a call status with a cryptographic proof of authenticity.
+    pub fn with_proof(mut self) -> Self {
+        self.with_proof = true;
+        self
+    }
 }
 
 /// Call status response.

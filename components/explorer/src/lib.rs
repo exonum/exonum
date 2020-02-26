@@ -287,6 +287,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
@@ -301,6 +302,7 @@ pub struct BlockWithTransactions {
 
 /// Execution error together with its location within the block.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ErrorWithLocation {
     /// Location of the error.
     pub location: CallInBlock,
@@ -552,6 +554,7 @@ impl CommittedTransaction {
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
