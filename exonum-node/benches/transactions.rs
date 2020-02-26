@@ -163,8 +163,7 @@ impl MessageVerifier {
             let mut core = CompatRuntime::new().unwrap();
             let handle = core.handle();
 
-            core.block_on(internal_part.run(handle))
-                .unwrap();
+            core.block_on(internal_part.run(handle)).unwrap();
         });
 
         MessageVerifier {
