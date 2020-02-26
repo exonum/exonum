@@ -30,7 +30,7 @@ use super::{
     CommonError as SupervisorCommonError, ConfigChange, ConfigProposalWithHash, ConfigPropose,
     ConfigVote, ConfigurationError, DeployRequest, DeployResult, FreezeService, MigrationError,
     MigrationRequest, MigrationResult, ResumeService, SchemaImpl, ServiceError, StartService,
-    StopService, Supervisor,
+    StopService, Supervisor, UnloadArtifact,
 };
 
 /// Supervisor service transactions.
@@ -138,13 +138,13 @@ impl StartService {
         if dispatcher_data.get_artifact(&self.artifact).is_none() {
             log::trace!(
                 "Discarded start of service {} from the unknown artifact {}.",
-                &self.name,
-                &self.artifact.name,
+                self.name,
+                self.artifact.name,
             );
 
             let err = ArtifactError::UnknownArtifact.with_description(format!(
                 "Discarded start of service {} from the unknown artifact {}.",
-                &self.name, &self.artifact.name,
+                self.name, self.artifact.name,
             ));
             return Err(err);
         }
@@ -153,7 +153,7 @@ impl StartService {
         if dispatcher_data.get_instance(self.name.as_str()).is_some() {
             return Err(ServiceError::InstanceExists.with_description(format!(
                 "Discarded an attempt to start of the already started instance {}.",
-                &self.name
+                self.name
             )));
         }
 
@@ -210,6 +210,16 @@ impl ResumeService {
         }
 
         Ok(())
+    }
+}
+
+impl UnloadArtifact {
+    fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
+        context
+            .data()
+            .for_dispatcher()
+            .check_unloading_artifact(&self.artifact_id)
+            .map_err(|e| ConfigurationError::malformed_propose(e.description()))
     }
 }
 
@@ -638,6 +648,9 @@ impl Supervisor {
         let mut modified_instances = HashSet::new();
         // To prevent multiple services start in one request.
         let mut services_to_start = HashSet::new();
+        // To prevent starting services with an unloaded artifact.
+        let mut artifacts_for_started_services = HashSet::new();
+        let mut unloaded_artifacts = HashSet::new();
 
         // Perform config verification.
         for change in changes {
@@ -645,14 +658,13 @@ impl Supervisor {
             match change {
                 ConfigChange::Consensus(config) => {
                     if consensus_propose_added {
-                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
-                            "Discarded multiple consensus change proposals in one request.",
-                        ));
+                        let msg = "Discarded multiple consensus change proposals in one request";
+                        return Err(ConfigurationError::malformed_propose(msg));
                     }
                     consensus_propose_added = true;
-                    config.validate().map_err(|e| {
-                        ConfigurationError::MalformedConfigPropose.with_description(e)
-                    })?;
+                    config
+                        .validate()
+                        .map_err(ConfigurationError::malformed_propose)?;
                 }
 
                 ConfigChange::Service(config) => {
@@ -660,17 +672,24 @@ impl Supervisor {
                 }
 
                 ConfigChange::StartService(start_service) => {
-                    if !services_to_start.insert(start_service.name.clone()) {
-                        return Err(ConfigurationError::MalformedConfigPropose.with_description(
-                            "Discarded multiple instances with the same name in one request.",
-                        ));
+                    if !services_to_start.insert(&start_service.name) {
+                        let msg = format!(
+                            "Discarded multiple starts of service `{}`",
+                            start_service.name
+                        );
+                        return Err(ConfigurationError::malformed_propose(msg));
                     }
+                    artifacts_for_started_services.insert(&start_service.artifact);
                     start_service.validate(context)?;
                 }
 
                 ConfigChange::StopService(stop_service) => {
                     stop_service.validate(context)?;
                 }
+                ConfigChange::ResumeService(resume_service) => {
+                    resume_service.validate(context)?;
+                }
+
                 ConfigChange::FreezeService(freeze_service) => {
                     let instance_state = freeze_service.validate(context)?;
                     let runtime_id = instance_state.spec.artifact.runtime_id;
@@ -685,15 +704,32 @@ impl Supervisor {
                             runtime_id,
                             instance_state.spec.artifact,
                         );
-                        let err = ConfigurationError::MalformedConfigPropose.with_description(msg);
-                        return Err(err);
+                        return Err(ConfigurationError::malformed_propose(msg));
                     }
                 }
-                ConfigChange::ResumeService(resume_service) => {
-                    resume_service.validate(context)?;
+
+                ConfigChange::UnloadArtifact(unload_artifact) => {
+                    if !unloaded_artifacts.insert(&unload_artifact.artifact_id) {
+                        let msg = format!(
+                            "Discarded multiple unloads of artifact `{}`",
+                            unload_artifact.artifact_id
+                        );
+                        return Err(ConfigurationError::malformed_propose(msg));
+                    }
+                    unload_artifact.validate(context)?;
                 }
             }
         }
+
+        let mut intersection = unloaded_artifacts.intersection(&artifacts_for_started_services);
+        if let Some(&artifact) = intersection.next() {
+            let msg = format!(
+                "Discarded proposal which both starts a service from artifact `{}` and unloads it",
+                artifact
+            );
+            return Err(ConfigurationError::malformed_propose(msg));
+        }
+
         Ok(())
     }
 

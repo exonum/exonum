@@ -74,6 +74,16 @@ pub struct StartService {
     pub config: Vec<u8>,
 }
 
+impl StartService {
+    /// Given the instance ID, splits the `StartService` request into `InstanceSpec`
+    /// and config value.
+    pub fn into_parts(self, id: InstanceId) -> (InstanceSpec, Vec<u8>) {
+        let spec = InstanceSpec::from_raw_parts(id, self.name, self.artifact);
+
+        (spec, self.config)
+    }
+}
+
 /// Request to stop an existing service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
@@ -103,14 +113,13 @@ pub struct ResumeService {
     pub params: Vec<u8>,
 }
 
-impl StartService {
-    /// Given the instance ID, splits the `StartService` request into `InstanceSpec`
-    /// and config value.
-    pub fn into_parts(self, id: InstanceId) -> (InstanceSpec, Vec<u8>) {
-        let spec = InstanceSpec::from_raw_parts(id, self.name, self.artifact);
-
-        (spec, self.config)
-    }
+/// Request to unload an unused artifact.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::UnloadArtifact")]
+pub struct UnloadArtifact {
+    /// Artifact identifier.
+    pub artifact_id: ArtifactId,
 }
 
 /// Configuration parameters of the certain service instance.
@@ -143,6 +152,8 @@ pub enum ConfigChange {
     ResumeService(ResumeService),
     /// Request to freeze an existing service instance.
     FreezeService(FreezeService),
+    /// Request to unload an unused artifact.
+    UnloadArtifact(UnloadArtifact),
 }
 
 /// Request for the configuration change
@@ -228,6 +239,13 @@ impl ConfigPropose {
             }));
         self
     }
+
+    /// Adds an artifact unloading request to this proposal.
+    pub fn unload_artifact(mut self, artifact_id: ArtifactId) -> Self {
+        self.changes
+            .push(ConfigChange::UnloadArtifact(UnloadArtifact { artifact_id }));
+        self
+    }
 }
 
 /// Confirmation vote for the configuration change.
@@ -278,6 +296,7 @@ impl_binary_key_for_binary_value! { DeployResult }
 impl_binary_key_for_binary_value! { StartService }
 impl_binary_key_for_binary_value! { StopService }
 impl_binary_key_for_binary_value! { ResumeService }
+impl_binary_key_for_binary_value! { UnloadArtifact }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
 impl_binary_key_for_binary_value! { MigrationRequest }
@@ -288,6 +307,7 @@ impl_serde_hex_for_binary_value! { StartService }
 impl_serde_hex_for_binary_value! { StopService }
 impl_serde_hex_for_binary_value! { FreezeService }
 impl_serde_hex_for_binary_value! { ResumeService }
+impl_serde_hex_for_binary_value! { UnloadArtifact }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 impl_serde_hex_for_binary_value! { MigrationRequest }

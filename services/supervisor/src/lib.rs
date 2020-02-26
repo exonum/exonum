@@ -150,7 +150,7 @@ pub use self::{
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
         DeployResult, FreezeService, MigrationRequest, MigrationResult, ResumeService,
-        ServiceConfig, StartService, StopService, SupervisorConfig,
+        ServiceConfig, StartService, StopService, SupervisorConfig, UnloadArtifact,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -304,6 +304,13 @@ fn update_configs(
                 context
                     .supervisor_extensions()
                     .initiate_resuming_service(resume_service.instance_id, resume_service.params)?;
+            }
+
+            ConfigChange::UnloadArtifact(unload_artifact) => {
+                log::trace!("Unloading artifact `{}`", unload_artifact.artifact_id);
+                context
+                    .supervisor_extensions()
+                    .unload_artifact(&unload_artifact.artifact_id)?;
             }
         }
     }
