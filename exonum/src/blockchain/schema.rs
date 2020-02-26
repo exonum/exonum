@@ -148,28 +148,13 @@ impl<T: Access> Schema<T> {
     /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
-        if self.block_transactions(location.block_height).len()
-            <= u64::from(location.position_in_block)
-        {
+        let records = self.call_records(location.block_height)?;
+        let txs_in_block = self.block_transactions(location.block_height).len();
+        if txs_in_block <= u64::from(location.position_in_block) {
             return None;
         }
-
-        let call_location = CallInBlock::transaction(location.position_in_block);
-        let call_result = match self
-            .call_errors_map(location.block_height)
-            .get(&call_location)
-        {
-            None => Ok(()),
-            Some(mut err) => {
-                let aux = self
-                    .call_errors_aux(location.block_height)
-                    .get(&call_location)
-                    .expect("BUG: Aux info is not saved for an error");
-                err.recombine_with_aux(aux);
-                Err(err)
-            }
-        };
-        Some(call_result)
+        let status = records.get(CallInBlock::transaction(location.position_in_block));
+        Some(status)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -399,15 +384,9 @@ impl<T: Access> CallRecords<T> {
         let block_proof = Schema::new(self.access.clone())
             .block_and_precommits(self.height)
             .unwrap();
-        let call_proof = self.errors.get_proof(call).map_values(|mut err| {
-            let aux = self
-                .errors_aux
-                .get(&call)
-                .expect("BUG: Aux info is not saved for an error");
-            err.recombine_with_aux(aux);
-            err
-        });
-        CallProof::new(block_proof, call_proof)
+        let error_description = self.errors_aux.get(&call).map(|aux| aux.description);
+        let call_proof = self.errors.get_proof(call);
+        CallProof::new(block_proof, call_proof, error_description)
     }
 }
 

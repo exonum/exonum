@@ -27,7 +27,7 @@ use crate::{
     helpers::{byzantine_quorum, Height, OrderedMap, ValidatorId},
     messages::{Precommit, Verified},
     proto::schema,
-    runtime::ExecutionError,
+    runtime::{ExecutionError, ExecutionErrorAux},
 };
 
 /// Trait that represents a key in block header entry map. Provides
@@ -388,18 +388,9 @@ impl IndexProof {
 /// hooks can be proven to external clients. Discerning successful execution
 /// from a non-existing service requires prior knowledge though.
 ///
-/// `CallProof`s should not be mixed up with a proof of transaction commitment.
+/// `CallProof`s should not be confused with a proof of transaction commitment.
 /// To verify that a certain transaction was committed, use a proof from
 /// the `block_transactions` index of the [core schema].
-///
-/// # Verification
-///
-/// If you are implementing `CallProof` verification, bear in mind that `ExecutionError`
-/// need to be stripped off the non-hashed information before verifying `call_proof`.
-/// See [`ExecutionError`] docs for more details of what information is not hashed.
-///
-/// This also means that non-hashed information is not covered by the authenticity guarantees;
-/// it has purely diagnostic purpose.
 ///
 /// [transaction]: ../runtime/struct.AnyTx.html
 /// [core schema]: struct.Schema.html
@@ -415,6 +406,12 @@ pub struct CallProof {
     /// The root hash of the proof must be equal to the `error_hash` mentioned in `block_proof`.
     pub call_proof: MapProof<CallInBlock, ExecutionError>,
 
+    /// Human-readable description of an error if the call status is erroneous.
+    /// This description is not authenticated and thus should be used for diagnostic purposes only.
+    /// If the call is successful, the error description should be `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_description: Option<String>,
+
     #[serde(skip, default)]
     _non_exhaustive: (),
 }
@@ -423,10 +420,12 @@ impl CallProof {
     pub(super) fn new(
         block_proof: BlockProof,
         call_proof: MapProof<CallInBlock, ExecutionError>,
+        error_description: Option<String>,
     ) -> Self {
         Self {
             block_proof,
             call_proof,
+            error_description,
             _non_exhaustive: (),
         }
     }
@@ -448,19 +447,25 @@ impl CallProof {
             return Err(ProofError::AmbiguousEntry);
         }
 
-        // We create `call_status` before we've removed non-hashed info from the error.
         let call_status = match maybe_status {
-            None => Ok(()),
-            Some(e) => Err(e.to_owned()),
+            None => {
+                if self.error_description.is_some() {
+                    return Err(ProofError::MalformedStatus);
+                }
+                Ok(())
+            }
+            Some(e) => {
+                let mut full_error = e.to_owned();
+                if !full_error.description().is_empty() {
+                    return Err(ProofError::MalformedStatus);
+                }
+                let description = self.error_description.clone().unwrap_or_default();
+                full_error.recombine_with_aux(ExecutionErrorAux { description });
+                Err(full_error)
+            }
         };
 
         self.call_proof
-            .clone()
-            .map_values(|mut err| {
-                // Remove non-hashed part of an error.
-                err.split_aux();
-                err
-            })
             .check_against_hash(self.block_proof.block.error_hash)
             .map_err(ProofError::IncorrectEntryProof)?;
         Ok((call.to_owned(), call_status))
@@ -872,7 +877,7 @@ mod tests {
         let error_map = schema.call_errors_map(Height(1));
         let proof = match kind {
             CallProofKind::Ok => error_map.get_proof(CallInBlock::before_transactions(0)),
-            CallProofKind::Error => error_map.get_proof(call).map_values(|_| err.clone()),
+            CallProofKind::Error => error_map.get_proof(call),
             CallProofKind::Ambiguous => error_map.get_multiproof(vec![call, other_call]),
         };
         (error_map.object_hash(), proof)
@@ -884,25 +889,21 @@ mod tests {
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
         let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
-        let mut call_proof = CallProof::new(block_proof, call_proof);
+        let mut call_proof = CallProof::new(block_proof, call_proof, Some("huh?".to_owned()));
         let (call, res) = call_proof.verify(&public_keys).unwrap();
         assert_eq!(call, CallInBlock::transaction(2));
         assert_eq!(res, Err(ExecutionError::service(5, "huh?")));
 
-        // Check that the proof remains valid if we remove or change the description.
-        call_proof.call_proof = call_proof
-            .call_proof
-            .map_values(|_| ExecutionError::service(5, ""));
+        // Check that the proof remains valid if we change the description.
+        call_proof.error_description = Some("other description".to_owned());
         let _ = call_proof.verify(&public_keys).unwrap();
-        call_proof.call_proof = call_proof
-            .call_proof
-            .map_values(|_| ExecutionError::service(5, "?huh"));
+        call_proof.error_description = None;
         let _ = call_proof.verify(&public_keys).unwrap();
 
         // ...but not if we change the hashed part of the error.
         call_proof.call_proof = call_proof
             .call_proof
-            .map_values(|_| ExecutionError::service(6, "huh?"));
+            .map_values(|_| ExecutionError::service(6, ""));
         let err = call_proof.verify(&public_keys).unwrap_err();
         assert_matches!(
             err,
@@ -916,7 +917,7 @@ mod tests {
         let keys: Vec<_> = (0..3).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
         let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
-        let mut call_proof = CallProof::new(block_proof, call_proof);
+        let mut call_proof = CallProof::new(block_proof, call_proof, None);
         let (call, res) = call_proof.verify(&public_keys).unwrap();
         assert_eq!(call, CallInBlock::before_transactions(0));
         assert_eq!(res, Ok(()));
@@ -925,6 +926,12 @@ mod tests {
         call_proof.block_proof.block.height = Height(100);
         let err = call_proof.verify(&public_keys).unwrap_err();
         assert_matches!(err, ProofError::IncorrectHeight);
+
+        // Check proof invalidation if an error description is supplied.
+        call_proof.block_proof.block.height = Height(1);
+        call_proof.error_description = Some("huh?".to_owned());
+        let err = call_proof.verify(&public_keys).unwrap_err();
+        assert_matches!(err, ProofError::MalformedStatus);
     }
 
     #[test]
@@ -933,7 +940,7 @@ mod tests {
         let keys: Vec<_> = (0..3).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
         let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
-        let call_proof = CallProof::new(block_proof, call_proof);
+        let call_proof = CallProof::new(block_proof, call_proof, Some("".to_owned()));
         let err = call_proof.verify(&public_keys).unwrap_err();
         assert_matches!(err, ProofError::AmbiguousEntry);
     }
