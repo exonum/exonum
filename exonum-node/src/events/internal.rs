@@ -77,16 +77,11 @@ impl InternalPart {
                 InternalRequest::VerifyMessage(tx) => {
                     // TODO Use separate thread pool for messages verification [ECR-4268]
                     let fut = Self::verify_message(tx, internal_tx).compat();
-                    handle
-                        .spawn_std(async {
-                            tokio_02::runtime::Handle::current()
-                                .spawn(fut)
-                                .await
-                                .expect("cannot spawn message verification future")
-                                .map_err(|_| log_error("message verification failed"))
-                                .ok();
-                        })
-                        .expect("cannot schedule message verification");
+                    tokio_02::spawn(async move {
+                        fut.await
+                            .map_err(|_| log_error("message verification failed"))
+                            .ok();
+                    });
                 }
 
                 InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
