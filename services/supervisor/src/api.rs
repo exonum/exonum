@@ -22,6 +22,7 @@
 //!
 //!     - [Obtaining consensus configuration](#obtaining-consensus-configuration)
 //!     - [Obtaining pending configuration proposal](#obtaining-pending-configuration-proposal)
+//!     - [Obtaining deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
 //!
 //! - Private API:
 //!
@@ -55,8 +56,7 @@
 //! use exonum_supervisor::Supervisor;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_rust_service(Supervisor)
 //!     .with_artifact(Supervisor.artifact_id())
@@ -66,8 +66,7 @@
 //! let consensus_config: ConsensusConfig = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("consensus-config")
-//!     .await?;
+//!     .get("consensus-config")?;
 //!
 //! # Ok(())
 //! # }
@@ -92,8 +91,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -104,11 +102,44 @@
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("config-proposal")
-//!     .await?;
+//!     .get("config-proposal")?;
 //!
 //! // Will be none, since we did not send a proposal.
 //! assert!(pending_proposal.is_none());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Obtaining Deployed Artifacts And Services
+//!
+//! | Property    | Value |
+//! |-------------|-------|
+//! | Path        | `/api/services/supervisor/services` |
+//! | Method      | GET   |
+//! | Query type  | - |
+//! | Return type | [`DispatcherInfo`] |
+//!
+//! Returns information about services available in the network.
+//!
+//! [`DispatcherInfo`]: struct.DispatcherInfo.html
+//!
+//! ```
+//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
+//! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
+//!
+//! # fn main() -> Result<(), failure::Error> {
+//! let mut testkit = // Same as in previous example...
+//! #     TestKitBuilder::validator()
+//! #         .with_rust_service(Supervisor)
+//! #         .with_artifact(Supervisor.artifact_id())
+//! #         .with_instance(Supervisor::simple())
+//! #         .build();
+//!
+//! let services_info: DispatcherInfo = testkit
+//!     .api()
+//!     .public(ApiKind::Service("supervisor"))
+//!     .get("services")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -160,8 +191,7 @@
 //! #     Vec::new()
 //! # }
 //! #
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -181,8 +211,7 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&deploy_request)
-//!     .post("deploy-artifact")
-//!     .await?;
+//!     .post("deploy-artifact")?;
 //!
 //! let block = testkit.create_block();
 //! let result = block[tx_hash].status();
@@ -226,8 +255,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_rust_service(Supervisor)
 //!     .with_artifact(Supervisor.artifact_id())
@@ -249,8 +277,7 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&migration_request)
-//!     .post("migrate")
-//!     .await?;
+//!     .post("migrate")?;
 //!
 //! let block = testkit.create_block();
 //! let result = block[tx_hash].status();
@@ -301,8 +328,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -318,8 +344,7 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&proposal)
-//!     .post("propose-config")
-//!     .await?;
+//!     .post("propose-config")?;
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
@@ -367,8 +392,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
@@ -394,8 +418,7 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&config_vote)
-//!     .post("confirm-config")
-//!     .await?;
+//!     .post("confirm-config")?;
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
@@ -432,8 +455,7 @@
 //! use exonum_supervisor::Supervisor;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -444,8 +466,7 @@
 //! let configuration_number: u64 = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
-//!     .get("configuration-number")
-//!     .await?;
+//!     .get("configuration-number")?;
 //!
 //! // There was no configuration proposals, so configuration number is 0.
 //! assert_eq!(configuration_number, 0);
@@ -471,8 +492,7 @@
 //! use exonum_supervisor::{mode::Mode, Supervisor, SupervisorConfig};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -483,8 +503,7 @@
 //! let config: SupervisorConfig = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
-//!     .get("supervisor-config")
-//!     .await?;
+//!     .get("supervisor-config")?;
 //!
 //! assert_eq!(config.mode, Mode::Simple);
 //! # Ok(())
@@ -522,8 +541,7 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -543,8 +561,7 @@
 //! #     .api()
 //! #     .private(ApiKind::Service("supervisor"))
 //! #     .query(&deploy_request)
-//! #     .post("deploy-artifact")
-//! #     .await?;
+//! #     .post("deploy-artifact")?;
 //! # testkit.create_block();
 //! let query = DeployInfoQuery::from(deploy_request);
 //!
@@ -552,8 +569,7 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("deploy-status")
-//!     .await?;
+//!     .get("deploy-status")?;
 //! # Ok(())
 //! # }
 //! ```
@@ -580,8 +596,7 @@
 //! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with_rust_service(Supervisor)
@@ -599,7 +614,7 @@
 //! #     .api()
 //! #     .private(ApiKind::Service("supervisor"))
 //! #     .query(&migration_request)
-//! #     .post("migrate").await?;
+//! #     .post("migrate")?;
 //! # testkit.create_block();
 //! let query = MigrationInfoQuery::from(migration_request);
 //!
@@ -607,13 +622,18 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("migration-status")
-//!     .await?;
+//!     .get("migration-status")?;
 //! # Ok(())
 //! # }
 //! ```
 
-use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height, runtime::ArtifactId};
+use exonum::{
+    blockchain::ConsensusConfig,
+    crypto::Hash,
+    helpers::Height,
+    merkledb::AsReadonly,
+    runtime::{ArtifactId, DispatcherSchema, InstanceState},
+};
 use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
@@ -730,60 +750,130 @@ impl From<MigrationRequest> for MigrationInfoQuery {
     }
 }
 
-struct ApiImpl(ServiceApiState);
+/// Services info response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct DispatcherInfo {
+    /// List of deployed artifacts.
+    pub artifacts: Vec<ArtifactId>,
+    /// List of services.
+    pub services: Vec<InstanceState>,
+}
 
-// Private API implementation.
-impl ApiImpl {
-    fn broadcaster(&self) -> Result<Broadcaster, api::Error> {
-        self.0.broadcaster().ok_or_else(|| {
+impl DispatcherInfo {
+    /// Loads dispatcher information from database.
+    fn load<T: AsReadonly>(schema: &DispatcherSchema<T>) -> Self {
+        Self {
+            artifacts: schema.service_artifacts().keys().collect(),
+            services: schema.service_instances().values().collect(),
+        }
+    }
+}
+
+/// Public API specification of the supervisor service.
+struct PublicApi;
+
+impl PublicApi {
+    /// Returns an actual consensus configuration of the blockchain.
+    fn consensus_config(state: ServiceApiState, _query: ()) -> Result<ConsensusConfig, api::Error> {
+        Ok(state.data().for_core().consensus_config())
+    }
+
+    /// Returns a pending propose config change.
+    fn config_proposal(
+        state: ServiceApiState,
+        _query: (),
+    ) -> Result<Option<ConfigProposalWithHash>, api::Error> {
+        Ok(SchemaImpl::new(state.service_data())
+            .public
+            .pending_proposal
+            .get())
+    }
+
+    /// Returns a list of deployed artifacts and initialized services.
+    fn services(state: ServiceApiState, _query: ()) -> Result<DispatcherInfo, api::Error> {
+        Ok(DispatcherInfo::load(&state.data().for_dispatcher()))
+    }
+}
+
+/// Private API specification of the supervisor service.
+struct PrivateApi;
+
+impl PrivateApi {
+    fn broadcaster(state: ServiceApiState) -> Result<Broadcaster, api::Error> {
+        state.broadcaster().ok_or_else(|| {
             api::Error::bad_request()
                 .title("Invalid broadcast request")
                 .detail("Nod is not a validator")
         })
     }
 
-    async fn deploy_artifact(self, artifact: DeployRequest) -> Result<Hash, api::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn deploy_artifact(
+        state: ServiceApiState,
+        artifact: DeployRequest,
+    ) -> Result<Hash, api::Error> {
+        Self::broadcaster(state)?
             .request_artifact_deploy((), artifact)
             .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
 
-    async fn migrate(self, request: MigrationRequest) -> Result<Hash, api::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `MigrationRequest` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn migrate(
+        state: ServiceApiState,
+        request: MigrationRequest,
+    ) -> Result<Hash, api::Error> {
+        Self::broadcaster(state)?
             .request_migration((), request)
             .await
             .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
     }
 
-    async fn propose_config(self, proposal: ConfigPropose) -> Result<Hash, api::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn propose_config(
+        state: ServiceApiState,
+        proposal: ConfigPropose,
+    ) -> Result<Hash, api::Error> {
+        Self::broadcaster(state)?
             .propose_config_change((), proposal)
             .await
             .map_err(|err| api::Error::internal(err).title("Config propose failed"))
     }
 
-    async fn confirm_config(self, vote: ConfigVote) -> Result<Hash, api::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `ConfigVote` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn confirm_config(state: ServiceApiState, vote: ConfigVote) -> Result<Hash, api::Error> {
+        Self::broadcaster(state)?
             .confirm_config_change((), vote)
             .await
             .map_err(|err| api::Error::internal(err).title("Config vote failed"))
     }
 
-    fn configuration_number(self) -> Result<u64, api::Error> {
-        let configuration_number =
-            SchemaImpl::new(self.0.service_data()).get_configuration_number();
+    /// Returns the number of processed configurations.
+    fn configuration_number(state: ServiceApiState, _query: ()) -> Result<u64, api::Error> {
+        let configuration_number = SchemaImpl::new(state.service_data()).get_configuration_number();
         Ok(configuration_number)
     }
 
-    fn supervisor_config(self) -> Result<SupervisorConfig, api::Error> {
-        let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
+    /// Returns an actual supervisor config.
+    fn supervisor_config(
+        state: ServiceApiState,
+        _query: (),
+    ) -> Result<SupervisorConfig, api::Error> {
+        let config = SchemaImpl::new(state.service_data()).supervisor_config();
         Ok(config)
     }
 
-    fn deploy_status(self, query: DeployInfoQuery) -> Result<AsyncEventState, api::Error> {
+    /// Returns the state of deployment for the given deploy request.
+    fn deploy_status(
+        state: ServiceApiState,
+        query: DeployInfoQuery,
+    ) -> Result<AsyncEventState, api::Error> {
         let request = DeployRequest::try_from(query)?;
-        let schema = SchemaImpl::new(self.0.service_data());
+        let schema = SchemaImpl::new(state.service_data());
         let status = schema.deploy_states.get(&request).ok_or_else(|| {
             api::Error::not_found().title("No corresponding deploy request found")
         })?;
@@ -791,9 +881,13 @@ impl ApiImpl {
         Ok(status)
     }
 
-    fn migration_status(self, query: MigrationInfoQuery) -> Result<MigrationState, api::Error> {
+    /// Returns the state of migration for the given migration request.
+    fn migration_status(
+        state: ServiceApiState,
+        query: MigrationInfoQuery,
+    ) -> Result<MigrationState, api::Error> {
         let request = MigrationRequest::try_from(query)?;
-        let schema = SchemaImpl::new(self.0.service_data());
+        let schema = SchemaImpl::new(state.service_data());
         let status = schema.migration_states.get(&request).ok_or_else(|| {
             api::Error::not_found().title("No corresponding migration request found")
         })?;
@@ -802,54 +896,29 @@ impl ApiImpl {
     }
 }
 
-// Public API implementation
-impl ApiImpl {
-    fn consensus_config(&self) -> Result<ConsensusConfig, api::Error> {
-        Ok(self.0.data().for_core().consensus_config())
-    }
-
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, api::Error> {
-        Ok(SchemaImpl::new(self.0.service_data())
-            .public
-            .pending_proposal
-            .get())
-    }
-}
-
 /// Wires Supervisor API endpoints.
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
         .endpoint_mut("deploy-artifact", |state, query| {
-            ApiImpl(state).deploy_artifact(query).boxed_local()
+            PrivateApi::deploy_artifact(state, query).boxed_local()
         })
         .endpoint_mut("migrate", |state, query| {
-            ApiImpl(state).migrate(query).boxed_local()
+            PrivateApi::migrate(state, query).boxed_local()
         })
         .endpoint_mut("propose-config", |state, query| {
-            ApiImpl(state).propose_config(query).boxed_local()
+            PrivateApi::propose_config(state, query).boxed_local()
         })
         .endpoint_mut("confirm-config", |state, query| {
-            ApiImpl(state).confirm_config(query).boxed_local()
+            PrivateApi::confirm_config(state, query).boxed_local()
         })
-        .endpoint("configuration-number", |state, _query: ()| {
-            ApiImpl(state).configuration_number()
-        })
-        .endpoint("supervisor-config", |state, _query: ()| {
-            ApiImpl(state).supervisor_config()
-        })
-        .endpoint("deploy-status", |state, query| {
-            ApiImpl(state).deploy_status(query)
-        })
-        .endpoint("migration-status", |state, query| {
-            ApiImpl(state).migration_status(query)
-        });
+        .endpoint("configuration-number", PrivateApi::configuration_number)
+        .endpoint("supervisor-config", PrivateApi::supervisor_config)
+        .endpoint("deploy-status", PrivateApi::deploy_status)
+        .endpoint("migration-status", PrivateApi::migration_status);
     builder
         .public_scope()
-        .endpoint("consensus-config", |state, _query: ()| {
-            ApiImpl(state).consensus_config()
-        })
-        .endpoint("config-proposal", |state, _query: ()| {
-            ApiImpl(state).config_proposal()
-        });
+        .endpoint("consensus-config", PublicApi::consensus_config)
+        .endpoint("config-proposal", PublicApi::config_proposal)
+        .endpoint("services", PublicApi::services);
 }

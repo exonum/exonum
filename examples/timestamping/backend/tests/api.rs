@@ -193,7 +193,8 @@ async fn test_api_cannot_add_same_content_hash() {
             "runtime_id": 0,
             "type": "service_error",
         }),
-    ).await;
+    )
+    .await;
 }
 
 #[actix_rt::test]

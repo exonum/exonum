@@ -50,7 +50,6 @@ cache:
   - $HOME/.kcov
 
 dist: bionic
-sudo: required
 
 env:
   global:
@@ -132,6 +131,10 @@ jobs:
   - name: unit-test
     script:
     - cargo test --all --lib --tests --benches
+
+  # Doc tests.
+  - name: doc-test
+    script:
     - cargo test --all --doc
 
   # Run examples and soak tests.
@@ -177,12 +180,6 @@ jobs:
     after_script:
     - deactivate
     - rm -rf .venv
-
-  # Check compatibility with Rust 1.36.
-  - name: 1.36-compat
-    rust: 1.36.0
-    script:
-    - cargo check --all --benches --tests --bins --examples --features "long_benchmarks"
 
 notifications:
   webhooks:

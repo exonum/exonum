@@ -736,13 +736,14 @@ impl TestKit {
             server_restart_max_retries: 5,
             server_restart_retry_timeout: 500,
         };
-        let manager_fut =
-            ApiManager::new(api_manager_config).run(endpoints_rx.compat().map_err(|_| {
+        let manager_fut = ApiManager::new(api_manager_config)
+            .run(endpoints_rx.compat().map_err(|_| {
                 io::Error::new(
                     io::ErrorKind::Other,
                     "Unable to receive `UpdateEndpoints` event",
                 )
-            })).map(drop);
+            }))
+            .map(drop);
 
         futures::future::join(manager_fut, events_stream).await;
         actor_handle.join().unwrap().unwrap();

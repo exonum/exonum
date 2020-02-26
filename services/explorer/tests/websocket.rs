@@ -86,7 +86,8 @@ fn assert_closure(mut client: Client<TcpStream>) {
 }
 
 fn init_testkit() -> (TestKit, TestKitApi) {
-    let mut testkit = TestKitBuilder::validator().with_logger()
+    let mut testkit = TestKitBuilder::validator()
+        .with_logger()
         .with_default_rust_service(CounterService)
         .with_default_rust_service(ExplorerFactory)
         .build();
