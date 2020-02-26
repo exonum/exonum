@@ -85,10 +85,14 @@ use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
 use exonum_api::{self as api, ApiAggregator, ApiBuilder};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
-use futures::{sync::oneshot, Future};
+use futures::FutureExt;
+use futures_01::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
 
-use std::thread::{self, JoinHandle};
+use std::{
+    io,
+    thread::{self, JoinHandle},
+};
 
 use super::TestKit;
 
@@ -96,7 +100,7 @@ use super::TestKit;
 pub(crate) struct TestKitActor(TestKit);
 
 impl TestKitActor {
-    pub(crate) fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
+    pub(crate) fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<io::Result<()>>) {
         let mut api_aggregator = testkit.update_aggregator();
 
         // Spawn the testkit actor on the new `actix` system.
@@ -117,16 +121,23 @@ impl TestKitActor {
         let mut builder = ApiBuilder::new();
         let api_scope = builder.private_scope();
 
-        let addr_ = addr.clone();
-        api_scope.endpoint("v1/status", move |()| {
-            Box::new(addr_.send(GetStatus).then(flatten_err)) as api::FutureResult<_>
+        api_scope.endpoint("v1/status", {
+            let addr_ = addr.clone();
+            move |()| {
+                let addr_ = addr_.clone();
+                async move { flatten_err(addr_.send(GetStatus).await) }.boxed_local()
+            }
         });
-        let addr_ = addr.clone();
-        api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
-            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as api::FutureResult<_>
+        api_scope.endpoint_mut("v1/blocks/rollback", {
+            let addr_ = addr.clone();
+            move |height| {
+                let addr_ = addr_.clone();
+                async move { flatten_err(addr_.send(RollBack(height)).await) }.boxed_local()
+            }
         });
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
-            Box::new(addr.send(query).then(flatten_err)) as api::FutureResult<_>
+            let addr_ = addr.clone();
+            async move { flatten_err(addr_.send(query).await) }.boxed_local()
         });
         builder
     }
@@ -303,7 +314,7 @@ mod tests {
         testkit.create_blocks_until(height);
         // Process incoming events in background.
         let events = testkit.remove_events_stream();
-        thread::spawn(|| events.wait().ok());
+        thread::spawn(|| futures::executor::block_on(events));
 
         let api_sender = testkit.api_sender.clone();
         let (aggregator, _) = TestKitActor::spawn(testkit);
@@ -314,11 +325,11 @@ mod tests {
         thread::sleep(Duration::from_millis(20));
     }
 
-    #[test]
-    fn test_create_block_with_empty_body() {
+    #[actix_rt::test]
+    async fn test_create_block_with_empty_body() {
         let api = init_handler(Height(0));
         let tx = timestamp("foo");
-        api.send(tx.clone());
+        api.send(tx.clone()).await;
         sleep();
 
         // Test a bodiless request
@@ -326,6 +337,7 @@ mod tests {
             .private("api/testkit")
             .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
+            .await
             .unwrap();
 
         assert_eq!(block_info.header.height, Height(1));
@@ -336,28 +348,30 @@ mod tests {
             .private("api/testkit")
             .query(&Height(1))
             .post("v1/blocks/rollback")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(0));
-        api.send(tx.clone());
+        api.send(tx.clone()).await;
         sleep();
 
         let block_info: BlockWithTransactions = api
             .private("api/testkit")
             .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].message(), &tx);
     }
 
-    #[test]
-    fn test_create_block_with_specified_transactions() {
+    #[actix_rt::test]
+    async fn test_create_block_with_specified_transactions() {
         let api = init_handler(Height(0));
         let tx_foo = timestamp("foo");
         let tx_bar = timestamp("bar");
-        api.send(tx_foo.clone());
-        api.send(tx_bar.clone());
+        api.send(tx_foo.clone()).await;
+        api.send(tx_bar.clone()).await;
         sleep();
 
         let body = CreateBlock {
@@ -367,6 +381,7 @@ mod tests {
             .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
@@ -379,14 +394,15 @@ mod tests {
             .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].message(), &tx_bar);
     }
 
-    #[test]
-    fn test_create_block_with_bogus_transaction() {
+    #[actix_rt::test]
+    async fn test_create_block_with_bogus_transaction() {
         let api = init_handler(Height(0));
 
         let body = CreateBlock {
@@ -396,6 +412,7 @@ mod tests {
             .private("api/testkit")
             .query(&body)
             .post::<BlockWithTransactions>("v1/blocks/create")
+            .await
             .unwrap_err();
 
         assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
@@ -406,8 +423,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_rollback_normal() {
+    #[actix_rt::test]
+    async fn test_rollback_normal() {
         let api = init_handler(Height(0));
 
         for i in 0..4 {
@@ -415,6 +432,7 @@ mod tests {
                 .private("api/testkit")
                 .query(&CreateBlock { tx_hashes: None })
                 .post("v1/blocks/create")
+                .await
                 .unwrap();
             assert_eq!(block.height(), Height(i + 1));
         }
@@ -424,6 +442,7 @@ mod tests {
             .private("api/testkit")
             .query(&Height(10))
             .post("v1/blocks/rollback")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(4));
 
@@ -433,6 +452,7 @@ mod tests {
                 .private("api/testkit")
                 .query(&Height(4))
                 .post("v1/blocks/rollback")
+                .await
                 .unwrap();
 
             assert_eq!(block_info.header.height, Height(3));
@@ -443,17 +463,19 @@ mod tests {
             .private("api/testkit")
             .query(&Height(1))
             .post::<BlockWithTransactions>("v1/blocks/rollback")
+            .await
             .unwrap();
         assert_eq!(block.header.height, Height(0));
     }
 
-    #[test]
-    fn test_rollback_past_genesis() {
+    #[actix_rt::test]
+    async fn test_rollback_past_genesis() {
         let api = init_handler(Height(4));
         let err = api
             .private("api/testkit")
             .query(&Height(0))
             .post::<BlockWithTransactions>("v1/blocks/rollback")
+            .await
             .unwrap_err();
 
         assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);

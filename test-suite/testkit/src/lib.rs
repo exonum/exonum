@@ -120,14 +120,15 @@ use exonum_api::{
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
-use futures_01::{sync::mpsc, Future, Stream};
+use futures::{compat::Stream01CompatExt, FutureExt, StreamExt, TryStreamExt};
+use futures_01::{sync::mpsc, Stream};
 
 #[cfg(feature = "exonum-node")]
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fmt, iter, mem,
+    fmt, io, iter, mem,
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
@@ -135,6 +136,7 @@ use std::{
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
     poll_events::{poll_events, poll_latest},
+    server::TestKitActor,
 };
 
 mod api;
@@ -143,7 +145,7 @@ mod checkpoint_db;
 pub mod migrations;
 mod network;
 mod poll_events;
-// pub mod server;
+pub mod server;
 
 type ApiNotifierChannel = (
     mpsc::Sender<UpdateEndpoints>,
@@ -184,7 +186,7 @@ type ApiNotifierChannel = (
 pub struct TestKit {
     blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
-    events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
+    events_stream: Box<dyn futures_01::Stream<Item = (), Error = ()> + Send + Sync>,
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
@@ -717,35 +719,33 @@ impl TestKit {
         &mut self.network
     }
 
-    fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        todo!();
+    async fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let events_stream = self.remove_events_stream();
+        let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
 
-        // let events_stream = self.remove_events_stream();
-        // let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
+        let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
+        let mut servers = HashMap::new();
+        servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
+        servers.insert(
+            ApiAccess::Private,
+            WebServerConfig::new(private_api_address),
+        );
+        let api_manager_config = ApiManagerConfig {
+            servers,
+            api_aggregator,
+            server_restart_max_retries: 5,
+            server_restart_retry_timeout: 500,
+        };
+        let manager_fut =
+            ApiManager::new(api_manager_config).run(endpoints_rx.compat().map_err(|_| {
+                io::Error::new(
+                    io::ErrorKind::Other,
+                    "Unable to receive `UpdateEndpoints` event",
+                )
+            })).map(drop);
 
-        // let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
-        // let mut servers = HashMap::new();
-        // servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
-        // servers.insert(
-        //     ApiAccess::Private,
-        //     WebServerConfig::new(private_api_address),
-        // );
-        // let api_manager_config = ApiManagerConfig {
-        //     servers,
-        //     api_aggregator,
-        //     server_restart_max_retries: 5,
-        //     server_restart_retry_timeout: 500,
-        // };
-        // let api_manager = ApiManager::new(api_manager_config, endpoints_rx);
-        // let system_runtime = SystemRuntime::start(api_manager).unwrap();
-
-        // // Run the event stream in a separate thread in order to put transactions to mempool
-        // // when they are received. Otherwise, a client would need to call a `poll_events` analogue
-        // // each time after a transaction is posted.
-        // let mut core = Core::new().unwrap();
-        // core.run(events_stream).unwrap();
-        // system_runtime.stop().unwrap();
-        // actor_handle.join().unwrap();
+        futures::future::join(manager_fut, events_stream).await;
+        actor_handle.join().unwrap().unwrap();
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -756,12 +756,13 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    pub(crate) fn remove_events_stream(&mut self) -> impl Future<Item = (), Error = ()> {
+    pub(crate) fn remove_events_stream(&mut self) -> impl std::future::Future<Output = ()> {
         let stream = mem::replace(
             &mut self.events_stream,
             Box::new(futures_01::stream::empty()),
         );
-        stream.for_each(|_| Ok(()))
+
+        stream.compat().for_each(|_| async {})
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
