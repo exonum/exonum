@@ -870,7 +870,7 @@ mod tests {
 
         let err = ExecutionError::service(5, "huh?");
         let call = CallInBlock::transaction(2);
-        schema.save_error(Height(1), call, err.clone());
+        schema.save_error(Height(1), call, err);
         let other_call = CallInBlock::after_transactions(0);
         schema.save_error(Height(1), other_call, ExecutionError::service(16, "oops"));
 

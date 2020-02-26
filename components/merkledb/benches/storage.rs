@@ -13,13 +13,16 @@
 // limitations under the License.
 
 use criterion::{
-    black_box, AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
+    black_box, AxisScale, BatchSize, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration,
+    Throughput,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
-use exonum_merkledb::{access::CopyAccessExt, Database, MapIndex, ObjectHash, TemporaryDB};
+use exonum_merkledb::{
+    access::CopyAccessExt, Database, Fork, ListIndex, MapIndex, ObjectHash, TemporaryDB,
+};
 
 const NAME: &str = "name";
 const FAMILY: &str = "index_family";
@@ -387,8 +390,50 @@ where
     );
 }
 
+fn fill_list(list: &mut ListIndex<&Fork, Vec<u8>>, rng: &mut impl Rng) {
+    for _ in 0..500 {
+        let mut buffer = vec![0_u8; 512];
+        rng.fill(&mut buffer[..]);
+        list.push(buffer);
+    }
+}
+
+fn bench_index_clearing(bencher: &mut Bencher<'_>) {
+    let mut rng = StdRng::from_seed(SEED);
+
+    let db = TemporaryDB::new();
+    // Surround the cleared index with the indexes in the same column family.
+    let fork = db.fork();
+    for key in &[0_u8, 2] {
+        fill_list(&mut fork.get_list(("list", key)), &mut rng);
+    }
+    db.merge(fork.into_patch()).unwrap();
+
+    bencher.iter_batched(
+        || {
+            let addr = ("list", &1_u8);
+            let fork = db.fork();
+            fill_list(&mut fork.get_list(addr), &mut rng);
+            db.merge(fork.into_patch()).unwrap();
+
+            let fork = db.fork();
+            fork.get_list::<_, Vec<u8>>(addr).clear();
+            fork.into_patch()
+        },
+        |patch| db.merge(patch).unwrap(),
+        BatchSize::SmallInput,
+    );
+
+    let snapshot = db.snapshot();
+    for key in &[0_u8, 2] {
+        let list = snapshot.get_list::<_, Vec<u8>>(("list", key));
+        assert_eq!(list.iter().count(), 500);
+    }
+}
+
 pub fn bench_storage(c: &mut Criterion) {
     exonum_crypto::init();
+
     // MapIndex
     bench_fn(c, "storage/plain_map/insert", plain_map_index_insert);
     bench_fn(c, "storage/plain_map/iter", plain_map_index_iter);
@@ -408,11 +453,10 @@ pub fn bench_storage(c: &mut Criterion) {
         "storage/plain_map_with_family/read",
         plain_map_index_with_family_read,
     );
+
     // ProofListIndex
     bench_fn(c, "storage/proof_list/append", proof_list_append);
-
     bench_fn(c, "storage/proof_list/extend", proof_list_extend);
-
     bench_fn(
         c,
         "storage/proof_list/proofs/build",
@@ -423,6 +467,7 @@ pub fn bench_storage(c: &mut Criterion) {
         "storage/proof_list/proofs/validate",
         proof_list_index_verify_proofs,
     );
+
     // ProofMapIndex
     bench_fn(
         c,
@@ -444,4 +489,7 @@ pub fn bench_storage(c: &mut Criterion) {
         "storage/proof_map/proofs/validate",
         proof_map_index_verify_proofs,
     );
+
+    // Index clearing
+    c.bench_function("storage/clearing", bench_index_clearing);
 }
