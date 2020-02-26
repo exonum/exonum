@@ -32,6 +32,7 @@ use super::{
     MigrationRequest, MigrationResult, ResumeService, SchemaImpl, ServiceError, StartService,
     StopService, Supervisor, UnloadArtifact,
 };
+use exonum::runtime::ArtifactStatus;
 
 /// Supervisor service transactions.
 #[allow(clippy::empty_line_after_outer_attr)] // false positive
@@ -117,7 +118,7 @@ impl ConfigChange {
                     "Discarded several actions concerning service with ID {}",
                     instance_id
                 );
-                return Err(ConfigurationError::MalformedConfigPropose.with_description(msg));
+                return Err(ConfigurationError::malformed_propose(msg));
             }
         }
         Ok(())
@@ -126,27 +127,28 @@ impl ConfigChange {
 
 impl StartService {
     fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        self.artifact
-            .validate()
-            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
-        InstanceSpec::is_valid_name(&self.name)
-            .map_err(|e| ServiceError::InvalidInstanceName.with_description(e))?;
+        InstanceSpec::is_valid_name(&self.name).map_err(|e| {
+            let msg = format!("Service name `{}` is invalid: {}", self.name, e);
+            ServiceError::InvalidInstanceName.with_description(msg)
+        })?;
 
+        // Check that artifact is deployed and active.
         let dispatcher_data = context.data().for_dispatcher();
-
-        // Check that artifact is deployed.
-        if dispatcher_data.get_artifact(&self.artifact).is_none() {
-            log::trace!(
-                "Discarded start of service {} from the unknown artifact {}.",
-                self.name,
-                self.artifact.name,
-            );
-
-            let err = ArtifactError::UnknownArtifact.with_description(format!(
-                "Discarded start of service {} from the unknown artifact {}.",
+        let artifact_state = dispatcher_data
+            .get_artifact(&self.artifact)
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Discarded start of service `{}` from the unknown artifact `{}`.",
+                    self.name, self.artifact.name,
+                );
+                ArtifactError::UnknownArtifact.with_description(msg)
+            })?;
+        if artifact_state.status != ArtifactStatus::Active {
+            let msg = format!(
+                "Discarded start of service `{}` from the non-active artifact `{}`.",
                 self.name, self.artifact.name,
-            ));
-            return Err(err);
+            );
+            return Err(ArtifactError::UnknownArtifact.with_description(msg));
         }
 
         // Check that there is no instance with the same name.
@@ -188,14 +190,15 @@ impl ResumeService {
     fn validate(&self, context: &ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let instance = get_instance(context, self.instance_id)?;
         let status = instance.status.as_ref();
+
         let can_be_resumed = status.map_or(false, InstanceStatus::can_be_resumed);
         if !can_be_resumed {
-            let err = ConfigurationError::MalformedConfigPropose.with_description(format!(
+            let status = status.map_or_else(|| "none".to_owned(), ToString::to_string);
+            let msg = format!(
                 "Discarded an attempt to resume service `{}` with inappropriate status ({})",
-                instance.spec.name,
-                status.map_or_else(|| "none".to_owned(), ToString::to_string)
-            ));
-            return Err(err);
+                instance.spec.name, status
+            );
+            return Err(ConfigurationError::malformed_propose(msg));
         }
 
         if instance.associated_artifact().is_none() {
@@ -206,7 +209,7 @@ impl ResumeService {
                 instance.data_version(),
                 instance.spec.artifact
             );
-            return Err(ConfigurationError::MalformedConfigPropose.with_description(msg));
+            return Err(ConfigurationError::malformed_propose(msg));
         }
 
         Ok(())
@@ -250,10 +253,12 @@ fn get_instance(
         .for_dispatcher()
         .get_instance(instance_id)
         .ok_or_else(|| {
-            ConfigurationError::MalformedConfigPropose
-                .with_description("Instance with the specified ID is absent.")
+            let msg = format!(
+                "Instance with ID {} is absent from the blockchain",
+                instance_id
+            );
+            ConfigurationError::malformed_propose(msg)
         })
-        .map_err(From::from)
 }
 
 /// Checks that the current service status allows a specified transition.
@@ -270,13 +275,12 @@ fn validate_status(
     if is_valid_transition {
         Ok(instance)
     } else {
-        let err = ConfigurationError::MalformedConfigPropose.with_description(format!(
+        let status = status.map_or_else(|| "none".to_owned(), ToString::to_string);
+        let msg = format!(
             "Discarded an attempt to {} service `{}` with inappropriate status ({})",
-            action,
-            instance.spec.name,
-            status.map_or_else(|| "none".to_owned(), ToString::to_string)
-        ));
-        Err(err)
+            action, instance.spec.name, status
+        );
+        Err(ConfigurationError::malformed_propose(msg))
     }
 }
 
@@ -290,10 +294,9 @@ pub(crate) fn get_instance_by_name(
         .for_dispatcher()
         .get_instance(service)
         .ok_or_else(|| {
-            ConfigurationError::MalformedConfigPropose
-                .with_description("Instance with the specified ID is absent.")
+            let msg = format!("Instance with name `{}` is absent from blockchain", service);
+            ConfigurationError::malformed_propose(msg)
         })
-        .map_err(From::from)
 }
 
 impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
@@ -305,21 +308,23 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         mut propose: ConfigPropose,
     ) -> Self::Output {
         let author = get_validator(&context)?;
-
         let current_height = context.data().for_core().height();
 
         // If `actual_from` field is not set, set it to the next height.
         if propose.actual_from == Height(0) {
             propose.actual_from = current_height.next();
-        }
-        // Otherwise verify that the `actual_from` height is in the future.
-        else if current_height >= propose.actual_from {
-            return Err(SupervisorCommonError::ActualFromIsPast.into());
+        } else if current_height >= propose.actual_from {
+            // Otherwise verify that the `actual_from` height is in the future.
+            let msg = format!(
+                "Actual height for config proposal ({}) is in the past (current height: {}).",
+                propose.actual_from, current_height
+            );
+            return Err(SupervisorCommonError::ActualFromIsPast.with_description(msg));
         }
 
         let mut schema = SchemaImpl::new(context.service_data());
 
-        // Verifies that there are no pending config changes.
+        // Verify that there are no pending config changes.
         if let Some(proposal) = schema.public.pending_proposal.get() {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
@@ -337,8 +342,13 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         let mut schema = SchemaImpl::new(context.service_data());
 
         // After all the checks verify that configuration number is expected one.
-        if propose.configuration_number != schema.get_configuration_number() {
-            return Err(ConfigurationError::IncorrectConfigurationNumber.into());
+        let expected_config_number = schema.get_configuration_number();
+        if propose.configuration_number != expected_config_number {
+            let msg = format!(
+                "Number for config proposal ({}) differs from the expected one ({})",
+                propose.configuration_number, expected_config_number
+            );
+            return Err(ConfigurationError::IncorrectConfigurationNumber.with_description(msg));
         }
         schema.increase_configuration_number();
 
@@ -371,18 +381,30 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
         // Verify that this config proposal is registered.
         if entry.propose_hash != vote.propose_hash {
-            return Err(ConfigurationError::ConfigProposeNotRegistered.into());
+            let msg = format!(
+                "Mismatch between the hash of the saved proposal ({}) and the hash \
+                 referenced in the vote ({})",
+                entry.propose_hash, vote.propose_hash
+            );
+            return Err(ConfigurationError::ConfigProposeNotRegistered.with_description(msg));
         }
 
-        let config_propose = entry.config_propose;
         // Verify that we didn't reach the deadline height.
-        if config_propose.actual_from <= core_schema.height() {
-            return Err(SupervisorCommonError::DeadlineExceeded.into());
+        let config_propose = entry.config_propose;
+        let current_height = core_schema.height();
+        if config_propose.actual_from <= current_height {
+            let msg = format!(
+                "Deadline height ({}) exceeded for the config proposal ({}); \
+                 voting for it is impossible",
+                config_propose.actual_from, current_height
+            );
+            return Err(SupervisorCommonError::DeadlineExceeded.with_description(msg));
         }
-        if schema
+
+        let already_confirmed = schema
             .config_confirms
-            .confirmed_by(&entry.propose_hash, &author)
-        {
+            .confirmed_by(&entry.propose_hash, &author);
+        if already_confirmed {
             return Err(ConfigurationError::AttemptToVoteTwice.into());
         }
 
@@ -404,45 +426,53 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         // Verify that transaction author is validator.
         let author = get_validator(&context)?;
 
-        deploy
-            .artifact
-            .validate()
-            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
+        deploy.artifact.validate().map_err(|e| {
+            let msg = format!(
+                "Artifact identifier `{}` is invalid: {}",
+                deploy.artifact, e
+            );
+            ArtifactError::InvalidArtifactId.with_description(msg)
+        })?;
 
-        let core_schema = context.data().for_core();
-        let validator_count = core_schema.consensus_config().validator_keys.len();
         // Check that we didn't reach the deadline height.
-        if deploy.deadline_height < core_schema.height() {
+        let core_schema = context.data().for_core();
+        let current_height = core_schema.height();
+        if deploy.deadline_height < current_height {
             return Err(SupervisorCommonError::ActualFromIsPast.into());
         }
         let mut schema = SchemaImpl::new(context.service_data());
 
         // Verify that the artifact is not deployed yet.
-        if context
+        let is_deployed = context
             .data()
             .for_dispatcher()
             .get_artifact(&deploy.artifact)
-            .is_some()
-        {
-            return Err(ArtifactError::AlreadyDeployed.into());
+            .is_some();
+        if is_deployed {
+            let msg = format!("Artifact `{}` is already deployed", deploy.artifact);
+            return Err(ArtifactError::AlreadyDeployed.with_description(msg));
         }
 
-        // If deployment is already registered, check whether request is initiated
+        // If deployment is already registered, check whether the request is new.
         if schema.pending_deployments.contains(&deploy.artifact) {
             let new_confirmation = !schema.deploy_requests.confirmed_by(&deploy, &author);
-            if new_confirmation {
+            return if new_confirmation {
                 // It's OK, just an additional confirmation.
                 schema.deploy_requests.confirm(&deploy, author);
-                return Ok(());
+                Ok(())
             } else {
-                // Author already confirmed deployment of this artifact,
-                // so it's a duplicate.
-                return Err(ArtifactError::DeployRequestAlreadyRegistered.into());
-            }
+                // Author already confirmed deployment of this artifact, so it's a duplicate.
+                let msg = format!(
+                    "Deploy of artifact `{}` is already confirmed by validator {}",
+                    deploy.artifact, author
+                );
+                Err(ArtifactError::DeployRequestAlreadyRegistered.with_description(msg))
+            };
         }
 
         schema.deploy_requests.confirm(&deploy, author);
         let supervisor_mode = schema.supervisor_config().mode;
+        let validator_count = core_schema.consensus_config().validator_keys.len();
         if supervisor_mode.deploy_approved(&deploy, &schema.deploy_requests, validator_count) {
             schema.deploy_states.put(&deploy, AsyncEventState::Pending);
             log::trace!("Deploy artifact request accepted {:?}", deploy.artifact);
@@ -459,24 +489,15 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
     ) -> Self::Output {
         // Verify that transaction author is validator.
         let author = get_validator(&context)?;
-
-        deploy_result
-            .request
-            .artifact
-            .validate()
-            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
-
         let core_schema = context.data().for_core();
         let current_height = core_schema.height();
-
         let schema = SchemaImpl::new(context.service_data());
 
         // Check if deployment already failed.
         if schema
             .deploy_states
             .get(&deploy_result.request)
-            .map(|state| state.is_failed())
-            .unwrap_or_default()
+            .map_or(false, |state| state.is_failed())
         {
             // This deployment is already resulted in failure, no further
             // processing needed.
@@ -487,17 +508,32 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         let deploy_request = schema
             .pending_deployments
             .get(&deploy_result.request.artifact)
-            .ok_or(ArtifactError::DeployRequestNotRegistered)?;
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Deploy of artifact `{}` is not registered; reporting its result is impossible",
+                    deploy_result.request.artifact
+                );
+                ArtifactError::DeployRequestNotRegistered.with_description(msg)
+            })?;
 
         // Check that pending deployment is the same as in confirmation.
         if deploy_request != deploy_result.request {
-            let error = ExecutionError::from(ArtifactError::DeployRequestNotRegistered);
-            return Err(error);
+            let msg = format!(
+                "Mismatch between the recorded deploy request for artifact `{}` and the request \
+                 mentioned in the deploy report",
+                deploy_result.request.artifact
+            );
+            return Err(ArtifactError::DeployRequestNotRegistered.with_description(msg));
         }
 
         // Verify that we didn't reach deadline height.
         if deploy_request.deadline_height < current_height {
-            return Err(SupervisorCommonError::DeadlineExceeded.into());
+            let msg = format!(
+                "Deadline height ({}) exceeded for the deploy request ({}); \
+                 reporting deploy result is impossible",
+                deploy_request.deadline_height, current_height
+            );
+            return Err(SupervisorCommonError::DeadlineExceeded.with_description(msg));
         }
 
         drop(schema);
@@ -516,28 +552,31 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         // Verify that transaction author is validator.
         let author = get_validator(&context)?;
 
-        // Verify that artifact can be parsed.
-        // Check that we can migrate to the provided artifact will be performed by core.
-        request
-            .new_artifact
-            .validate()
-            .map_err(|e| ArtifactError::InvalidArtifactId.with_description(e))?;
-
         // Check that target instance exists.
-        let instance = get_instance_by_name(&context, request.service.as_ref())?;
+        let instance = get_instance_by_name(&context, &request.service)?;
         let core_schema = context.data().for_core();
         let validator_count = core_schema.consensus_config().validator_keys.len();
 
         // Check that we didn't reach the deadline height.
-        if request.deadline_height < core_schema.height() {
-            return Err(SupervisorCommonError::ActualFromIsPast.into());
+        let current_height = core_schema.height();
+        if request.deadline_height < current_height {
+            let msg = format!(
+                "Deadline height ({}) for the migration request is in the past (current height: {})",
+                request.deadline_height, current_height
+            );
+            return Err(SupervisorCommonError::ActualFromIsPast.with_description(msg));
         }
-        let mut schema = SchemaImpl::new(context.service_data());
 
+        let mut schema = SchemaImpl::new(context.service_data());
         schema.migration_requests.confirm(&request, author);
         let supervisor_mode = schema.supervisor_config().mode;
-        if supervisor_mode.migration_approved(&request, &schema.migration_requests, validator_count)
-        {
+        let migration_approved = supervisor_mode.migration_approved(
+            &request,
+            &schema.migration_requests,
+            validator_count,
+        );
+
+        if migration_approved {
             log::trace!(
                 "Migration request for instance {} accepted",
                 request.service
@@ -557,7 +596,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             drop(schema);
             let supervisor_extensions = context.supervisor_extensions();
             let result = supervisor_extensions
-                .initiate_migration(request.new_artifact.clone(), request.service.as_ref());
+                .initiate_migration(request.new_artifact.clone(), &request.service);
 
             // Check whether migration started successfully.
             let migration_type = match result {
@@ -597,14 +636,19 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
         let core_schema = context.data().for_core();
         let current_height = core_schema.height();
-
         let schema = SchemaImpl::new(context.service_data());
 
         // Verify that this migration is registered.
         let state = schema
             .migration_states
             .get(&result.request)
-            .ok_or(MigrationError::MigrationRequestNotRegistered)?;
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Migration request {:?} is not registered; impossible to process its result",
+                    result.request
+                );
+                MigrationError::MigrationRequestNotRegistered.with_description(msg)
+            })?;
 
         // Check if migration already failed.
         if state.is_failed() {
@@ -615,13 +659,18 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
 
         // Verify that we didn't reach deadline height.
         if result.request.deadline_height < current_height {
-            return Err(SupervisorCommonError::DeadlineExceeded.into());
+            let msg = format!(
+                "Deadline height ({}) exceeded for the migation request ({}); \
+                 reporting its result is impossible",
+                result.request.deadline_height, current_height
+            );
+            return Err(SupervisorCommonError::DeadlineExceeded.with_description(msg));
         }
 
         drop(schema);
 
         match result.status.0 {
-            Ok(hash) => Self::confirm_migration(context, &result.request, hash, author)?,
+            Ok(hash) => Self::confirm_migration(context, &result.request, hash, author),
             Err(error) => {
                 // Since the migration process error is represented as a string rather than
                 // `ExecutionError`, we use our service error code, but set the description
@@ -629,10 +678,9 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
                 let fail_cause =
                     ExecutionError::service(MigrationError::MigrationFailed as u8, error);
                 let initiate_rollback = true;
-                Self::fail_migration(context, &result.request, fail_cause, initiate_rollback)?;
+                Self::fail_migration(context, &result.request, fail_cause, initiate_rollback)
             }
         }
-        Ok(())
     }
 }
 
@@ -847,7 +895,7 @@ impl Supervisor {
 
             // Commit the migration.
             let supervisor_extensions = context.supervisor_extensions();
-            supervisor_extensions.commit_migration(request.service.as_ref(), state_hash)?;
+            supervisor_extensions.commit_migration(&request.service, state_hash)?;
         }
         Ok(())
     }
@@ -894,7 +942,7 @@ impl Supervisor {
         if initiate_rollback {
             context
                 .supervisor_extensions()
-                .rollback_migration(request.service.as_ref())?;
+                .rollback_migration(&request.service)?;
         }
 
         Ok(())

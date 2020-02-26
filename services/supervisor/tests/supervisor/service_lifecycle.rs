@@ -242,7 +242,7 @@ fn stop_non_existent_service() {
         actual_err,
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
-            .with_description_containing("Instance with the specified ID is absent.")
+            .with_description_containing("Instance with ID 2 is absent from the blockchain")
     )
 }
 
@@ -263,7 +263,7 @@ fn unload_unused_artifact() {
     let change = ConfigPropose::immediate(1).start_service(artifact.clone(), "test", ());
     let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
     let err = execute_transaction(&mut testkit, change).unwrap_err();
-    let expected_msg = "Discarded start of service test from the unknown artifact";
+    let expected_msg = "Discarded start of service `test` from the unknown artifact";
     assert_eq!(
         err,
         ErrorMatch::from_fail(&ArtifactError::UnknownArtifact)
