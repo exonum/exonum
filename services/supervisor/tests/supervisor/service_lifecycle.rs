@@ -31,7 +31,9 @@ use exonum_rust_runtime::{DefaultInstance, ExecutionContext, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use crate::inc::IncService;
-use exonum_supervisor::{ConfigPropose, ConfigurationError, Supervisor, SupervisorInterface};
+use exonum_supervisor::{
+    ArtifactError, ConfigPropose, ConfigurationError, Supervisor, SupervisorInterface,
+};
 
 #[derive(Debug, Clone, Copy)]
 struct RuntimeWithoutFreeze;
@@ -245,9 +247,93 @@ fn stop_non_existent_service() {
 }
 
 #[test]
+fn unload_unused_artifact() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let artifact = IncService.artifact_id();
+    let change = ConfigPropose::immediate(0).unload_artifact(artifact.clone());
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    execute_transaction(&mut testkit, change).expect("Cannot unload artifact");
+
+    let snapshot = testkit.snapshot();
+    assert!(snapshot.for_dispatcher().get_artifact(&artifact).is_none());
+
+    // Check that an attempt to start an `IncService` fails now.
+    let change = ConfigPropose::immediate(1).start_service(artifact.clone(), "test", ());
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let err = execute_transaction(&mut testkit, change).unwrap_err();
+    let expected_msg = "Discarded start of service test from the unknown artifact";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ArtifactError::UnknownArtifact)
+            .with_description_containing(expected_msg)
+    );
+
+    // So does unloading the artifact again.
+    let change = ConfigPropose::immediate(1).unload_artifact(artifact);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let err = execute_transaction(&mut testkit, change).unwrap_err();
+    let expected_msg = "Requested to unload artifact `0:inc:1.0.0`, which is not deployed";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing(expected_msg)
+    );
+}
+
+#[test]
+fn unloading_used_artifact() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+    start_inc_service(&mut testkit);
+
+    let change = ConfigPropose::immediate(1).unload_artifact(IncService.artifact_id());
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let err = execute_transaction(&mut testkit, change).unwrap_err();
+    let expected_msg = "Cannot unload artifact `0:inc:1.0.0`: service `1:inc` references it";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing(expected_msg)
+    );
+}
+
+#[test]
+fn unloading_artifact_with_concurrent_service_start() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+    let artifact = IncService.artifact_id();
+    let change = ConfigPropose::immediate(0)
+        .start_service(artifact.clone(), "inc", ())
+        .unload_artifact(artifact.clone());
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+
+    let err = execute_transaction(&mut testkit, change).expect_err("Config should fail");
+    let expected_msg = "starts a service from artifact `0:inc:1.0.0` and unloads it";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing(expected_msg)
+    );
+
+    // Switch two actions in the proposal around; it should still fail.
+    let change = ConfigPropose::immediate(0)
+        .unload_artifact(artifact.clone())
+        .start_service(artifact, "inc", ());
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+
+    let err = execute_transaction(&mut testkit, change).expect_err("Config should fail");
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing(expected_msg)
+    );
+}
+
+#[test]
 fn duplicate_stop_service_request() {
     let mut testkit = create_testkit();
-
     let instance_id = start_inc_service(&mut testkit).spec.id;
 
     // An attempt to stop service twice.
@@ -264,7 +350,26 @@ fn duplicate_stop_service_request() {
         ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
             .for_service(SUPERVISOR_INSTANCE_ID)
             .with_description_containing("Discarded several actions concerning service with ID 1")
-    )
+    );
+}
+
+#[test]
+fn duplicate_artifact_unload_request() {
+    let mut testkit = create_testkit();
+    let keypair = testkit.us().service_keypair();
+
+    let artifact = IncService.artifact_id();
+    let change = ConfigPropose::immediate(0)
+        .unload_artifact(artifact.clone())
+        .unload_artifact(artifact);
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    let err = execute_transaction(&mut testkit, change).expect_err("Change should fail");
+
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing("Discarded multiple unloads of artifact `0:inc:1.0.0`")
+    );
 }
 
 #[test]
