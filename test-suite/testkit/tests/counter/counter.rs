@@ -173,7 +173,7 @@ impl CounterApi {
         Ok(schema.counter.get().unwrap_or_default())
     }
 
-    fn count_with_proof(state: ServiceApiState) -> api::Result<CounterWithProof> {
+    async fn count_with_proof(state: ServiceApiState) -> api::Result<CounterWithProof> {
         let proof = state
             .data()
             .proof_for_service_index("counter")
@@ -200,7 +200,8 @@ impl CounterApi {
         builder
             .private_scope()
             .endpoint("count", |state, _query: ()| {
-                Self::count(state.service_data())
+                let count = Self::count(state.service_data());
+                async move { count }
             })
             .endpoint_mut("reset", |state, _query: ()| {
                 Self::reset(state).boxed_local()
@@ -208,7 +209,8 @@ impl CounterApi {
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {
-                Self::count(state.service_data())
+                let count = Self::count(state.service_data());
+                async move { count }
             })
             .endpoint_mut("count", |state, query| {
                 Self::increment(state, query).boxed_local()
@@ -251,7 +253,7 @@ impl CounterApi {
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
         let blockchain = builder.blockchain().clone();
-        let handler = move |request: HttpRequest| -> api::Result<u64> {
+        let handler = move |request: HttpRequest| {
             let auth_header = request
                 .headers()
                 .get("Authorization")

@@ -58,7 +58,7 @@ impl Service for SimpleService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("answer", |_state, _query: ()| Ok(42));
+            .endpoint("answer", |_state, _query: ()| async { Ok(42) });
     }
 }
 

@@ -86,13 +86,13 @@ impl IncInterface<ExecutionContext<'_>> for IncService {
 pub struct PublicApi;
 
 impl PublicApi {
-    fn counter(state: ServiceApiState, _query: ()) -> api::Result<u64> {
+    async fn counter(state: ServiceApiState, _query: ()) -> api::Result<u64> {
         Schema::new(state.service_data())
             .count()
             .ok_or_else(|| api::Error::not_found().title("Counter is not set yet"))
     }
 
-    fn ping(_state: ServiceApiState, _query: ()) -> api::Result<()> {
+    async fn ping(_state: ServiceApiState, _query: ()) -> api::Result<()> {
         Ok(())
     }
 

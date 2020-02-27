@@ -57,17 +57,17 @@ pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting a single timestamp.
-    pub fn handle_timestamp(
+    pub async fn handle_timestamp(
         self,
         state: ServiceApiState,
-        hash: &Hash,
+        hash: Hash,
     ) -> api::Result<Option<TimestampEntry>> {
         let schema = Schema::new(state.service_data());
-        Ok(schema.timestamps.get(hash))
+        Ok(schema.timestamps.get(&hash))
     }
 
     /// Endpoint for getting the proof of a single timestamp.
-    pub fn handle_timestamp_proof(
+    pub async fn handle_timestamp_proof(
         self,
         state: ServiceApiState,
         hash: Hash,
@@ -88,7 +88,7 @@ impl PublicApi {
     }
 
     /// Endpoint for getting service configuration.
-    pub fn get_service_configuration(self, state: ServiceApiState) -> api::Result<Config> {
+    pub async fn get_service_configuration(self, state: ServiceApiState) -> api::Result<Config> {
         Schema::new(state.service_data())
             .config
             .get()
@@ -101,7 +101,7 @@ impl PublicApi {
             .public_scope()
             .endpoint("v1/timestamps/value", {
                 move |state: ServiceApiState, query: TimestampQuery| {
-                    self.handle_timestamp(state, &query.hash)
+                    self.handle_timestamp(state, query.hash)
                 }
             })
             .endpoint("v1/timestamps/proof", {
@@ -110,7 +110,9 @@ impl PublicApi {
                 }
             })
             .endpoint("v1/timestamps/config", {
-                move |state: ServiceApiState, _query: ()| self.get_service_configuration(state)
+                move |state: ServiceApiState, _query: ()| {
+                    self.get_service_configuration(state)
+                }
             });
     }
 }

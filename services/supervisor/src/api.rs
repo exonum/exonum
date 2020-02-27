@@ -638,7 +638,6 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
 };
-use futures::FutureExt;
 use serde_derive::{Deserialize, Serialize};
 
 use std::convert::TryFrom;
@@ -774,12 +773,12 @@ struct PublicApi;
 
 impl PublicApi {
     /// Returns an actual consensus configuration of the blockchain.
-    fn consensus_config(state: ServiceApiState, _query: ()) -> Result<ConsensusConfig, api::Error> {
+    async fn consensus_config(state: ServiceApiState, _query: ()) -> Result<ConsensusConfig, api::Error> {
         Ok(state.data().for_core().consensus_config())
     }
 
     /// Returns a pending propose config change.
-    fn config_proposal(
+    async fn config_proposal(
         state: ServiceApiState,
         _query: (),
     ) -> Result<Option<ConfigProposalWithHash>, api::Error> {
@@ -790,7 +789,7 @@ impl PublicApi {
     }
 
     /// Returns a list of deployed artifacts and initialized services.
-    fn services(state: ServiceApiState, _query: ()) -> Result<DispatcherInfo, api::Error> {
+    async fn services(state: ServiceApiState, _query: ()) -> Result<DispatcherInfo, api::Error> {
         Ok(DispatcherInfo::load(&state.data().for_dispatcher()))
     }
 }
@@ -853,13 +852,13 @@ impl PrivateApi {
     }
 
     /// Returns the number of processed configurations.
-    fn configuration_number(state: ServiceApiState, _query: ()) -> Result<u64, api::Error> {
+    async fn configuration_number(state: ServiceApiState, _query: ()) -> Result<u64, api::Error> {
         let configuration_number = SchemaImpl::new(state.service_data()).get_configuration_number();
         Ok(configuration_number)
     }
 
     /// Returns an actual supervisor config.
-    fn supervisor_config(
+    async fn supervisor_config(
         state: ServiceApiState,
         _query: (),
     ) -> Result<SupervisorConfig, api::Error> {
@@ -868,7 +867,7 @@ impl PrivateApi {
     }
 
     /// Returns the state of deployment for the given deploy request.
-    fn deploy_status(
+    async fn deploy_status(
         state: ServiceApiState,
         query: DeployInfoQuery,
     ) -> Result<AsyncEventState, api::Error> {
@@ -882,7 +881,7 @@ impl PrivateApi {
     }
 
     /// Returns the state of migration for the given migration request.
-    fn migration_status(
+    async fn migration_status(
         state: ServiceApiState,
         query: MigrationInfoQuery,
     ) -> Result<MigrationState, api::Error> {
@@ -900,18 +899,10 @@ impl PrivateApi {
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", |state, query| {
-            PrivateApi::deploy_artifact(state, query).boxed_local()
-        })
-        .endpoint_mut("migrate", |state, query| {
-            PrivateApi::migrate(state, query).boxed_local()
-        })
-        .endpoint_mut("propose-config", |state, query| {
-            PrivateApi::propose_config(state, query).boxed_local()
-        })
-        .endpoint_mut("confirm-config", |state, query| {
-            PrivateApi::confirm_config(state, query).boxed_local()
-        })
+        .endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
+        .endpoint_mut("migrate", PrivateApi::migrate)
+        .endpoint_mut("propose-config", PrivateApi::propose_config)
+        .endpoint_mut("confirm-config", PrivateApi::confirm_config)
         .endpoint("configuration-number", PrivateApi::configuration_number)
         .endpoint("supervisor-config", PrivateApi::supervisor_config)
         .endpoint("deploy-status", PrivateApi::deploy_status)
