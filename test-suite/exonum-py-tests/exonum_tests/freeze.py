@@ -18,16 +18,9 @@ class FreezeTests(unittest.TestCase):
     """Tests for a checking service freezing mechanism."""
 
     def setUp(self):
-        try:
-            self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-            wait_network_to_start(self.network)
-        except Exception as error:
-            # If exception is raised in `setUp`, `tearDown` won't be called,
-            # thus here we ensure that network is stopped and temporary data is removed.
-            # Then we re-raise exception, since the test should fail.
-            self.network.stop()
-            self.network.deinitialize()
-            raise error
+        self.network = run_4_nodes("exonum-cryptocurrency-advanced")
+        self.addCleanup(self._tear_down, False)
+        wait_network_to_start(self.network)
 
     def test_freeze_service(self):
         host, public_port, private_port = self.network.api_address(0)
@@ -118,7 +111,16 @@ class FreezeTests(unittest.TestCase):
                 bob_balance = crypto_client.get_balance(bob_keys)
                 self.assertEqual(bob_balance, 100)
 
+    def _tear_down(self, check_exit_codes=True):
+        """Performs cleanup, removing network files."""
+
+        if self.network is not None:
+            outputs = self.network.stop()
+            self.network.deinitialize()
+            self.network = None
+
+            if check_exit_codes:
+                assert_processes_exited_successfully(self, outputs)
+
     def tearDown(self):
-        outputs = self.network.stop()
-        assert_processes_exited_successfully(self, outputs)
-        self.network.deinitialize()
+        self._tear_down()

@@ -218,3 +218,4 @@ class ApiTest(unittest.TestCase):
     def tearDown(self):
         outputs = self.network.stop()
         assert_processes_exited_successfully(self, outputs)
+        self.network.deinitialize()

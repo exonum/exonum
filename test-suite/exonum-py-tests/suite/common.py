@@ -13,6 +13,11 @@ RETRIES_AMOUNT = 20
 ARTIFACT_NAME = "exonum-cryptocurrency-advanced"
 ARTIFACT_VERSION = "1.0.0-rc.1"
 
+MIN_PEER_PORT = 6331
+MIN_API_PORT = 8080
+# Range of ports to use. Since each test requires 4 peer ports and 8 API ports,
+# not restricting the port range can easily enumerate hundreds of ports.
+PORT_RANGE = 32
 
 def run_dev_node(application: str) -> ExonumNetwork:
     """Starts a single node in the run-dev mode and returns
@@ -27,18 +32,16 @@ def run_dev_node(application: str) -> ExonumNetwork:
 
     return network
 
+available_peer_port = MIN_PEER_PORT
+available_api_port = MIN_API_PORT
 
 def run_n_nodes(application: str, nodes_amount: int) -> ExonumNetwork:
     """Creates and runs a network with N validators and return an
     `ExonumNetwork` object with it."""
 
+    global available_peer_port, available_api_port
+
     address = "127.0.0.1:{}"
-
-    # Assign peer ports starting from 6331.
-    available_peer_port = 6331
-
-    # Assign API ports starting from 8080.
-    available_api_port = 8080
 
     network = ExonumNetwork(application)
     network.generate_template(nodes_amount)
@@ -47,11 +50,17 @@ def run_n_nodes(application: str, nodes_amount: int) -> ExonumNetwork:
         network.generate_config(i, address.format(available_peer_port))
         available_peer_port += 1
 
+    if available_peer_port > MIN_PEER_PORT + PORT_RANGE:
+        available_peer_port = MIN_PEER_PORT
+
     for i in range(nodes_amount):
         public_api_address = address.format(available_api_port)
         private_api_address = address.format(available_api_port + 1)
         network.finalize(i, public_api_address, private_api_address)
         available_api_port += 2
+
+    if available_api_port > MIN_API_PORT + PORT_RANGE:
+        available_api_port = MIN_API_PORT
 
     for i in range(nodes_amount):
         network.run_node(i)
@@ -114,17 +123,24 @@ def wait_network_to_start(network: ExonumNetwork) -> None:
 
 def wait_for_block(network: ExonumNetwork, height: int = 1) -> None:
     """Wait for block at specific height"""
+
     for validator_id in range(network.validators_count()):
         host, public_port, private_port = network.api_address(validator_id)
         client = ExonumClient(host, public_port, private_port)
         for _ in range(RETRIES_AMOUNT):
-            if client.public_api.get_block(height).status_code == 200:
-                break
+            try:
+                block = client.public_api.get_block(height)
+                if block.status_code == 200: break
+            except ConnectionError:
+                pass
             time.sleep(0.5)
+        else:
+            raise Exception(f'Waiting for block {height} failed for validator {validator_id}')
 
 
 def wait_api_to_start(network: ExonumNetwork) -> None:
     """Wait for api starting"""
+
     for validator_id in range(network.validators_count()):
         host, public_port, private_port = network.api_address(validator_id)
         client = ExonumClient(host, public_port, private_port)
@@ -134,6 +150,8 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
                 break
             except ConnectionError:
                 time.sleep(0.5)
+        else:
+            raise Exception(f'Waiting for start failed for validator {validator_id}')
 
 
 def generate_config(

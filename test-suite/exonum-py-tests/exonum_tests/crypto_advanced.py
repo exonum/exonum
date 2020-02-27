@@ -20,39 +20,32 @@ class CryptoAdvancedTest(unittest.TestCase):
     """Tests for Cryptocurrency Advanced"""
 
     def setUp(self):
-        try:
-            self.network = run_4_nodes("exonum-cryptocurrency-advanced")
-            wait_network_to_start(self.network)
+        self.network = run_4_nodes("exonum-cryptocurrency-advanced")
+        self.addCleanup(self._tear_down, False)
+        wait_network_to_start(self.network)
 
-            instances = {"crypto": {"artifact": "cryptocurrency"}}
-            cryptocurrency_advanced_config_dict = generate_config(
-                self.network, instances=instances
-            )
+        instances = {"crypto": {"artifact": "cryptocurrency"}}
+        cryptocurrency_advanced_config_dict = generate_config(
+            self.network, instances=instances
+        )
 
-            cryptocurrency_advanced_config = Configuration(
-                cryptocurrency_advanced_config_dict
-            )
-            with Launcher(cryptocurrency_advanced_config) as launcher:
-                explorer = launcher.explorer()
+        cryptocurrency_advanced_config = Configuration(
+            cryptocurrency_advanced_config_dict
+        )
+        with Launcher(cryptocurrency_advanced_config) as launcher:
+            explorer = launcher.explorer()
 
-                # Skip deploy and start. The service has been already included.
-                # launcher.deploy_all()
-                # launcher.wait_for_deploy()
-                # launcher.start_all()
-                # launcher.wait_for_start()
+            # Skip deploy and start. The service has been already included.
+            # launcher.deploy_all()
+            # launcher.wait_for_deploy()
+            # launcher.start_all()
+            # launcher.wait_for_start()
 
-                for artifact in launcher.launch_state.completed_deployments():
-                    deployed = explorer.check_deployed(artifact)
-                    self.assertEqual(deployed, True)
+            for artifact in launcher.launch_state.completed_deployments():
+                deployed = explorer.check_deployed(artifact)
+                self.assertEqual(deployed, True)
 
-                # Launcher checks that config is applied, no need to check it again.
-        except Exception as error:
-            # If exception is raise in `setUp`, `tearDown` won't be called,
-            # thus here we ensure that network is stopped and temporary data is removed.
-            # Then we re-raise exception, since the test should fail.
-            self.network.stop()
-            self.network.deinitialize()
-            raise error
+            # Launcher checks that config is applied, no need to check it again.
 
     def test_create_wallet(self):
         """Tests the wallet creation"""
@@ -227,7 +220,16 @@ class CryptoAdvancedTest(unittest.TestCase):
                     tx_status = tx_info["status"]["type"]
                     self.assertEqual(tx_status, "service_error")
 
+    def _tear_down(self, check_exit_codes=True):
+        """Performs cleanup, removing network files."""
+
+        if self.network is not None:
+            outputs = self.network.stop()
+            self.network.deinitialize()
+            self.network = None
+
+            if check_exit_codes:
+                assert_processes_exited_successfully(self, outputs)
+
     def tearDown(self):
-        outputs = self.network.stop()
-        assert_processes_exited_successfully(self, outputs)
-        self.network.deinitialize()
+        self._tear_down()
