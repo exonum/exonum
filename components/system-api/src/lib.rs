@@ -53,12 +53,18 @@
 //! use exonum_system_api::{private::{ConsensusStatus, NodeInfo}, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! let mut testkit = TestKitBuilder::validator()
-//!     .with_plugin(SystemApiPlugin)
-//!     .build();
-//! let api = testkit.api();
-//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info").unwrap();
-//! assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
+//! #[actix_rt::main]
+//! async fn main() -> Result<(), failure::Error> {
+//!     let mut testkit = TestKitBuilder::validator()
+//!         .with_plugin(SystemApiPlugin)
+//!         .build();
+//!     let api = testkit.api();
+//!     let info: NodeInfo = api.private(ApiKind::System)
+//!         .get("v1/info")
+//!         .await?;
+//!     assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
+//!     Ok(())
+//! }
 //! ```
 //!
 //! Note that the testkit does not emulate the functionality of the node completely; it does
