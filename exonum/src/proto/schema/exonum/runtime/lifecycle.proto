@@ -50,7 +50,7 @@ message ArtifactState {
     // The artifact is pending unload.
     UNLOADING = 0;
     // The artifact is pending deployment.
-    PENDING = 1;
+    DEPLOYING = 1;
     // The artifact has been successfully deployed.
     ACTIVE = 2;
   }

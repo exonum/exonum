@@ -449,7 +449,7 @@ pub enum ArtifactStatus {
     /// The artifact is pending unload.
     Unloading,
     /// The artifact is pending deployment.
-    Pending,
+    Deploying,
     /// The artifact has been successfully deployed.
     Active,
 
@@ -462,7 +462,7 @@ impl Display for ArtifactStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ArtifactStatus::Active => f.write_str("active"),
-            ArtifactStatus::Pending => f.write_str("pending"),
+            ArtifactStatus::Deploying => f.write_str("deploying"),
             ArtifactStatus::Unloading => f.write_str("unloading"),
             ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
@@ -478,7 +478,7 @@ impl ProtobufConvert for ArtifactStatus {
         match self {
             ArtifactStatus::Unloading => UNLOADING,
             ArtifactStatus::Active => ACTIVE,
-            ArtifactStatus::Pending => PENDING,
+            ArtifactStatus::Deploying => DEPLOYING,
             ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
         }
     }
@@ -489,7 +489,7 @@ impl ProtobufConvert for ArtifactStatus {
         Ok(match pb {
             UNLOADING => ArtifactStatus::Unloading,
             ACTIVE => ArtifactStatus::Active,
-            PENDING => ArtifactStatus::Pending,
+            DEPLOYING => ArtifactStatus::Deploying,
         })
     }
 }

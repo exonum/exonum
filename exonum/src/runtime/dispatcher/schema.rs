@@ -256,7 +256,7 @@ impl Schema<&Fork> {
         // Add artifact to registry with pending status.
         self.artifacts().put(
             artifact,
-            ArtifactState::new(deploy_spec, ArtifactStatus::Pending),
+            ArtifactState::new(deploy_spec, ArtifactStatus::Deploying),
         );
         // Add artifact to pending artifacts queue.
         self.pending_artifacts().insert(artifact);
@@ -570,7 +570,7 @@ impl Schema<&Fork> {
                 .expect("Artifact marked as pending is not saved in `artifacts`");
 
             match state.status {
-                ArtifactStatus::Pending => {
+                ArtifactStatus::Deploying => {
                     state.status = ArtifactStatus::Active;
                     artifacts.put(&artifact, state);
                 }
