@@ -171,6 +171,7 @@ impl TestNetwork {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TestNode {
     keys: Keys,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     validator_id: Option<ValidatorId>,
 }
 
