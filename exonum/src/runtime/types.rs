@@ -859,9 +859,6 @@ impl ProtobufConvert for MigrationStatus {
 /// [`address()`](#method.address) method. Services may use this representation to compare
 /// or index callers without the necessity to care about all possible kinds of authorization
 /// supported by the framework.
-///
-/// This enum is not supposed to be exhaustively matched, so that new variants may be added to it
-/// without breaking semver compatibility.
 #[derive(Debug, PartialEq, Clone)]
 #[derive(BinaryValue, ObjectHash)]
 #[non_exhaustive]
