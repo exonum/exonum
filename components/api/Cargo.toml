@@ -17,16 +17,15 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 actix-cors = "0.2.0"
-actix-service = "1.0.5"
 actix-web = { version = "2.0.0", default-features = false }
-chrono = { version = "0.4.6", features = ["serde"] }
-failure = "0.1.5"
-futures = { version = "0.3.4", features = ["compat"] }
-log = "0.4.6"
-serde = { version = "1.0.101", features = ["derive"] }
-serde_json = "1.0.19"
-serde_urlencoded = "0.6.0"
+chrono = { version = "0.4.10", features = ["serde"] }
+failure = "0.1.6"
+futures = "0.3.4"
+log = "0.4.8"
+serde = { version = "1.0.104", features = ["derive"] }
+serde_json = "1.0.48"
+serde_urlencoded = "0.6.1"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"
-toml = "0.5.5"
+toml = "0.5.6"

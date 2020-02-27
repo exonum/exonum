@@ -431,7 +431,7 @@ impl ServiceApiScope {
 ///         # async fn long_async_task(query: MyQuery) -> Option<Hash> {
 ///         #     Some(Hash::zero())
 ///         # }
-/// 
+///
 ///         Ok(long_async_task(query).await)
 ///     }
 /// }
