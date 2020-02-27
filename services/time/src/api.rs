@@ -39,7 +39,8 @@
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();
 //! let mut testkit: TestKit = TestKitBuilder::validator()
@@ -54,7 +55,8 @@
 //! // Make request to the `current_time` endpoint.
 //! let response: Option<DateTime<Utc>> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
-//!     .get("v1/current_time")?;
+//!     .get("v1/current_time")
+//!     .await?;
 //! // Since no blocks were created yet, time is not available.
 //! assert!(response.is_none());
 //!
@@ -62,7 +64,8 @@
 //! testkit.create_blocks_until(Height(5));
 //! let response: Option<DateTime<Utc>> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
-//!     .get("v1/current_time")?;
+//!     .get("v1/current_time")
+//!     .await?;
 //! // At this moment, time should be available.
 //! assert!(response.is_some());
 //! # Ok(())
@@ -94,7 +97,8 @@
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();
 //! let mut testkit: TestKit = TestKitBuilder::validator()
@@ -110,7 +114,8 @@
 //! // Obtain validator times.
 //! let response: Vec<ValidatorTime> = api
 //!     .private(ApiKind::Service(TIME_SERVICE_NAME))
-//!     .get("v1/validators_times")?;
+//!     .get("v1/validators_times")
+//!     .await?;
 //! for validator in response {
 //!     assert!(validator.time.is_some());
 //! }

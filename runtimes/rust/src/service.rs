@@ -335,7 +335,8 @@ impl<'a> AfterCommitContext<'a> {
 ///             // Broadcast a `do_something` transaction with
 ///             // the specified payload. We swallow an error in this case
 ///             // (in a more thorough setup, it could be logged).
-///             broadcaster.publish_string((), "!".to_owned()).ok();
+///             let task = broadcaster.publish_string((), "!".to_owned());
+///             futures::executor::block_on(task).ok();
 ///         }
 ///     }
 /// }

@@ -407,8 +407,8 @@ impl ServiceApiScope {
 /// // Create API handlers.
 /// impl MyApi {
 ///     /// Immutable handler which returns a hash of the block at the given height.
-///     pub fn block_hash(
-///         state: &ServiceApiState,
+///     pub async fn block_hash(
+///         state: ServiceApiState,
 ///         query: MyQuery,
 ///     ) -> api::Result<Option<BlockInfo>> {
 ///         let schema = state.data().for_core();
@@ -419,18 +419,20 @@ impl ServiceApiScope {
 ///     }
 ///
 ///     /// Simple handler without any parameters.
-///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///     pub async fn ping(_state: ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
 ///
-///     /// You may also create asynchronous handlers for long requests.
-///     pub fn async_operation(
-///         _state: &ServiceApiState,
+///     /// You may also uses asynchronous tasks.
+///     pub async fn async_operation(
+///         _state: ServiceApiState,
 ///         query: MyQuery,
-///     ) -> api::FutureResult<Option<Hash>> {
-///         Box::new(futures::lazy(move || {
-///             Ok(Some(query.block_height.object_hash()))
-///         }))
+///     ) -> api::Result<Option<Hash>> {
+///         # async fn long_async_task(query: MyQuery) -> Option<Hash> {
+///         #     Some(Hash::zero())
+///         # }
+/// 
+///         Ok(long_async_task(query).await)
 ///     }
 /// }
 ///

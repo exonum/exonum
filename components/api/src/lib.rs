@@ -43,7 +43,7 @@
 //!     let mut builder = ApiBuilder::new();
 //!     builder
 //!         .public_scope()
-//!         .endpoint("some", |query: SomeQuery| {
+//!         .endpoint("some", |query: SomeQuery| async move {
 //!             Ok(query.first + query.second)
 //!         });
 //!     builder

@@ -42,15 +42,15 @@
 //! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! #[actix_rt::main]
-//! async fn main() -> Result<(), failure::Error> {
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_plugin(SystemApiPlugin)
-//!         .build();
-//!     let api = testkit.api();
-//!     let info: NodeInfo = api.private(ApiKind::System).get("v1/info").await?;
-//!     Ok(())
-//! }
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .build();
+//! let api = testkit.api();
+//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info").await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Get Node Statistics
@@ -70,15 +70,15 @@
 //! use exonum_system_api::{private::NodeStats, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! #[actix_rt::main]
-//! async fn main() -> Result<(), failure::Error> {
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_plugin(SystemApiPlugin)
-//!         .build();
-//!     let api = testkit.api();
-//!     let info: NodeStats = api.private(ApiKind::System).get("v1/stats").await?;
-//!     Ok(())
-//! }
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .build();
+//! let api = testkit.api();
+//! let info: NodeStats = api.private(ApiKind::System).get("v1/stats").await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Add Peer
@@ -100,25 +100,26 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! #[actix_rt::main]
-//! async fn main() -> Result<(), failure::Error> {
-//!     # let address = "127.0.0.1:8080".to_owned();
-//!     # let public_key = Default::default();
-//!     // Obtaining address and public key of target node skipped...
-//!     let connect_info = ConnectInfo {
-//!         address,
-//!         public_key,
-//!     };
-//! 
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_plugin(SystemApiPlugin)
-//!         .build();
-//!     let api = testkit.api();
-//!     api.private(ApiKind::System)
-//!         .query(&connect_info)
-//!         .post("v1/peers").await?;
-//!     Ok(())
-//! }
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
+//! # let address = "127.0.0.1:8080".to_owned();
+//! # let public_key = Default::default();
+//! // Obtaining address and public key of target node skipped...
+//! let connect_info = ConnectInfo {
+//!     address,
+//!     public_key,
+//! };
+//!
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .build();
+//! let api = testkit.api();
+//! api.private(ApiKind::System)
+//!     .query(&connect_info)
+//!     .post("v1/peers")
+//!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Change Consensus Status
@@ -138,20 +139,20 @@
 //! use exonum_system_api::{private::ConsensusEnabledQuery, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! 
-//! #[actix_rt::main]
-//! async fn main() -> Result<(), failure::Error> {
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_plugin(SystemApiPlugin)
-//!         .build();
-//!     let api = testkit.api();
-//!     let enabled = true;
-//!     let query = ConsensusEnabledQuery { enabled };
-//!     api.private(ApiKind::System)
-//!         .query(&query)
-//!         .post("v1/consensus_status").await?;
-//!     Ok(())
-//! }
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .build();
+//! let api = testkit.api();
+//! let enabled = true;
+//! let query = ConsensusEnabledQuery { enabled };
+//! api.private(ApiKind::System)
+//!     .query(&query)
+//!     .post("v1/consensus_status")
+//!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Node Shutdown
@@ -169,15 +170,17 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! #[actix_rt::main]
-//! async fn main() -> Result<(), failure::Error> {
-//!     let mut testkit = TestKitBuilder::validator()
-//!         .with_plugin(SystemApiPlugin)
-//!         .build();
-//!     let api = testkit.api();
-//!     api.private(ApiKind::System).post::<()>("v1/shutdown").await?;
-//!     Ok(())
-//! }
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
+//! let mut testkit = TestKitBuilder::validator()
+//!     .with_plugin(SystemApiPlugin)
+//!     .build();
+//! let api = testkit.api();
+//! api.private(ApiKind::System)
+//!     .post::<()>("v1/shutdown")
+//!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 // limitations under the License.
 
