@@ -67,7 +67,10 @@ pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting a single wallet.
-    pub async fn wallet_info(state: ServiceApiState, query: WalletQuery) -> api::Result<WalletInfo> {
+    pub async fn wallet_info(
+        state: ServiceApiState,
+        query: WalletQuery,
+    ) -> api::Result<WalletInfo> {
         let IndexProof {
             block_proof,
             index_proof,

@@ -143,24 +143,29 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         // This endpoint returns list of protobuf source files of the specified artifact,
         // otherwise it returns source files of Exonum itself.
         .endpoint("proto-sources", {
-            move |query: ProtoSourcesQuery| -> api::Result<Vec<ProtoSourceFile>> {
-                if let ProtoSourcesQuery::Artifact { name, version } = query {
-                    let artifact_id = ArtifactId::new(RuntimeIdentifier::Rust, name, version)
-                        .map_err(|e| {
+            move |query: ProtoSourcesQuery| {
+                let filtered_sources = filtered_sources.clone();
+                let exonum_sources = exonum_sources.clone();
+
+                async move {
+                    if let ProtoSourcesQuery::Artifact { name, version } = query {
+                        let artifact_id = ArtifactId::new(RuntimeIdentifier::Rust, name, version)
+                            .map_err(|e| {
                             api::Error::bad_request()
                                 .title("Invalid query")
                                 .detail(format!("Invalid artifact query: {}", e))
                         })?;
-                    filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
-                        api::Error::not_found()
-                            .title("Artifact sources not found")
-                            .detail(format!(
-                                "Unable to find sources for artifact {}",
-                                artifact_id
-                            ))
-                    })
-                } else {
-                    Ok(exonum_sources.clone())
+                        filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
+                            api::Error::not_found()
+                                .title("Artifact sources not found")
+                                .detail(format!(
+                                    "Unable to find sources for artifact {}",
+                                    artifact_id
+                                ))
+                        })
+                    } else {
+                        Ok(exonum_sources.clone())
+                    }
                 }
             }
         });

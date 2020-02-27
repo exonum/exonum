@@ -773,7 +773,10 @@ struct PublicApi;
 
 impl PublicApi {
     /// Returns an actual consensus configuration of the blockchain.
-    async fn consensus_config(state: ServiceApiState, _query: ()) -> Result<ConsensusConfig, api::Error> {
+    async fn consensus_config(
+        state: ServiceApiState,
+        _query: (),
+    ) -> Result<ConsensusConfig, api::Error> {
         Ok(state.data().for_core().consensus_config())
     }
 

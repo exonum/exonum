@@ -95,7 +95,8 @@ impl Api {
             .endpoint_mut(
                 "moved-mutable",
                 move |state: ServiceApiState, _query: PingQuery| async move {
-                    Err(state.moved_permanently("ping-pong-deprecated-mut").into()) as api::Result<()>
+                    Err(state.moved_permanently("ping-pong-deprecated-mut").into())
+                        as api::Result<()>
                 },
             )
             .endpoint(

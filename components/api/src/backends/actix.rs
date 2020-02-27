@@ -27,14 +27,14 @@ use actix_web::{
     web::{self, scope, Json, Query},
     FromRequest, HttpResponse,
 };
-use futures::future::{FutureExt, LocalBoxFuture};
+use futures::future::{Future, FutureExt, LocalBoxFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{fmt, sync::Arc};
 
 use crate::{
     Actuality, AllowOrigin, ApiBackend, ApiScope, EndpointMutability, Error as ApiError,
-    ExtendApiBackend, FutureResult, NamedWith,
+    ExtendApiBackend, NamedWith,
 };
 
 /// Type alias for the inner `actix-web` HTTP requests handler.
@@ -193,26 +193,6 @@ impl From<EndpointMutability> for actix_web::http::Method {
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, crate::Result<I>, F>> for RequestHandler
-where
-    F: Fn(Q) -> crate::Result<I> + 'static + Send + Sync + Clone,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, crate::Result<I>, F>) -> Self {
-        // Convert handler that returns a `Result` into handler that will return `FutureResult`.
-        let handler = f.inner.handler;
-        let future_endpoint = move |query| -> FutureResult<I> {
-            let handler = handler.clone();
-            async move { handler(query) }.boxed_local()
-        };
-        let named_with_future = NamedWith::new(f.name, future_endpoint, f.mutability);
-
-        // Then we can create a `RequestHandler` with the `From` specialization for future result.
-        RequestHandler::from(named_with_future)
-    }
-}
-
 /// Takes `HttpRequest` as a parameter and extracts query:
 /// - If request is immutable, the query is parsed from query string,
 /// - If request is mutable, the query is parsed from the request body as JSON.
@@ -237,13 +217,14 @@ where
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
+impl<Q, I, F, R> From<NamedWith<Q, I, R, F>> for RequestHandler
 where
-    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
+    F: Fn(Q) -> R + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
+    R: Future<Output = Result<I, crate::Error>>,
 {
-    fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, R, F>) -> Self {
         let handler = f.inner.handler;
         let actuality = f.inner.actuality;
         let mutability = f.mutability;

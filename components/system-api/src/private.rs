@@ -303,30 +303,34 @@ impl SystemApi {
 
     fn handle_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
-            let mut connected_peers = Vec::new();
+        api_scope.endpoint(name, move |_query: ()| {
+            let shared_api_state = shared_api_state.clone();
+            async move {
+                let mut connected_peers = Vec::new();
 
-            for connect_info in shared_api_state.outgoing_connections() {
-                connected_peers.push(ConnectedPeerInfo::new(
-                    &connect_info,
-                    ConnectDirection::Outgoing,
-                ));
+                for connect_info in shared_api_state.outgoing_connections() {
+                    connected_peers.push(ConnectedPeerInfo::new(
+                        &connect_info,
+                        ConnectDirection::Outgoing,
+                    ));
+                }
+
+                for connect_info in shared_api_state.incoming_connections() {
+                    connected_peers.push(ConnectedPeerInfo::new(
+                        &connect_info,
+                        ConnectDirection::Incoming,
+                    ));
+                }
+
+                Ok(NodeInfo {
+                    consensus_status: Self::get_consensus_status(&shared_api_state),
+                    connected_peers,
+                    exonum_version: exonum_version().unwrap_or_else(|| Version::new(0, 0, 0)),
+                    rust_version: rust_version().unwrap_or_else(|| Version::new(0, 0, 0)),
+                    os_info: os_info(),
+                })
             }
-
-            for connect_info in shared_api_state.incoming_connections() {
-                connected_peers.push(ConnectedPeerInfo::new(
-                    &connect_info,
-                    ConnectDirection::Incoming,
-                ));
-            }
-
-            Ok(NodeInfo {
-                consensus_status: Self::get_consensus_status(&shared_api_state),
-                connected_peers,
-                exonum_version: exonum_version().unwrap_or_else(|| Version::new(0, 0, 0)),
-                rust_version: rust_version().unwrap_or_else(|| Version::new(0, 0, 0)),
-                os_info: os_info(),
-            })
+            .boxed_local()
         });
         self
     }
@@ -334,19 +338,23 @@ impl SystemApi {
     fn handle_stats(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let this = self.clone();
         api_scope.endpoint(name, move |_query: ()| {
-            let snapshot = this.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
-            let uptime = SystemTime::now()
-                .duration_since(this.start_time)
-                .unwrap_or_default()
-                .as_secs();
-            Ok(NodeStats {
-                height: schema.height().into(),
-                tx_pool_size: schema.transactions_pool_len(),
-                tx_count: schema.transactions_len(),
-                tx_cache_size: this.shared_api_state.tx_cache_size(),
-                uptime,
-            })
+            let this = this.clone();
+            async move {
+                let snapshot = this.blockchain.snapshot();
+                let schema = Schema::new(&snapshot);
+                let uptime = SystemTime::now()
+                    .duration_since(this.start_time)
+                    .unwrap_or_default()
+                    .as_secs();
+                Ok(NodeStats {
+                    height: schema.height().into(),
+                    tx_pool_size: schema.transactions_pool_len(),
+                    tx_count: schema.transactions_len(),
+                    tx_cache_size: this.shared_api_state.tx_cache_size(),
+                    uptime,
+                })
+            }
+            .boxed_local()
         });
         self
     }

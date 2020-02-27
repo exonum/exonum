@@ -110,9 +110,7 @@ impl PublicApi {
                 }
             })
             .endpoint("v1/timestamps/config", {
-                move |state: ServiceApiState, _query: ()| {
-                    self.get_service_configuration(state)
-                }
+                move |state: ServiceApiState, _query: ()| self.get_service_configuration(state)
             });
     }
 }

@@ -158,7 +158,10 @@ pub(crate) struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
-    async fn current_time(state: api::ServiceApiState, _query: ()) -> Result<Option<DateTime<Utc>>> {
+    async fn current_time(
+        state: api::ServiceApiState,
+        _query: (),
+    ) -> Result<Option<DateTime<Utc>>> {
         Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
@@ -191,7 +194,9 @@ impl PrivateApi {
     }
 
     /// Endpoint for getting time values for current validators.
-    pub async fn current_validators_time(state: api::ServiceApiState) -> Result<Vec<ValidatorTime>> {
+    pub async fn current_validators_time(
+        state: api::ServiceApiState,
+    ) -> Result<Vec<ValidatorTime>> {
         let validator_keys = state.data().for_core().consensus_config().validator_keys;
         let schema = TimeSchema::new(state.service_data());
 
