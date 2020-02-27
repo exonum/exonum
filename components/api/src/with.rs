@@ -105,7 +105,11 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 
     /// Replaces the used handler with a new one.
-    pub fn with_different_handler<F1>(self, handler: F1) -> Deprecated<Q, I, R, F1> {
+    pub fn with_different_handler<F1, R1>(self, handler: F1) -> Deprecated<Q, I, R1, F1>
+    where
+        F1: Fn(Q) -> R1,
+        R1: Future<Output = Result<I>>,
+    {
         Deprecated {
             handler,
             discontinued_on: self.discontinued_on,

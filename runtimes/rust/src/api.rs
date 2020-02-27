@@ -25,7 +25,7 @@ use exonum::{
     },
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
-use futures::future::{Future, FutureExt, LocalBoxFuture};
+use futures::future::{Future, FutureExt};
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
@@ -195,8 +195,6 @@ pub struct ServiceApiScope {
     artifact: ArtifactId,
 }
 
-type DeprecatedFuture<I> = LocalBoxFuture<'static, exonum_api::Result<I>>;
-
 impl ServiceApiScope {
     /// Creates a new service API scope for the specified service instance.
     fn new(blockchain: Blockchain, descriptor: InstanceDescriptor, artifact: ArtifactId) -> Self {
@@ -288,7 +286,7 @@ impl ServiceApiScope {
     pub fn deprecated_endpoint<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        deprecated: Deprecated<Q, I, DeprecatedFuture<I>, F>,
+        deprecated: Deprecated<Q, I, R, F>,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -320,7 +318,6 @@ impl ServiceApiScope {
                     .await
                     .map_err(move |err| err.source(descriptor.to_string()))
             }
-            .boxed_local()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
@@ -334,7 +331,7 @@ impl ServiceApiScope {
     pub fn deprecated_endpoint_mut<Q, I, F, R>(
         &mut self,
         name: &'static str,
-        deprecated: Deprecated<Q, I, DeprecatedFuture<I>, F>,
+        deprecated: Deprecated<Q, I, R, F>,
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
@@ -366,7 +363,6 @@ impl ServiceApiScope {
                     .await
                     .map_err(move |err| err.source(descriptor.to_string()))
             }
-            .boxed_local()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
