@@ -19,7 +19,7 @@
 
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::Block,
+    blockchain::{Block, CallProof},
     crypto::Hash,
     helpers::Height,
     merkledb::BinaryValue,
@@ -184,6 +184,16 @@ impl TransactionQuery {
     }
 }
 
+/// Query parameters to check the execution status of a transaction.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TransactionStatusQuery {
+    /// The hash of the transaction to be searched.
+    pub hash: Hash,
+    /// Whether to return the status with a cryptographic proof of authenticity.
+    #[serde(default)]
+    pub with_proof: bool,
+}
+
 /// Query parameters to check the execution status of a `before_transactions` or
 /// `after_transactions` call.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -192,11 +202,20 @@ pub struct CallStatusQuery {
     pub height: Height,
     /// Numerical service identifier.
     pub service_id: InstanceId,
+    /// Whether to return the status with a cryptographic proof of authenticity.
+    #[serde(default)]
+    pub with_proof: bool,
 }
 
 /// Call status response.
+///
+/// This enum is serialized in JSON untagged. Hence, if the consumer knows the type of the response,
+/// she may parse it directly to `ExecutionStatus` or `CallProof`.
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct CallStatusResponse {
-    /// Execution status of a call.
-    pub status: ExecutionStatus,
+#[serde(untagged)]
+pub enum CallStatusResponse {
+    /// Simple response.
+    Simple(ExecutionStatus),
+    /// Response with a cryptographic proof of authenticity.
+    Proof(CallProof),
 }
