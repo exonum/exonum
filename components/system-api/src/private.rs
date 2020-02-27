@@ -188,7 +188,8 @@ use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::SystemTime};
 
 /// Information about the current state of the node.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct NodeStats {
     /// Height of the blockchain.
     pub height: u64,
@@ -205,6 +206,7 @@ pub struct NodeStats {
 /// Consensus status of the current node.
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ConsensusStatus {
     /// Consensus disabled on this node.
     Disabled,
@@ -217,6 +219,7 @@ pub enum ConsensusStatus {
 /// Type of the network connection.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ConnectDirection {
     /// Incoming connection.
     Incoming,
@@ -226,6 +229,7 @@ pub enum ConnectDirection {
 
 /// Info about connected peer.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ConnectedPeerInfo {
     /// Address of the peer.
     pub address: String,
@@ -246,7 +250,8 @@ impl ConnectedPeerInfo {
 }
 
 /// Short information about the current node.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[non_exhaustive]
 pub struct NodeInfo {
     /// Consensus status.
     pub consensus_status: ConsensusStatus,
@@ -262,9 +267,17 @@ pub struct NodeInfo {
 
 /// Query for setting consensus enabled or disabled.
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[non_exhaustive]
 pub struct ConsensusEnabledQuery {
     /// Denotes if consensus should be enabled or disabled.
     pub enabled: bool,
+}
+
+impl ConsensusEnabledQuery {
+    /// Creates a new consensus switch query.
+    pub fn new(enabled: bool) -> Self {
+        Self { enabled }
+    }
 }
 
 /// Private system API.
