@@ -153,6 +153,7 @@ impl Message for GetStatus {
 
 /// Testkit status, returned by the corresponding API endpoint.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TestKitStatus {
     /// Current blockchain height.
     pub height: Height,
@@ -173,6 +174,7 @@ impl Handler<GetStatus> for TestKitActor {
 
 /// Block creation parameters for the testkit server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CreateBlock {
     /// List of transaction hashes to include in the block. Transactions should be
     /// present in the memory pool of the testkit.
