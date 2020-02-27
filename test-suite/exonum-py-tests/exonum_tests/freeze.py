@@ -22,7 +22,7 @@ class FreezeTests(unittest.TestCase):
             self.network = run_4_nodes("exonum-cryptocurrency-advanced")
             wait_network_to_start(self.network)
         except Exception as error:
-            # If exception is raise in `setUp`, `tearDown` won't be called,
+            # If exception is raised in `setUp`, `tearDown` won't be called,
             # thus here we ensure that network is stopped and temporary data is removed.
             # Then we re-raise exception, since the test should fail.
             self.network.stop()
@@ -30,7 +30,6 @@ class FreezeTests(unittest.TestCase):
             raise error
 
     def test_freeze_service(self):
-
         host, public_port, private_port = self.network.api_address(0)
         client = ExonumClient(host, public_port, private_port)
 
@@ -54,19 +53,18 @@ class FreezeTests(unittest.TestCase):
             launcher.start_all()
             launcher.wait_for_start()
 
-        # Check that the service status has been changed for `frozen`.
+        # Check that the service status has been changed to `frozen`.
         for service in client.public_api.available_services().json()["services"]:
             if service["spec"]["name"] == "crypto":
                 self.assertEqual(service["status"]["type"], "frozen")
 
-        # Try to create a new wallet. The operation should be failed.
+        # Try to create a new wallet. The operation should fail.
         with ExonumCryptoAdvancedClient(client) as crypto_client:
             bob_keys = KeyPair.generate()
             response = crypto_client.create_wallet(bob_keys, "Bob")
             self.assertEqual(response.status_code, 400)
-            self.assertEqual(
-                response.json()["title"], "Failed to add transaction to memory pool"  # Cause the service is frozen
-            )
+            # Because the service is frozen, transaction should be inadmissible.
+            self.assertEqual(response.json()["title"], "Failed to add transaction to memory pool")
 
         # Check that we can use service endpoints for data retrieving. Check wallet once again.
         with ExonumCryptoAdvancedClient(client) as crypto_client:
@@ -74,7 +72,6 @@ class FreezeTests(unittest.TestCase):
             self.assertEqual(alice_balance, 100)
 
     def test_resume_after_freeze_service(self):
-
         host, public_port, private_port = self.network.api_address(0)
         client = ExonumClient(host, public_port, private_port)
 
@@ -90,32 +87,16 @@ class FreezeTests(unittest.TestCase):
         # Freeze the service
         instances = {"crypto": {"artifact": "cryptocurrency", "action": "freeze"}}
         cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, deploy=False)
-
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
         with Launcher(cryptocurrency_advanced_config) as launcher:
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
             launcher.wait_for_start()
-
-        # Check that the service status has been changed for `frozen`.
-        for service in client.public_api.available_services().json()["services"]:
-            if service["spec"]["name"] == "crypto":
-                self.assertEqual(service["status"]["type"], "frozen")
-
-        # Try to create a new wallet. The operation should be failed.
-        with ExonumCryptoAdvancedClient(client) as crypto_client:
-            bob_keys = KeyPair.generate()
-            response = crypto_client.create_wallet(bob_keys, "Bob")
-            self.assertEqual(response.status_code, 400)
-            self.assertEqual(
-                response.json()["title"], "Failed to add transaction to memory pool"  # Cause the service is frozen
-            )
 
         # Resume the service
         instances = {"crypto": {"artifact": "cryptocurrency", "action": "resume"}}
         cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, deploy=False)
-
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
         with Launcher(cryptocurrency_advanced_config) as launcher:
             launcher.deploy_all()
@@ -123,7 +104,7 @@ class FreezeTests(unittest.TestCase):
             launcher.start_all()
             launcher.wait_for_start()
 
-        # Check that the service status has been changed for `frozen`.
+        # Check that the service status has been changed to `active`.
         for service in client.public_api.available_services().json()["services"]:
             if service["spec"]["name"] == "crypto":
                 self.assertEqual(service["status"]["type"], "active")
@@ -134,8 +115,8 @@ class FreezeTests(unittest.TestCase):
             crypto_client.create_wallet(bob_keys, "Bob")
             with client.create_subscriber("transactions") as subscriber:
                 subscriber.wait_for_new_event()
-                alice_balance = crypto_client.get_balance(bob_keys)
-                self.assertEqual(alice_balance, 100)
+                bob_balance = crypto_client.get_balance(bob_keys)
+                self.assertEqual(bob_balance, 100)
 
     def tearDown(self):
         outputs = self.network.stop()
