@@ -157,12 +157,8 @@ fn test_discard_config_with_not_enough_confirms() {
 
     // Sign confirmation transaction by second validator
     let keypair = testkit.network().validators()[1].service_keypair();
-    let signed_confirm = keypair.confirm_config_change(
-        SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: proposal_hash,
-        },
-    );
+    let signed_confirm =
+        keypair.confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash));
     testkit
         .create_block_with_transaction(signed_confirm)
         .transactions[0]
@@ -196,9 +192,7 @@ fn test_apply_config_by_min_required_majority() {
         .status()
         .expect("Transaction with change propose discarded.");
 
-    let confirm = ConfigVote {
-        propose_hash: proposal_hash,
-    };
+    let confirm = ConfigVote::new(proposal_hash);
     // Sign and send confirmation transaction by second validator
     let keys = testkit.network().validators()[1].service_keypair();
     let tx = keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, confirm.clone());
@@ -240,12 +234,8 @@ fn test_send_confirmation_by_initiator() {
 
     // Try to send confirmation transaction by the initiator
     let keys = testkit.network().us().service_keypair();
-    let signed_confirm = keys.confirm_config_change(
-        SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: proposal_hash,
-        },
-    );
+    let signed_confirm =
+        keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash));
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();
@@ -297,12 +287,8 @@ fn test_confirm_config_by_incorrect_validator() {
         .expect("Transaction with change propose discarded.");
 
     let keys = KeyPair::random();
-    let signed_confirm = keys.confirm_config_change(
-        SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: proposal_hash,
-        },
-    );
+    let signed_confirm =
+        keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash));
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();

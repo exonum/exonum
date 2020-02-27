@@ -752,6 +752,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
 
 /// Services info response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[non_exhaustive]
 pub struct DispatcherInfo {
     /// List of deployed artifacts.
     pub artifacts: Vec<ArtifactId>,

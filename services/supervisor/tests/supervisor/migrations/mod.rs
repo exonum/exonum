@@ -17,8 +17,8 @@ use exonum::{
     helpers::{Height, ValidatorId},
     merkledb::access::Prefixed,
     runtime::{
-        migrations::MigrationStatus, versioning::Version, CoreError, ErrorMatch, ExecutionError,
-        InstanceId, SUPERVISOR_INSTANCE_ID,
+        versioning::Version, CoreError, ErrorMatch, ExecutionError, InstanceId,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
@@ -522,12 +522,7 @@ fn migration_consensus() {
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
-
-    let migration_status = MigrationStatus(Ok(reference_hash));
-    let migration_result = MigrationResult {
-        request: request.clone(),
-        status: migration_status,
-    };
+    let migration_result = MigrationResult::new(request.clone(), Ok(reference_hash));
 
     // Build confirmation transactions
     let confirmations: Vec<_> = (1..validators_amount)
@@ -584,12 +579,7 @@ fn migration_no_consensus() {
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
-
-    let migration_status = MigrationStatus(Ok(reference_hash));
-    let migration_result = MigrationResult {
-        request: request.clone(),
-        status: migration_status,
-    };
+    let migration_result = MigrationResult::new(request.clone(), Ok(reference_hash));
 
     // Build confirmation transactions for every validator except one.
     let confirmations: Vec<_> = (1..(validators_amount - 1))
@@ -642,12 +632,7 @@ fn migration_hash_divergence() {
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
-
-    let migration_status = MigrationStatus(Ok(reference_hash));
-    let migration_result = MigrationResult {
-        request: request.clone(),
-        status: migration_status,
-    };
+    let migration_result = MigrationResult::new(request.clone(), Ok(reference_hash));
 
     // Build confirmation transactions for every validator except one.
     let mut confirmations: Vec<_> = (1..(validators_amount - 1))
@@ -658,12 +643,7 @@ fn migration_hash_divergence() {
         .collect();
 
     // For a missing validator, create an incorrect hash report.
-    let wrong_status = MigrationStatus(Ok(Hash::zero()));
-    let wrong_result = MigrationResult {
-        request: request.clone(),
-        status: wrong_status,
-    };
-
+    let wrong_result = MigrationResult::new(request.clone(), Ok(Hash::zero()));
     let wrong_confirmation = {
         let last_validator_id = validators_amount - 1;
         let keypair = testkit

@@ -129,6 +129,7 @@ impl ConfigSpec {
         match mode {
             SupervisorMode::Simple => self.expected_dir().join("template.simple.toml"),
             SupervisorMode::Decentralized => self.expected_dir().join("template.dec.toml"),
+            _ => unreachable!("Not tested"),
         }
     }
 

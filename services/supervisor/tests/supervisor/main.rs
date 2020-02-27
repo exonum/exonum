@@ -161,11 +161,7 @@ fn deploy_confirmation_hash_default(testkit: &TestKit, request: &DeployRequest) 
 }
 
 fn deploy_request(artifact: ArtifactId, deadline_height: Height) -> DeployRequest {
-    DeployRequest {
-        artifact,
-        spec: Vec::default(),
-        deadline_height,
-    }
+    DeployRequest::new(artifact, deadline_height)
 }
 
 fn start_service_request(

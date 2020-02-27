@@ -28,12 +28,11 @@ use crate::{
     SERVICE_NAME as CONFIG_SERVICE_NAME,
 };
 use exonum_supervisor::{
-    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, Schema, ServiceConfig, Supervisor,
+    supervisor_name, ConfigChange, ConfigPropose, ConfigVote, Schema, Supervisor,
     SupervisorInterface,
 };
 
 pub const CFG_CHANGE_HEIGHT: Height = Height(3);
-
 pub const SECOND_SERVICE_ID: InstanceId = 119;
 pub const SECOND_SERVICE_NAME: &str = "change-service";
 
@@ -66,12 +65,9 @@ pub fn build_confirmation_transactions(
         .iter()
         .filter(|validator| validator.validator_id() != Some(initiator_id))
         .map(|validator| {
-            validator.service_keypair().confirm_config_change(
-                SUPERVISOR_INSTANCE_ID,
-                ConfigVote {
-                    propose_hash: proposal_hash,
-                },
-            )
+            validator
+                .service_keypair()
+                .confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash))
         })
         .collect()
 }
@@ -83,13 +79,7 @@ pub struct ConfigProposeBuilder {
 impl ConfigProposeBuilder {
     pub fn new(cfg_change_height: Height) -> Self {
         ConfigProposeBuilder {
-            config_propose: ConfigPropose {
-                actual_from: cfg_change_height,
-                changes: vec![],
-                // As in the common cases we test only one config, it's ok
-                // to have default value of 0 for test purposes.
-                configuration_number: 0,
-            },
+            config_propose: ConfigPropose::new(0, cfg_change_height),
         }
     }
 
@@ -106,22 +96,16 @@ impl ConfigProposeBuilder {
     }
 
     pub fn extend_service_config_propose(mut self, params: String) -> Self {
-        self.config_propose
-            .changes
-            .push(ConfigChange::Service(ServiceConfig {
-                instance_id: CONFIG_SERVICE_ID,
-                params: params.into_bytes(),
-            }));
+        self.config_propose = self
+            .config_propose
+            .service_config(CONFIG_SERVICE_ID, params);
         self
     }
 
     pub fn extend_second_service_config_propose(mut self, params: String) -> Self {
-        self.config_propose
-            .changes
-            .push(ConfigChange::Service(ServiceConfig {
-                instance_id: SECOND_SERVICE_ID,
-                params: params.into_bytes(),
-            }));
+        self.config_propose = self
+            .config_propose
+            .service_config(SECOND_SERVICE_ID, params);
         self
     }
 

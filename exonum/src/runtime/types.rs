@@ -807,6 +807,12 @@ impl InstanceState {
 #[derive(BinaryValue, ObjectHash)]
 pub struct MigrationStatus(pub Result<Hash, String>);
 
+impl From<Result<Hash, String>> for MigrationStatus {
+    fn from(res: Result<Hash, String>) -> Self {
+        Self(res)
+    }
+}
+
 impl ProtobufConvert for MigrationStatus {
     type ProtoStruct = schema::lifecycle::MigrationStatus;
 

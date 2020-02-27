@@ -310,6 +310,6 @@ impl NodeBuilder {
             .general
             .supervisor_mode
             .clone();
-        Supervisor::builtin_instance(SupervisorConfig { mode })
+        Supervisor::builtin_instance(SupervisorConfig::new(mode))
     }
 }

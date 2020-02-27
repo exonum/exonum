@@ -33,14 +33,23 @@ use super::{mode::Mode, proto};
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Config")]
+#[non_exhaustive]
 pub struct SupervisorConfig {
     /// Supervisor operating mode.
     pub mode: Mode,
 }
 
+impl SupervisorConfig {
+    /// Creates a new configuration with the specified supervisor mode.
+    pub fn new(mode: Mode) -> Self {
+        Self { mode }
+    }
+}
+
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::DeployRequest")]
+#[non_exhaustive]
 pub struct DeployRequest {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -50,10 +59,28 @@ pub struct DeployRequest {
     pub deadline_height: Height,
 }
 
+impl DeployRequest {
+    /// Creates a deploy request with an empty artifact specification.
+    pub fn new(artifact: ArtifactId, deadline_height: Height) -> Self {
+        Self {
+            artifact,
+            deadline_height,
+            spec: Vec::new(),
+        }
+    }
+
+    /// Sets the artifact specification for this request.
+    pub fn with_spec(mut self, spec: Vec<u8>) -> Self {
+        self.spec = spec;
+        self
+    }
+}
+
 /// Confirmation that artifact deployment has ended for a validator.
 /// Result can be either successful or unsuccessful.
 #[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "proto::DeployResult")]
+#[non_exhaustive]
 pub struct DeployResult {
     /// Corresponding request.
     pub request: DeployRequest,
@@ -65,6 +92,7 @@ pub struct DeployResult {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::StartService")]
+#[non_exhaustive]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -78,6 +106,7 @@ pub struct StartService {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::StopService")]
+#[non_exhaustive]
 pub struct StopService {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -87,6 +116,7 @@ pub struct StopService {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::FreezeService")]
+#[non_exhaustive]
 pub struct FreezeService {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -96,6 +126,7 @@ pub struct FreezeService {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ResumeService")]
+#[non_exhaustive]
 pub struct ResumeService {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -118,6 +149,7 @@ impl StartService {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ServiceConfig")]
+#[non_exhaustive]
 pub struct ServiceConfig {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -125,11 +157,22 @@ pub struct ServiceConfig {
     pub params: Vec<u8>,
 }
 
+impl ServiceConfig {
+    /// Creates a new configuration request.
+    pub fn new(instance_id: InstanceId, params: impl BinaryValue) -> Self {
+        Self {
+            instance_id,
+            params: params.into_bytes(),
+        }
+    }
+}
+
 /// Atomic configuration change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigChange", rename(case = "snake_case"))]
+#[non_exhaustive]
 pub enum ConfigChange {
     /// New consensus config.
     Consensus(ConsensusConfig),
@@ -149,6 +192,7 @@ pub enum ConfigChange {
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigPropose")]
+#[non_exhaustive]
 pub struct ConfigPropose {
     /// The height until which the update configuration procedure should be completed.
     pub actual_from: Height,
@@ -233,9 +277,17 @@ impl ConfigPropose {
 /// Confirmation vote for the configuration change.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigVote")]
+#[non_exhaustive]
 pub struct ConfigVote {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,
+}
+
+impl ConfigVote {
+    /// Creates a vote for the proposal with the specified hash.
+    pub fn new(propose_hash: Hash) -> Self {
+        Self { propose_hash }
+    }
 }
 
 /// Request for the service data migration.
@@ -254,6 +306,7 @@ pub struct MigrationRequest {
 /// Result can be either successful or unsuccessful.
 #[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "proto::MigrationResult")]
+#[non_exhaustive]
 pub struct MigrationResult {
     /// Corresponding request.
     pub request: MigrationRequest,
@@ -261,11 +314,22 @@ pub struct MigrationResult {
     pub status: MigrationStatus,
 }
 
+impl MigrationResult {
+    /// Creates a migration result.
+    pub fn new(request: MigrationRequest, result: impl Into<MigrationStatus>) -> Self {
+        Self {
+            request,
+            status: result.into(),
+        }
+    }
+}
+
 /// Pending config change proposal entry
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigProposalWithHash")]
+#[non_exhaustive]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,

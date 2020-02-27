@@ -296,13 +296,10 @@ fn main() {
     println!("Blockchain is ready for transactions!");
 
     let handle = thread::spawn(move || {
-        let deploy_height = Height(50);
         // Send an artifact `DeployRequest` to the sample runtime.
-        let request = DeployRequest {
-            artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
-            deadline_height: deploy_height,
-            spec: Vec::default(),
-        };
+        let deploy_height = Height(50);
+        let artifact = "255:sample_artifact:0.1.0".parse().unwrap();
+        let request = DeployRequest::new(artifact, deploy_height);
         let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
         blockchain_ref
             .sender()
