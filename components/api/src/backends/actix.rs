@@ -123,7 +123,6 @@ impl ResponseError for ApiError {
             .header(header::CONTENT_TYPE, "application/problem+json")
             .body(body);
 
-        // TODO Find trait for extend method [ECR-4268]
         for (key, value) in self.headers.iter() {
             response.headers_mut().append(key.clone(), value.clone());
         }
@@ -232,7 +231,6 @@ where
             let handler = handler.clone();
             let actuality = actuality.clone();
 
-            // TODO Rewrite without extra matcher [ECR-4268]
             async move {
                 let query = extract_query(request, payload, mutability).await?;
                 let response = handler(query).await.map_err(actix_web::Error::from)?;
