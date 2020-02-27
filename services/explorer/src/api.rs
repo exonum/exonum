@@ -177,21 +177,22 @@
 //! |-------------|-------|
 //! | Path        | `/api/explorer/v1/call_status/transaction` |
 //! | Method      | GET   |
-//! | Query type  | [`TransactionQuery`] |
+//! | Query type  | [`TransactionStatusQuery`] |
 //! | Return type | [`CallStatusResponse`] |
 //!
 //! Returns call status of committed transaction.
 //!
-//! [`CallStatusResponse`]: struct.CallStatusResponse.html
+//! [`TransactionStatusQuery`]: struct.TransactionStatusQuery.html
+//! [`CallStatusResponse`]: enum.CallStatusResponse.html
 //!
 //! ```
 //! # use exonum::{
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
-//! #     runtime::{ExecutionError, ExecutionFail},
+//! #     runtime::{ExecutionError, ExecutionFail, ExecutionStatus},
 //! # };
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
-//! # use exonum_explorer_service::{api::{TransactionQuery, CallStatusResponse}, ExplorerFactory};
+//! # use exonum_explorer_service::{api::TransactionStatusQuery, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
@@ -226,13 +227,16 @@
 //! testkit.create_block_with_transaction(tx.clone());
 //!
 //! let api = testkit.api();
-//! let response: CallStatusResponse = reqwest::Client::new()
+//! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/transaction"))
-//!     .query(&TransactionQuery { hash: tx.object_hash() })
+//!     .query(&TransactionStatusQuery {
+//!         hash: tx.object_hash(),
+//!         with_proof: false,
+//!     })
 //!     .send()?
 //!     .error_for_status()?
 //!     .json()?;
-//! let err = response.status.0.unwrap_err();
+//! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Error!");
 //! # Ok(())
 //! # }
@@ -256,11 +260,11 @@
 //! ```
 //! # use exonum::{
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
-//! #     runtime::{ExecutionError, ExecutionFail},
+//! #     runtime::{ExecutionError, ExecutionFail, ExecutionStatus},
 //! # };
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
-//! # use exonum_explorer_service::{api::{CallStatusQuery, CallStatusResponse}, ExplorerFactory};
+//! # use exonum_explorer_service::{api::CallStatusQuery, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 //! # #[service_factory(artifact_name = "my-service")]
@@ -284,16 +288,17 @@
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: CallStatusResponse = reqwest::Client::new()
+//! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/before_transactions"))
 //!     .query(&CallStatusQuery {
 //!         height: Height(2),
 //!         service_id: MyService::INSTANCE_ID,
+//!         with_proof: false,
 //!     })
 //!     .send()?
 //!     .error_for_status()?
 //!     .json()?;
-//! let err = response.status.0.unwrap_err();
+//! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Not a good start");
 //! # Ok(())
 //! # }
@@ -383,7 +388,8 @@ pub use exonum_explorer::{
     },
     api::{
         BlockInfo, BlockQuery, BlocksQuery, BlocksRange, CallStatusQuery, CallStatusResponse,
-        TransactionHex, TransactionQuery, TransactionResponse, MAX_BLOCKS_PER_REQUEST,
+        TransactionHex, TransactionQuery, TransactionResponse, TransactionStatusQuery,
+        MAX_BLOCKS_PER_REQUEST,
     },
     TransactionInfo,
 };
@@ -512,58 +518,64 @@ impl ExplorerApi {
             })
     }
 
-    fn transaction_status(
-        schema: Schema<&dyn Snapshot>,
-        query: TransactionQuery,
+    fn get_status(
+        schema: &Schema<&dyn Snapshot>,
+        block_height: Height,
+        call_in_block: CallInBlock,
+        with_proof: bool,
     ) -> api::Result<CallStatusResponse> {
-        let explorer = BlockchainExplorer::from_schema(schema);
-
-        let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
+        let records = schema.call_records(block_height).ok_or_else(|| {
             api::Error::not_found()
-                .title("Transaction not found")
-                .detail(format!("Unknown transaction hash ({})", query.hash))
+                .title("Block not found")
+                .detail(format!(
+                    "Block with height {} is not yet created",
+                    block_height
+                ))
         })?;
 
-        let tx_info = match tx_info {
-            TransactionInfo::Committed(info) => info,
-            TransactionInfo::InPool { .. } => {
-                let err = api::Error::not_found()
-                    .title("Transaction not found")
-                    .detail(format!(
-                        "Requested transaction ({}) is not executed yet",
-                        query.hash
-                    ));
-                return Err(err);
-            }
-        };
+        Ok(if with_proof {
+            let proof = records.get_proof(call_in_block);
+            CallStatusResponse::Proof(proof)
+        } else {
+            let status = ExecutionStatus(records.get(call_in_block));
+            CallStatusResponse::Simple(status)
+        })
+    }
 
-        let call_in_block = CallInBlock::transaction(tx_info.location().position_in_block());
-        let block_height = tx_info.location().block_height();
+    fn transaction_status(
+        schema: &Schema<&dyn Snapshot>,
+        query: TransactionStatusQuery,
+    ) -> api::Result<CallStatusResponse> {
+        let tx_location = schema
+            .transactions_locations()
+            .get(&query.hash)
+            .ok_or_else(|| {
+                api::Error::not_found()
+                    .title("Transaction not committed")
+                    .detail(format!("Unknown transaction hash ({})", query.hash))
+            })?;
 
-        let status = ExecutionStatus(explorer.call_status(block_height, call_in_block));
-        Ok(CallStatusResponse { status })
+        let call_in_block = CallInBlock::transaction(tx_location.position_in_block());
+        let block_height = tx_location.block_height();
+        Self::get_status(schema, block_height, call_in_block, query.with_proof)
     }
 
     /// Returns call status of `before_transactions` hook.
     fn before_transactions_status(
-        schema: Schema<&dyn Snapshot>,
+        schema: &Schema<&dyn Snapshot>,
         query: CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
-        let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::before_transactions(query.service_id);
-        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
-        Ok(CallStatusResponse { status })
+        Self::get_status(schema, query.height, call_in_block, query.with_proof)
     }
 
     /// Returns call status of `after_transactions` hook.
     fn after_transactions_status(
-        schema: Schema<&dyn Snapshot>,
+        schema: &Schema<&dyn Snapshot>,
         query: CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
-        let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::after_transactions(query.service_id);
-        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
-        Ok(CallStatusResponse { status })
+        Self::get_status(schema, query.height, call_in_block, query.with_proof)
     }
 
     fn add_transaction(
@@ -609,13 +621,13 @@ impl ExplorerApi {
                 Self::block(state.data().for_core(), query)
             })
             .endpoint("v1/call_status/transaction", |state, query| {
-                Self::transaction_status(state.data().for_core(), query)
+                Self::transaction_status(&state.data().for_core(), query)
             })
             .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(state.data().for_core(), query)
+                Self::after_transactions_status(&state.data().for_core(), query)
             })
             .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(state.data().for_core(), query)
+                Self::before_transactions_status(&state.data().for_core(), query)
             })
             .endpoint("v1/transactions", |state, query| {
                 Self::transaction_info(state.data().for_core(), query)

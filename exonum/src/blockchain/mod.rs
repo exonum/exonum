@@ -16,10 +16,13 @@
 
 pub use self::{
     api_sender::{ApiSender, SendError},
-    block::{AdditionalHeaders, Block, BlockHeaderKey, BlockProof, IndexProof, ProposerId},
+    block::{
+        AdditionalHeaders, Block, BlockHeaderKey, BlockProof, CallProof, IndexProof, ProofError,
+        ProposerId,
+    },
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
-    schema::{CallInBlock, Schema, TxLocation},
+    schema::{CallErrorsIter, CallInBlock, CallRecords, Schema, TxLocation},
 };
 
 pub mod config;
@@ -295,9 +298,9 @@ impl BlockchainMut {
         // Skip execution for genesis block.
         if height > Height(0) {
             let errors = self.dispatcher.before_transactions(&mut fork);
-            let mut call_errors = Schema::new(&fork).call_errors(height);
+            let mut schema = Schema::new(&fork);
             for (location, error) in errors {
-                call_errors.put(&location, error);
+                schema.save_error(height, location, error);
             }
         }
 
@@ -309,9 +312,9 @@ impl BlockchainMut {
         // During processing of the genesis block, this hook is already called in another method.
         if height > Height(0) {
             let errors = self.dispatcher.after_transactions(&mut fork);
-            let mut call_errors = Schema::new(&fork).call_errors(height);
+            let mut schema = Schema::new(&fork);
             for (location, error) in errors {
-                call_errors.put(&location, error);
+                schema.save_error(height, location, error);
             }
         }
 
@@ -339,7 +342,7 @@ impl BlockchainMut {
         let prev_hash = self.inner.last_hash();
 
         let schema = Schema::new(&fork);
-        let error_hash = schema.call_errors(height).object_hash();
+        let error_hash = schema.call_errors_map(height).object_hash();
         let tx_hash = schema.block_transactions(height).object_hash();
         let patch = fork.into_patch();
         let state_hash = SystemSchema::new(&patch).state_hash();
@@ -376,9 +379,7 @@ impl BlockchainMut {
         let mut schema = Schema::new(&*fork);
 
         if let Err(e) = tx_result {
-            schema
-                .call_errors(height)
-                .put(&CallInBlock::transaction(index), e);
+            schema.save_error(height, CallInBlock::transaction(index), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
         tx_cache.remove(&tx_hash);

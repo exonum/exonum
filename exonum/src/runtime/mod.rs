@@ -201,7 +201,6 @@
 //! [docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
 //! [blog:lifecycle]: https://medium.com/meetbitfury/about-service-lifecycles-in-exonum-58c67678c6bb
 
-pub(crate) use self::dispatcher::Dispatcher;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{
@@ -219,10 +218,7 @@ pub use self::{
         MethodId, MigrationStatus,
     },
 };
-
-// Re-export for serializing `ExecutionError` via `serde`.
-#[doc(hidden)]
-pub use error::execution_error::ExecutionErrorSerde;
+pub(crate) use self::{dispatcher::Dispatcher, error::ExecutionErrorAux};
 
 pub mod migrations;
 pub mod oneshot;
