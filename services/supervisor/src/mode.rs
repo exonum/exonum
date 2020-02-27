@@ -27,7 +27,7 @@ use exonum_proto::ProtobufConvert;
 use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use super::{multisig::MultisigIndex, proto, DeployRequest, MigrationRequest};
 
@@ -123,6 +123,15 @@ impl Mode {
                 confirmations >= byzantine_quorum(validators)
             }
         }
+    }
+}
+
+impl fmt::Display for Mode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Simple => "simple",
+            Self::Decentralized => "decentralized",
+        })
     }
 }
 

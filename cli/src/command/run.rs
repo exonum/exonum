@@ -34,6 +34,7 @@ use crate::{
 
 /// Container for node configuration parameters produced by `Run` command.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct NodeRunConfig {
     /// Final node configuration parameters.
     pub node_config: NodeConfig,
@@ -47,6 +48,7 @@ pub struct NodeRunConfig {
 
 /// Run the node with provided node config.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Run {
     /// Path to a node configuration file.
     #[structopt(long, short = "c")]

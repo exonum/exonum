@@ -130,7 +130,10 @@
     clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
-pub use crate::config_manager::DefaultConfigManager;
+pub use crate::{
+    config_manager::DefaultConfigManager,
+    io::{load_config_file, save_config_file},
+};
 pub use structopt;
 
 use exonum::{
@@ -148,11 +151,11 @@ use tempfile::TempDir;
 
 use std::{env, ffi::OsString, iter, path::PathBuf};
 
-use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
+use crate::command::{Command, ExonumCommand, NodeRunConfig, StandardResult};
 
 pub mod command;
 pub mod config;
-pub mod io;
+mod io;
 pub mod password;
 
 mod config_manager;
