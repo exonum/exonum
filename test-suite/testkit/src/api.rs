@@ -69,13 +69,37 @@ impl fmt::Display for ApiKind {
     }
 }
 
-/// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
+/// API encapsulation for the testkit. Allows to execute and asynchronously retrieve results
 /// for REST-ful endpoints of services.
 ///
 /// Note that `TestKitApi` instantiation spawns a new HTTP server. Hence, it is advised to reuse
 /// existing instances unless it is impossible. The latter may be the case if changes
 /// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
 /// instantiated.
+/// 
+/// The HTTP server uses `actix_rt` under the hood, so in order to execute asynchronous methods,
+/// the user must use this API inside the `actix_rt` runtime. 
+/// The easiest way to do that is to use `#[actix_rt::test]` instead of `#[test]`.
+/// 
+/// # Example
+/// 
+/// ```
+/// #[actix_rt::test]
+/// async fn test_api() {
+///     let testkit = TestKitBuilder::validator().build();
+///     let api = testkit.api();
+/// 
+///     // By default we only have Rust runtime endpoints.
+///     use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
+/// 
+///     let proto_sources: Vec<ProtoSourceFile> = api
+///         .public(ApiKind::RustRuntime)
+///         .query(&ProtoSourcesQuery::Core)
+///         .get("proto-sources")
+///         .await
+///         .expect("Request to the valid endpoint failed");
+/// }
+/// ```
 pub struct TestKitApi {
     test_server: TestServer,
     test_client: Client,
