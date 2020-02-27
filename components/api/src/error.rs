@@ -24,7 +24,8 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// API HTTP error struct.
-#[derive(Fail, Debug, Default)]
+#[derive(Fail, Debug)]
+#[non_exhaustive]
 pub struct Error {
     /// HTTP error code.
     pub http_code: HttpStatusCode,
@@ -35,6 +36,7 @@ pub struct Error {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
+#[non_exhaustive]
 pub struct ErrorBody {
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]

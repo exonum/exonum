@@ -1075,17 +1075,13 @@ impl Node {
 
         let mut servers = HashMap::new();
         if let Some(listen_address) = api_cfg.public_api_address {
-            let server_config = WebServerConfig {
-                listen_address,
-                allow_origin: api_cfg.public_allow_origin.clone(),
-            };
+            let mut server_config = WebServerConfig::new(listen_address);
+            server_config.allow_origin = api_cfg.public_allow_origin.clone();
             servers.insert(ApiAccess::Public, server_config);
         }
         if let Some(listen_address) = api_cfg.private_api_address {
-            let server_config = WebServerConfig {
-                listen_address,
-                allow_origin: api_cfg.private_allow_origin.clone(),
-            };
+            let mut server_config = WebServerConfig::new(listen_address);
+            server_config.allow_origin = api_cfg.private_allow_origin.clone();
             servers.insert(ApiAccess::Private, server_config);
         }
 
