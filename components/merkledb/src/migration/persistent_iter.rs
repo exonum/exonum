@@ -44,11 +44,11 @@ where
 {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            IteratorPosition::NextKey(key) => {
+            Self::NextKey(key) => {
                 let key_ref: &K = key.borrow();
                 formatter.debug_tuple("NextKey").field(&key_ref).finish()
             }
-            IteratorPosition::Ended => formatter.debug_tuple("Ended").finish(),
+            Self::Ended => formatter.debug_tuple("Ended").finish(),
         }
     }
 }
@@ -59,13 +59,13 @@ where
 {
     fn to_bytes(&self) -> Vec<u8> {
         match self {
-            IteratorPosition::NextKey(key) => {
+            Self::NextKey(key) => {
                 let key: &K = key.borrow();
                 let mut buffer = vec![0; 1 + key.size()];
                 key.write(&mut buffer[1..]);
                 buffer
             }
-            IteratorPosition::Ended => vec![1],
+            Self::Ended => vec![1],
         }
     }
 
@@ -75,8 +75,8 @@ where
             "`IteratorPosition` serialization cannot be empty"
         );
         Ok(match bytes[0] {
-            0 => IteratorPosition::NextKey(K::read(&bytes[1..])),
-            1 => IteratorPosition::Ended,
+            0 => Self::NextKey(K::read(&bytes[1..])),
+            1 => Self::Ended,
             _ => bail!("Invalid `IteratorPosition` discriminant"),
         })
     }

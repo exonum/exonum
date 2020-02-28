@@ -372,7 +372,7 @@ impl BlockchainMut {
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
     ) {
         let schema = Schema::new(&*fork);
-        let transaction = get_transaction(&tx_hash, &schema.transactions(), &tx_cache)
+        let transaction = get_transaction(&tx_hash, &schema.transactions(), tx_cache)
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
@@ -471,7 +471,7 @@ pub fn get_transaction<T: RawAccess>(
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
 ) -> Option<Verified<AnyTx>> {
-    txs.get(&hash).or_else(|| tx_cache.get(&hash).cloned())
+    txs.get(hash).or_else(|| tx_cache.get(hash).cloned())
 }
 
 /// Check that transaction exists in the persistent pool or in the transaction cache.
@@ -481,5 +481,5 @@ pub fn contains_transaction<T: RawAccess>(
     txs: &MapIndex<T, Hash, Verified<AnyTx>>,
     tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
 ) -> bool {
-    txs.contains(&hash) || tx_cache.contains_key(&hash)
+    txs.contains(hash) || tx_cache.contains_key(hash)
 }

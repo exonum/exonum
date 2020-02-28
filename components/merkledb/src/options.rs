@@ -21,6 +21,7 @@ use serde_derive::{Deserialize, Serialize};
 ///
 /// These parameters apply to the underlying database of Exonum, currently `RocksDB`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct DbOptions {
     /// Number of open files that can be used by the database.
     ///
@@ -45,10 +46,6 @@ pub struct DbOptions {
     ///
     /// Defaults to `CompressionType::None`, meaning there is no compression.
     pub compression_type: CompressionType,
-
-    /// No-op field for forward compatibility.
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl DbOptions {
@@ -62,7 +59,6 @@ impl DbOptions {
             max_open_files,
             create_if_missing,
             compression_type,
-            non_exhaustive: (),
         }
     }
 }
@@ -88,13 +84,13 @@ pub enum CompressionType {
 impl From<CompressionType> for DBCompressionType {
     fn from(compression_type: CompressionType) -> Self {
         match compression_type {
-            CompressionType::Bz2 => DBCompressionType::Bz2,
-            CompressionType::Lz4 => DBCompressionType::Lz4,
-            CompressionType::Lz4hc => DBCompressionType::Lz4hc,
-            CompressionType::Snappy => DBCompressionType::Snappy,
-            CompressionType::Zlib => DBCompressionType::Zlib,
-            CompressionType::Zstd => DBCompressionType::Zstd,
-            CompressionType::None => DBCompressionType::None,
+            CompressionType::Bz2 => Self::Bz2,
+            CompressionType::Lz4 => Self::Lz4,
+            CompressionType::Lz4hc => Self::Lz4hc,
+            CompressionType::Snappy => Self::Snappy,
+            CompressionType::Zlib => Self::Zlib,
+            CompressionType::Zstd => Self::Zstd,
+            CompressionType::None => Self::None,
         }
     }
 }

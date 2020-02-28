@@ -54,7 +54,7 @@ where
         self.index
             .get(id)
             .and_then(|set| {
-                if set.0.contains(&author) {
+                if set.0.contains(author) {
                     Some(())
                 } else {
                     None

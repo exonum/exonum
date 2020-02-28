@@ -49,26 +49,26 @@ pub struct InternalEvent(pub(crate) InternalEventInner);
 
 impl InternalEvent {
     pub fn jump_to_round(height: Height, round: Round) -> Self {
-        InternalEvent(InternalEventInner::JumpToRound(height, round))
+        Self(InternalEventInner::JumpToRound(height, round))
     }
 
     pub fn message_verified(message: Message) -> Self {
-        InternalEvent(InternalEventInner::MessageVerified(Box::new(message)))
+        Self(InternalEventInner::MessageVerified(Box::new(message)))
     }
 
     pub fn is_message_verified(&self) -> bool {
-        match self {
-            InternalEvent(InternalEventInner::MessageVerified(_)) => true,
+        match self.0 {
+            InternalEventInner::MessageVerified(_) => true,
             _ => false,
         }
     }
 
     pub(crate) fn timeout(timeout: NodeTimeout) -> Self {
-        InternalEvent(InternalEventInner::Timeout(timeout))
+        Self(InternalEventInner::Timeout(timeout))
     }
 
     pub(crate) fn shutdown() -> Self {
-        InternalEvent(InternalEventInner::Shutdown)
+        Self(InternalEventInner::Shutdown)
     }
 }
 

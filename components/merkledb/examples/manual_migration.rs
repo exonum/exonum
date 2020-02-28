@@ -38,7 +38,7 @@ use crate::migration::{perform_migration, v1, v2};
 /// - `Wallet.public_key` field is removed.
 /// - `Wallet.history_hash` field is added.
 /// - Wallets and wallet history belonging to the users named "Eve' are dropped.
-fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork>) {
+fn migrate_wallets(new_data: Migration<&Fork>, old_data: Prefixed<ReadonlyFork<'_>>) {
     let old_schema = v1::Schema::new(old_data);
     let mut new_schema = v2::Schema::new(new_data.clone());
 

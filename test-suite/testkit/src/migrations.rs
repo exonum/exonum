@@ -292,7 +292,7 @@ where
 
         impl<U> Clone for Shared<U> {
             fn clone(&self) -> Self {
-                Shared(Arc::clone(&self.0))
+                Self(Arc::clone(&self.0))
             }
         }
 

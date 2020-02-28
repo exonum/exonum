@@ -45,7 +45,7 @@ impl ApiNodeState {
     fn new() -> Self {
         Self {
             is_enabled: true,
-            ..Default::default()
+            ..Self::default()
         }
     }
 }

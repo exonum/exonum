@@ -108,8 +108,7 @@ impl NodeHandler {
             self.state.config().max_message_len as usize - TX_RES_EMPTY_SIZE;
 
         for hash in hashes {
-            if let Some(tx) = get_transaction(&hash, &schema.transactions(), &self.state.tx_cache())
-            {
+            if let Some(tx) = get_transaction(hash, &schema.transactions(), self.state.tx_cache()) {
                 let raw = tx.as_raw().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(

@@ -83,6 +83,7 @@ impl<T> PartialEq for Verified<T> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T> Verified<T> {
     /// Returns reference to the underlying signed message.
     pub fn as_raw(&self) -> &SignedMessage {

@@ -63,7 +63,6 @@ impl Runtime for MigrationRuntime {
     fn is_supported(&self, feature: &RuntimeFeature) -> bool {
         match feature {
             RuntimeFeature::FreezingServices => true,
-            _ => false,
         }
     }
 

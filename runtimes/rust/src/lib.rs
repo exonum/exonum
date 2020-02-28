@@ -300,8 +300,24 @@
 //! # }
 //! ```
 
-#![warn(missing_debug_implementations, missing_docs)]
-#![deny(unsafe_code, bare_trait_objects)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
 
 pub use exonum::runtime::ExecutionContext;
 
@@ -474,9 +490,9 @@ impl RustRuntimeBuilder {
             blockchain: None,
             api_notifier,
             available_artifacts: self.available_artifacts,
-            deployed_artifacts: Default::default(),
-            started_services: Default::default(),
-            started_services_by_name: Default::default(),
+            deployed_artifacts: HashSet::new(),
+            started_services: BTreeMap::new(),
+            started_services_by_name: HashMap::new(),
             changed_services_since_last_block: false,
         }
     }
@@ -533,13 +549,13 @@ impl RustRuntime {
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        if self.deployed_artifacts.contains(&artifact) {
+        if self.deployed_artifacts.contains(artifact) {
             panic!(
                 "BUG: Core requested deploy of already deployed artifact {:?}",
                 artifact
             );
         }
-        if !self.available_artifacts.contains_key(&artifact) {
+        if !self.available_artifacts.contains_key(artifact) {
             let description = format!(
                 "Runtime failed to deploy artifact with id {}, \
                  it is not listed among available artifacts. Available artifacts: {}",
@@ -682,13 +698,12 @@ impl Runtime for RustRuntime {
     }
 
     fn deploy_artifact(&mut self, artifact: ArtifactId, spec: Vec<u8>) -> Receiver {
-        let result = if !spec.is_empty() {
+        let result = if spec.is_empty() {
+            self.deploy(&artifact)
+        } else {
             // Keep the spec for Rust artifacts empty.
             Err(Error::IncorrectArtifactId.into())
-        } else {
-            self.deploy(&artifact)
         };
-
         Receiver::with_result(result)
     }
 
@@ -775,7 +790,7 @@ impl Runtime for RustRuntime {
     ) -> Result<Option<MigrationScript>, InitMigrationError> {
         let artifact = self
             .available_artifacts
-            .get(&new_artifact)
+            .get(new_artifact)
             .unwrap_or_else(|| {
                 panic!(
                     "BUG: `migrate` call to a non-existing artifact {:?}",

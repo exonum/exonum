@@ -544,7 +544,7 @@ impl ExplorerApi {
 
     fn transaction_status(
         schema: &Schema<&dyn Snapshot>,
-        query: TransactionStatusQuery,
+        query: &TransactionStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let tx_location = schema
             .transactions_locations()
@@ -563,7 +563,7 @@ impl ExplorerApi {
     /// Returns call status of `before_transactions` hook.
     fn before_transactions_status(
         schema: &Schema<&dyn Snapshot>,
-        query: CallStatusQuery,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let call_in_block = CallInBlock::before_transactions(query.service_id);
         Self::get_status(schema, query.height, call_in_block, query.with_proof)
@@ -572,7 +572,7 @@ impl ExplorerApi {
     /// Returns call status of `after_transactions` hook.
     fn after_transactions_status(
         schema: &Schema<&dyn Snapshot>,
-        query: CallStatusQuery,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let call_in_block = CallInBlock::after_transactions(query.service_id);
         Self::get_status(schema, query.height, call_in_block, query.with_proof)
@@ -621,13 +621,13 @@ impl ExplorerApi {
                 Self::block(state.data().for_core(), query)
             })
             .endpoint("v1/call_status/transaction", |state, query| {
-                Self::transaction_status(&state.data().for_core(), query)
+                Self::transaction_status(&state.data().for_core(), &query)
             })
             .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(&state.data().for_core(), query)
+                Self::after_transactions_status(&state.data().for_core(), &query)
             })
             .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(&state.data().for_core(), query)
+                Self::before_transactions_status(&state.data().for_core(), &query)
             })
             .endpoint("v1/transactions", |state, query| {
                 Self::transaction_info(state.data().for_core(), query)

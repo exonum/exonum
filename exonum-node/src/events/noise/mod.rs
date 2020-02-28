@@ -70,7 +70,7 @@ impl HandshakeRawMessage {
                 read_exact(stream, vec![0_u8; len as usize])
             })
             .map_err(into_failure)
-            .and_then(|(stream, msg)| Ok((stream, HandshakeRawMessage(msg))))
+            .and_then(|(stream, msg)| Ok((stream, Self(msg))))
     }
 
     pub fn write<S: AsyncWrite + 'static>(

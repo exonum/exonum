@@ -45,9 +45,10 @@ macro_rules! concat_keys {
 macro_rules! impl_object_hash_for_binary_value {
     ($( $type:ty ),*) => {
         $(
+            #[allow(clippy::use_self)] // false positive
             impl ObjectHash for $type {
                 fn object_hash(&self) -> Hash {
-                    exonum_crypto::hash(&self.to_bytes())
+                    exonum_crypto::hash(&$crate::BinaryValue::to_bytes(self))
                 }
             }
         )*

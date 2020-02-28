@@ -249,10 +249,8 @@ impl fmt::Display for AccessError {
 }
 
 /// Error that can be emitted during accessing an object from the database.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum AccessErrorKind {
     /// Index has wrong type.
     #[fail(
@@ -294,10 +292,6 @@ pub enum AccessErrorKind {
     /// Custom error.
     #[fail(display = "{}", _0)]
     Custom(#[fail(cause)] Error),
-
-    #[doc(hidden)]
-    #[fail(display = "")] // Never actually generated.
-    __NonExhaustive,
 }
 
 /// Constructs an object atop the database. The constructed object provides access to data

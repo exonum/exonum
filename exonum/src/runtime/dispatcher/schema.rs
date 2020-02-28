@@ -61,9 +61,9 @@ impl MigrationTransition {
         use PbMigrationTransition::*;
         match value {
             None => NONE,
-            Some(MigrationTransition::Start) => START,
-            Some(MigrationTransition::Commit) => COMMIT,
-            Some(MigrationTransition::Rollback) => ROLLBACK,
+            Some(Self::Start) => START,
+            Some(Self::Commit) => COMMIT,
+            Some(Self::Rollback) => ROLLBACK,
         }
     }
 
@@ -71,9 +71,9 @@ impl MigrationTransition {
         use PbMigrationTransition::*;
         Ok(match pb {
             NONE => None,
-            START => Some(MigrationTransition::Start),
-            COMMIT => Some(MigrationTransition::Commit),
-            ROLLBACK => Some(MigrationTransition::Rollback),
+            START => Some(Self::Start),
+            COMMIT => Some(Self::Commit),
+            ROLLBACK => Some(Self::Rollback),
         })
     }
 }
@@ -87,8 +87,8 @@ enum MigrationOutcome {
 impl From<MigrationOutcome> for MigrationTransition {
     fn from(value: MigrationOutcome) -> Self {
         match value {
-            MigrationOutcome::Rollback => MigrationTransition::Rollback,
-            MigrationOutcome::Commit(_) => MigrationTransition::Commit,
+            MigrationOutcome::Rollback => Self::Rollback,
+            MigrationOutcome::Commit(_) => Self::Commit,
         }
     }
 }
@@ -149,8 +149,6 @@ impl<T: Access> Schema<T> {
                 .and_then(|instance_name| instances.get(&instance_name)),
 
             InstanceQuery::Name(instance_name) => instances.get(instance_name),
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 
