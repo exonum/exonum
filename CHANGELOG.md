@@ -16,6 +16,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   special communication channel is used to send deployment status from the
   runtime to the dispatcher. (#1788)
 
+- `Schema::call_errors` was removed in favor of more comprehensive
+  `call_records` method. (#1792)
+
 #### exonum-system-api
 
 - Public api module has been removed. List of endpoints from private api has
@@ -34,6 +37,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Exonum now supports service freezing. A frozen service has fixed state (i.e.,
   does not process transactions and service hooks), but, unlike stopped services,
   the service HTTP API remains active. (#1780)
+
+- Core and the explorer service now support retrieving call status with
+  a cryptographic proof of authenticity. (#1792)
 
 #### exonum-supervisor
 

@@ -75,7 +75,7 @@ impl InternalPart {
 
             match request {
                 InternalRequest::VerifyMessage(tx) => {
-                    // TODO Use separate thread pool for messages verification [ECR-4268]
+                    // FIXME Use thread pool for messages verification [ECR-4269]
                     let fut = Self::verify_message(tx, internal_tx).compat();
                     tokio_02::spawn(async move {
                         fut.await
