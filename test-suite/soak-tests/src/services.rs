@@ -61,16 +61,14 @@ impl Service for MainService {
         if let Some(broadcaster) = context.broadcaster() {
             let height = context.height();
             let service_key = context.service_key();
-            futures::executor::block_on(async move {
-                if let Err(e) = broadcaster.timestamp((), height).await {
-                    log::error!(
-                        "[{}] Failed to broadcast transaction at height {}: {}",
-                        service_key,
-                        height,
-                        e
-                    );
-                }
-            })
+            if let Err(e) = broadcaster.blocking().timestamp((), height) {
+                log::error!(
+                    "[{}] Failed to broadcast transaction at height {}: {}",
+                    service_key,
+                    height,
+                    e
+                );
+            }
         }
     }
 }

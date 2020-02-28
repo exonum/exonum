@@ -533,11 +533,9 @@ impl Supervisor {
                     let confirmation = DeployResult::new(unconfirmed_request, result);
                     // TODO Investigate how to use async operations in the
                     // `after_commit` hook [ECR-4295]
-                    futures::executor::block_on(async move {
-                        if let Err(e) = tx_sender.report_deploy_result((), confirmation).await {
-                            log::error!("Cannot send `DeployResult`: {}", e);
-                        }
-                    });
+                    if let Err(e) = tx_sender.blocking().report_deploy_result((), confirmation) {
+                        log::error!("Cannot send `DeployResult`: {}", e);
+                    };
                 }
                 Ok(())
             });
@@ -675,11 +673,12 @@ impl Supervisor {
                 if let Some(tx_sender) = tx_sender {
                     let confirmation = MigrationResult { request, status };
 
-                    futures::executor::block_on(async move {
-                        if let Err(e) = tx_sender.report_migration_result((), confirmation).await {
-                            log::error!("Cannot send `MigrationResult`: {}", e);
-                        }
-                    });
+                    if let Err(e) = tx_sender
+                        .blocking()
+                        .report_migration_result((), confirmation)
+                    {
+                        log::error!("Cannot send `MigrationResult`: {}", e);
+                    }
                 }
             }
         }

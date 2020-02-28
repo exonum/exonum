@@ -362,6 +362,11 @@ impl Broadcaster {
         }
     }
 
+    /// Returns a synchronous broadcaster that blocks the current thread to broadcast transaction.
+    pub fn blocking(self) -> BlockingBroadcaster {
+        BlockingBroadcaster(self)
+    }
+
     pub(super) fn keypair(&self) -> &KeyPair {
         &self.service_keypair
     }
@@ -371,7 +376,7 @@ impl Broadcaster {
     }
 }
 
-/// Signs and broadcasts a transaction to the other nodes in the network.
+/// Signs and asynchronous broadcasts a transaction to the other nodes in the network.
 ///
 /// The transaction is signed by the service keypair of the node. The same input transaction
 /// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
@@ -397,6 +402,30 @@ impl GenericCall<()> for Broadcaster {
             Ok(tx_hash)
         }
         .boxed()
+    }
+}
+
+/// A wrapper around the [`Broadcaster`] to broadcast transactions synchronously.
+///
+/// [`Broadcaster`]: struct.Broadcaster.html
+#[derive(Debug, Clone)]
+pub struct BlockingBroadcaster(Broadcaster);
+
+/// Signs and synchronous broadcasts a transaction to the other nodes in the network.
+///
+/// The transaction is signed by the service keypair of the node. The same input transaction
+/// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
+/// field to the input transaction (e.g., a `u64`) and change it between the calls.
+///
+/// # Return value
+///
+/// Returns the hash of the created transaction, or an error if the transaction cannot be
+/// broadcast. An error means that the node is being shut down.
+impl GenericCall<()> for BlockingBroadcaster {
+    type Output = Result<Hash, SendError>;
+
+    fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
+        futures::executor::block_on(self.0.generic_call((), method, args))
     }
 }
 
