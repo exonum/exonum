@@ -85,7 +85,6 @@ use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
 use exonum_api::{self as api, ApiAggregator, ApiBuilder};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
-use futures::FutureExt;
 use futures_01::{sync::oneshot, Future};
 use serde::{Deserialize, Serialize};
 
@@ -125,19 +124,19 @@ impl TestKitActor {
             let addr_ = addr.clone();
             move |()| {
                 let addr_ = addr_.clone();
-                async move { flatten_err(addr_.send(GetStatus).await) }.boxed_local()
+                async move { flatten_err(addr_.send(GetStatus).await) }
             }
         });
         api_scope.endpoint_mut("v1/blocks/rollback", {
             let addr_ = addr.clone();
             move |height| {
                 let addr_ = addr_.clone();
-                async move { flatten_err(addr_.send(RollBack(height)).await) }.boxed_local()
+                async move { flatten_err(addr_.send(RollBack(height)).await) }
             }
         });
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
             let addr_ = addr.clone();
-            async move { flatten_err(addr_.send(query).await) }.boxed_local()
+            async move { flatten_err(addr_.send(query).await) }
         });
         builder
     }

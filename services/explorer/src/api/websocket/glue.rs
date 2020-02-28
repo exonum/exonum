@@ -48,15 +48,15 @@ impl ExplorerApi {
     {
         let index = move |request: HttpRequest, stream: Payload| {
             {
-                let blockchain = blockchain.clone();
-                let shared_state = shared_state.clone();
-                let extract_query = extract_query.clone();
+                let maybe_address = shared_state.ensure_server(&blockchain);
+                let extract_query = extract_query(&request);
+
                 async move {
-                    let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
+                    let address = maybe_address.ok_or_else(|| {
                         let msg = "Server shut down".to_owned();
                         api::Error::not_found().title(msg)
                     })?;
-                    let query = extract_query(&request).await?;
+                    let query = extract_query.await?;
                     ws::start(Session::new(address, vec![query]), &request, stream)
                 }
             }

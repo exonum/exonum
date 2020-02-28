@@ -203,26 +203,20 @@ impl CounterApi {
                 let count = Self::count(state.service_data());
                 async move { count }
             })
-            .endpoint_mut("reset", |state, _query: ()| {
-                Self::reset(state).boxed_local()
-            });
+            .endpoint_mut("reset", |state, _query: ()| Self::reset(state));
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {
                 let count = Self::count(state.service_data());
                 async move { count }
             })
-            .endpoint_mut("count", |state, query| {
-                Self::increment(state, query).boxed_local()
-            });
+            .endpoint_mut("count", |state, query| Self::increment(state, query));
         builder
             .public_scope()
             .endpoint("count-with-proof", |state, _query: ()| {
                 Self::count_with_proof(state)
             })
-            .endpoint_mut("count", |state, query| {
-                Self::increment(state, query).boxed_local()
-            });
+            .endpoint_mut("count", |state, query| Self::increment(state, query));
 
         // Check sending incorrect transactions via `ApiSender`. Testkit should not include
         // such transactions to the transaction pool.
