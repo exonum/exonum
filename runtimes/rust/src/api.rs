@@ -232,7 +232,6 @@ impl ServiceApiScope {
                     .await
                     .map_err(|err| err.source(descriptor.to_string()))
             }
-            .boxed_local()
         });
         self
     }
@@ -262,7 +261,6 @@ impl ServiceApiScope {
                     .await
                     .map_err(|err| err.source(descriptor.to_string()))
             }
-            .boxed_local()
         });
         self
     }
@@ -298,7 +296,6 @@ impl ServiceApiScope {
                     .await
                     .map_err(|err| err.source(descriptor.to_string()))
             }
-            .boxed_local()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
@@ -337,7 +334,6 @@ impl ServiceApiScope {
                     .await
                     .map_err(|err| err.source(descriptor.to_string()))
             }
-            .boxed_local()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
