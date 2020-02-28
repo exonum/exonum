@@ -39,7 +39,7 @@ use crate::{
     },
 };
 
-use self::schema::{MigrationTransition, ModifiedInstanceInfo};
+use self::schema::{ArtifactAction, MigrationTransition, ModifiedInstanceInfo};
 use super::{
     error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
     migrations::{
@@ -263,11 +263,12 @@ impl Dispatcher {
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
+
             self.deploy_artifact(artifact.clone(), state.deploy_spec)
                 .unwrap_or_else(|err| {
                     panic!(
-                        "BUG: Can't restore state, artifact {:?} has not been deployed now, \
-                         but was deployed previously. Reported error: {}",
+                        "BUG: Cannot restore blockchain state; artifact `{}` failed to deploy \
+                         after successful previous deployment. Reported error: {}",
                         artifact, err
                     );
                 });
@@ -293,6 +294,28 @@ impl Dispatcher {
         for runtime in self.runtimes.values_mut() {
             runtime.on_resume();
         }
+    }
+
+    /// Adds a built-in artifact to the dispatcher. Unlike artifacts added via `commit_artifact` +
+    /// `deploy_artifact`, this method skips artifact commitment; the artifact
+    /// is synchronously deployed and marked as `Active`.
+    ///
+    /// # Panics
+    ///
+    /// This method treats errors during artifact deployment as fatal and panics on them.
+    pub(crate) fn add_builtin_artifact(
+        &mut self,
+        fork: &Fork,
+        artifact: ArtifactId,
+        payload: Vec<u8>,
+    ) {
+        Schema::new(fork)
+            .add_active_artifact(&artifact, payload.clone())
+            .unwrap_or_else(|err| {
+                panic!("Cannot deploy a built-in artifact: {}", err);
+            });
+        self.deploy_artifact(artifact, payload)
+            .unwrap_or_else(|err| panic!("Cannot deploy a built-in artifact: {}", err));
     }
 
     /// Add a built-in service with the predefined identifier.
@@ -325,7 +348,6 @@ impl Dispatcher {
         if should_rollback && res.is_ok() {
             res = Err(CoreError::IncorrectCall.into());
         }
-
         res
     }
 
@@ -393,6 +415,13 @@ impl Dispatcher {
         Schema::new(fork)
             .add_pending_artifact(artifact, deploy_spec)
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
+    }
+
+    pub(crate) fn unload_artifact(
+        fork: &Fork,
+        artifact: &ArtifactId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork).unload_artifact(artifact)
     }
 
     /// Initiates migration of an existing stopped service to a newer artifact.
@@ -671,9 +700,20 @@ impl Dispatcher {
 
         let patch = fork.into_patch();
 
-        // Block futures with pending deployments.
-        for (artifact, deploy_spec) in pending_artifacts {
-            self.block_until_deployed(artifact, deploy_spec);
+        // Process changed artifacts, blocking on futures with pending deployments.
+        for (artifact, action) in pending_artifacts {
+            match action {
+                ArtifactAction::Deploy(deploy_spec) => {
+                    self.block_until_deployed(artifact, deploy_spec);
+                }
+                ArtifactAction::Unload => {
+                    let runtime = self
+                        .runtimes
+                        .get_mut(&artifact.runtime_id)
+                        .expect("BUG: Cannot obtain runtime for an unloaded artifact");
+                    runtime.unload_artifact(&artifact);
+                }
+            }
         }
 
         // Notify runtime about changes in service instances.

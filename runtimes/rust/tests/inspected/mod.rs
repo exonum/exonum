@@ -137,6 +137,7 @@ pub enum RuntimeEvent {
     ResumeRuntime,
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
+    UnloadArtifact(ArtifactId),
     StartAddingService(InstanceSpec, Vec<u8>),
     MigrateService(ArtifactId, Version),
     StartResumingService(InstanceSpec, Vec<u8>),
@@ -208,6 +209,12 @@ impl<T: Runtime> Runtime for Inspected<T> {
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         self.runtime.is_artifact_deployed(id)
+    }
+
+    fn unload_artifact(&mut self, artifact: &ArtifactId) {
+        self.events
+            .push(RuntimeEvent::UnloadArtifact(artifact.to_owned()));
+        self.runtime.unload_artifact(artifact);
     }
 
     fn initiate_adding_service(
@@ -355,6 +362,7 @@ pub trait ToySupervisor<Ctx> {
     type Output;
 
     fn deploy_artifact(&self, context: Ctx, request: DeployArtifact) -> Self::Output;
+    fn unload_artifact(&self, context: Ctx, artifact: ArtifactId) -> Self::Output;
     fn start_service(&self, context: Ctx, request: StartService) -> Self::Output;
     fn stop_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
     fn freeze_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
@@ -381,6 +389,14 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
             .supervisor_extensions()
             .start_artifact_registration(&request.test_service_artifact, request.spec);
         Ok(())
+    }
+
+    fn unload_artifact(
+        &self,
+        mut context: ExecutionContext<'_>,
+        artifact: ArtifactId,
+    ) -> Self::Output {
+        context.supervisor_extensions().unload_artifact(&artifact)
     }
 
     fn start_service(

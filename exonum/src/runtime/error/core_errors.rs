@@ -59,6 +59,8 @@ pub enum CoreError {
     CannotResumeService = 13,
     /// Incorrect call handler: an inner call has returned an error, but it was not propagated.
     IncorrectCall = 14,
+    /// Cannot unload artifact.
+    CannotUnloadArtifact = 15,
 }
 
 impl CoreError {

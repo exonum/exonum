@@ -410,17 +410,20 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ArtifactStatus {
+    /// The artifact is pending unload.
+    Unloading,
     /// The artifact is pending deployment.
-    Pending = 1,
+    Deploying,
     /// The artifact has been successfully deployed.
-    Active = 2,
+    Active,
 }
 
 impl Display for ArtifactStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Unloading => f.write_str("unloading"),
             Self::Active => f.write_str("active"),
-            Self::Pending => f.write_str("pending"),
+            Self::Deploying => f.write_str("deploying"),
         }
     }
 }
@@ -429,19 +432,22 @@ impl ProtobufConvert for ArtifactStatus {
     type ProtoStruct = schema::lifecycle::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
+        use self::schema::lifecycle::ArtifactState_Status::*;
+
         match self {
-            Self::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
-            Self::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
+            Self::Unloading => UNLOADING,
+            Self::Active => ACTIVE,
+            Self::Deploying => DEPLOYING,
         }
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+        use self::schema::lifecycle::ArtifactState_Status::*;
+
         Ok(match pb {
-            schema::lifecycle::ArtifactState_Status::ACTIVE => Self::Active,
-            schema::lifecycle::ArtifactState_Status::PENDING => Self::Pending,
-            schema::lifecycle::ArtifactState_Status::NONE => {
-                bail!("Status `NONE` is reserved for the further usage.")
-            }
+            UNLOADING => Self::Unloading,
+            ACTIVE => Self::Active,
+            DEPLOYING => Self::Deploying,
         })
     }
 }

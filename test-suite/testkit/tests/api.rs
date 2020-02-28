@@ -16,7 +16,7 @@
 
 use exonum::runtime::SUPERVISOR_INSTANCE_ID;
 use exonum_api as api;
-use exonum_rust_runtime::ServiceFactory;
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
@@ -309,4 +309,59 @@ fn error_after_migration() {
         .get("ping-pong")
         .expect("API should work fine after restart");
     assert_eq!(pong, 11);
+}
+
+fn test_no_old_artifact_after_unload(unload: bool) {
+    let (mut testkit, _) = init_testkit();
+    let keys = testkit.us().service_keypair();
+
+    // Freeze and migrate the service.
+    let tx = keys.freeze_service(SUPERVISOR_INSTANCE_ID, SERVICE_ID);
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().unwrap();
+
+    let tx = keys.start_migration(
+        SUPERVISOR_INSTANCE_ID,
+        StartMigration {
+            instance_id: SERVICE_ID,
+            new_artifact: ApiServiceV2.artifact_id(),
+            migration_len: 0,
+        },
+    );
+    let block = testkit.create_block_with_transaction(tx);
+    block[0].status().unwrap();
+
+    if unload {
+        // Unload the old service artifact.
+        let tx = keys.unload_artifact(SUPERVISOR_INSTANCE_ID, ApiService.artifact_id());
+        let block = testkit.create_block_with_transaction(tx);
+        block[0].status().unwrap();
+    }
+
+    // Restart the testkit.
+    let stopped = testkit.stop();
+    let runtime = RustRuntime::builder()
+        .with_factory(Supervisor)
+        .with_factory(ApiServiceV2); // We don't need migration capabilities now.
+    let mut testkit = stopped.resume(runtime);
+    let api = testkit.api();
+
+    // Check the HTTP API of the updated service.
+    let pong: u64 = api
+        .public(ApiKind::Service(SERVICE_NAME))
+        .query(&PingQuery { value: 10 })
+        .get("ping-pong")
+        .expect("API should work fine after testkit restart");
+    assert_eq!(pong, 11);
+}
+
+#[test]
+fn no_old_artifact_after_unload() {
+    test_no_old_artifact_after_unload(true);
+}
+
+#[test]
+#[should_panic(expected = "artifact `0:api-service:1.0.0` failed to deploy")]
+fn no_old_artifact_without_unload() {
+    test_no_old_artifact_after_unload(false);
 }

@@ -711,6 +711,16 @@ impl Runtime for RustRuntime {
         self.deployed_artifacts.contains(id)
     }
 
+    // Unloading an artifact is effectively a no-op.
+    fn unload_artifact(&mut self, artifact: &ArtifactId) {
+        let was_present = self.deployed_artifacts.remove(artifact);
+        debug_assert!(
+            was_present,
+            "Requested to unload non-existing artifact `{}`",
+            artifact
+        );
+    }
+
     fn initiate_adding_service(
         &self,
         context: ExecutionContext<'_>,
