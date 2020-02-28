@@ -14,6 +14,8 @@
 
 //! Module of the rust-protobuf generated files.
 
+#![allow(clippy::pedantic, clippy::nursery)] // used in generated code
+
 pub use self::{list_proof::*, map_proof::*};
 
 use exonum_crypto::{proto::*, HASH_SIZE};

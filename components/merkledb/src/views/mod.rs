@@ -227,7 +227,7 @@ impl<T: RawAccess> View<T> {
     pub(crate) fn new(index_access: T, address: impl Into<ResolvedAddress>) -> Self {
         let address = address.into();
         let changes = index_access.changes(&address);
-        View::Real(ViewInner {
+        Self::Real(ViewInner {
             index_access,
             changes,
             address,
@@ -237,35 +237,35 @@ impl<T: RawAccess> View<T> {
     /// Creates a new phantom view. The phantom views do not borrow changes and do not retain
     /// resolved address / access.
     pub(crate) fn new_phantom() -> Self {
-        View::Phantom
+        Self::Phantom
     }
 
     /// Returns the access this view is attached to. If this view is phantom, returns `None`.
     pub(crate) fn access(&self) -> Option<&T> {
         match self {
-            View::Real(ViewInner { index_access, .. }) => Some(index_access),
-            View::Phantom => None,
+            Self::Real(ViewInner { index_access, .. }) => Some(index_access),
+            Self::Phantom => None,
         }
     }
 
     fn get_bytes(&self, key: &[u8]) -> Option<Vec<u8>> {
         match self {
-            View::Real(inner) => inner.get_bytes(key),
-            View::Phantom => None,
+            Self::Real(inner) => inner.get_bytes(key),
+            Self::Phantom => None,
         }
     }
 
     fn contains_raw_key(&self, key: &[u8]) -> bool {
         match self {
-            View::Real(inner) => inner.contains_raw_key(key),
-            View::Phantom => false,
+            Self::Real(inner) => inner.contains_raw_key(key),
+            Self::Phantom => false,
         }
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
         match self {
-            View::Real(inner) => inner.iter_bytes(from),
-            View::Phantom => Box::new(EmptyIterator),
+            Self::Real(inner) => inner.iter_bytes(from),
+            Self::Phantom => Box::new(EmptyIterator),
         }
     }
 
@@ -367,7 +367,7 @@ impl<T: RawAccess> View<T> {
         K: BinaryKey + ?Sized,
         V: BinaryValue,
     {
-        if let View::Real(inner) = self {
+        if let Self::Real(inner) = self {
             if let Some(changes) = inner.changes.as_mut() {
                 changes
                     .data
@@ -383,7 +383,7 @@ impl<T: RawAccess> View<T> {
     ///
     /// The aggregation flag is used by `Fork::into_patch()` to update the state aggregator.
     pub(crate) fn set_or_forget_aggregation(&mut self, namespace: Option<String>) {
-        if let View::Real(ViewInner { changes, .. }) = self {
+        if let Self::Real(ViewInner { changes, .. }) = self {
             if let Some(changes) = changes.as_mut() {
                 changes.set_aggregation(namespace);
             }
@@ -398,8 +398,8 @@ impl<T: RawAccessMut> View<T> {
              The caller should check the access type before calling any mutable methods";
 
         match self {
-            View::Real(ViewInner { changes, .. }) => changes.as_mut().expect(ACCESS_ERROR),
-            View::Phantom => panic!(ACCESS_ERROR),
+            Self::Real(ViewInner { changes, .. }) => changes.as_mut().expect(ACCESS_ERROR),
+            Self::Phantom => panic!(ACCESS_ERROR),
         }
     }
 

@@ -124,13 +124,13 @@ impl Finalize {
                 let public_key = Self::get_consensus_key(config).unwrap();
                 // `skipped_key` is a consensus key of the current node. We don't need
                 // to include `ConnectInfo` with this key in the connect list.
-                if public_key != *key_to_skip {
+                if public_key == *key_to_skip {
+                    None
+                } else {
                     Some(ConnectInfo {
                         public_key,
                         address: config.address.clone().unwrap(),
                     })
-                } else {
-                    None
                 }
             })
             .collect();

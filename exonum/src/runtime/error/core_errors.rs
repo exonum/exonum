@@ -16,18 +16,16 @@
 
 use exonum_derive::ExecutionFail;
 
-use crate::runtime::{ErrorKind, ExecutionError};
+use crate::runtime::{ExecutionError, ExecutionFail};
 
 /// List of possible core errors.
 ///
 /// Note that in most cases you don't need to spawn a core error, unless your service is
 /// providing some wrapper for core logic and should behave just like core.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "core")]
+#[non_exhaustive]
 pub enum CoreError {
     /// Runtime identifier is incorrect in this context.
     IncorrectRuntime = 0,
@@ -63,10 +61,6 @@ pub enum CoreError {
     IncorrectCall = 14,
     /// Cannot unload artifact.
     CannotUnloadArtifact = 15,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive = 255,
 }
 
 impl CoreError {
@@ -75,11 +69,6 @@ impl CoreError {
             "Maximum depth of call stack ({}) has been reached.",
             max_depth
         );
-        ExecutionError::new(
-            ErrorKind::Core {
-                code: CoreError::StackOverflow as u8,
-            },
-            description,
-        )
+        Self::StackOverflow.with_description(description)
     }
 }

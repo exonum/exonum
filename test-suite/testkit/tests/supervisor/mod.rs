@@ -57,7 +57,6 @@ pub trait SupervisorInterface<Ctx> {
     /// Resumes the service with the empty arguments.
     fn resume_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
     fn start_migration(&self, context: Ctx, arg: StartMigration) -> Self::Output;
-
     fn unload_artifact(&self, context: Ctx, artifact: ArtifactId) -> Self::Output;
 }
 

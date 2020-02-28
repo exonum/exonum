@@ -812,7 +812,7 @@ mod proto {
             ensure!(index <= MAX_INDEX, "index is out of range");
             ensure!(u64::from(height) <= HEIGHT_SHIFT, "height is out of range");
 
-            Ok(ProofListKey::new(height as u8, index))
+            Ok(Self::new(height as u8, index))
         }
     }
 
@@ -881,7 +881,7 @@ mod proto {
                 })
                 .collect::<Result<Vec<(u64, V)>, Error>>()?;
 
-            Ok(ListProof::from_raw_parts(proof, entries, pb.get_length()))
+            Ok(Self::from_raw_parts(proof, entries, pb.get_length()))
         }
     }
 }

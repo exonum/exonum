@@ -118,7 +118,7 @@ where
             .expect("Error while serializing value")
     }
 
-    fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(bytes.as_ref())?;
         Self::from_pb(pb)

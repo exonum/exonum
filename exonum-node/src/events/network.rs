@@ -60,8 +60,8 @@ pub enum ConnectedPeerAddr {
 impl ConnectedPeerAddr {
     pub fn is_incoming(&self) -> bool {
         match self {
-            ConnectedPeerAddr::In(_) => true,
-            ConnectedPeerAddr::Out(_, _) => false,
+            Self::In(_) => true,
+            Self::Out(_, _) => false,
         }
     }
 }
@@ -109,7 +109,7 @@ struct ConnectionPool {
 
 impl ConnectionPool {
     fn new() -> Self {
-        ConnectionPool {
+        Self {
             peers: Rc::new(RefCell::new(HashMap::new())),
         }
     }
@@ -214,7 +214,7 @@ impl Connection {
         address: ConnectedPeerAddr,
         key: PublicKey,
     ) -> Self {
-        Connection {
+        Self {
             handle,
             socket,
             receiver_rx,
@@ -245,7 +245,7 @@ impl NetworkHandler {
         handshake_params: HandshakeParams,
         connect_list: SharedConnectList,
     ) -> Self {
-        NetworkHandler {
+        Self {
             handle,
             listen_address: address,
             pool: connection_pool,
@@ -297,7 +297,7 @@ impl NetworkHandler {
                 let connect_list = self.connect_list.clone();
                 let listener = handshake
                     .listen(incoming_connection)
-                    .and_then(move |(socket, raw, key)| (Ok(socket), Self::parse_connect_msg(Some(raw), key)))
+                    .and_then(move |(socket, raw, key)| (Ok(socket), Self::parse_connect_msg(Some(raw), &key)))
                     .and_then(move |(socket, message)| {
                         if pool.contains(&message.author()) {
                             Box::new(future::ok(()))
@@ -368,7 +368,7 @@ impl NetworkHandler {
                         Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
                     })
                     .and_then(move |(socket, raw, key)| {
-                        (Ok(socket), Self::parse_connect_msg(Some(raw), key))
+                        (Ok(socket), Self::parse_connect_msg(Some(raw), &key))
                     })
                     .and_then(move |(socket, message)| {
                         let connection_limit_reached = pool.count_outgoing() >= max_connections;
@@ -488,14 +488,14 @@ impl NetworkHandler {
     ) -> impl Future<Item = (), Error = failure::Error> {
         trace!("Established connection with peer={:?}", connection.address);
         let handle = connection.handle.clone();
-        Self::send_peer_connected_event(&connection.address, message, &network_tx).and_then(
+        Self::send_peer_connected_event(&connection.address, message, network_tx).and_then(
             move |network_tx| Self::process_messages(&pool, &handle, connection, &network_tx),
         )
     }
 
     fn parse_connect_msg(
         raw: Option<Vec<u8>>,
-        key: x25519::PublicKey,
+        key: &x25519::PublicKey,
     ) -> Result<Verified<Connect>, failure::Error> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
@@ -509,7 +509,7 @@ impl NetworkHandler {
         let author = into_x25519_public_key(connect.author());
 
         ensure!(
-            author == key,
+            author == *key,
             "Connect message public key doesn't match with the received peer key"
         );
 

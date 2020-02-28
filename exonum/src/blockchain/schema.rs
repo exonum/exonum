@@ -429,9 +429,6 @@ impl Iterator for CallErrorsIter<'_> {
 /// assert!(CallInBlock::after_transactions(0) < CallInBlock::after_transactions(1));
 /// ```
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// # See also
 ///
 /// Not to be confused with [`CallSite`], which provides information about a call in which
@@ -447,6 +444,7 @@ impl Iterator for CallErrorsIter<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)] // builtin traits
 #[derive(Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum CallInBlock {
     /// Call of `before_transactions` hook in a service.
     BeforeTransactions {
@@ -463,10 +461,6 @@ pub enum CallInBlock {
         /// Numerical service identifier.
         id: InstanceId,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl ProtobufConvert for CallInBlock {
@@ -475,25 +469,24 @@ impl ProtobufConvert for CallInBlock {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            CallInBlock::BeforeTransactions { id } => pb.set_before_transactions(*id),
-            CallInBlock::Transaction { index } => pb.set_transaction(*index),
-            CallInBlock::AfterTransactions { id } => pb.set_after_transactions(*id),
-            CallInBlock::__NonExhaustive => unreachable!("Never actually constructed"),
+            Self::BeforeTransactions { id } => pb.set_before_transactions(*id),
+            Self::Transaction { index } => pb.set_transaction(*index),
+            Self::AfterTransactions { id } => pb.set_after_transactions(*id),
         }
         pb
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         if pb.has_before_transactions() {
-            Ok(CallInBlock::BeforeTransactions {
+            Ok(Self::BeforeTransactions {
                 id: pb.get_before_transactions(),
             })
         } else if pb.has_transaction() {
-            Ok(CallInBlock::Transaction {
+            Ok(Self::Transaction {
                 index: pb.get_transaction(),
             })
         } else if pb.has_after_transactions() {
-            Ok(CallInBlock::AfterTransactions {
+            Ok(Self::AfterTransactions {
                 id: pb.get_after_transactions(),
             })
         } else {
@@ -505,17 +498,17 @@ impl ProtobufConvert for CallInBlock {
 impl CallInBlock {
     /// Creates a location corresponding to a `before_transactions` call.
     pub fn before_transactions(id: InstanceId) -> Self {
-        CallInBlock::BeforeTransactions { id }
+        Self::BeforeTransactions { id }
     }
 
     /// Creates a location corresponding to a transaction.
     pub fn transaction(index: u32) -> Self {
-        CallInBlock::Transaction { index }
+        Self::Transaction { index }
     }
 
     /// Creates a location corresponding to a `after_transactions` call.
     pub fn after_transactions(id: InstanceId) -> Self {
-        CallInBlock::AfterTransactions { id }
+        Self::AfterTransactions { id }
     }
 }
 
@@ -524,16 +517,15 @@ impl_binary_key_for_binary_value!(CallInBlock);
 impl fmt::Display for CallInBlock {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CallInBlock::BeforeTransactions { id } => write!(
+            Self::BeforeTransactions { id } => write!(
                 formatter,
                 "`before_transactions` for service with ID {}",
                 id
             ),
-            CallInBlock::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
-            CallInBlock::AfterTransactions { id } => {
+            Self::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
+            Self::AfterTransactions { id } => {
                 write!(formatter, "`after_transactions` for service with ID {}", id)
             }
-            CallInBlock::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 }

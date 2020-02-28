@@ -98,16 +98,16 @@ impl InitAction {
 impl Execute for InitAction {
     fn execute(self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            InitAction::Noop => Ok(()),
-            InitAction::Panic => panic!(PANIC_STR),
-            InitAction::Error(code, description) => Err(ExecutionError::service(code, description)),
+            Self::Noop => Ok(()),
+            Self::Panic => panic!(PANIC_STR),
+            Self::Error(code, description) => Err(ExecutionError::service(code, description)),
         }
     }
 }
 
 impl Default for InitAction {
     fn default() -> Self {
-        InitAction::Noop
+        Self::Noop
     }
 }
 
@@ -123,13 +123,13 @@ enum AfterTransactionsAction {
 impl Execute for AfterTransactionsAction {
     fn execute(self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            AfterTransactionsAction::AddValue(value) => {
+            Self::AddValue(value) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(value);
                 Ok(())
             }
 
-            AfterTransactionsAction::Panic => panic!(PANIC_STR),
+            Self::Panic => panic!(PANIC_STR),
         }
     }
 }
@@ -157,34 +157,34 @@ enum Transaction {
 impl Transaction {
     fn sign(self, instance_id: InstanceId, keypair: &KeyPair) -> Verified<AnyTx> {
         let tx = AnyTx::new(CallInfo::new(instance_id, 0), self.into_bytes());
-        tx.sign_with_keypair(&keypair)
+        tx.sign_with_keypair(keypair)
     }
 }
 
 impl Execute for Transaction {
     fn execute(self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            Transaction::AddValue(value) => {
+            Self::AddValue(value) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(value);
                 Ok(())
             }
 
-            Transaction::Panic => {
+            Self::Panic => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(42);
                 panic!(PANIC_STR);
             }
 
-            Transaction::MerkledbError => panic!(MerkledbError::new(PANIC_STR)),
+            Self::MerkledbError => panic!(MerkledbError::new(PANIC_STR)),
 
-            Transaction::ExecutionError(code, description) => {
+            Self::ExecutionError(code, description) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(42);
                 Err(ExecutionError::service(code, description))
             }
 
-            Transaction::DeployArtifact(artifact_id) => {
+            Self::DeployArtifact(artifact_id) => {
                 // Code below will panic if there is already deployed artifact with the
                 // same ID. This sort of expected behavior, since we're intentionally skipping
                 // the `start_deploy` step (which will make the test nature much more complex).
@@ -192,11 +192,11 @@ impl Execute for Transaction {
                 Ok(())
             }
 
-            Transaction::AddService(spec, constructor) => {
+            Self::AddService(spec, constructor) => {
                 context.initiate_adding_service(spec, constructor)
             }
 
-            Transaction::StopService(instance_id) => {
+            Self::StopService(instance_id) => {
                 Dispatcher::initiate_stopping_service(context.fork, instance_id)
             }
         }
@@ -226,7 +226,7 @@ impl RuntimeInspector {
     fn new(available: Vec<ArtifactId>) -> Self {
         Self {
             available,
-            ..Default::default()
+            ..Self::default()
         }
     }
 

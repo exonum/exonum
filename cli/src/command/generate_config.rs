@@ -18,7 +18,9 @@
 use exonum::{
     blockchain::ValidatorKeys,
     keys::{generate_keys, Keys},
+    merkledb::DbOptions,
 };
+use exonum_node::{ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig};
 use failure::{bail, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
@@ -154,12 +156,12 @@ impl ExonumCommand for GenerateConfig {
             listen_address,
             external_address: self.peer_address.to_string(),
             master_key_path: master_key_path.clone(),
-            api: Default::default(),
-            network: Default::default(),
-            mempool: Default::default(),
-            database: Default::default(),
-            thread_pool_size: Default::default(),
-            connect_list: Default::default(),
+            api: NodeApiConfig::default(),
+            network: NetworkConfiguration::default(),
+            mempool: MemoryPoolConfig::default(),
+            database: DbOptions::default(),
+            thread_pool_size: None,
+            connect_list: ConnectListConfig::default(),
             consensus_public_key: keys.consensus_pk(),
         };
 

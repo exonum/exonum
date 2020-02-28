@@ -163,7 +163,7 @@ impl PublicApi {
     }
 
     /// Extend API.
-    pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
+    pub fn wire(builder: &mut api::ServiceApiBuilder) {
         builder
             .public_scope()
             .endpoint("v1/current_time", Self::current_time);
@@ -208,7 +208,7 @@ impl PrivateApi {
     }
 
     /// Wires time service API endpoints.
-    pub fn wire(self, builder: &mut api::ServiceApiBuilder) {
+    pub fn wire(builder: &mut api::ServiceApiBuilder) {
         builder
             .private_scope()
             .endpoint("v1/validators_times", {

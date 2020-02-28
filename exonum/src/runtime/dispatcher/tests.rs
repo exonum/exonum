@@ -158,6 +158,7 @@ impl SampleRuntime {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl From<SampleRuntime> for Arc<dyn Runtime> {
     fn from(value: SampleRuntime) -> Self {
         Arc::new(value)
@@ -168,7 +169,6 @@ impl Runtime for SampleRuntime {
     fn is_supported(&self, feature: &RuntimeFeature) -> bool {
         match feature {
             RuntimeFeature::FreezingServices => self.runtime_type == SampleRuntimes::First as u32,
-            _ => false,
         }
     }
 
@@ -964,7 +964,7 @@ fn delayed_deployment() {
 
 fn test_failed_deployment(db: &Arc<TemporaryDB>, runtime: &DeploymentRuntime, artifact_name: &str) {
     let blockchain = Blockchain::new(
-        Arc::clone(&db) as Arc<dyn Database>,
+        Arc::clone(db) as Arc<dyn Database>,
         gen_keypair(),
         ApiSender::closed(),
     );
@@ -977,7 +977,7 @@ fn test_failed_deployment(db: &Arc<TemporaryDB>, runtime: &DeploymentRuntime, ar
 
     // Queue an artifact for deployment.
     let (artifact, spec) =
-        runtime.deploy_test_artifact(artifact_name, "1.0.0", &mut dispatcher, &db);
+        runtime.deploy_test_artifact(artifact_name, "1.0.0", &mut dispatcher, db);
     // We should not panic during async deployment.
     assert!(!dispatcher.is_artifact_deployed(&artifact));
     assert_eq!(runtime.deploy_attempts(&artifact), 1);

@@ -57,12 +57,12 @@ fn noise_convert_ed_to_curve_dh() {
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
     // Do DH.
-    let mut keypair_i: SodiumDh25519 = Default::default();
+    let mut keypair_i = SodiumDh25519::default();
     keypair_i.set(secret_key_i.as_ref());
     let mut output_i = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_i.dh(public_key_r.as_ref(), &mut output_i).unwrap();
 
-    let mut keypair_r: SodiumDh25519 = Default::default();
+    let mut keypair_r = SodiumDh25519::default();
     keypair_r.set(secret_key_r.as_ref());
     let mut output_r = [0_u8; PUBLIC_KEY_LENGTH];
     keypair_r.dh(public_key_i.as_ref(), &mut output_r).unwrap();
@@ -87,13 +87,13 @@ fn noise_converted_keys_handshake() {
     let (_, secret_key_i) = into_x25519_keypair(public_key_i, secret_key_i).unwrap();
     let (public_key_r, secret_key_r) = into_x25519_keypair(public_key_r, secret_key_r).unwrap();
 
-    let mut h_i = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
+    let mut initiator = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
         .local_private_key(secret_key_i.as_ref())
         .remote_public_key(public_key_r.as_ref())
         .build_initiator()
         .expect("Unable to create initiator");
 
-    let mut h_r = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
+    let mut responder = Builder::with_resolver(PATTERN.parse().unwrap(), Box::new(SodiumResolver))
         .local_private_key(secret_key_r.as_ref())
         .build_responder()
         .expect("Unable to create responder");
@@ -101,17 +101,27 @@ fn noise_converted_keys_handshake() {
     let mut buffer_msg = [0_u8; MSG_SIZE * 2];
     let mut buffer_out = [0_u8; MSG_SIZE * 2];
 
-    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
-    h_r.read_message(&buffer_msg[..len], &mut buffer_out)
+    let len = initiator
+        .write_message(&[0_u8; 0], &mut buffer_msg)
         .unwrap();
-    let len = h_r.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
-    h_i.read_message(&buffer_msg[..len], &mut buffer_out)
+    responder
+        .read_message(&buffer_msg[..len], &mut buffer_out)
         .unwrap();
-    let len = h_i.write_message(&[0_u8; 0], &mut buffer_msg).unwrap();
-    h_r.read_message(&buffer_msg[..len], &mut buffer_out)
+    let second_len = responder
+        .write_message(&[0_u8; 0], &mut buffer_msg)
+        .unwrap();
+    initiator
+        .read_message(&buffer_msg[..second_len], &mut buffer_out)
+        .unwrap();
+    let third_len = initiator
+        .write_message(&[0_u8; 0], &mut buffer_msg)
+        .unwrap();
+    responder
+        .read_message(&buffer_msg[..third_len], &mut buffer_out)
         .unwrap();
 
-    h_r.into_transport_mode()
+    responder
+        .into_transport_mode()
         .expect("Unable to transition session into transport mode");
 }
 
@@ -210,7 +220,7 @@ struct BogusMessage {
 
 impl BogusMessage {
     fn new(step: HandshakeStep, message: &'static [u8]) -> Self {
-        BogusMessage { step, message }
+        Self { step, message }
     }
 }
 
@@ -222,7 +232,7 @@ enum HandshakeStep {
 }
 
 impl HandshakeStep {
-    fn next(self) -> Option<HandshakeStep> {
+    fn next(self) -> Option<Self> {
         use self::HandshakeStep::*;
 
         match self {
@@ -350,7 +360,7 @@ fn wait_for_handshake_result(
     //TODO: very likely will be removed in [ECR-1664].
     thread::sleep(Duration::from_millis(500));
 
-    let sender_err = send_handshake(&addr, &params, sender_message);
+    let sender_err = send_handshake(&addr, params, sender_message);
     let listener_err = err_rx
         .wait()
         .next()
@@ -378,9 +388,9 @@ fn run_handshake_listener(
                 handle.spawn({
                     let handshake = match bogus_message {
                         Some(message) => Either::A(
-                            NoiseErrorHandshake::responder(&params, &peer, message).listen(stream),
+                            NoiseErrorHandshake::responder(params, &peer, message).listen(stream),
                         ),
-                        None => Either::B(NoiseHandshake::responder(&params, &peer).listen(stream)),
+                        None => Either::B(NoiseHandshake::responder(params, &peer).listen(stream)),
                     };
 
                     handshake
@@ -402,11 +412,11 @@ fn send_handshake(
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
-    let stream = TcpStream::connect(&addr, &handle)
+    let stream = TcpStream::connect(addr, &handle)
         .map_err(into_failure)
         .and_then(|sock| match bogus_message {
-            None => NoiseHandshake::initiator(&params, addr).send(sock),
-            Some(message) => NoiseErrorHandshake::initiator(&params, addr, message).send(sock),
+            None => NoiseHandshake::initiator(params, addr).send(sock),
+            Some(message) => NoiseErrorHandshake::initiator(params, addr, message).send(sock),
         })
         .map(|_| ());
 
@@ -427,7 +437,7 @@ impl NoiseErrorHandshake {
         peer_address: &SocketAddr,
         bogus_message: BogusMessage,
     ) -> Self {
-        NoiseErrorHandshake {
+        Self {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
             inner: Some(NoiseHandshake::initiator(params, peer_address)),
@@ -439,7 +449,7 @@ impl NoiseErrorHandshake {
         peer_address: &SocketAddr,
         bogus_message: BogusMessage,
     ) -> Self {
-        NoiseErrorHandshake {
+        Self {
             bogus_message,
             current_step: HandshakeStep::EphemeralKeyExchange,
             inner: Some(NoiseHandshake::responder(params, peer_address)),

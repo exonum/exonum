@@ -94,8 +94,24 @@
 //! assert!(schema.transactions().contains(&tx4.object_hash()));
 //! ```
 
-#![warn(missing_debug_implementations, missing_docs)]
-#![deny(unsafe_code, bare_trait_objects)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
 
 pub use crate::{
     api::{ApiKind, RequestBuilder, TestKitApi},
@@ -474,11 +490,11 @@ impl TestKit {
             .unwrap();
         drop(guard);
 
-        // Modify the self configuration
+        // Modify the self configuration.
         let actual_consensus_config = self.consensus_config();
         if actual_consensus_config != saved_consensus_config {
             self.network_mut()
-                .update_consensus_config(actual_consensus_config);
+                .update_consensus_config(&actual_consensus_config);
         }
 
         self.poll_events();
