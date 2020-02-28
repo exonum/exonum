@@ -210,13 +210,13 @@ impl CounterApi {
                 let count = Self::count(state.service_data());
                 async move { count }
             })
-            .endpoint_mut("count", |state, query| Self::increment(state, query));
+            .endpoint_mut("count", Self::increment);
         builder
             .public_scope()
             .endpoint("count-with-proof", |state, _query: ()| {
                 Self::count_with_proof(state)
             })
-            .endpoint_mut("count", |state, query| Self::increment(state, query));
+            .endpoint_mut("count", Self::increment);
 
         // Check sending incorrect transactions via `ApiSender`. Testkit should not include
         // such transactions to the transaction pool.
