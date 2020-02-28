@@ -14,7 +14,7 @@ of the started services.
 
 Supervisor is an Exonum service capable of the following activities:
 
-- Deploying service artifacts
+- Deploying service artifacts and unloading unused artifacts
 - Instantiating services
 - Changing configuration of instantiated services
 - Changing a state of instantiated services: stopping, freezing, resuming,
@@ -27,9 +27,9 @@ documentation of [service lifecycle][docs:lifecycle] and the [supervisor][docs:s
 Supervisor service has two different operating modes: a "simple" mode and a
 "decentralized" mode. The difference between modes is in the decision making approach:
 
-- Within the decentralized mode, to deploy a service or apply a new
-  configuration, more than 2/3rds of validators should reach a consensus;
-- Within the simple mode, any decision is executed after a single validator
+- In the decentralized mode, to instantiate a service or apply a new
+  configuration, more than 2/3rds of validators should reach a consensus.
+- In the simple mode, any decision is executed after a single validator
   approval.
 
 The simple mode can be useful if one network administrator manages all the
@@ -54,29 +54,24 @@ by himself. An expected format of requests for those endpoints is a serialized
 Protobuf message.
 
 To deploy an artifact, one (within the "simple" mode) or majority (within the
-"decentralized" mode) of the nodes should receive a `DeployRequest` message
+"decentralized" mode) of the nodes should submit a `DeployRequest` message
 through API.
 
-To request a config change, one node should receive a `ConfigPropose` message
+To request a config change, one node should submit a `ConfigPropose` message
 through API.
-
-For the "simple" mode no more actions are required. For the "decentralized"
-mode the majority of the nodes should also receive `ConfigVote` messages
+For the "simple" mode, no more actions are required. For the "decentralized"
+mode, the majority of the nodes should also submit `ConfigVote` messages
 with a hash of the proposed configuration.
-
 The proposal initiator that sends the original `ConfigPropose` message
 should not vote for the configuration; the supervisor considers that the initiator
 has voted by submitting a proposal.
 
-The operation of starting or resuming a service is treated similarly to a
-configuration change and follows the same rules.
-
-Consult [the crate docs](https://docs.rs/exonum-supervisor) for more details
-about the service API.
+Starting, resuming or freezing a service, or unloading an artifact
+are treated similarly to a configuration change and follow the same rules.
 
 ## HTTP API
 
-REST API of the service is documented in the crate docs.
+REST API of the service is documented in [the crate docs](https://docs.rs/exonum-supervisor).
 
 ## Usage
 
