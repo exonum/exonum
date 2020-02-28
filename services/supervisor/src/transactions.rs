@@ -660,7 +660,7 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
         // Verify that we didn't reach deadline height.
         if result.request.deadline_height < current_height {
             let msg = format!(
-                "Deadline height ({}) exceeded for the migation request ({}); \
+                "Deadline height ({}) exceeded for the migration request ({}); \
                  reporting its result is impossible",
                 result.request.deadline_height, current_height
             );
