@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    helpers::Height,
-    runtime::{ExecutionError, ExecutionErrorSerde},
-};
+use exonum::{helpers::Height, runtime::ExecutionError};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
 use failure::{self, format_err};
@@ -38,7 +35,6 @@ pub enum AsyncEventState {
         /// Height on which error happened.
         height: Height,
         /// Occurred error.
-        #[serde(with = "ExecutionErrorSerde")]
         error: ExecutionError,
     },
     /// Deployment finished successfully.

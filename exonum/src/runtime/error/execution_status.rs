@@ -13,13 +13,11 @@
 // limitations under the License.
 
 use exonum_derive::*;
-use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
 use failure::ensure;
 
-use crate::{crypto::Hash, proto::schema::errors as errors_proto};
-
 use super::ExecutionError;
+use crate::proto::schema::errors as errors_proto;
 
 /// Status of a call execution in a way it is stored in the blockchain.
 /// This result may be either an empty unit type, in case of success,
@@ -66,15 +64,6 @@ impl ProtobufConvert for ExecutionStatus {
             Ok(())
         };
         Ok(Self(inner))
-    }
-}
-
-impl ObjectHash for ExecutionStatus {
-    fn object_hash(&self) -> Hash {
-        match &self.0 {
-            Err(e) => e.object_hash(),
-            Ok(_) => Hash::zero(),
-        }
     }
 }
 

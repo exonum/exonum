@@ -15,21 +15,22 @@
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
-    impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofEntry, ProofListIndex, ProofMapIndex,
+    impl_binary_key_for_binary_value,
+    indexes::{Entries, Values},
+    Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
 use failure::format_err;
 
 use std::fmt;
 
-use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
+use super::{Block, BlockProof, CallProof, ConsensusConfig};
 use crate::{
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Precommit, Verified},
     proto::schema::blockchain as pb_blockchain,
-    runtime::InstanceId,
+    runtime::{ExecutionError, ExecutionErrorAux, InstanceId},
 };
 
 /// Defines `&str` constants with given name and value.
@@ -46,6 +47,7 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     CALL_ERRORS => "call_errors";
+    CALL_ERRORS_AUX => "call_errors_aux";
     TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
@@ -116,48 +118,43 @@ impl<T: Access> Schema<T> {
         self.access.get_map(TRANSACTIONS)
     }
 
-    /// Returns a record of errors that occurred during execution of a particular block.
-    ///
-    /// This method can be used to build a proof that execution of a certain transaction
-    /// ended up with a particular status.
-    /// For an execution that resulted in an error, this will be an usual proof of existence.
-    /// If the transaction was executed successfully, such a proof will be a proof of absence.
-    /// Since the number of transactions in a block is mentioned in the block header, the user
-    /// will be able to distinguish absence of error (meaning successful execution) from
-    /// the absence of a transaction with such an index. Indeed, if the index is less
-    /// than amount of transactions in block, the proof denotes successful execution;
-    /// otherwise, the transaction with the given index does not exist in the block.
-    ///
-    /// Similarly, execution errors of the `before_transactions` / `after_transactions`
-    /// hooks can be proven to external clients. Discerning successful execution
-    /// from a non-existing service requires prior knowledge though.
-    ///
-    /// Proofs obtained with this method should not be mixed up with a proof of transaction
-    /// commitment. To verify that a certain transaction was committed, use a proof from
-    /// the `block_transactions` index.
-    // TODO: Retain historic information about services [ECR-3922]
-    pub fn call_errors(
+    pub(crate) fn call_errors_map(
         &self,
         block_height: Height,
     ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
         self.access.get_proof_map((CALL_ERRORS, &block_height.0))
     }
 
+    /// Returns auxiliary information about an error that does not influence blockchain state hash.
+    fn call_errors_aux(
+        &self,
+        block_height: Height,
+    ) -> MapIndex<T::Base, CallInBlock, ExecutionErrorAux> {
+        self.access.get_map((CALL_ERRORS_AUX, &block_height.0))
+    }
+
+    /// Returns a record of errors that occurred during execution of a particular block.
+    /// If the block is not committed, returns `None`.
+    pub fn call_records(&self, block_height: Height) -> Option<CallRecords<T>> {
+        self.block_hash_by_height(block_height)?;
+        Some(CallRecords {
+            height: block_height,
+            errors: self.call_errors_map(block_height),
+            errors_aux: self.call_errors_aux(block_height),
+            access: self.access.clone(),
+        })
+    }
+
     /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
-        if self.block_transactions(location.block_height).len()
-            <= u64::from(location.position_in_block)
-        {
+        let records = self.call_records(location.block_height)?;
+        let txs_in_block = self.block_transactions(location.block_height).len();
+        if txs_in_block <= u64::from(location.position_in_block) {
             return None;
         }
-
-        let call_location = CallInBlock::transaction(location.position_in_block);
-        let call_result = match self.call_errors(location.block_height).get(&call_location) {
-            None => Ok(()),
-            Some(e) => Err(e),
-        };
-        Some(call_result)
+        let status = records.get(CallInBlock::transaction(location.position_in_block));
+        Some(status)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -326,6 +323,91 @@ where
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
+    }
+
+    /// Saves an error to the blockchain.
+    pub(crate) fn save_error(
+        &mut self,
+        height: Height,
+        call: CallInBlock,
+        mut err: ExecutionError,
+    ) {
+        let aux = err.split_aux();
+        self.call_errors_map(height).put(&call, err);
+        self.call_errors_aux(height).put(&call, aux);
+    }
+}
+
+/// Information about call errors within a specific block.
+///
+/// This data type can be used to get information or build proofs that execution
+/// of a certain call ended up with a particular status.
+#[derive(Debug)]
+pub struct CallRecords<T: Access> {
+    height: Height,
+    errors: ProofMapIndex<T::Base, CallInBlock, ExecutionError>,
+    errors_aux: MapIndex<T::Base, CallInBlock, ExecutionErrorAux>,
+    access: T,
+}
+
+impl<T: Access> CallRecords<T> {
+    /// Iterates over errors in a block.
+    pub fn errors(&self) -> CallErrorsIter<'_> {
+        CallErrorsIter {
+            errors_iter: self.errors.iter(),
+            aux_iter: self.errors_aux.values(),
+        }
+    }
+
+    /// Returns a result of a call execution.
+    ///
+    /// # Return value
+    ///
+    /// This method will return `Ok(())` both if the call completed successfully, or if
+    /// was not performed at all. The caller is responsible to distinguish these two outcomes.
+    pub fn get(&self, call: CallInBlock) -> Result<(), ExecutionError> {
+        match self.errors.get(&call) {
+            Some(mut err) => {
+                let aux = self
+                    .errors_aux
+                    .get(&call)
+                    .expect("BUG: Aux info is not saved for an error");
+                err.recombine_with_aux(aux);
+                Err(err)
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Returns a cryptographic proof of authenticity for a top-level call within a block.
+    pub fn get_proof(&self, call: CallInBlock) -> CallProof {
+        let block_proof = Schema::new(self.access.clone())
+            .block_and_precommits(self.height)
+            .unwrap();
+        let error_description = self.errors_aux.get(&call).map(|aux| aux.description);
+        let call_proof = self.errors.get_proof(call);
+        CallProof::new(block_proof, call_proof, error_description)
+    }
+}
+
+/// Iterator over errors in a block returned by `CallRecords::errors()`.
+#[derive(Debug)]
+pub struct CallErrorsIter<'a> {
+    errors_iter: Entries<'a, CallInBlock, ExecutionError>,
+    aux_iter: Values<'a, ExecutionErrorAux>,
+}
+
+impl Iterator for CallErrorsIter<'_> {
+    type Item = (CallInBlock, ExecutionError);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (call, mut error) = self.errors_iter.next()?;
+        let aux = self
+            .aux_iter
+            .next()
+            .expect("BUG: Aux info is not saved for an error");
+        error.recombine_with_aux(aux);
+        Some((call, error))
     }
 }
 

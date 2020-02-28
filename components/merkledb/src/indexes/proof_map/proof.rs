@@ -447,6 +447,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     }
 }
 
+#[allow(clippy::use_self)] // false positives in `map_values`
 impl<K, V, KeyMode> MapProof<K, V, KeyMode>
 where
     V: BinaryValue,
@@ -592,6 +593,29 @@ where
                     Err(ValidationError::UnmatchedRootHash)
                 }
             })
+    }
+
+    /// Maps values in this proof. Note that this transform may render the proof invalid.
+    pub fn map_values<U, F>(self, mut map_fn: F) -> MapProof<K, U, KeyMode>
+    where
+        U: BinaryValue,
+        F: FnMut(V) -> U,
+    {
+        MapProof {
+            entries: self
+                .entries
+                .into_iter()
+                .map(|entry| match entry {
+                    OptionalEntry::Missing { missing } => OptionalEntry::Missing { missing },
+                    OptionalEntry::KV { key, value } => OptionalEntry::KV {
+                        key,
+                        value: map_fn(value),
+                    },
+                })
+                .collect(),
+            proof: self.proof,
+            _key_mode: PhantomData,
+        }
     }
 }
 

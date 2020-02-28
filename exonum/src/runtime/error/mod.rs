@@ -16,6 +16,7 @@
 //! occurred within runtime workflow.
 //!
 //! The most important parts of the module are:
+//!
 //! - [`ExecutionFail`] - the trait representing an error type;
 //! - [`CallSite`] - struct denoting the location of error;
 //! - [`ExecutionError`] - the representation of occurred error;
@@ -56,7 +57,7 @@ use std::{
 };
 
 use super::{CallInfo, InstanceId, MethodId};
-use crate::proto::schema::errors as errors_proto;
+use crate::proto::schema::{details, errors as errors_proto};
 
 /// Trait representing an error type defined in the service or runtime code.
 ///
@@ -120,6 +121,14 @@ pub struct ExecutionError {
     description: String,
     runtime_id: Option<u32>,
     call_site: Option<CallSite>,
+}
+
+/// Additional details about an `ExecutionError` that do not influence blockchain state hash.
+#[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "details::ExecutionErrorAux")]
+pub(crate) struct ExecutionErrorAux {
+    /// Human-readable error description.
+    pub description: String,
 }
 
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.

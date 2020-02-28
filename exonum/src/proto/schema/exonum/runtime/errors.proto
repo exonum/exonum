@@ -40,15 +40,17 @@ enum ErrorKind {
 
 // Result of unsuccessful runtime execution.
 //
-// ExecutionError message provides the information about the source of the error.
+// `ExecutionError` message provides the information about the source of the error.
 // The source of error is determined as following:
+//
 // - If both runtime ID and call site are set, then error is related to the service code.
 // - If runtime ID is set, and call site is not set, then error is related to the runtime code.
 // - If none of runtime ID and call site is set, then error originates in the core code.
+//
 // Option with set call site and unset runtime ID is not valid, receiving a message
 // with such a combination means receiving a malformed message.
 //
-// Though in most cases 'runtime_id' and 'call_site' are enough to deduce the source of error,
+// Though in most cases `runtime_id` and `call_site` are enough to deduce the source of error,
 // 'ErrorKind' type can be used to resolve ambiguity.
 message ExecutionError {
   // The kind of error that indicates its type.
@@ -56,7 +58,8 @@ message ExecutionError {
   // User defined error code that can have different meanings for the different
   // error kinds.
   uint32 code = 2;
-  // Optional description which doesn't affect `object_hash`.
+  // Optional error description. When one verifies proof of error authenticity,
+  // the description should not be included into error serialization.
   string description = 3;
 
   // Runtime ID will be set if the error is related to the certain runtime.
