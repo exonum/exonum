@@ -21,12 +21,7 @@ use futures::{
     stream::{TryStream, TryStreamExt},
 };
 
-use std::{
-    collections::HashMap,
-    io,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
-};
+use std::{collections::HashMap, io, net::SocketAddr};
 
 use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
@@ -80,30 +75,25 @@ pub struct UpdateEndpoints {
     pub endpoints: Vec<(String, ApiBuilder)>,
 }
 
-#[derive(Debug, Default)]
-struct ApiManagerInner {
+/// Actor responsible for API management. The actor encapsulates endpoint handlers and
+/// is capable of updating them via `UpdateEndpoints`.
+#[derive(Debug)]
+pub struct ApiManager {
+    config: ApiManagerConfig,
     servers: Vec<Server>,
     endpoints: Vec<(String, ApiBuilder)>,
 }
 
-/// Actor responsible for API management. The actor encapsulates endpoint handlers and
-/// is capable of updating them via `UpdateEndpoints`.
-#[derive(Debug, Clone)]
-pub struct ApiManager {
-    config: ApiManagerConfig,
-    inner: Arc<Mutex<ApiManagerInner>>,
-}
-
 impl ApiManager {
-    /// Creates a new API manager instance with the specified runtime configuration
+    /// Creates a new API manager instance with the specified runtime configuration.
     pub fn new(config: ApiManagerConfig) -> Self {
         Self {
             config,
-            inner: Arc::default(),
+            servers: Vec::new(),
+            endpoints: Vec::new(),
         }
     }
 
-    /// TODO
     async fn start_servers(&mut self) -> io::Result<()> {
         log::trace!("Servers start requested.");
 
@@ -119,37 +109,31 @@ impl ApiManager {
 
         try_join_all(servers.clone()).await?;
 
-        self.inner.lock().unwrap().servers = servers;
+        self.servers = servers;
         Ok(())
     }
 
     async fn stop_servers(&mut self) {
-        let mut inner = self.inner.lock().unwrap();
-
         log::trace!("Servers stop requested.");
 
-        for server in inner.servers.drain(..) {
+        for server in self.servers.drain(..) {
             server.stop(true).await;
         }
     }
 
-    /// TODO
-    pub async fn run<S: TryStream<Ok = UpdateEndpoints, Error = io::Error>>(
-        self,
-        endpoints_rx: S,
-    ) -> io::Result<()> {
-        endpoints_rx
-            .try_for_each(move |request| {
-                let mut manager = self.clone();
-                async move {
-                    log::info!("Server restart requested");
+    /// Starts API manager actor with the specified endpoints update stream.
+    pub async fn run<S>(mut self, mut endpoints_rx: S) -> io::Result<()>
+    where
+        S: TryStream<Ok = UpdateEndpoints, Error = io::Error> + Unpin,
+    {
+        while let Some(request) = endpoints_rx.try_next().await? {
+            log::info!("Server restart requested");
+            self.stop_servers().await;
+            self.endpoints = request.endpoints;
+            self.start_servers().await?;
+        }
 
-                    manager.stop_servers().await;
-                    manager.inner.lock().unwrap().endpoints = request.endpoints;
-                    manager.start_servers().await
-                }
-            })
-            .await
+        Ok(())
     }
 
     fn start_server(
@@ -161,7 +145,7 @@ impl ApiManager {
         log::info!("Starting {} web api on {}", access, listen_address);
 
         let mut aggregator = self.config.api_aggregator.clone();
-        aggregator.extend(self.inner.lock().unwrap().endpoints.clone());
+        aggregator.extend(self.endpoints.clone());
         let server = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())

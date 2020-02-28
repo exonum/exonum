@@ -645,7 +645,10 @@ fn expedited_propose_on_transaction_pressure() {
 fn valid_txs_are_broadcast() {
     let sandbox = timestamping_sandbox();
     let tx = gen_timestamping_tx();
-    futures::executor::block_on(sandbox.api_sender.broadcast_transaction(tx.clone())).unwrap();
+    sandbox
+        .api_sender
+        .broadcast_transaction_blocking(tx.clone())
+        .unwrap();
     sandbox.process_events();
     sandbox.broadcast(&tx);
 }
@@ -654,7 +657,10 @@ fn valid_txs_are_broadcast() {
 fn incorrect_txs_are_not_broadcast() {
     let sandbox = timestamping_sandbox();
     let incorrect_tx = gen_incorrect_tx();
-    futures::executor::block_on(sandbox.api_sender.broadcast_transaction(incorrect_tx)).unwrap();
+    sandbox
+        .api_sender
+        .broadcast_transaction_blocking(incorrect_tx)
+        .unwrap();
     sandbox.process_events();
     // If the transaction is broadcast, the sandbox will panic on drop.
 }

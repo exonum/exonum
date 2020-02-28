@@ -76,22 +76,22 @@ impl fmt::Display for ApiKind {
 /// existing instances unless it is impossible. The latter may be the case if changes
 /// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
 /// instantiated.
-/// 
+///
 /// The HTTP server uses `actix_rt` under the hood, so in order to execute asynchronous methods,
-/// the user must use this API inside the `actix_rt` runtime. 
+/// the user must use this API inside the `actix_rt` runtime.
 /// The easiest way to do that is to use `#[actix_rt::test]` instead of `#[test]`.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// #[actix_rt::test]
 /// async fn test_api() {
 ///     let testkit = TestKitBuilder::validator().build();
 ///     let api = testkit.api();
-/// 
+///
 ///     // By default we only have Rust runtime endpoints.
 ///     use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
-/// 
+///
 ///     let proto_sources: Vec<ProtoSourceFile> = api
 ///         .public(ApiKind::RustRuntime)
 ///         .query(&ProtoSourcesQuery::Core)

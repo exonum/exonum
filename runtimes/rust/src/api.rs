@@ -25,7 +25,7 @@ use exonum::{
     },
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
-use futures::future::{Future, FutureExt};
+use futures::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
@@ -221,23 +221,15 @@ impl ServiceApiScope {
         let artifact = self.artifact.clone();
         self.inner.endpoint(name, move |query: Q| {
             let handler = handler.clone();
-            let blockchain = blockchain.clone();
-            let descriptor = descriptor.clone();
-            let artifact = artifact.clone();
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
 
             async move {
-                let maybe_state =
-                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-                let state = match maybe_state {
-                    Ok(state) => state,
-                    Err(err) => return Err(err),
-                };
-
-                let descriptor = descriptor.clone();
-
+                let state = maybe_state?;
+                let descriptor = state.instance().clone();
                 handler(state, query)
                     .await
-                    .map_err(move |err| err.source(descriptor.to_string()))
+                    .map_err(|err| err.source(descriptor.to_string()))
             }
             .boxed_local()
         });
@@ -259,23 +251,17 @@ impl ServiceApiScope {
         let artifact = self.artifact.clone();
         self.inner.endpoint_mut(name, move |query: Q| {
             let handler = handler.clone();
-            let blockchain = blockchain.clone();
-            let descriptor = descriptor.clone();
-            let artifact = artifact.clone();
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
 
             async move {
-                let maybe_state =
-                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-                let state = match maybe_state {
-                    Ok(state) => state,
-                    Err(err) => return Err(err),
-                };
-
-                let descriptor = descriptor.clone();
+                let state = maybe_state?;
+                let descriptor = state.instance().clone();
                 handler(state, query)
                     .await
-                    .map_err(move |err| err.source(descriptor.to_string()))
+                    .map_err(|err| err.source(descriptor.to_string()))
             }
+            .boxed_local()
         });
         self
     }
@@ -297,27 +283,21 @@ impl ServiceApiScope {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
-        let inner = deprecated.handler.clone();
+        let handler = deprecated.handler.clone();
 
         let handler = move |query: Q| {
-            let inner = inner.clone();
-            let blockchain = blockchain.clone();
-            let descriptor = descriptor.clone();
-            let artifact = artifact.clone();
+            let handler = handler.clone();
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
 
             async move {
-                let maybe_state =
-                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-                let state = match maybe_state {
-                    Ok(state) => state,
-                    Err(err) => return Err(err),
-                };
-
-                let descriptor = descriptor.clone();
-                inner(state, query)
+                let state = maybe_state?;
+                let descriptor = state.instance().clone();
+                handler(state, query)
                     .await
-                    .map_err(move |err| err.source(descriptor.to_string()))
+                    .map_err(|err| err.source(descriptor.to_string()))
             }
+            .boxed_local()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
@@ -342,27 +322,21 @@ impl ServiceApiScope {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
-        let inner = deprecated.handler.clone();
+        let handler = deprecated.handler.clone();
 
         let handler = move |query: Q| {
-            let inner = inner.clone();
-            let blockchain = blockchain.clone();
-            let descriptor = descriptor.clone();
-            let artifact = artifact.clone();
+            let handler = handler.clone();
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
 
             async move {
-                let maybe_state =
-                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-                let state = match maybe_state {
-                    Ok(state) => state,
-                    Err(err) => return Err(err),
-                };
-
-                let descriptor = descriptor.clone();
-                inner(state, query)
+                let state = maybe_state?;
+                let descriptor = state.instance().clone();
+                handler(state, query)
                     .await
-                    .map_err(move |err| err.source(descriptor.to_string()))
+                    .map_err(|err| err.source(descriptor.to_string()))
             }
+            .boxed_local()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
@@ -423,7 +397,7 @@ impl ServiceApiScope {
 ///         Ok(())
 ///     }
 ///
-///     /// You may also uses asynchronous tasks.
+///     /// You may also use asynchronous tasks.
 ///     pub async fn async_operation(
 ///         _state: ServiceApiState,
 ///         query: MyQuery,
@@ -431,7 +405,6 @@ impl ServiceApiScope {
 ///         # async fn long_async_task(query: MyQuery) -> Option<Hash> {
 ///         #     Some(Hash::zero())
 ///         # }
-///
 ///         Ok(long_async_task(query).await)
 ///     }
 /// }

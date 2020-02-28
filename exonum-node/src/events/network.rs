@@ -382,13 +382,10 @@ impl NetworkHandler {
                             let addr = match socket.get_ref().peer_addr() {
                                 Ok(addr) => addr,
                                 Err(e) => {
-                                    return Box::new(err(format_err!(
+                                    return to_box(err::<(), _>(format_err!(
                                         "Couldn't take peer addr from socket = {}",
                                         e
-                                    )))
-                                        as Box<
-                                            dyn Future<Error = failure::Error, Item = ()> + Send,
-                                        >;
+                                    )));
                                 }
                             };
                             let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);

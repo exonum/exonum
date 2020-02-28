@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use failure::Fail;
-use futures::compat::Future01CompatExt;
-use futures_01::{sync::mpsc, Future, Sink};
+use futures::{compat::Future01CompatExt, Future};
+use futures_01::{sync::mpsc, Future as _, Sink};
 
 use std::fmt;
 
@@ -41,19 +41,27 @@ impl<T: Send + 'static> ApiSender<T> {
         ApiSender(mpsc::channel(0).0)
     }
 
-    /// Sends a message to the node.
+    /// Sends a message to the node asynchronously.
     ///
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub async fn send_message(&self, message: T) -> Result<(), SendError> {
+    pub fn send_message(&self, message: T) -> impl Future<Output = Result<(), SendError>> {
         self.0
             .clone()
             .send(message)
             .map(drop)
             .map_err(|_| SendError(()))
             .compat()
-            .await
+    }
+
+    /// Sends a message to the node synchronously.
+    ///
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub fn send_message_blocking(&self, message: T) -> Result<(), SendError> {
+        futures::executor::block_on(self.send_message(message))
     }
 }
 
@@ -61,14 +69,27 @@ impl ApiSender {
     /// Sends a transaction over the channel. If this sender is connected to a node,
     /// this will broadcast the transaction to all nodes in the blockchain network.
     ///
-    /// This is an asynchronous operation that can take some time if the node is overloaded
+    /// # Return value
+    ///
+    /// The failure means that the node is being shut down.
+    pub fn broadcast_transaction(
+        &self,
+        tx: Verified<AnyTx>,
+    ) -> impl Future<Output = Result<(), SendError>> {
+        self.send_message(tx)
+    }
+
+    /// Sends a transaction over the channel synchronously. If this sender is connected to a node,
+    /// this will broadcast the transaction to all nodes in the blockchain network.
+    ///
+    /// This is an blocking operation that can take some time if the node is overloaded
     /// with requests.
     ///
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub async fn broadcast_transaction(&self, tx: Verified<AnyTx>) -> Result<(), SendError> {
-        self.send_message(tx).await
+    pub fn broadcast_transaction_blocking(&self, tx: Verified<AnyTx>) -> Result<(), SendError> {
+        self.send_message_blocking(tx)
     }
 }
 
