@@ -401,7 +401,7 @@ impl Server {
     fn handle_transaction(
         &self,
         message: Transaction,
-    ) -> LocalBoxFuture<'static, Result<TransactionResponse, failure::Error>> {
+    ) -> impl Future<Output = Result<TransactionResponse, failure::Error>> {
         let sender = self.blockchain.sender().to_owned();
         let verified = self.check_transaction(message);
 
@@ -414,7 +414,6 @@ impl Server {
                 .map(move |()| TransactionResponse { tx_hash })
                 .map_err(From::from)
         }
-        .boxed_local()
     }
 }
 
@@ -533,7 +532,7 @@ impl Handler<Transaction> for Server {
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
-        self.handle_transaction(message)
+        self.handle_transaction(message).boxed_local()
     }
 }
 

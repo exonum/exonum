@@ -589,7 +589,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("deploy-status").await?;
+//!     .get("deploy-status")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```

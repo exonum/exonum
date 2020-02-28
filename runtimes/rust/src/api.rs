@@ -227,6 +227,7 @@ impl ServiceApiScope {
             async move {
                 let state = maybe_state?;
                 let descriptor = state.instance().clone();
+                // TODO Try to avoid descriptor cloning here. [ECR-4269]
                 handler(state, query)
                     .await
                     .map_err(|err| err.source(descriptor.to_string()))
