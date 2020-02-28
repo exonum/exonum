@@ -20,20 +20,21 @@ class ApiTest(unittest.TestCase):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
         wait_network_to_start(self.network)
 
-    def test_health_check(self):
-        """Tests the `healthcheck` endpoint."""
+    def test_node_info_check(self):
+        """Tests the `info` endpoint."""
 
         time.sleep(10)
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            health_info_response = client.public_api.health_info()
-            self.assertEqual(health_info_response.status_code, 200)
+            node_info_response = client.private_api.get_info()
+            self.assertEqual(node_info_response.status_code, 200)
+            node_info = node_info_response.json()
             self.assertEqual(
-                health_info_response.json()["connected_peers"],
+                len(node_info["connected_peers"]),
                 self.network.validators_count() - 1,
             )
-            self.assertEqual(health_info_response.json()["consensus_status"], "Active")
+            self.assertEqual(node_info["consensus_status"], "active")
 
     def test_block_response(self):
         """Tests the `block` endpoint. Check response for block"""
@@ -201,27 +202,20 @@ class ApiTest(unittest.TestCase):
             self.assertEqual(response_info["title"], "Failed to get transaction info")
             self.assertEqual(response_info["detail"], r'{"type":"unknown"}')
 
-    def test_zero_initial_stats(self):
-        """Tests the `stats` endpoint. Check initial stats values"""
+    def test_node_stats(self):
+        """Tests the `stats` endpoint."""
 
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
             client = ExonumClient(host, public_port, private_port)
-            stats = client.public_api.stats()
-            self.assertEqual(stats.status_code, 200)
-            self.assertEqual(stats.json()["tx_count"], 0)
-            self.assertEqual(stats.json()["tx_pool_size"], 0)
-            self.assertEqual(stats.json()["tx_cache_size"], 0)
-
-    def test_user_agent(self):
-        """Tests the `user_agent` endpoint."""
-
-        for validator_id in range(self.network.validators_count()):
-            host, public_port, private_port = self.network.api_address(validator_id)
-            client = ExonumClient(host, public_port, private_port)
-            user_agent_response = client.public_api.user_agent()
-            self.assertEqual(user_agent_response.status_code, 200)
+            node_stats_response = client.private_api.get_stats()
+            self.assertEqual(node_stats_response.status_code, 200)
+            node_stats = node_stats_response.json()
+            self.assertEqual(node_stats["tx_count"], 0)
+            self.assertEqual(node_stats["tx_pool_size"], 0)
+            self.assertEqual(node_stats["tx_cache_size"], 0)
 
     def tearDown(self):
         outputs = self.network.stop()
         assert_processes_exited_successfully(self, outputs)
+        self.network.deinitialize()
