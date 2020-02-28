@@ -17,7 +17,7 @@ from suite import (
 
 
 class CryptoAdvancedTest(unittest.TestCase):
-    """Tests for Cryptocurrency Advanced"""
+    """Tests for advanced cryptocurrency"""
 
     def setUp(self):
         self.network = run_4_nodes("exonum-cryptocurrency-advanced")
@@ -34,13 +34,6 @@ class CryptoAdvancedTest(unittest.TestCase):
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
             explorer = launcher.explorer()
-
-            # Skip deploy and start. The service has been already included.
-            # launcher.deploy_all()
-            # launcher.wait_for_deploy()
-            # launcher.start_all()
-            # launcher.wait_for_start()
-
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)

@@ -25,7 +25,7 @@ class RegularDeployTest(unittest.TestCase):
     """Tests for Exonum deploy process in regular mode."""
 
     def setUp(self):
-        self.network = run_4_nodes("exonum-cryptocurrency-advanced")
+        self.network = run_4_nodes("cryptocurrency-migration")
         wait_network_to_start(self.network)
 
     def test_deploy_regular_without_instance(self):
@@ -293,7 +293,6 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             with self.assertRaises(RuntimeError):
@@ -400,6 +399,7 @@ class RegularDeployTest(unittest.TestCase):
 
     def tearDown(self):
         outputs = self.network.stop()
+        self.network.deinitialize()
         assert_processes_exited_successfully(self, outputs)
 
 
@@ -407,7 +407,7 @@ class DevDeployTest(unittest.TestCase):
     """Tests for Exonum deploy process in dev mode."""
 
     def setUp(self):
-        self.network = run_dev_node("exonum-cryptocurrency-advanced")
+        self.network = run_dev_node("cryptocurrency-migration")
         wait_network_to_start(self.network)
 
     def test_deploy_run_dev(self):
@@ -455,4 +455,5 @@ class DevDeployTest(unittest.TestCase):
 
     def tearDown(self):
         outputs = self.network.stop()
+        self.network.deinitialize()
         assert_processes_exited_successfully(self, outputs)

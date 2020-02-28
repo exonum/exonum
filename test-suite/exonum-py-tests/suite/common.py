@@ -10,8 +10,8 @@ from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 from requests.exceptions import ConnectionError
 
 RETRIES_AMOUNT = 20
-ARTIFACT_NAME = "exonum-cryptocurrency-advanced"
-ARTIFACT_VERSION = "1.0.0-rc.1"
+ARTIFACT_NAME = "exonum-cryptocurrency"
+ARTIFACT_VERSION = "0.2.0"
 
 MIN_PEER_PORT = 6331
 MIN_API_PORT = 8080
