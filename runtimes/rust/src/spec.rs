@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Specifications of Rust artifacts for use in deployment.
+//! Specifications of Rust and non-Rust artifacts for use in deployment.
 
 use exonum::{
     blockchain::config::{GenesisConfigBuilder, InstanceInitParams},
@@ -152,7 +152,8 @@ impl<T: ServiceFactory + MigrateData> Deploy for Spec<T, Migrating> {
     }
 }
 
-/// FIXME
+/// Deploy specification for a non-Rust artifact. The spec can include 0 or more
+/// instantiated services.
 #[derive(Debug)]
 pub struct ForeignSpec {
     artifact: ArtifactId,
@@ -161,10 +162,11 @@ pub struct ForeignSpec {
 }
 
 impl ForeignSpec {
-    /// FIXME
+    /// Creates a spec based on the provided artifact.
     pub fn new(artifact: ArtifactId) -> Self {
         assert_ne!(
-            artifact.runtime_id, RuntimeIdentifier::Rust as u32,
+            artifact.runtime_id,
+            RuntimeIdentifier::Rust as u32,
             "Deploying Rust artifacts with `ForeignSpec` does not make sense; the Rust runtime \
              will not hold the service factory necessary to instantiate corresponding services. \
              Use `Spec` instead"
@@ -176,13 +178,13 @@ impl ForeignSpec {
         }
     }
 
-    /// FIXME
+    /// Adds a deploy specification to use together with the artifact.
     pub fn with_deploy_spec(mut self, spec: impl BinaryValue) -> Self {
         self.deploy_spec = Some(spec.into_bytes());
         self
     }
 
-    /// FIXME
+    /// Adds a new built-in service instance to instantiate at the genesis block.
     pub fn with_instance(
         mut self,
         id: InstanceId,

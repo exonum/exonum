@@ -27,7 +27,7 @@ use exonum_node::NodePlugin;
 use exonum_rust_runtime::{spec::Deploy, RustRuntime, RustRuntimeBuilder};
 use futures::sync::mpsc;
 
-use std::{net::SocketAddr};
+use std::net::SocketAddr;
 
 use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 
