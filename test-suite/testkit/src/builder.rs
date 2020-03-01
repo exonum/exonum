@@ -38,7 +38,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// ```
 /// # use exonum::{crypto::Hash, merkledb::Snapshot, runtime::BlockchainData};
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
-/// # use exonum_testkit::TestKitBuilder;
+/// # use exonum_testkit::{Spec, TestKitBuilder};
 /// # use exonum_rust_runtime::{Service, ServiceFactory};
 /// #
 /// # const SERVICE_ID: u32 = 1;
@@ -51,12 +51,9 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # pub struct ExampleService;
 /// # impl Service for ExampleService {}
 /// #
-/// let service = ExampleService;
-/// let artifact = service.artifact_id();
+/// let service = Spec::new(ExampleService).with_instance(SERVICE_ID, "example", ());
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_artifact(artifact.clone())
-///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
-///     .with_rust_service(service)
+///     .with(service)
 ///     .with_validators(4)
 ///     .build();
 /// testkit.create_block();

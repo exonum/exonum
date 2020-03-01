@@ -49,7 +49,7 @@
 //!     runtime::{InstanceId, SnapshotExt},
 //! };
 //! use exonum_rust_runtime::ServiceFactory;
-//! use exonum_testkit::{TestKit, TestKitBuilder};
+//! use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 //! use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
 //!
 //! use std::sync::Arc;
@@ -65,33 +65,26 @@
 //!
 //! // Factory for time service will create instances of the service with given
 //! // time provider.
-//! let time_service_factory =
+//! let time_service =
 //!     TimeServiceFactory::with_provider(time_provider.clone() as Arc<dyn TimeProvider>);
-//! let time_service_artifact = time_service_factory.artifact_id();
+//! let time_service = Spec::new(time_service).with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
 //!
 //! // Create testkit with the time service.
 //! let mut testkit: TestKit = TestKitBuilder::validator()
-//!     .with_artifact(time_service_artifact.clone())
-//!     .with_instance(
-//!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-//!     )
-//!     .with_rust_service(time_service_factory)
+//!     .with(time_service)
 //!     // Add other services here
 //!     .build();
 //!
 //! // Set time in `MockTimeProvider`.
 //! time_provider.set_time(Utc.timestamp(10, 0));
-//!
 //! // Create some blocks for time to appear in the blockchain.
 //! testkit.create_blocks_until(Height(2));
 //!
 //! // Obtain time service schema.
 //! let snapshot = testkit.snapshot();
 //! let time_schema: TimeSchema<_> = snapshot.service_schema(TIME_SERVICE_NAME).unwrap();
-//!
 //! // Obtain time from the schema. Service can base its logic on this time.
 //! let time = time_schema.time.get();
-//!
 //! // With `MockServiceProvider` we can ensure that time is based on data
 //! // provided by `TimeProvider`.
 //! assert_eq!(time, Some(time_provider.time()));
