@@ -21,6 +21,7 @@ fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
         .with_default_rust_service(OldService)
+        // TODO: replace with "migrating service" once ECR-4298 is resolved.
         .with_rust_service(CryptocurrencyService)
         .run()
 }
