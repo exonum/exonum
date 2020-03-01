@@ -49,7 +49,6 @@ pub struct Migrating(());
 #[derive(Debug)]
 pub struct Spec<T, Kind> {
     service: T,
-    deploy_artifact: bool,
     instances: Vec<InstanceInitParams>,
     default_instance: Option<InstanceInitParams>,
     _kind: PhantomData<Kind>,
@@ -71,12 +70,6 @@ impl<T: ServiceFactory, Kind> Spec<T, Kind> {
         ));
         self
     }
-
-    /// Switches off deploying the artifact corresponding to the enclosed service factory.
-    pub fn no_deploy(mut self) -> Self {
-        self.deploy_artifact = false;
-        self
-    }
 }
 
 impl<T: DefaultInstance, Kind> Spec<T, Kind> {
@@ -93,7 +86,6 @@ impl<T: ServiceFactory> Spec<T, Simple> {
     pub fn new(service: T) -> Self {
         Self {
             service,
-            deploy_artifact: true,
             instances: vec![],
             default_instance: None,
             _kind: PhantomData,
@@ -106,7 +98,6 @@ impl<T: ServiceFactory> Spec<T, Migrating> {
     pub fn migrating(service: T) -> Self {
         Self {
             service,
-            deploy_artifact: true,
             instances: vec![],
             default_instance: None,
             _kind: PhantomData,
@@ -118,11 +109,7 @@ impl<T: ServiceFactory> Sealed for Spec<T, Simple> {}
 
 impl<T: ServiceFactory> Deploy for Spec<T, Simple> {
     fn deploy(self, genesis: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder) {
-        let mut new_config = mem::take(genesis);
-        if self.deploy_artifact {
-            new_config = new_config.with_artifact(self.service.artifact_id());
-        }
-
+        let mut new_config = mem::take(genesis).with_artifact(self.service.artifact_id());
         let instances = self.default_instance.into_iter().chain(self.instances);
         for instance in instances {
             new_config = new_config.with_instance(instance);
@@ -137,17 +124,58 @@ impl<T: ServiceFactory> Sealed for Spec<T, Migrating> {}
 
 impl<T: ServiceFactory + MigrateData> Deploy for Spec<T, Migrating> {
     fn deploy(self, genesis: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder) {
-        let mut new_config = mem::take(genesis);
-        if self.deploy_artifact {
-            new_config = new_config.with_artifact(self.service.artifact_id());
-        }
-
+        let mut new_config = mem::take(genesis).with_artifact(self.service.artifact_id());
         let instances = self.default_instance.into_iter().chain(self.instances);
         for instance in instances {
             new_config = new_config.with_instance(instance);
         }
         *genesis = new_config;
 
+        *rt = mem::take(rt).with_migrating_factory(self.service);
+    }
+}
+
+/// Deploy specification which just adds a service factory to the Rust runtime without
+/// deploying a corresponding artifact. Useful mainly for tests; use `Spec` to deploy the artifact.
+#[derive(Debug)]
+pub struct JustFactory<T, Kind> {
+    service: T,
+    _kind: PhantomData<Kind>,
+}
+
+impl<T: ServiceFactory> JustFactory<T, Simple> {
+    /// Creates a new specification wrapping the provided service factory.
+    pub fn new(service: T) -> Self {
+        Self {
+            service,
+            _kind: PhantomData,
+        }
+    }
+}
+
+impl<T: ServiceFactory> Sealed for JustFactory<T, Simple> {}
+
+impl<T: ServiceFactory> Deploy for JustFactory<T, Simple> {
+    fn deploy(self, _: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder) {
+        *rt = mem::take(rt).with_factory(self.service);
+    }
+}
+
+impl<T: ServiceFactory + MigrateData> JustFactory<T, Migrating> {
+    /// Creates a new specification wrapping the provided service factory with support
+    /// of data migrations.
+    pub fn migrating(service: T) -> Self {
+        Self {
+            service,
+            _kind: PhantomData,
+        }
+    }
+}
+
+impl<T: ServiceFactory + MigrateData> Sealed for JustFactory<T, Migrating> {}
+
+impl<T: ServiceFactory + MigrateData> Deploy for JustFactory<T, Migrating> {
+    fn deploy(self, _: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder) {
         *rt = mem::take(rt).with_migrating_factory(self.service);
     }
 }

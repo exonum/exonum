@@ -495,11 +495,11 @@
 //!
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_rust_runtime::{spec::{JustFactory, Spec}, ServiceFactory};
 //! use exonum_supervisor::{
 //!     api::DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor,
 //! };
-//! # use exonum_testkit::{ApiKind, Spec, TestKitBuilder};
+//! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # use exonum_derive::*;
 //! # use exonum_rust_runtime::Service;
@@ -514,7 +514,7 @@
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with(Supervisor::simple())
-//! #         .with(Spec::new(SomeService).no_deploy())
+//! #         .with(JustFactory::new(SomeService))
 //! #         .build();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.

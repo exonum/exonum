@@ -22,7 +22,11 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_rust_runtime::{api, spec::Spec, RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{
+    api,
+    spec::{JustFactory, Spec},
+    RustRuntimeBuilder, ServiceFactory,
+};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,
@@ -216,7 +220,7 @@ fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with(Supervisor::decentralized())
-        .with(Spec::new(IncService).no_deploy())
+        .with(JustFactory::new(IncService))
         .build()
 }
 
@@ -224,7 +228,7 @@ fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with(Supervisor::decentralized())
-        .with(Spec::new(IncService).no_deploy())
+        .with(JustFactory::new(IncService))
         .with_validators(n)
         .build()
 }
@@ -237,7 +241,7 @@ fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
         .with(Supervisor::decentralized())
-        .with(Spec::new(IncService).no_deploy())
+        .with(JustFactory::new(IncService))
         .with_validators(1)
         .build()
 }
@@ -514,7 +518,7 @@ fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with(Supervisor::decentralized())
-        .with(Spec::new(IncService).no_deploy())
+        .with(JustFactory::new(IncService))
         .build();
     deploy_default(&mut testkit);
 

@@ -27,8 +27,11 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory as _};
-use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
+use exonum_rust_runtime::{
+    spec::{JustFactory, Spec},
+    DefaultInstance, Service, ServiceFactory as _,
+};
+use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
     supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, Supervisor,
@@ -318,7 +321,7 @@ fn test_send_proposal_with_api() {
 fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
         .with(Supervisor::simple())
-        .with(Spec::new(DeployableService).no_deploy())
+        .with(JustFactory::new(DeployableService))
         .build();
 
     let deadline_height = Height(5);
