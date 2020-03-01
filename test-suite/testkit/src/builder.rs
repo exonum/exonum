@@ -111,7 +111,8 @@ impl TestKitBuilder {
         self
     }
 
-    /// FIXME
+    /// Adds a deploy spec to this builder. The spec may contain artifacts and service instances
+    /// to deploy at the blockchain start.
     pub fn with(mut self, spec: impl Deploy) -> Self {
         spec.deploy(&mut self.genesis_config, &mut self.rust_runtime);
         self
