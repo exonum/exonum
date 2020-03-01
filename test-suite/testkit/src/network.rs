@@ -103,7 +103,7 @@ impl TestNetwork {
 
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
-    pub fn genesis_config(&self) -> ConsensusConfig {
+    pub fn consensus_config(&self) -> ConsensusConfig {
         let validator_keys = self
             .validators()
             .iter()

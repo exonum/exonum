@@ -530,7 +530,7 @@ impl From<InstanceSpec> for InstanceInitParams {
 }
 
 /// Creates `GenesisConfig` from components.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GenesisConfigBuilder {
     /// Consensus config.
     consensus_config: ConsensusConfig,

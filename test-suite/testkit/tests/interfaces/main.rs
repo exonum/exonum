@@ -20,7 +20,7 @@ use exonum::{
     },
 };
 use exonum_rust_runtime::DefaultInstance;
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use crate::{
@@ -41,9 +41,9 @@ mod services;
 fn testkit_with_interfaces() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_default_rust_service(WalletService)
-        .with_default_rust_service(DepositService)
-        .with_default_rust_service(AnyCallService)
+        .with(Spec::new(WalletService).with_default_instance())
+        .with(Spec::new(DepositService).with_default_instance())
+        .with(Spec::new(AnyCallService).with_default_instance())
         .build()
 }
 
@@ -396,10 +396,11 @@ fn test_any_call_panic_recursion_limit() {
 }
 
 fn execute_custom_call(f: CustomCall) -> (TestKit, Result<(), ExecutionError>) {
+    let custom_service = CustomCallService::new(f);
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_default_rust_service(WalletService)
-        .with_default_rust_service(CustomCallService::new(f))
+        .with(Spec::new(WalletService).with_default_instance())
+        .with(Spec::new(custom_service).with_default_instance())
         .build();
 
     let keypair = KeyPair::random();

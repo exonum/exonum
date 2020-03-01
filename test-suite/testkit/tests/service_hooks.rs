@@ -20,7 +20,7 @@ use exonum::{
 use exonum_explorer::BlockchainExplorer;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_rust_runtime::{RustRuntime, ServiceFactory};
-use exonum_testkit::TestKitBuilder;
+use exonum_testkit::{Spec, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 pub use crate::{
@@ -39,7 +39,7 @@ const SUPERVISOR_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(service.clone())
+        .with(Spec::new(service.clone()).with_default_instance())
         .build();
 
     // Check that `after_commit` invoked on the correct height.
@@ -72,7 +72,7 @@ fn test_after_commit_with_auditor() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
-        .with_default_rust_service(service.clone())
+        .with(Spec::new(service.clone()).with_default_instance())
         .build();
 
     for i in 1..5 {
@@ -98,8 +98,8 @@ fn test_after_commit_with_auditor() {
 fn after_commit_not_called_after_service_stop() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(Supervisor)
-        .with_default_rust_service(service.clone())
+        .with(Spec::new(Supervisor).with_default_instance())
+        .with(Spec::new(service.clone()).with_default_instance())
         .build();
     service.switch_to_generic_broadcast();
 
@@ -128,8 +128,8 @@ fn after_commit_not_called_after_service_stop() {
 fn after_commit_during_service_freeze() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(Supervisor)
-        .with_default_rust_service(service.clone())
+        .with(Spec::new(Supervisor).with_default_instance())
+        .with(Spec::new(service.clone()).with_default_instance())
         .build();
 
     let keys = testkit.us().service_keypair();
@@ -156,10 +156,9 @@ fn after_commit_during_service_freeze() {
 fn after_commit_during_migration() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(Supervisor)
-        .with_default_rust_service(service.clone())
-        .with_migrating_rust_service(AfterCommitServiceV2)
-        .with_artifact(AfterCommitServiceV2.artifact_id())
+        .with(Spec::new(Supervisor).with_default_instance())
+        .with(Spec::new(service.clone()).with_default_instance())
+        .with(Spec::migrating(AfterCommitServiceV2))
         .build();
 
     let keys = testkit.us().service_keypair();
@@ -209,8 +208,8 @@ fn after_commit_during_migration() {
 fn incorrect_txs_are_not_included_into_blocks() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(Supervisor)
-        .with_default_rust_service(service)
+        .with(Spec::new(Supervisor).with_default_instance())
+        .with(Spec::new(service).with_default_instance())
         .build();
     let keys = testkit.us().service_keypair();
 
@@ -244,7 +243,7 @@ fn incorrect_txs_are_not_included_into_blocks() {
 fn restart_testkit() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_default_rust_service(AfterCommitService::new())
+        .with(Spec::new(AfterCommitService::new()).with_default_instance())
         .build();
     testkit.create_blocks_until(Height(5));
 
@@ -285,7 +284,7 @@ fn restart_testkit() {
 #[test]
 fn tx_pool_is_retained_on_restart() {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(AfterCommitService::new())
+        .with(Spec::new(AfterCommitService::new()).with_default_instance())
         .build();
 
     let tx_hashes: Vec<_> = (100..105)

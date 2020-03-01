@@ -28,7 +28,7 @@ use std::sync::{
     Arc,
 };
 
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 
 #[exonum_interface(auto_ids)]
 trait ErroneousInterface<Ctx> {
@@ -70,7 +70,7 @@ impl DefaultInstance for ErroneousService {
 fn init_testkit() -> TestKit {
     let service = ErroneousService::default();
     TestKitBuilder::validator()
-        .with_default_rust_service(service)
+        .with(Spec::new(service).with_default_instance())
         .build()
 }
 

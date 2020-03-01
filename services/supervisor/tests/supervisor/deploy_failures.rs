@@ -27,7 +27,6 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{ExecutionError, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -189,9 +188,7 @@ fn testkit_with_failing_runtime(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .with_additional_runtime(FailingRuntime::default())
         .build()
 }

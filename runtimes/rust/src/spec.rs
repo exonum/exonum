@@ -1,0 +1,217 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+//! Specifications of Rust artifacts for use in deployment.
+
+use exonum::{
+    blockchain::config::{GenesisConfigBuilder, InstanceInitParams},
+    merkledb::BinaryValue,
+    runtime::{migrations::MigrateData, ArtifactId, InstanceId, RuntimeIdentifier},
+};
+
+use std::{marker::PhantomData, mem};
+
+use self::sealed::Sealed;
+use crate::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+/// Denotes a data type that can be used as an argument to `NodeBuilder::with()`.
+///
+/// This is a sealed trait: it is not meant to be implemented by the external data types.
+pub trait Deploy: Sealed {
+    /// Modifies the genesis config and Rust runtime builders to deploy self.
+    fn deploy(self, genesis: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder);
+}
+
+/// Marker type for artifact deployment without migration support.
+#[derive(Debug)]
+pub struct Simple(());
+
+/// Marker type for artifact deployment with migration support.
+#[derive(Debug)]
+pub struct Migrating(());
+
+/// Deploy specification for a Rust artifact. The spec can include 0 or more instantiated services.
+#[derive(Debug)]
+pub struct Spec<T, Kind> {
+    service: T,
+    deploy_artifact: bool,
+    instances: Vec<InstanceInitParams>,
+    default_instance: Option<InstanceInitParams>,
+    _kind: PhantomData<Kind>,
+}
+
+impl<T: ServiceFactory, Kind> Spec<T, Kind> {
+    /// Adds a new built-in service instance to instantiate at the genesis block.
+    pub fn with_instance(
+        mut self,
+        id: InstanceId,
+        name: impl Into<String>,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        self.instances.push(InstanceInitParams::new(
+            id,
+            name,
+            self.service.artifact_id(),
+            constructor,
+        ));
+        self
+    }
+
+    /// Switches off deploying the artifact corresponding to the enclosed service factory.
+    pub fn no_deploy(mut self) -> Self {
+        self.deploy_artifact = false;
+        self
+    }
+}
+
+impl<T: DefaultInstance, Kind> Spec<T, Kind> {
+    /// Adds a built-in service instance with the default identifiers
+    /// to instantiate at the genesis block.
+    pub fn with_default_instance(mut self) -> Self {
+        self.default_instance = Some(self.service.default_instance());
+        self
+    }
+}
+
+impl<T: ServiceFactory> Spec<T, Simple> {
+    /// Creates a spec with no support of data migrations.
+    pub fn new(service: T) -> Self {
+        Self {
+            service,
+            deploy_artifact: true,
+            instances: vec![],
+            default_instance: None,
+            _kind: PhantomData,
+        }
+    }
+}
+
+impl<T: ServiceFactory> Spec<T, Migrating> {
+    /// Creates a spec with support of data migrations.
+    pub fn migrating(service: T) -> Self {
+        Self {
+            service,
+            deploy_artifact: true,
+            instances: vec![],
+            default_instance: None,
+            _kind: PhantomData,
+        }
+    }
+}
+
+impl<T: ServiceFactory> Sealed for Spec<T, Simple> {}
+
+impl<T: ServiceFactory> Deploy for Spec<T, Simple> {
+    fn deploy(self, genesis: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder) {
+        let mut new_config = mem::take(genesis);
+        if self.deploy_artifact {
+            new_config = new_config.with_artifact(self.service.artifact_id());
+        }
+
+        let instances = self.default_instance.into_iter().chain(self.instances);
+        for instance in instances {
+            new_config = new_config.with_instance(instance);
+        }
+        *genesis = new_config;
+
+        *rt = mem::take(rt).with_factory(self.service);
+    }
+}
+
+impl<T: ServiceFactory> Sealed for Spec<T, Migrating> {}
+
+impl<T: ServiceFactory + MigrateData> Deploy for Spec<T, Migrating> {
+    fn deploy(self, genesis: &mut GenesisConfigBuilder, rt: &mut RustRuntimeBuilder) {
+        let mut new_config = mem::take(genesis);
+        if self.deploy_artifact {
+            new_config = new_config.with_artifact(self.service.artifact_id());
+        }
+
+        let instances = self.default_instance.into_iter().chain(self.instances);
+        for instance in instances {
+            new_config = new_config.with_instance(instance);
+        }
+        *genesis = new_config;
+
+        *rt = mem::take(rt).with_migrating_factory(self.service);
+    }
+}
+
+/// FIXME
+#[derive(Debug)]
+pub struct ForeignSpec {
+    artifact: ArtifactId,
+    deploy_spec: Option<Vec<u8>>,
+    instances: Vec<InstanceInitParams>,
+}
+
+impl ForeignSpec {
+    /// FIXME
+    pub fn new(artifact: ArtifactId) -> Self {
+        assert_ne!(
+            artifact.runtime_id, RuntimeIdentifier::Rust as u32,
+            "Deploying Rust artifacts with `ForeignSpec` does not make sense; the Rust runtime \
+             will not hold the service factory necessary to instantiate corresponding services. \
+             Use `Spec` instead"
+        );
+        Self {
+            artifact,
+            deploy_spec: None,
+            instances: vec![],
+        }
+    }
+
+    /// FIXME
+    pub fn with_deploy_spec(mut self, spec: impl BinaryValue) -> Self {
+        self.deploy_spec = Some(spec.into_bytes());
+        self
+    }
+
+    /// FIXME
+    pub fn with_instance(
+        mut self,
+        id: InstanceId,
+        name: impl Into<String>,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        self.instances.push(InstanceInitParams::new(
+            id,
+            name,
+            self.artifact.clone(),
+            constructor,
+        ));
+        self
+    }
+}
+
+impl Sealed for ForeignSpec {}
+
+impl Deploy for ForeignSpec {
+    fn deploy(self, genesis: &mut GenesisConfigBuilder, _: &mut RustRuntimeBuilder) {
+        let mut new_config = if let Some(deploy_spec) = self.deploy_spec {
+            mem::take(genesis).with_parametric_artifact(self.artifact, deploy_spec)
+        } else {
+            mem::take(genesis).with_artifact(self.artifact)
+        };
+
+        for instance in self.instances {
+            new_config = new_config.with_instance(instance);
+        }
+        *genesis = new_config;
+    }
+}

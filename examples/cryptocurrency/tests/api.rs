@@ -24,9 +24,9 @@ use exonum::{
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::{api, ServiceFactory};
+use exonum_rust_runtime::api;
 use exonum_testkit::{
-    explorer::api::TransactionQuery, ApiKind, TestKit, TestKitApi, TestKitBuilder,
+    explorer::api::TransactionQuery, ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder,
 };
 use pretty_assertions::assert_eq;
 use serde_json::json;
@@ -344,12 +344,9 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let artifact = CryptocurrencyService.artifact_id();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_rust_service(CryptocurrencyService)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(Spec::new(CryptocurrencyService).with_instance(INSTANCE_ID, INSTANCE_NAME, ()))
         .build();
     let api = CryptocurrencyApi {
         inner: testkit.api(),

@@ -18,8 +18,7 @@
 
 use exonum::runtime::{SnapshotExt, SUPERVISOR_INSTANCE_ID};
 use exonum_merkledb::BinaryValue;
-use exonum_rust_runtime::ServiceFactory;
-use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
     supervisor_name, ConfigChange, ConfigPropose, Schema, ServiceConfig, Supervisor,
@@ -43,17 +42,13 @@ fn assert_supervisor_config(testkit: &TestKit, config: SupervisorConfig) {
 fn initial_configuration() {
     // Check for simple mode.
     let testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
     assert_supervisor_config(&testkit, Supervisor::simple_config());
 
     // Check for decentralized mode.
     let testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
+        .with(Supervisor::decentralized())
         .build();
     assert_supervisor_config(&testkit, Supervisor::decentralized_config());
 }
@@ -63,17 +58,13 @@ fn initial_configuration() {
 #[should_panic(expected = "Invalid configuration for supervisor.")]
 fn incorrect_configuration() {
     let incorrect_config = vec![0x12, 0x34]; // Obviously incorrect config.
-    let incorrect_instance = Supervisor
-        .artifact_id()
-        .into_default_instance(SUPERVISOR_INSTANCE_ID, Supervisor::NAME)
-        .with_constructor(incorrect_config);
+    let bogus_spec = Spec::new(Supervisor).with_instance(
+        SUPERVISOR_INSTANCE_ID,
+        Supervisor::NAME,
+        incorrect_config,
+    );
 
-    let _testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(incorrect_instance)
-        .build();
-
+    TestKitBuilder::validator().with(bogus_spec).build();
     // By this moment, genesis block should be created and node is expected to panic.
 }
 
@@ -81,9 +72,7 @@ fn incorrect_configuration() {
 #[test]
 fn configure_call() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
 
     // Change config to decentralized.
@@ -111,9 +100,7 @@ fn configure_call() {
 #[test]
 fn supervisor_config_api() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
     assert_eq!(
         testkit
@@ -126,9 +113,7 @@ fn supervisor_config_api() {
 
     // Check for decentralized mode.
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
+        .with(Supervisor::decentralized())
         .build();
     assert_eq!(
         testkit

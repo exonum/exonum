@@ -119,6 +119,7 @@ pub use crate::{
     network::{TestNetwork, TestNode},
 };
 pub use exonum_explorer as explorer;
+pub use exonum_rust_runtime::spec::Spec;
 
 use exonum::{
     blockchain::{
@@ -235,16 +236,8 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let artifact = service_factory.artifact_id();
-        TestKitBuilder::validator()
-            .with_artifact(artifact.clone())
-            .with_instance(
-                artifact
-                    .into_default_instance(id, name)
-                    .with_constructor(constructor),
-            )
-            .with_rust_service(service_factory)
-            .build()
+        let spec = Spec::new(service_factory).with_instance(id, name, constructor);
+        TestKitBuilder::validator().with(spec).build()
     }
 
     fn assemble(

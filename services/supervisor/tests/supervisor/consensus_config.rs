@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::ObjectHash;
+use exonum::{helpers::ValidatorId, merkledb::ObjectHash};
 use exonum_testkit::TestKitBuilder;
-
-use exonum::helpers::ValidatorId;
-use exonum_rust_runtime::ServiceFactory;
 
 use crate::utils::*;
 use exonum_supervisor::Supervisor;
@@ -25,9 +22,7 @@ use exonum_supervisor::Supervisor;
 fn test_add_nodes_to_validators() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(1)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
+        .with(Supervisor::decentralized())
         .build();
 
     let new_node_keys = testkit.network_mut().add_node().public_keys();

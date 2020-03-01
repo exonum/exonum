@@ -19,8 +19,7 @@ use exonum::{
     merkledb::ObjectHash,
     runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::ServiceFactory;
-use exonum_testkit::TestKitBuilder;
+use exonum_testkit::{Spec, TestKitBuilder};
 
 use crate::{utils::*, IncService as ConfigChangeService};
 use exonum_supervisor::{
@@ -495,19 +494,15 @@ fn test_another_configuration_change_proposal() {
 fn test_service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
     let keypair = KeyPair::random();
-    let fake_supervisor_artifact = Supervisor.artifact_id();
-
-    let fake_supervisor_instance = fake_supervisor_artifact
-        .clone()
-        .into_default_instance(FAKE_SUPERVISOR_ID, "fake-supervisor")
-        .with_constructor(Supervisor::decentralized_config());
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_rust_service(Supervisor)
-        .with_artifact(fake_supervisor_artifact)
-        .with_instance(fake_supervisor_instance)
-        .with_default_rust_service(ConfigChangeService)
+        .with(Spec::new(Supervisor).with_instance(
+            FAKE_SUPERVISOR_ID,
+            "fake-supervisor",
+            Supervisor::decentralized_config(),
+        ))
+        .with(Spec::new(ConfigChangeService).with_default_instance())
         .build();
 
     let params = "I am a new parameter".to_owned();
