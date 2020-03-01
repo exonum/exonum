@@ -57,7 +57,7 @@
 //! # use exonum_explorer_service::api::websocket::{
 //! #     IncomingMessage, Response, SubscriptionType, Notification,
 //! # };
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! # use std::time::Duration;
 //! use websocket::OwnedMessage;
 //!
@@ -74,7 +74,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_default_rust_service(ExplorerFactory)
+//!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
 //! let api = testkit.api();
 //! let url = api.public_url("api/explorer/v1/ws");
@@ -112,7 +112,7 @@
 //! #     websocket::{IncomingMessage, Response, SubscriptionType, Notification},
 //! #     TransactionHex, TransactionResponse,
 //! # };
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! # use std::time::Duration;
 //! # use websocket::OwnedMessage;
 //! // `stringify` and `parse` functions are defined as in the previous example.
@@ -150,8 +150,8 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(ExplorerFactory)
-//!    .with_default_rust_service(MyService)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let api = testkit.api();
 //!
