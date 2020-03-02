@@ -17,7 +17,7 @@
 use actix_web::{
     http,
     web::{Payload, Query},
-    Error as ActixError, FromRequest,
+    FromRequest,
 };
 use actix_web_actors::ws;
 use exonum::blockchain::Blockchain;
@@ -27,7 +27,7 @@ use exonum_api::{
     ApiBackend,
 };
 use exonum_rust_runtime::api::ServiceApiScope;
-use futures::{Future, FutureExt};
+use futures::{future, FutureExt};
 
 use std::sync::Arc;
 
@@ -36,36 +36,30 @@ use crate::api::ExplorerApi;
 
 impl ExplorerApi {
     /// Subscribes to events.
-    fn handle_ws<Q, R>(
+    fn handle_ws<Q>(
         name: &str,
         backend: &mut actix_backend::ApiBuilder,
         blockchain: Blockchain,
         shared_state: SharedStateRef,
         extract_query: Q,
     ) where
-        Q: Fn(&HttpRequest) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = Result<SubscriptionType, ActixError>> + 'static,
+        Q: Fn(&HttpRequest) -> SubscriptionType + 'static + Clone + Send + Sync,
     {
         let handler = move |request: HttpRequest, stream: Payload| {
-            {
-                let maybe_address = shared_state.ensure_server(&blockchain);
-                let extract_query = extract_query(&request);
+            let maybe_address = shared_state.ensure_server(&blockchain);
+            let address =
+                maybe_address.ok_or_else(|| api::Error::not_found().title("Server shut down"))?;
 
-                async move {
-                    let address = maybe_address.ok_or_else(|| {
-                        api::Error::not_found().title("Server shut down")
-                    })?;
-                    let query = extract_query.await?;
-                    ws::start(Session::new(address, vec![query]), &request, stream)
-                }
-            }
-            .boxed_local()
+            let query = extract_query(&request);
+            ws::start(Session::new(address, vec![query]), &request, stream)
         };
+        let raw_handler =
+            move |request, stream| future::ready(handler(request, stream)).boxed_local();
 
         backend.raw_handler(RequestHandler {
             name: name.to_owned(),
             method: http::Method::GET,
-            inner: Arc::from(handler) as Arc<RawHandler>,
+            inner: Arc::from(raw_handler) as Arc<RawHandler>,
         });
     }
 
@@ -76,7 +70,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             self.blockchain.clone(),
             shared_state.clone(),
-            |_| async { Ok(SubscriptionType::Blocks) },
+            |_| SubscriptionType::Blocks,
         );
         // Default subscription for transactions.
         Self::handle_ws(
@@ -85,23 +79,20 @@ impl ExplorerApi {
             self.blockchain.clone(),
             shared_state.clone(),
             |request| {
-                let is_empty_query = request.query_string().is_empty();
-                let extract = Query::extract(request);
-
-                async move {
-                    if is_empty_query {
-                        return Ok(SubscriptionType::Transactions { filter: None });
-                    }
-
-                    extract
-                        .await
-                        .map(|query: Query<TransactionFilter>| {
-                            Ok(SubscriptionType::Transactions {
-                                filter: Some(query.into_inner()),
-                            })
-                        })
-                        .unwrap_or(Ok(SubscriptionType::None))
+                if request.query_string().is_empty() {
+                    return SubscriptionType::Transactions { filter: None };
                 }
+
+                // `future::Ready<_>` type annotation is redundant; it's here to check that
+                // `now_or_never` will not fail due to changes in `actix`.
+                let extract: future::Ready<_> = Query::<TransactionFilter>::extract(request);
+                extract
+                    .now_or_never()
+                    .expect("`Ready` futures always have their output immediately available")
+                    .map(|query| SubscriptionType::Transactions {
+                        filter: Some(query.into_inner()),
+                    })
+                    .unwrap_or(SubscriptionType::None)
             },
         );
         // Default websocket connection.
@@ -110,7 +101,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             self.blockchain.clone(),
             shared_state,
-            |_| async { Ok(SubscriptionType::None) },
+            |_| SubscriptionType::None,
         );
         self
     }
