@@ -132,7 +132,7 @@ impl TestNetwork {
 
     /// Updates the test network with a new consensus configuration.
     // TODO Optimize O(n^2) [ECR-3222]
-    pub fn update_consensus_config(&mut self, config: ConsensusConfig) {
+    pub fn update_consensus_config(&mut self, config: &ConsensusConfig) {
         // Assign new node roles.
         for node in &mut self.nodes {
             node.validator_id = config
@@ -175,7 +175,7 @@ pub struct TestNode {
 impl TestNode {
     /// Creates a new auditor.
     pub fn new_auditor() -> Self {
-        TestNode {
+        Self {
             keys: Keys::random(),
             validator_id: None,
         }
@@ -183,7 +183,7 @@ impl TestNode {
 
     /// Creates a new validator with the given id.
     pub fn new_validator(validator_id: ValidatorId) -> Self {
-        TestNode {
+        Self {
             keys: Keys::random(),
             validator_id: Some(validator_id),
         }
@@ -194,8 +194,8 @@ impl TestNode {
         consensus_keys: impl Into<KeyPair>,
         service_keys: impl Into<KeyPair>,
         validator_id: Option<ValidatorId>,
-    ) -> TestNode {
-        TestNode {
+    ) -> Self {
+        Self {
             keys: Keys::from_keys(consensus_keys, service_keys),
             validator_id,
         }
@@ -220,7 +220,7 @@ impl TestNode {
                 SystemTime::now().into(),
             ),
             self.keys.consensus_pk(),
-            &self.keys.consensus_sk(),
+            self.keys.consensus_sk(),
         )
     }
 

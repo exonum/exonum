@@ -71,8 +71,8 @@ impl ArtifactProtobufSpec {
         includes: impl IntoIterator<Item = impl Into<ProtoSourceFile>>,
     ) -> Self {
         Self {
-            sources: sources.into_iter().map(|x| x.into()).collect(),
-            includes: includes.into_iter().map(|x| x.into()).collect(),
+            sources: sources.into_iter().map(Into::into).collect(),
+            includes: includes.into_iter().map(Into::into).collect(),
         }
     }
 }

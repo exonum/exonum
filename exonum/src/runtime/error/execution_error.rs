@@ -18,6 +18,7 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 use exonum_proto::ProtobufConvert;
 use failure::bail;
+use protobuf::well_known_types::Empty;
 
 use std::{
     any::Any,
@@ -180,13 +181,13 @@ impl ProtobufConvert for ExecutionError {
         if let Some(runtime_id) = self.runtime_id {
             inner.set_runtime_id(runtime_id);
         } else {
-            inner.set_no_runtime_id(Default::default());
+            inner.set_no_runtime_id(Empty::new());
         }
 
         if let Some(ref call_site) = self.call_site {
             inner.set_call_site(call_site.to_pb());
         } else {
-            inner.set_no_call_site(Default::default());
+            inner.set_no_call_site(Empty::new());
         }
         inner
     }

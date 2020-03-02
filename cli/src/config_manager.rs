@@ -31,7 +31,7 @@ pub struct DefaultConfigManager {
     tx: mpsc::Sender<UpdateRequest>,
 }
 
-/// Messages for ConfigManager.
+/// Messages for `ConfigManager`.
 #[derive(Debug)]
 pub struct UpdateRequest(ConnectListConfig);
 
@@ -84,10 +84,14 @@ impl ConfigManager for DefaultConfigManager {
 
 #[cfg(test)]
 mod tests {
-    use exonum::crypto::KeyPair;
-    use exonum_node::{ConnectInfo, ConnectListConfig};
+    use exonum::{blockchain::ConsensusConfig, crypto::KeyPair, merkledb::DbOptions};
+    use exonum_node::{
+        ConnectInfo, ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig,
+    };
     use exonum_supervisor::mode::Mode;
     use tempfile::tempdir;
+
+    use std::path::PathBuf;
 
     use super::DefaultConfigManager;
     use crate::config::{GeneralConfig, NodeConfig, NodePrivateConfig, NodePublicConfig};
@@ -99,17 +103,17 @@ mod tests {
             private_config: NodePrivateConfig {
                 listen_address: "127.0.0.1:5400".parse().unwrap(),
                 external_address: "127.0.0.1:5400".to_string(),
-                master_key_path: Default::default(),
-                api: Default::default(),
-                network: Default::default(),
-                mempool: Default::default(),
-                database: Default::default(),
+                master_key_path: PathBuf::default(),
+                api: NodeApiConfig::default(),
+                network: NetworkConfiguration::default(),
+                mempool: MemoryPoolConfig::default(),
+                database: DbOptions::default(),
                 thread_pool_size: None,
-                connect_list: Default::default(),
+                connect_list: ConnectListConfig::default(),
                 consensus_public_key: KeyPair::random().public_key(),
             },
             public_config: NodePublicConfig {
-                consensus: Default::default(),
+                consensus: ConsensusConfig::default(),
                 general: GeneralConfig {
                     validators_count: 1,
                     supervisor_mode: Mode::Simple,

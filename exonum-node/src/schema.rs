@@ -72,8 +72,7 @@ where
         self.access.get_entry(CONSENSUS_ROUND).set(round);
     }
 
-    /// Saves a collection of SignedMessage to the consensus messages cache with single access to the
-    /// `Fork` instance.
+    /// Saves a collection of `SignedMessage`s to the consensus messages cache.
     pub fn save_messages<I>(&mut self, round: Round, iter: I)
     where
         I: IntoIterator<Item = Message>,

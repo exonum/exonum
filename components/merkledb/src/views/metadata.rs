@@ -67,7 +67,7 @@ impl IndexType {
     /// Checks if the index of this type is Merkelized.
     pub fn is_merkelized(self) -> bool {
         match self {
-            IndexType::ProofList | IndexType::ProofMap | IndexType::ProofEntry => true,
+            Self::ProofList | Self::ProofMap | Self::ProofEntry => true,
             _ => false,
         }
     }
@@ -99,6 +99,7 @@ impl BinaryAttribute for () {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl BinaryAttribute for u64 {
     fn size(&self) -> usize {
         mem::size_of_val(self)
@@ -123,7 +124,7 @@ impl BinaryAttribute for Hash {
     }
 
     fn read(buffer: &[u8]) -> Result<Self, Error> {
-        Hash::from_slice(buffer).ok_or_else(|| {
+        Self::from_slice(buffer).ok_or_else(|| {
             Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!(
@@ -153,7 +154,7 @@ impl BinaryAttribute for Vec<u8> {
 
 impl Default for IndexType {
     fn default() -> Self {
-        IndexType::Unknown
+        Self::Unknown
     }
 }
 
@@ -250,6 +251,7 @@ impl<V> IndexMetadata<V> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl IndexMetadata {
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;

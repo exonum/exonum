@@ -164,15 +164,13 @@ where
 /// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
 /// or in the service code, depending on the `kind` of the error.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
+#[non_exhaustive]
 pub struct CallSite {
     /// ID of the service instance handling the call.
     pub instance_id: InstanceId,
     /// Type of a call.
     #[serde(flatten)]
     pub call_type: CallType,
-
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl CallSite {
@@ -180,7 +178,6 @@ impl CallSite {
         Self {
             instance_id,
             call_type,
-            non_exhaustive: (),
         }
     }
 
@@ -191,7 +188,6 @@ impl CallSite {
                 interface: interface.into(),
                 id: call_info.method_id,
             },
-            non_exhaustive: (),
         }
     }
 }
@@ -224,7 +220,6 @@ impl ProtobufConvert for CallSite {
             }
             CallType::BeforeTransactions => pb.set_call_type(BEFORE_TRANSACTIONS),
             CallType::AfterTransactions => pb.set_call_type(AFTER_TRANSACTIONS),
-            CallType::__NonExhaustive => unreachable!(),
         }
         pb
     }
@@ -247,11 +242,9 @@ impl ProtobufConvert for CallSite {
 }
 
 /// Type of a call to a service.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum CallType {
     /// Service initialization.
     Constructor,
@@ -271,27 +264,19 @@ pub enum CallType {
     BeforeTransactions,
     /// Hook executing after processing transactions in a block.
     AfterTransactions,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[serde(skip)]
-    __NonExhaustive,
 }
 
 impl fmt::Display for CallType {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CallType::Constructor => formatter.write_str("constructor"),
-            CallType::Resume => formatter.write_str("resuming routine"),
-            CallType::Method { interface, id } if interface.is_empty() => {
+            Self::Constructor => formatter.write_str("constructor"),
+            Self::Resume => formatter.write_str("resuming routine"),
+            Self::Method { interface, id } if interface.is_empty() => {
                 write!(formatter, "method {}", id)
             }
-            CallType::Method { interface, id } => {
-                write!(formatter, "{}::(method {})", interface, id)
-            }
-            CallType::BeforeTransactions => formatter.write_str("before_transactions hook"),
-            CallType::AfterTransactions => formatter.write_str("after_transactions hook"),
-            CallType::__NonExhaustive => unreachable!(),
+            Self::Method { interface, id } => write!(formatter, "{}::(method {})", interface, id),
+            Self::BeforeTransactions => formatter.write_str("before_transactions hook"),
+            Self::AfterTransactions => formatter.write_str("after_transactions hook"),
         }
     }
 }

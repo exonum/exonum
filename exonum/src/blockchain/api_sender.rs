@@ -26,19 +26,19 @@ pub struct ApiSender<T = Verified<AnyTx>>(mpsc::Sender<T>);
 
 impl<T> Clone for ApiSender<T> {
     fn clone(&self) -> Self {
-        ApiSender(self.0.clone())
+        Self(self.0.clone())
     }
 }
 
 impl<T: Send + 'static> ApiSender<T> {
     /// Creates new `ApiSender` with the given channel.
     pub fn new(inner: mpsc::Sender<T>) -> Self {
-        ApiSender(inner)
+        Self(inner)
     }
 
     /// Creates a dummy sender which is not connected to anything and thus cannot send messages.
     pub fn closed() -> Self {
-        ApiSender(mpsc::channel(0).0)
+        Self(mpsc::channel(0).0)
     }
 
     /// Sends a message to the node asynchronously.

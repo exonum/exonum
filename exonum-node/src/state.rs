@@ -182,7 +182,7 @@ pub trait VoteMessage: Clone {
 
 impl VoteMessage for Verified<Precommit> {
     fn validator(&self) -> ValidatorId {
-        self.payload().validator()
+        self.payload().validator
     }
 }
 
@@ -275,12 +275,12 @@ impl RequestData {
     /// Returns timeout value of the data request.
     pub fn timeout(&self) -> Duration {
         let ms = match *self {
-            RequestData::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
-            RequestData::ProposeTransactions(..)
-            | RequestData::BlockTransactions
-            | RequestData::PoolTransactions => TRANSACTIONS_REQUEST_TIMEOUT,
-            RequestData::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
-            RequestData::Block(..) => BLOCK_REQUEST_TIMEOUT,
+            Self::Propose(..) => PROPOSE_REQUEST_TIMEOUT,
+            Self::ProposeTransactions(..) | Self::BlockTransactions | Self::PoolTransactions => {
+                TRANSACTIONS_REQUEST_TIMEOUT
+            }
+            Self::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
+            Self::Block(..) => BLOCK_REQUEST_TIMEOUT,
         };
         Duration::from_millis(ms)
     }
@@ -405,7 +405,7 @@ pub(crate) struct SharedConnectList {
 impl SharedConnectList {
     /// Creates `SharedConnectList` from `ConnectList`.
     pub fn from_connect_list(connect_list: ConnectList) -> Self {
-        SharedConnectList {
+        Self {
             inner: Arc::new(RwLock::new(connect_list)),
         }
     }
@@ -535,7 +535,7 @@ impl State {
             .map_or(false, |validator| self.leader(self.round()) == validator.id)
     }
 
-    /// Returns node's ConnectList.
+    /// Returns a connect list of the node.
     pub fn connect_list(&self) -> SharedConnectList {
         self.connect_list.clone()
     }
@@ -700,8 +700,13 @@ impl State {
     pub(super) fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
         self.nodes_max_height
             .iter()
-            .filter(|&(_, h)| *h > self.height())
-            .map(|(v, _)| v)
+            .filter_map(|(key, height)| {
+                if *height > self.height() {
+                    Some(key)
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
@@ -867,11 +872,11 @@ impl State {
         full_proposes.sort_unstable_by(|(hash1, round1), (hash2, round2)| {
             // Compare rounds first.
             // Note that we call `cmp` on `round2` to obtain descending order.
-            let cmp_result = round2.cmp(&round1);
+            let cmp_result = round2.cmp(round1);
             if let std::cmp::Ordering::Equal = cmp_result {
                 // Rounds are equal, compare by hash (in direct order,
                 // since it doesn't affect anything).
-                hash1.cmp(&hash2)
+                hash1.cmp(hash2)
             } else {
                 // Rounds are different, use the comparison result.
                 cmp_result
@@ -1072,7 +1077,7 @@ impl State {
         assert!(self.incomplete_block().is_none());
 
         for hash in &incomplete_block.transactions {
-            if contains_transaction(hash, &txs_map, &self.tx_cache) {
+            if contains_transaction(hash, txs_map, &self.tx_cache) {
                 if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
                     panic!("Received block with already committed transaction");
                 }

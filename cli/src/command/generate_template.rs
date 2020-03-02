@@ -14,6 +14,7 @@
 
 //! Standard Exonum CLI command used to generate common configuration file.
 
+use exonum::blockchain::ConsensusConfig;
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use failure::Error;
 use serde_derive::{Deserialize, Serialize};
@@ -43,7 +44,7 @@ pub struct GenerateTemplate {
 impl ExonumCommand for GenerateTemplate {
     fn execute(self) -> Result<StandardResult, Error> {
         let config = NodePublicConfig {
-            consensus: Default::default(),
+            consensus: ConsensusConfig::default(),
             general: GeneralConfig {
                 validators_count: self.validators_count,
                 supervisor_mode: self.supervisor_mode,

@@ -12,7 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::runtime::{ExecutionError, ExecutionFail};
 use exonum_derive::*;
+
+use std::fmt;
 
 /// General errors that can occur within supervisor interaction.
 /// Error codes 0-15.
@@ -70,6 +73,12 @@ pub enum ConfigurationError {
     IncorrectConfigurationNumber = 52,
     /// Invalid configuration for supervisor.
     InvalidConfig = 53,
+}
+
+impl ConfigurationError {
+    pub(crate) fn malformed_propose(description: impl fmt::Display) -> ExecutionError {
+        Self::MalformedConfigPropose.with_description(description)
+    }
 }
 
 /// Configuration-related errors group.

@@ -46,15 +46,14 @@ impl ExplorerApi {
         Q: Fn(&HttpRequest) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = Result<SubscriptionType, ActixError>> + 'static,
     {
-        let index = move |request: HttpRequest, stream: Payload| {
+        let handler = move |request: HttpRequest, stream: Payload| {
             {
                 let maybe_address = shared_state.ensure_server(&blockchain);
                 let extract_query = extract_query(&request);
 
                 async move {
                     let address = maybe_address.ok_or_else(|| {
-                        let msg = "Server shut down".to_owned();
-                        api::Error::not_found().title(msg)
+                        api::Error::not_found().title("Server shut down")
                     })?;
                     let query = extract_query.await?;
                     ws::start(Session::new(address, vec![query]), &request, stream)
@@ -66,7 +65,7 @@ impl ExplorerApi {
         backend.raw_handler(RequestHandler {
             name: name.to_owned(),
             method: http::Method::GET,
-            inner: Arc::from(index) as Arc<RawHandler>,
+            inner: Arc::from(handler) as Arc<RawHandler>,
         });
     }
 

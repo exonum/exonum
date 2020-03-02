@@ -121,7 +121,7 @@ impl RocksDB {
             .map_err(Into::into)
     }
 
-    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
     }
 
@@ -147,7 +147,7 @@ impl RocksDB {
                 if key.len() < LARGER_KEY.len() {
                     batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY)?;
                 } else {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], &key)?;
+                    batch.delete_range_cf::<&[u8]>(cf, &[], key)?;
                     batch.delete_cf(cf, &key)?;
                 }
             }
@@ -236,7 +236,7 @@ impl RocksDB {
 }
 
 impl RocksDBSnapshot {
-    fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+    fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
     }
 

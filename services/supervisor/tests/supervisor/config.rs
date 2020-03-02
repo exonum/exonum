@@ -341,6 +341,7 @@ fn test_try_confirm_non_existent_proposal() {
         *err,
         ErrorMatch::from_fail(&ConfigurationError::ConfigProposeNotRegistered)
             .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing("Mismatch between the hash of the saved proposal")
     );
 }
 
@@ -432,10 +433,11 @@ fn test_incorrect_actual_from_field() {
     let signed_proposal = sign_config_propose_transaction(&testkit, propose, ValidatorId(0));
     let block = testkit.create_block_with_transaction(signed_proposal);
     let err = block.transactions[0].status().unwrap_err();
+    let expected_msg = "Actual height for config proposal (3) is in the past (current height: 3)";
     assert_eq!(
         *err,
         ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
-            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(expected_msg)
     );
 }
 
@@ -797,10 +799,12 @@ fn test_discard_incorrect_configuration_number() {
         sign_config_propose_transaction(&testkit, config_proposal, ValidatorId(0));
     let block = testkit.create_block_with_transaction(signed_proposal);
     let err = block.transactions[0].status().unwrap_err();
+    let expected_msg = "Number for config proposal (100) differs from the expected one (0)";
     assert_eq!(
         *err,
         ErrorMatch::from_fail(&ConfigurationError::IncorrectConfigurationNumber)
             .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_description_containing(expected_msg)
     );
     assert_eq!(config_propose_entry(&testkit), None);
 
@@ -853,7 +857,7 @@ fn test_discard_incorrect_configuration_number() {
     assert_eq!(
         *err,
         ErrorMatch::from_fail(&ConfigurationError::IncorrectConfigurationNumber)
-            .for_service(SUPERVISOR_INSTANCE_ID)
+            .with_any_description()
     );
     assert_eq!(config_propose_entry(&testkit), None);
 }

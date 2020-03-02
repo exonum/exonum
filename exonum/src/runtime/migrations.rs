@@ -139,22 +139,18 @@ type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationE
 
 /// Types of data migrations.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum MigrationType {
     /// Fast-forward migration, that is, migration that does not actually change the data layout
     /// of a service.
     FastForward,
     /// Asynchronous data migration that can change the data layout of a service.
     Async,
-
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 /// Errors that can occur in a migration script.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum MigrationError {
     /// Error has occurred in the helper code, due to either a database-level failure (e.g.,
     /// we've run out of disc space) or the migration script getting aborted.
@@ -166,22 +162,18 @@ pub enum MigrationError {
     /// Custom error signalling that the migration cannot be completed.
     #[fail(display = "{}", _0)]
     Custom(String),
-
-    #[doc(hidden)]
-    #[fail(display = "")] // Never actually generated.
-    __NonExhaustive,
 }
 
 impl MigrationError {
     /// Creates a new migration error.
     pub fn new(cause: impl fmt::Display) -> Self {
-        MigrationError::Custom(cause.to_string())
+        Self::Custom(cause.to_string())
     }
 }
 
 impl From<db_migration::MigrationError> for MigrationError {
     fn from(err: db_migration::MigrationError) -> Self {
-        MigrationError::Helper(err)
+        Self::Helper(err)
     }
 }
 
@@ -270,6 +262,7 @@ impl MigrationScript {
 
 /// Context of a migration.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MigrationContext {
     /// The migration helper allowing to access service data and prepare migrated data.
     pub helper: MigrationHelper,
@@ -288,9 +281,6 @@ pub struct MigrationContext {
     /// [`MigrationScript`]: struct.MigrationScript.html
     /// [`MigrateData`]: trait.MigrateData.html
     pub data_version: Version,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl MigrationContext {
@@ -305,7 +295,6 @@ impl MigrationContext {
             helper,
             instance_spec,
             data_version,
-            non_exhaustive: (),
         }
     }
 }
@@ -347,10 +336,8 @@ pub trait MigrateData {
 
 /// Errors that can occur when initiating a data migration. This error indicates that the migration
 /// cannot be started.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum InitMigrationError {
     /// The start version is too far in the past.
     #[fail(
@@ -381,10 +368,6 @@ pub enum InitMigrationError {
     /// Data migrations are not supported by the artifact.
     #[fail(display = "Data migrations are not supported by the artifact")]
     NotSupported,
-
-    #[doc(hidden)]
-    #[fail(display = "")] // Never actually generated.
-    __NonExhaustive,
 }
 
 impl From<InitMigrationError> for ExecutionError {

@@ -14,7 +14,7 @@
 
 //! Supervisor is an [Exonum][exonum] service capable of the following activities:
 //!
-//! - Deploying service artifacts
+//! - Deploying service artifacts and unloading unused artifacts
 //! - Instantiating services
 //! - Changing configuration of instantiated services
 //! - Changing a state of instantiated services: stopping, freezing, resuming,
@@ -47,14 +47,14 @@
 //! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
 //! of the nodes should receive a [`DeployRequest`] message through API.
 //!
-//! To request a config change, one node should receive a [`ConfigPropose`] message through API.
+//! To request a config change, one node should submit a [`ConfigPropose`] message through API.
 //! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
-//! should also receive [`ConfigVote`] messages with a hash of the proposed configuration.
+//! should also submit [`ConfigVote`] messages with a hash of the proposed configuration.
 //! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
 //! This node votes for the configuration propose automatically.
 //!
-//! The operation of changing a service state except for data migrations is treated similarly
-//! to a configuration change and follows the same rules.
+//! Starting, resuming or freezing a service, or unloading an artifact
+//! are treated similarly to a configuration change and follow the same rules.
 //!
 //! ## Migrations Management
 //!
@@ -123,11 +123,23 @@
 //! [`ConfigPropose`]: struct.ConfigPropose.html
 //! [`ConfigVote`]: struct.ConfigVote.html
 
-#![deny(
+#![warn(
     missing_debug_implementations,
     missing_docs,
     unsafe_code,
     bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub use self::{
@@ -138,7 +150,7 @@ pub use self::{
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
         DeployResult, FreezeService, MigrationRequest, MigrationResult, ResumeService,
-        ServiceConfig, StartService, StopService, SupervisorConfig,
+        ServiceConfig, StartService, StopService, SupervisorConfig, UnloadArtifact,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -190,7 +202,7 @@ fn update_configs(
     const NO_SERVICE: &str =
         "BUG: Instance with the specified ID is absent in the dispatcher schema";
 
-    for change in changes.into_iter() {
+    for change in changes {
         match change {
             ConfigChange::Consensus(config) => {
                 log::trace!("Updating consensus configuration {:?}", config);
@@ -293,6 +305,13 @@ fn update_configs(
                     .supervisor_extensions()
                     .initiate_resuming_service(resume_service.instance_id, resume_service.params)?;
             }
+
+            ConfigChange::UnloadArtifact(unload_artifact) => {
+                log::trace!("Unloading artifact `{}`", unload_artifact.artifact_id);
+                context
+                    .supervisor_extensions()
+                    .unload_artifact(&unload_artifact.artifact_id)?;
+            }
         }
     }
     Ok(())
@@ -302,33 +321,32 @@ fn update_configs(
 /// entry if needed.
 fn assign_instance_id(context: &ExecutionContext<'_>) -> InstanceId {
     let mut schema = SchemaImpl::new(context.service_data());
-    match schema.assign_instance_id() {
-        Some(id) => id,
-        None => {
-            // Instance ID entry is not initialized, do it now.
-            // We have to do it lazy, since dispatcher doesn't know the amount
-            // of builtin instances until the genesis block is committed, and
-            // `after_transactions` hook is not invoked for services at the genesis
-            // block.
+    if let Some(id) = schema.assign_instance_id() {
+        id
+    } else {
+        // Instance ID entry is not initialized, do it now.
+        // We have to do it lazy, since dispatcher doesn't know the amount
+        // of builtin instances until the genesis block is committed, and
+        // `after_transactions` hook is not invoked for services at the genesis
+        // block.
 
-            // ID for the new instance is next to the highest builtin ID to avoid
-            // overlap if builtin identifiers space is sparse.
-            let dispatcher_schema = context.data().for_dispatcher();
-            let builtin_instances = dispatcher_schema.service_instances();
+        // ID for the new instance is next to the highest builtin ID to avoid
+        // overlap if builtin identifiers space is sparse.
+        let dispatcher_schema = context.data().for_dispatcher();
+        let builtin_instances = dispatcher_schema.service_instances();
 
-            let new_instance_id = builtin_instances
-                .values()
-                .map(|state| state.spec.id)
-                .max()
-                .unwrap_or(SUPERVISOR_INSTANCE_ID)
-                + 1;
+        let new_instance_id = builtin_instances
+            .values()
+            .map(|state| state.spec.id)
+            .max()
+            .unwrap_or(SUPERVISOR_INSTANCE_ID)
+            + 1;
 
-            // We're going to use ID obtained above, so the vacant ID is next to it.
-            let vacant_instance_id = new_instance_id + 1;
-            schema.vacant_instance_id.set(vacant_instance_id);
+        // We're going to use ID obtained above, so the vacant ID is next to it.
+        let vacant_instance_id = new_instance_id + 1;
+        schema.vacant_instance_id.set(vacant_instance_id);
 
-            new_instance_id
-        }
+        new_instance_id
     }
 }
 
@@ -372,8 +390,7 @@ impl Supervisor {
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
     pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
-        Supervisor
-            .artifact_id()
+        Self.artifact_id()
             .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
             .with_constructor(config)
     }
@@ -400,10 +417,10 @@ impl Service for Supervisor {
     }
 
     fn before_transactions(&self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        self.remove_outdated_deployments(&context);
-        self.remove_outdated_config_proposal(&context);
-        self.flush_completed_migrations(&mut context)?;
-        self.remove_outdated_migrations(&mut context)?;
+        Self::remove_outdated_deployments(&context);
+        Self::remove_outdated_config_proposal(&context);
+        Self::flush_completed_migrations(&mut context)?;
+        Self::remove_outdated_migrations(&mut context)?;
         Ok(())
     }
 
@@ -446,8 +463,8 @@ impl Service for Supervisor {
 
     /// Sends confirmation transaction for unconfirmed deployment requests.
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
-        self.process_unconfirmed_deployments(&mut context);
-        self.process_incomplete_migrations(&mut context);
+        Self::process_unconfirmed_deployments(&mut context);
+        Self::process_incomplete_migrations(&mut context);
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
@@ -457,7 +474,7 @@ impl Service for Supervisor {
 
 impl Supervisor {
     /// Removes deployments for which deadline height is already exceeded.
-    fn remove_outdated_deployments(&self, context: &ExecutionContext<'_>) {
+    fn remove_outdated_deployments(context: &ExecutionContext<'_>) {
         let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
@@ -480,7 +497,7 @@ impl Supervisor {
     }
 
     /// Removes pending config proposal if it's outdated.
-    fn remove_outdated_config_proposal(&self, context: &ExecutionContext<'_>) {
+    fn remove_outdated_config_proposal(context: &ExecutionContext<'_>) {
         let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
@@ -497,7 +514,7 @@ impl Supervisor {
 
     /// Goes through pending deployments, chooses ones that we're not confirmed by our node
     /// and starts the local deployment routine for them.
-    fn process_unconfirmed_deployments(&self, context: &mut AfterCommitContext<'_>) {
+    fn process_unconfirmed_deployments(context: &mut AfterCommitContext<'_>) {
         let service_key = context.service_key();
 
         let deployments: Vec<_> = {
@@ -506,12 +523,12 @@ impl Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
+                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(request) {
                         // From all pending requests we are interested only in ones not
                         // confirmed by us.
                         !schema
                             .deploy_confirmations
-                            .confirmed_by(&request, &service_key)
+                            .confirmed_by(request, &service_key)
                     } else {
                         false
                     }
@@ -547,7 +564,6 @@ impl Supervisor {
     /// This has to be done in the block other than one in which migration was committed,
     /// so this method is invoked in `before_transactions` of the next block.
     fn flush_completed_migrations(
-        &self,
         context: &mut ExecutionContext<'_>,
     ) -> Result<(), ExecutionError> {
         let mut schema = SchemaImpl::new(context.service_data());
@@ -576,7 +592,7 @@ impl Supervisor {
 
             // Update the state of a migration.
             let mut state = schema.migration_state_unchecked(&request);
-            let instance = transactions::get_instance_by_name(&context, request.service.as_ref())
+            let instance = transactions::get_instance_by_name(context, request.service.as_ref())
                 .expect("BUG: Migration succeed, but there is no such instance in core");
             state.update(AsyncEventState::Succeed, instance.data_version().clone());
             schema.migration_states.put(&request, state);
@@ -587,7 +603,6 @@ impl Supervisor {
 
     /// Rollbacks and removes migrations for which deadline height is already exceeded.
     fn remove_outdated_migrations(
-        &self,
         context: &mut ExecutionContext<'_>,
     ) -> Result<(), ExecutionError> {
         let height = context.data().for_core().height();
@@ -628,7 +643,7 @@ impl Supervisor {
     }
 
     /// Goes through incomplete migrations, checking their statuses.
-    fn process_incomplete_migrations(&self, context: &mut AfterCommitContext<'_>) {
+    fn process_incomplete_migrations(context: &mut AfterCommitContext<'_>) {
         let service_key = context.service_key();
 
         // First of all, check all the new migrations and request core to start them.

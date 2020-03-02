@@ -55,7 +55,7 @@ impl ConnectList {
             .map(|peer| (peer.public_key, peer.address))
             .collect();
 
-        ConnectList { peers }
+        Self { peers }
     }
 
     /// Creates `ConnectList` from the previously saved list of peers.
@@ -110,12 +110,12 @@ impl ConnectListConfig {
             })
             .collect();
 
-        ConnectListConfig { peers }
+        Self { peers }
     }
 
     /// Creates a `ConnectListConfig` from `ConnectList`.
     pub(super) fn from_connect_list(connect_list: &SharedConnectList) -> Self {
-        ConnectListConfig {
+        Self {
             peers: connect_list.peers(),
         }
     }

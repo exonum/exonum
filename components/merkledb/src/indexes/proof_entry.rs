@@ -266,7 +266,7 @@ mod tests {
             }
 
             fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-                u8::from_bytes(bytes).map(CustomHash)
+                u8::from_bytes(bytes).map(Self)
             }
         }
 

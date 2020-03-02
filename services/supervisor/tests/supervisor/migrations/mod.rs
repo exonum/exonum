@@ -18,7 +18,7 @@ use exonum::{
     merkledb::access::Prefixed,
     runtime::{
         migrations::MigrationStatus, versioning::Version, CoreError, ErrorMatch, ExecutionError,
-        InstanceId, SUPERVISOR_INSTANCE_ID,
+        InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID,
     },
 };
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
@@ -582,13 +582,27 @@ async fn migration_no_consensus() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
+    let new_artifact = MigrationServiceV02.artifact_id();
     let request = MigrationRequest {
-        new_artifact: MigrationServiceV02.artifact_id(),
+        new_artifact: new_artifact.clone(),
         service: MigrationService::INSTANCE_NAME.into(),
         deadline_height,
     };
-
     send_migration_request(&mut testkit, request.clone()).await;
+
+    // Check that the target artifact cannot be unloaded now.
+    let config = ConfigPropose::immediate(1).unload_artifact(new_artifact.clone());
+    let signed_config = testkit
+        .us()
+        .service_keypair()
+        .propose_config_change(SUPERVISOR_INSTANCE_ID, config.clone());
+    let err = execute_transaction(&mut testkit, signed_config).unwrap_err();
+    let expected_msg = "`512:migration-service` references it as the data migration target";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&ConfigurationError::MalformedConfigPropose)
+            .with_description_containing(expected_msg)
+    );
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
@@ -622,6 +636,19 @@ async fn migration_no_consensus() {
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
 
     migration_service::v01::verify_schema(prefixed);
+
+    // The target artifact can be unloaded now that the migration is timed out.
+    // Since config proposal don't feature a seed, we authorize the proposal from another validator.
+    let signed_config = testkit.network().validators()[1]
+        .service_keypair()
+        .propose_config_change(SUPERVISOR_INSTANCE_ID, config);
+    execute_transaction(&mut testkit, signed_config).unwrap();
+
+    let snapshot = testkit.snapshot();
+    assert!(snapshot
+        .for_dispatcher()
+        .get_artifact(&new_artifact)
+        .is_none());
 }
 
 /// Test for a migration workflow with multiple validators.

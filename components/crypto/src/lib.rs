@@ -26,22 +26,17 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // `filter(..).map(..)` often looks more shorter and readable.
-    clippy::filter_map,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // Variant name ends with the enum name. Similar behavior to similar_names.
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
-    clippy::use_self,
-    clippy::default_trait_access,
-    // Too much work to fix this issues.
-    clippy::missing_errors_doc,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 #[macro_use]
@@ -231,7 +226,7 @@ pub struct HashStream(crypto_impl::HashState);
 impl HashStream {
     /// Creates a new instance of `HashStream`.
     pub fn new() -> Self {
-        HashStream(crypto_impl::HashState::init())
+        Self(crypto_impl::HashState::init())
     }
 
     /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
@@ -286,7 +281,7 @@ impl SignStream {
     /// let stream = SignStream::new();
     /// ```
     pub fn new() -> Self {
-        SignStream(crypto_impl::SignState::init())
+        Self(crypto_impl::SignState::init())
     }
 
     /// Adds a new `chunk` to the message that will eventually be signed and/or verified.

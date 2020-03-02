@@ -72,6 +72,10 @@
 //!   to assume that a deployment failure at this stage is local to the node and
 //!   could be fixed by the node admin.
 //!
+//! 6. If the artifact is not associated with any services, it can be *unloaded*. Unloading
+//!   the artifact may free resources associated with in in the corresponding runtime.
+//!   Like other lifecycle events, unloading an artifact is controlled by the supervisor service.
+//!
 //! # Service Lifecycle
 //!
 //! 1. Once the artifact is committed, it is possible to instantiate the corresponding service.
@@ -240,20 +244,14 @@ mod types;
 pub const SUPERVISOR_INSTANCE_ID: InstanceId = 0;
 
 /// List of predefined runtimes.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(u32)]
+#[non_exhaustive]
 pub enum RuntimeIdentifier {
     /// Built-in Rust runtime.
     Rust = 0,
     /// Exonum Java Binding runtime.
     Java = 1,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl From<RuntimeIdentifier> for u32 {
@@ -265,8 +263,8 @@ impl From<RuntimeIdentifier> for u32 {
 impl RuntimeIdentifier {
     fn transform(id: u32) -> Result<Self, ()> {
         match id {
-            0 => Ok(RuntimeIdentifier::Rust),
-            1 => Ok(RuntimeIdentifier::Java),
+            0 => Ok(Self::Rust),
+            1 => Ok(Self::Java),
             _ => Err(()),
         }
     }
@@ -275,32 +273,25 @@ impl RuntimeIdentifier {
 impl fmt::Display for RuntimeIdentifier {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RuntimeIdentifier::Rust => formatter.write_str("Rust runtime"),
-            RuntimeIdentifier::Java => formatter.write_str("Java runtime"),
-            RuntimeIdentifier::__NonExhaustive => unreachable!("Never actually generated"),
+            Self::Rust => formatter.write_str("Rust runtime"),
+            Self::Java => formatter.write_str("Java runtime"),
         }
     }
 }
 
 /// Optional features that may or may not be supported by a particular `Runtime`.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum RuntimeFeature {
     /// Freezing services: disabling APIs mutating service state (e.g., transactions)
     /// while leaving read-only APIs switched on.
     FreezingServices,
-
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl fmt::Display for RuntimeFeature {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            RuntimeFeature::FreezingServices => formatter.write_str("freezing services"),
-            RuntimeFeature::__NonExhaustive => unreachable!(),
+            Self::FreezingServices => formatter.write_str("freezing services"),
         }
     }
 }
@@ -325,12 +316,26 @@ impl fmt::Display for RuntimeFeature {
 ///
 /// ```text
 /// LIFE ::= initialize (GENESIS | RESUME) BLOCK* shutdown
-/// GENESIS ::= (deploy_artifact | initiate_adding_service update_service_status)* after_commit
-/// RESUME ::= (deploy_artifact | update_service_status)* on_resume
+/// GENESIS ::=
+///     deploy_artifact*
+///     (initiate_adding_service update_service_status)*
+///     after_commit
+/// RESUME ::= (deploy_artifact | update_service_status | migrate)* on_resume
 /// BLOCK* ::= PROPOSAL+ COMMIT
-/// PROPOSAL ::= before_transactions* (execute | initiate_adding_service)* after_transactions*
-/// COMMIT ::= deploy_artifact* update_service_status* after_commit
+/// PROPOSAL ::=
+///     (before_transactions CALL*)*
+///     (execute CALL*)*
+///     (after_transactions CALL*)*
+/// CALL ::= execute | initiate_adding_service | initiate_resuming_service | migrate
+/// COMMIT ::=
+///     (deploy_artifact | unload_artifact)*
+///     (update_service_status | migrate)*
+///     after_commit
 /// ```
+///
+/// `before_transactions`, `execute` and `after_transactions` handlers may spawn
+/// child calls among services; this is denoted as `CALL*` in the excerpt above. The child calls
+/// are executed synchronously. See the [*Service Interaction*] article for more details.
 ///
 /// The ordering for the "read-only" methods `is_artifact_deployed` and `is_supported` in relation
 /// to the lifecycle above is not specified.
@@ -357,6 +362,8 @@ impl fmt::Display for RuntimeFeature {
 /// Panics in the `Runtime` methods are **not** caught. A panic in the runtime method will cause
 /// the node termination. To catch panics in the Rust code and convert them to unchecked execution
 /// errors, use the [`catch_panic`](fn.catch_panic.html) method.
+///
+/// [*Service Interaction*]: https://exonum.com/doc/version/latest/advanced/service-interaction/
 #[allow(unused_variables)]
 pub trait Runtime: Send + fmt::Debug + 'static {
     /// Initializes the runtime, providing a `Blockchain` instance for further use.
@@ -391,7 +398,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// The default implementation does nothing.
     fn on_resume(&mut self) {}
 
-    /// A request to deploy an artifact with the given identifier and an additional deploy
+    /// Requests to deploy an artifact with the given identifier and an additional deploy
     /// specification.
     ///
     /// This method is called *once* for a specific artifact during the `Runtime` lifetime:
@@ -403,11 +410,31 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// Core guarantees that there will be no request to deploy an artifact which is already deployed,
     /// thus runtime should not report an attempt to do so as `ExecutionError`, but should consider it
     /// a bug in core.
-    // TODO: Elaborate constraints on `Runtime::deploy_artifact` futures (ECR-3840)
     fn deploy_artifact(&mut self, artifact: ArtifactId, deploy_spec: Vec<u8>) -> oneshot::Receiver;
 
     /// Returns `true` if the specified artifact is deployed in this runtime.
-    fn is_artifact_deployed(&self, id: &ArtifactId) -> bool;
+    fn is_artifact_deployed(&self, artifact: &ArtifactId) -> bool;
+
+    /// Requests to unload an artifact with the given identifier. Unloading may free resources
+    /// (e.g., RAM) associated with the artifact.
+    ///
+    /// The following invariants are guaranteed to hold when this call is performed:
+    ///
+    /// - The artifact is deployed
+    /// - There are no services with any status associated with the artifact, either as
+    ///   an artifact [responsible for service logic][assoc-artifact] or as a [migration target]
+    ///   of the data migration in a service.
+    ///
+    /// The default implementation does nothing. While this may be inefficient, this implementation
+    /// is logically accurate. Indeed, the runtime retains resources associated with the artifact
+    /// (until the node is restarted), but on the blockchain level, the artifact is considered
+    /// unloaded.
+    ///
+    /// [assoc-artifact]: struct.InstanceState.html#method.associated_artifact
+    /// [migration target]: migrations/struct.InstanceMigration.html#structfield.target
+    fn unload_artifact(&mut self, artifact: &ArtifactId) {
+        // The default implementation does nothing.
+    }
 
     /// Runs the constructor of a new service instance with the given specification
     /// and initial arguments. The constructor can initialize the storage of the service,
@@ -648,6 +675,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     fn shutdown(&mut self) {}
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T: Runtime> From<T> for Box<dyn Runtime> {
     fn from(value: T) -> Self {
         Box::new(value)
@@ -667,35 +695,30 @@ pub trait WellKnownRuntime: Runtime {
 ///
 /// [`Runtime`]: trait.Runtime.html
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct RuntimeInstance {
     /// Identifier of the enclosed runtime.
     pub id: u32,
     /// Enclosed `Runtime` object.
     pub instance: Box<dyn Runtime>,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl RuntimeInstance {
     /// Constructs a new `RuntimeInstance` object.
     pub fn new(id: u32, instance: Box<dyn Runtime>) -> Self {
-        Self {
-            id,
-            instance,
-            non_exhaustive: (),
-        }
+        Self { id, instance }
     }
 }
 
 impl<T: WellKnownRuntime> From<T> for RuntimeInstance {
     fn from(runtime: T) -> Self {
-        RuntimeInstance::new(T::ID, runtime.into())
+        Self::new(T::ID, runtime.into())
     }
 }
 
 /// Instance descriptor contains information to access the running service instance.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct InstanceDescriptor {
     /// A unique numeric ID of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.id)
@@ -703,9 +726,6 @@ pub struct InstanceDescriptor {
     /// A unique name of the service instance.
     /// [Read more.](struct.InstanceSpec.html#structfield.name)
     pub name: String,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl InstanceDescriptor {
@@ -714,13 +734,12 @@ impl InstanceDescriptor {
         Self {
             id,
             name: name.into(),
-            non_exhaustive: (),
         }
     }
 }
 
 impl fmt::Display for InstanceDescriptor {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(formatter, "{}:{}", self.id, self.name)
     }
 }

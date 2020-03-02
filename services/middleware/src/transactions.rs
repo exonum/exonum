@@ -49,6 +49,7 @@ pub struct CheckedCall {
 mod pb_version_req {
     use super::*;
 
+    #[allow(clippy::needless_pass_by_value)] // required by `exonum-proto`
     pub fn from_pb(pb: String) -> Result<VersionReq, failure::Error> {
         pb.parse().map_err(From::from)
     }

@@ -224,6 +224,7 @@ impl CounterApi {
         let service_keys = builder.blockchain().service_keypair().to_owned();
         builder.public_scope().endpoint_mut(
             "incorrect-tx",
+            // FIXME: improve code quality
             move |_state: ServiceApiState, by: u64| {
                 let api_sender = api_sender.clone();
                 let service_keys = service_keys.clone();

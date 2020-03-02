@@ -825,7 +825,7 @@ impl PublicApi {
 struct PrivateApi;
 
 impl PrivateApi {
-    fn broadcaster(state: ServiceApiState) -> Result<Broadcaster, api::Error> {
+    fn broadcaster(state: &ServiceApiState) -> Result<Broadcaster, api::Error> {
         state.broadcaster().ok_or_else(|| {
             api::Error::bad_request()
                 .title("Invalid broadcast request")
@@ -839,7 +839,7 @@ impl PrivateApi {
         state: ServiceApiState,
         artifact: DeployRequest,
     ) -> Result<Hash, api::Error> {
-        Self::broadcaster(state)?
+        Self::broadcaster(&state)?
             .request_artifact_deploy((), artifact)
             .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
@@ -851,7 +851,7 @@ impl PrivateApi {
         state: ServiceApiState,
         request: MigrationRequest,
     ) -> Result<Hash, api::Error> {
-        Self::broadcaster(state)?
+        Self::broadcaster(&state)?
             .request_migration((), request)
             .await
             .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
@@ -863,7 +863,7 @@ impl PrivateApi {
         state: ServiceApiState,
         proposal: ConfigPropose,
     ) -> Result<Hash, api::Error> {
-        Self::broadcaster(state)?
+        Self::broadcaster(&state)?
             .propose_config_change((), proposal)
             .await
             .map_err(|err| api::Error::internal(err).title("Config propose failed"))
@@ -872,7 +872,7 @@ impl PrivateApi {
     /// Creates and broadcasts the `ConfigVote` transaction, which is signed
     /// by the current node, and returns its hash.
     async fn confirm_config(state: ServiceApiState, vote: ConfigVote) -> Result<Hash, api::Error> {
-        Self::broadcaster(state)?
+        Self::broadcaster(&state)?
             .confirm_config_change((), vote)
             .await
             .map_err(|err| api::Error::internal(err).title("Config vote failed"))

@@ -35,6 +35,25 @@
 
 // spell-checker:ignore cors
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
+
 pub use crate::{
     connect_list::{ConnectInfo, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
@@ -117,6 +136,7 @@ pub mod _bench_types {
 /// This enum is not intended to be exhaustively matched. New variants may be added to it
 /// without breaking semver compatibility.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
@@ -124,8 +144,6 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 /// Node timeout types.
@@ -218,7 +236,7 @@ impl Default for NodeApiConfig {
             private_api_address: None,
             public_allow_origin: None,
             private_allow_origin: None,
-            server_restart: Default::default(),
+            server_restart: ServerRestartPolicy::default(),
         }
     }
 }
@@ -416,23 +434,23 @@ pub(crate) enum NodeRole {
 
 impl Default for NodeRole {
     fn default() -> Self {
-        NodeRole::Auditor
+        Self::Auditor
     }
 }
 
 impl NodeRole {
-    /// Constructs new NodeRole from `validator_id`.
+    /// Constructs new `NodeRole` from `validator_id`.
     pub fn new(validator_id: Option<ValidatorId>) -> Self {
         match validator_id {
-            Some(validator_id) => NodeRole::Validator(validator_id),
-            None => NodeRole::Auditor,
+            Some(validator_id) => Self::Validator(validator_id),
+            None => Self::Auditor,
         }
     }
 
     /// Checks if node is validator.
     pub fn is_validator(self) -> bool {
         match self {
-            NodeRole::Validator(_) => true,
+            Self::Validator(_) => true,
             _ => false,
         }
     }
@@ -471,7 +489,7 @@ impl NodeHandler {
                 &user_agent(),
             ),
             config.keys.consensus_pk(),
-            &config.keys.consensus_sk(),
+            config.keys.consensus_sk(),
         );
 
         let connect_list = config.connect_list;
@@ -1233,15 +1251,15 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, 
             let config = NodeConfig {
                 listen_address: peers[idx].parse().unwrap(),
                 external_address: peers[idx].clone(),
-                network: Default::default(),
+                network: NetworkConfiguration::default(),
                 consensus: consensus.clone(),
                 connect_list: ConnectListConfig::from_validator_keys(
                     &consensus.validator_keys,
                     &peers,
                 ),
-                api: Default::default(),
-                mempool: Default::default(),
-                thread_pool_size: Default::default(),
+                api: NodeApiConfig::default(),
+                mempool: MemoryPoolConfig::default(),
+                thread_pool_size: None,
             };
             (config, keys)
         })

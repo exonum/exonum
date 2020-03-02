@@ -454,7 +454,7 @@ pub struct MigrationHelper {
 }
 
 impl fmt::Debug for MigrationHelper {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_tuple("MigrationHelper")
             .field(&self.namespace)

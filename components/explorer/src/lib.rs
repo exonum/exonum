@@ -29,6 +29,27 @@
 //! [`BlockWithTransactions`]: struct.BlockWithTransactions.html
 //! [testkit]: https://docs.rs/exonum-testkit/latest/exonum_testkit/struct.TestKit.html
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc,
+    // False positive: WebSocket
+    clippy::doc_markdown
+)]
+
 use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{Block, CallInBlock, CallProof, Schema, TxLocation},
@@ -809,7 +830,7 @@ pub fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Ut
     if precommits.is_empty() {
         UNIX_EPOCH.into()
     } else {
-        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time()).collect();
+        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time).collect();
         times.sort();
         times[times.len() / 2]
     }
