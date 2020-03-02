@@ -220,18 +220,17 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
         self.inner.endpoint(name, move |query: Q| {
-            // TODO Try to avoid handler and descriptor extra cloning here. [ECR-4269]
-            let handler = handler.clone();
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return future::err(err).left_future(),
+            };
 
-            async move {
-                let state = maybe_state?;
-                let descriptor = state.instance().clone();
-                handler(state, query)
-                    .await
-                    .map_err(|err| err.source(descriptor.to_string()))
-            }
+            let descriptor = descriptor.clone();
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
         });
         self
     }
@@ -250,17 +249,17 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
         self.inner.endpoint_mut(name, move |query: Q| {
-            let handler = handler.clone();
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return future::err(err).left_future(),
+            };
 
-            async move {
-                let state = maybe_state?;
-                let descriptor = state.instance().clone();
-                handler(state, query)
-                    .await
-                    .map_err(|err| err.source(descriptor.to_string()))
-            }
+            let descriptor = descriptor.clone();
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
         });
         self
     }
@@ -285,17 +284,17 @@ impl ServiceApiScope {
         let handler = deprecated.handler.clone();
 
         let handler = move |query: Q| {
-            let handler = handler.clone();
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return future::err(err).left_future(),
+            };
 
-            async move {
-                let state = maybe_state?;
-                let descriptor = state.instance().clone();
-                handler(state, query)
-                    .await
-                    .map_err(|err| err.source(descriptor.to_string()))
-            }
+            let descriptor = descriptor.clone();
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
@@ -323,17 +322,17 @@ impl ServiceApiScope {
         let handler = deprecated.handler.clone();
 
         let handler = move |query: Q| {
-            let handler = handler.clone();
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return future::err(err).left_future(),
+            };
 
-            async move {
-                let state = maybe_state?;
-                let descriptor = state.instance().clone();
-                handler(state, query)
-                    .await
-                    .map_err(|err| err.source(descriptor.to_string()))
-            }
+            let descriptor = descriptor.clone();
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
         };
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(handler);
