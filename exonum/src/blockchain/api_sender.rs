@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use failure::Fail;
-use futures::{compat::Future01CompatExt, Future};
+use futures::{compat::Future01CompatExt, executor::block_on, Future};
 use futures_01::{sync::mpsc, Future as _, Sink};
 
 use std::fmt;
@@ -61,7 +61,7 @@ impl<T: Send + 'static> ApiSender<T> {
     ///
     /// The failure means that the node is being shut down.
     pub fn send_message_blocking(&self, message: T) -> Result<(), SendError> {
-        futures::executor::block_on(self.send_message(message))
+        block_on(self.send_message(message))
     }
 }
 

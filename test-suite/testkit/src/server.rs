@@ -253,6 +253,7 @@ impl Handler<RollBack> for TestKitActor {
 
 #[cfg(test)]
 mod tests {
+    use actix_rt::time::delay_for;
     use exonum::{
         crypto::{gen_keypair, Hash},
         helpers::Height,
@@ -311,17 +312,18 @@ mod tests {
             .with_rust_service(service)
             .build();
         testkit.create_blocks_until(height);
+
         // Process incoming events in background.
         let events = testkit.remove_events_stream();
-        thread::spawn(|| futures::executor::block_on(events));
+        actix_rt::spawn(events);
 
         let api_sender = testkit.api_sender.clone();
         let (aggregator, _) = TestKitActor::spawn(testkit);
         TestKitApi::from_raw_parts(aggregator, api_sender)
     }
 
-    fn sleep() {
-        thread::sleep(Duration::from_millis(20));
+    async fn sleep() {
+        delay_for(Duration::from_millis(20)).await;
     }
 
     #[actix_rt::test]
@@ -329,7 +331,7 @@ mod tests {
         let api = init_handler(Height(0));
         let tx = timestamp("foo");
         api.send(tx.clone()).await;
-        sleep();
+        sleep().await;
 
         // Test a bodiless request
         let block_info: BlockWithTransactions = api
@@ -351,7 +353,7 @@ mod tests {
             .unwrap();
         assert_eq!(block_info.header.height, Height(0));
         api.send(tx.clone()).await;
-        sleep();
+        sleep().await;
 
         let block_info: BlockWithTransactions = api
             .private("api/testkit")
@@ -371,7 +373,7 @@ mod tests {
         let tx_bar = timestamp("bar");
         api.send(tx_foo.clone()).await;
         api.send(tx_bar.clone()).await;
-        sleep();
+        sleep().await;
 
         let body = CreateBlock {
             tx_hashes: Some(vec![tx_foo.object_hash()]),
