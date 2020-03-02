@@ -29,8 +29,8 @@ fn create_testkit() -> TestKit {
         .build()
 }
 
-#[test]
-fn info() {
+#[actix_rt::test]
+async fn info() {
     // This test checks whether the endpoint returns expected result and correctness of
     // serialize. Expected results:
     //
@@ -39,7 +39,7 @@ fn info() {
     let mut testkit = create_testkit();
     let api = testkit.api();
 
-    let info: NodeInfo = api.private(ApiKind::System).get("v1/info").unwrap();
+    let info: NodeInfo = api.private(ApiKind::System).get("v1/info").await.unwrap();
     let expected = NodeInfo {
         consensus_status: ConsensusStatus::Enabled,
         connected_peers: vec![],
@@ -50,11 +50,11 @@ fn info() {
     assert_eq!(info, expected);
 }
 
-#[test]
-fn stats() {
+#[actix_rt::test]
+async fn stats() {
     let mut testkit = create_testkit();
     let api = testkit.api();
-    let info: NodeStats = api.private(ApiKind::System).get("v1/stats").unwrap();
+    let info: NodeStats = api.private(ApiKind::System).get("v1/stats").await.unwrap();
     let expected = NodeStats {
         height: 0,
         tx_pool_size: 0,
@@ -65,12 +65,13 @@ fn stats() {
     assert_eq!(info, expected);
 }
 
-#[test]
-fn shutdown() {
+#[actix_rt::test]
+async fn shutdown() {
     let mut testkit = create_testkit();
     let api = testkit.api();
     api.private(ApiKind::System)
         .post::<()>("v1/shutdown")
+        .await
         .unwrap();
     let control_messages = testkit.poll_control_messages();
     match control_messages.as_slice() {

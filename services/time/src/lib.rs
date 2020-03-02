@@ -143,7 +143,7 @@ impl Service for TimeService {
         // the transaction with the current time.
         if let Some(broadcast) = context.broadcaster() {
             let time = TxTime::new(self.time.current_time());
-            broadcast.report_time((), time).ok();
+            broadcast.blocking().report_time((), time).ok();
         }
     }
 

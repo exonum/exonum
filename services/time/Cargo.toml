@@ -25,6 +25,7 @@ exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
 failure = "0.1.5"
+futures = "0.3.4"
 protobuf = "2.8.0"
 serde = "1.0"
 serde_derive = "1.0"
@@ -35,6 +36,7 @@ exonum-cli = { version = "1.0.0-rc.1", path = "../../cli" }
 exonum-supervisor = { version = "1.0.0-rc.1", path = "../supervisor" }
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
+actix-rt = "1.0.0"
 bincode = "1.2.1"
 pretty_assertions = "0.6.1"
 

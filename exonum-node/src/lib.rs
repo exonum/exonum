@@ -53,20 +53,20 @@ use exonum::{
     runtime::RuntimeInstance,
 };
 use exonum_api::{
-    backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiAggregator, ApiManager,
-    ApiManagerConfig, UpdateEndpoints, WebServerConfig,
+    AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
+    WebServerConfig,
 };
 use failure::{ensure, format_err, Error};
-use futures::{sync::mpsc, Future, Sink};
+use futures::{compat::Stream01CompatExt, stream::TryStreamExt};
+use futures_01::{sync::mpsc, Sink};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio_core::reactor::Core;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fmt,
+    fmt, io,
     net::SocketAddr,
     sync::Arc,
     thread,
@@ -801,8 +801,8 @@ impl ShutdownHandle {
     /// # Return value
     ///
     /// The failure means that the node is already being shut down.
-    pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
-        self.inner.send_message(ExternalMessage::Shutdown)
+    pub async fn shutdown(self) -> Result<(), SendError> {
+        self.inner.send_message(ExternalMessage::Shutdown).await
     }
 }
 
@@ -1110,30 +1110,22 @@ impl Node {
     fn run_handler(mut self, handshake_params: HandshakeParams) -> Result<(), Error> {
         self.handler.initialize();
 
-        let pool_size = self.thread_pool_size;
         let (handler_part, network_part, internal_part) = self.into_reactor();
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new().map_err(into_failure)?;
+            let mut core = CompatRuntime::new().map_err(into_failure)?;
             let handle = core.handle();
 
-            let mut pool_builder = ThreadPoolBuilder::new();
-            if let Some(pool_size) = pool_size {
-                pool_builder.pool_size(pool_size as usize);
-            }
-            let thread_pool = pool_builder.build();
-            let executor = thread_pool.sender().clone();
-
-            core.handle().spawn(internal_part.run(handle, executor));
+            core.spawn(internal_part.run(handle));
 
             let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler)
+            core.block_on(network_handler)
                 .map(drop)
                 .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
         });
 
-        let mut core = Core::new().map_err(into_failure)?;
-        core.run(handler_part.run())
+        let mut core = CompatRuntime::new().map_err(into_failure)?;
+        core.block_on(handler_part.run())
             .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
 
         network_thread.join().unwrap()
@@ -1157,8 +1149,20 @@ impl Node {
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list();
-        let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
-        SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
+
+        let api_manager = ApiManager::new(self.api_manager_config);
+        let endpoints = self.channel.endpoints.1;
+        thread::spawn(move || {
+            actix_rt::System::new("exonum-node").block_on(api_manager.run(
+                endpoints.compat().map_err(|_| {
+                    io::Error::new(
+                        io::ErrorKind::Other,
+                        "Unable to receive `UpdateEndpoints` event",
+                    )
+                }),
+            ))
+        });
+
         let (network_tx, network_rx) = self.channel.network_events;
         let internal_requests_rx = self.channel.internal_requests.1;
         let network_part = NetworkPart {

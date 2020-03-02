@@ -59,11 +59,13 @@ impl Service for MainService {
 
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         if let Some(broadcaster) = context.broadcaster() {
-            if let Err(e) = broadcaster.timestamp((), context.height()) {
+            let height = context.height();
+            let service_key = context.service_key();
+            if let Err(e) = broadcaster.blocking().timestamp((), height) {
                 log::error!(
                     "[{}] Failed to broadcast transaction at height {}: {}",
-                    context.service_key(),
-                    context.height(),
+                    service_key,
+                    height,
                     e
                 );
             }

@@ -40,8 +40,8 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 }
 
 /// Performs basic get request to detect that API works at all.
-#[test]
-fn ping_pong() {
+#[actix_rt::test]
+async fn ping_pong() {
     let (_testkit, api) = init_testkit();
 
     let ping = PingQuery { value: 64 };
@@ -49,18 +49,20 @@ fn ping_pong() {
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .get("ping-pong")
+        .await
         .expect("Request to the valid endpoint failed");
     assert_eq!(ping.value, pong);
 }
 
-#[test]
-fn submit_tx() {
+#[actix_rt::test]
+async fn submit_tx() {
     let (mut testkit, api) = init_testkit();
 
     let ping = PingQuery { value: 64 };
     api.public(ApiKind::Service("api-service"))
         .query(&ping)
         .post::<()>("submit-tx")
+        .await
         .expect("Request to the valid endpoint failed");
     let block = testkit.create_block();
     assert_eq!(block.len(), 1);
@@ -73,8 +75,8 @@ fn submit_tx() {
 
 /// Checks that for deprecated endpoints the corresponding warning is added to the headers
 /// of the response.
-#[test]
-fn deprecated() {
+#[actix_rt::test]
+async fn deprecated() {
     let (_testkit, api) = init_testkit();
 
     let ping = PingQuery { value: 64 };
@@ -91,6 +93,7 @@ fn deprecated() {
         .query(&ping)
         .expect_header("Warning", UNBOUND_WARNING)
         .get("ping-pong-deprecated")
+        .await
         .expect("Request to the valid endpoint failed");
     assert_eq!(ping.value, pong);
 
@@ -99,6 +102,7 @@ fn deprecated() {
         .query(&ping)
         .expect_header("Warning", WARNING_WITH_DEADLINE)
         .get("ping-pong-deprecated-with-deadline")
+        .await
         .expect("Request to the valid endpoint failed");
     assert_eq!(ping.value, pong);
 
@@ -107,13 +111,14 @@ fn deprecated() {
         .query(&ping)
         .expect_header("Warning", UNBOUND_WARNING)
         .post("ping-pong-deprecated-mut")
+        .await
         .expect("Request to the valid endpoint failed");
     assert_eq!(ping.value, pong);
 }
 
 /// Checks that endpoints marked as `Gone` return the corresponding HTTP error.
-#[test]
-fn gone() {
+#[actix_rt::test]
+async fn gone() {
     let (_testkit, api) = init_testkit();
 
     let ping = PingQuery { value: 64 };
@@ -122,6 +127,7 @@ fn gone() {
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .get::<u64>("gone-immutable")
+        .await
         .expect_err("Request to the `Gone` endpoint succeed");
 
     assert_eq!(pong_error.http_code, api::HttpStatusCode::GONE);
@@ -134,6 +140,7 @@ fn gone() {
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .post::<u64>("gone-mutable")
+        .await
         .expect_err("Request to the `Gone` endpoint succeed");
 
     assert_eq!(pong_error.http_code, api::HttpStatusCode::GONE);
@@ -145,8 +152,8 @@ fn gone() {
 
 /// Checks that endpoints marked as `MovedPermanently` return the corresponding HTTP error, and
 /// the response contains location in headers.
-#[test]
-fn moved() {
+#[actix_rt::test]
+async fn moved() {
     let (_testkit, api) = init_testkit();
 
     let ping = PingQuery { value: 64 };
@@ -156,6 +163,7 @@ fn moved() {
         .query(&ping)
         .expect_header("Location", "../ping-pong?value=64")
         .get::<u64>("moved-immutable")
+        .await
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
 
     assert_eq!(pong_error.http_code, api::HttpStatusCode::MOVED_PERMANENTLY);
@@ -169,6 +177,7 @@ fn moved() {
         .query(&ping)
         .expect_header("Location", "../ping-pong-deprecated-mut")
         .post::<u64>("moved-mutable")
+        .await
         .expect_err("Request to the `MovedPermanently` endpoint succeed");
 
     assert_eq!(pong_error.http_code, api::HttpStatusCode::MOVED_PERMANENTLY);
@@ -179,8 +188,8 @@ fn moved() {
 }
 
 /// Checks response from endpoint with new error type.
-#[test]
-fn endpoint_with_new_error_type() {
+#[actix_rt::test]
+async fn endpoint_with_new_error_type() {
     let (_testkit, api) = init_testkit();
 
     // Check OK response.
@@ -189,6 +198,7 @@ fn endpoint_with_new_error_type() {
         .public(ApiKind::Service("api-service"))
         .query(&ok_query)
         .get("error")
+        .await
         .expect("This request should be successful");
     assert_eq!(ok_query.value, response);
 
@@ -198,6 +208,7 @@ fn endpoint_with_new_error_type() {
         .public(ApiKind::Service("api-service"))
         .query(&err_query)
         .get::<u64>("error")
+        .await
         .expect_err("Should return error.");
 
     assert_eq!(error.http_code, api::HttpStatusCode::BAD_REQUEST);
@@ -214,8 +225,8 @@ fn endpoint_with_new_error_type() {
     assert_eq!(error.body.error_code, Some(42));
 }
 
-#[test]
-fn submit_tx_when_service_is_stopped() {
+#[actix_rt::test]
+async fn submit_tx_when_service_is_stopped() {
     let (mut testkit, api) = init_testkit();
     let keys = testkit.us().service_keypair();
 
@@ -228,6 +239,7 @@ fn submit_tx_when_service_is_stopped() {
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .post::<()>("submit-tx")
+        .await
         .expect_err("Request to the valid endpoint should fail");
     assert_eq!(err.http_code, api::HttpStatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(err.body.title, "Service is not active");
@@ -236,8 +248,8 @@ fn submit_tx_when_service_is_stopped() {
     assert!(block.is_empty());
 }
 
-#[test]
-fn submit_tx_when_service_is_frozen() {
+#[actix_rt::test]
+async fn submit_tx_when_service_is_frozen() {
     let (mut testkit, api) = init_testkit();
     let keys = testkit.us().service_keypair();
 
@@ -250,6 +262,7 @@ fn submit_tx_when_service_is_frozen() {
         .public(ApiKind::Service("api-service"))
         .query(&ping)
         .post::<()>("submit-tx")
+        .await
         .expect_err("Request to the valid endpoint should fail");
     assert_eq!(err.http_code, api::HttpStatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(err.body.title, "Service is not active");
@@ -258,8 +271,8 @@ fn submit_tx_when_service_is_frozen() {
     assert!(block.is_empty());
 }
 
-#[test]
-fn error_after_migration() {
+#[actix_rt::test]
+async fn error_after_migration() {
     let (mut testkit, api) = init_testkit();
     let keys = testkit.us().service_keypair();
 
@@ -272,6 +285,7 @@ fn error_after_migration() {
         .public(ApiKind::Service(SERVICE_NAME))
         .query(&PingQuery { value: 10 })
         .get("ping-pong")
+        .await
         .expect("API should work fine after restart");
     assert_eq!(pong, 10);
 
@@ -291,6 +305,7 @@ fn error_after_migration() {
         .public(ApiKind::Service(SERVICE_NAME))
         .query(&PingQuery { value: 10 })
         .get::<u64>("ping-pong")
+        .await
         .expect_err("API should return errors now");
     assert_eq!(error.http_code, api::HttpStatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(
@@ -307,6 +322,7 @@ fn error_after_migration() {
         .public(ApiKind::Service(SERVICE_NAME))
         .query(&PingQuery { value: 10 })
         .get("ping-pong")
+        .await
         .expect("API should work fine after restart");
     assert_eq!(pong, 11);
 }

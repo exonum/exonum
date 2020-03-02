@@ -24,7 +24,6 @@ use exonum::{
 };
 use exonum_node::{generate_testnet_config, Node, NodeBuilder, ShutdownHandle};
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
-use futures::Future;
 use structopt::StructOpt;
 
 use std::{sync::Arc, thread, time::Duration};
@@ -51,9 +50,7 @@ impl RunHandle {
     }
 
     fn join(self) -> KeyPair {
-        self.shutdown_handle
-            .shutdown()
-            .wait()
+        futures::executor::block_on(self.shutdown_handle.shutdown())
             .expect("Cannot shut down node");
         self.node_thread
             .join()

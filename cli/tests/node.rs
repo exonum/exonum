@@ -22,7 +22,6 @@ use exonum_derive::*;
 use exonum_explorer_service::api::BlocksRange;
 use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service, ServiceFactory};
 use exonum_supervisor::api::DispatcherInfo;
-use futures::Future;
 use lazy_static::lazy_static;
 use tempfile::TempDir;
 
@@ -59,7 +58,7 @@ impl Service for SimpleService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("answer", |_state, _query: ()| Ok(42));
+            .endpoint("answer", |_state, _query: ()| async { Ok(42) });
     }
 }
 
@@ -161,7 +160,7 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
         .json()?;
     assert_eq!(answer, 42);
 
-    shutdown_handle.shutdown().wait()?;
+    futures::executor::block_on(shutdown_handle.shutdown())?;
     node_thread.join().ok();
     Ok(())
 }

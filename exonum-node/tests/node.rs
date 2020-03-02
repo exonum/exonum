@@ -20,9 +20,9 @@ use exonum::{
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
-use futures::{sync::mpsc, Future, Stream};
+use futures_01::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
-use tokio_core::reactor::Core;
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
 use std::{
     sync::{Arc, Mutex},
@@ -48,7 +48,7 @@ impl RunHandle {
     }
 
     fn join(self) {
-        self.shutdown_handle.shutdown().wait().unwrap();
+        futures::executor::block_on(self.shutdown_handle.shutdown()).unwrap();
         self.node_thread.join().unwrap();
     }
 }
@@ -128,11 +128,11 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
 fn test_node_run() {
     let (nodes, commit_rxs) = run_nodes(4, 16_300);
 
-    let mut core = Core::new().unwrap();
+    let mut core = CompatRuntime::new().unwrap();
     let duration = Duration::from_secs(60);
     for rx in commit_rxs {
         let future = rx.into_future().timeout(duration).map_err(drop);
-        core.run(future).expect("failed commit");
+        core.block_on(future).expect("failed commit");
     }
 
     for handle in nodes {

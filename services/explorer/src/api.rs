@@ -402,8 +402,7 @@ use exonum::{
     runtime::ExecutionStatus,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::api::{self, ServiceApiScope};
-use futures::{Future, IntoFuture};
+use exonum_rust_runtime::api::{self, ServiceApiScope, ServiceApiState};
 use hex::FromHex;
 use serde_json::json;
 
@@ -423,8 +422,8 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> api::Result<BlocksRange> {
-        let explorer = BlockchainExplorer::from_schema(schema);
+    async fn blocks(state: ServiceApiState, query: BlocksQuery) -> api::Result<BlocksRange> {
+        let explorer = BlockchainExplorer::from_schema(state.data().for_core());
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(api::Error::bad_request()
                 .title("Invalid block request")
@@ -491,8 +490,8 @@ impl ExplorerApi {
         })
     }
 
-    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> api::Result<BlockInfo> {
-        let explorer = BlockchainExplorer::from_schema(schema);
+    async fn block(state: ServiceApiState, query: BlockQuery) -> api::Result<BlockInfo> {
+        let explorer = BlockchainExplorer::from_schema(state.data().for_core());
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             api::Error::not_found()
                 .title("Failed to get block info")
@@ -504,11 +503,11 @@ impl ExplorerApi {
         })
     }
 
-    fn transaction_info(
-        schema: Schema<&dyn Snapshot>,
+    async fn transaction_info(
+        state: ServiceApiState,
         query: TransactionQuery,
     ) -> api::Result<TransactionInfo> {
-        BlockchainExplorer::from_schema(schema)
+        BlockchainExplorer::from_schema(state.data().for_core())
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
@@ -519,7 +518,7 @@ impl ExplorerApi {
     }
 
     fn get_status(
-        schema: &Schema<&dyn Snapshot>,
+        schema: Schema<&dyn Snapshot>,
         block_height: Height,
         call_in_block: CallInBlock,
         with_proof: bool,
@@ -542,10 +541,11 @@ impl ExplorerApi {
         })
     }
 
-    fn transaction_status(
-        schema: &Schema<&dyn Snapshot>,
+    async fn transaction_status(
+        state: ServiceApiState,
         query: TransactionStatusQuery,
     ) -> api::Result<CallStatusResponse> {
+        let schema = state.data().for_core();
         let tx_location = schema
             .transactions_locations()
             .get(&query.hash)
@@ -557,32 +557,47 @@ impl ExplorerApi {
 
         let call_in_block = CallInBlock::transaction(tx_location.position_in_block());
         let block_height = tx_location.block_height();
-        Self::get_status(schema, block_height, call_in_block, query.with_proof)
+        Self::get_status(
+            state.data().for_core(),
+            block_height,
+            call_in_block,
+            query.with_proof,
+        )
     }
 
     /// Returns call status of `before_transactions` hook.
-    fn before_transactions_status(
-        schema: &Schema<&dyn Snapshot>,
+    async fn before_transactions_status(
+        state: ServiceApiState,
         query: CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let call_in_block = CallInBlock::before_transactions(query.service_id);
-        Self::get_status(schema, query.height, call_in_block, query.with_proof)
+        Self::get_status(
+            state.data().for_core(),
+            query.height,
+            call_in_block,
+            query.with_proof,
+        )
     }
 
     /// Returns call status of `after_transactions` hook.
-    fn after_transactions_status(
-        schema: &Schema<&dyn Snapshot>,
+    async fn after_transactions_status(
+        state: ServiceApiState,
         query: CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let call_in_block = CallInBlock::after_transactions(query.service_id);
-        Self::get_status(schema, query.height, call_in_block, query.with_proof)
+        Self::get_status(
+            state.data().for_core(),
+            query.height,
+            call_in_block,
+            query.with_proof,
+        )
     }
 
-    fn add_transaction(
-        snapshot: &dyn Snapshot,
-        sender: &ApiSender,
+    async fn add_transaction(
+        state: ServiceApiState,
+        sender: ApiSender,
         query: TransactionHex,
-    ) -> api::FutureResult<TransactionResponse> {
+    ) -> api::Result<TransactionResponse> {
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
@@ -591,51 +606,38 @@ impl ExplorerApi {
             Ok((verified, tx_hash))
         };
 
-        let sender = sender.clone();
-        let send_transaction = move |(verified, tx_hash)| {
-            sender
-                .broadcast_transaction(verified)
-                .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))
-        };
+        let (verified, tx_hash) = verify_message(state.snapshot(), query.tx_body).map_err(|e| {
+            api::Error::bad_request()
+                .title("Failed to add transaction to memory pool")
+                .detail(e.to_string())
+        })?;
 
-        Box::new(
-            verify_message(snapshot, query.tx_body)
-                .into_future()
-                .map_err(|e| {
-                    api::Error::bad_request()
-                        .title("Failed to add transaction to memory pool")
-                        .detail(e.to_string())
-                })
-                .and_then(send_transaction),
-        )
+        sender
+            .broadcast_transaction(verified)
+            .await
+            .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))?;
+        Ok(TransactionResponse { tx_hash })
     }
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
-            .endpoint("v1/blocks", |state, query| {
-                Self::blocks(state.data().for_core(), query)
-            })
-            .endpoint("v1/block", |state, query| {
-                Self::block(state.data().for_core(), query)
-            })
-            .endpoint("v1/call_status/transaction", |state, query| {
-                Self::transaction_status(&state.data().for_core(), query)
-            })
-            .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(&state.data().for_core(), query)
-            })
-            .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(&state.data().for_core(), query)
-            })
-            .endpoint("v1/transactions", |state, query| {
-                Self::transaction_info(state.data().for_core(), query)
-            });
+            .endpoint("v1/blocks", Self::blocks)
+            .endpoint("v1/block", Self::block)
+            .endpoint("v1/call_status/transaction", Self::transaction_status)
+            .endpoint(
+                "v1/call_status/after_transactions",
+                Self::after_transactions_status,
+            )
+            .endpoint(
+                "v1/call_status/before_transactions",
+                Self::before_transactions_status,
+            )
+            .endpoint("v1/transactions", Self::transaction_info);
 
-        let tx_sender = self.blockchain.sender().to_owned();
-        api_scope.endpoint_mut("v1/transactions", move |state, query| {
-            Self::add_transaction(state.snapshot(), &tx_sender, query)
+        api_scope.endpoint_mut("v1/transactions", {
+            let tx_sender = self.blockchain.sender().to_owned();
+            move |state, query| Self::add_transaction(state, tx_sender.clone(), query)
         });
         self
     }

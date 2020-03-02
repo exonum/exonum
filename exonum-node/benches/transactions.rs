@@ -29,9 +29,8 @@ use exonum::{
     messages::Verified,
     runtime::{AnyTx, CallInfo},
 };
-use futures::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
-use tokio_core::reactor::Core;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
+use futures_01::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
 use std::{
     sync::{Arc, RwLock},
@@ -151,8 +150,8 @@ impl MessageVerifier {
         };
 
         let handler_thread = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
-            core.run(handler_part.run()).unwrap();
+            let mut core = CompatRuntime::new().unwrap();
+            core.block_on(handler_part.run()).unwrap();
         });
 
         let internal_part = InternalPart {
@@ -161,13 +160,10 @@ impl MessageVerifier {
         };
 
         let network_thread = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
+            let mut core = CompatRuntime::new().unwrap();
             let handle = core.handle();
 
-            let thread_pool = ThreadPoolBuilder::new().build();
-            let verify_handle = thread_pool.sender().clone();
-
-            core.run(internal_part.run(handle, verify_handle)).unwrap();
+            core.block_on(internal_part.run(handle)).unwrap();
         });
 
         MessageVerifier {
@@ -222,12 +218,12 @@ fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
 
     let verifier = MessageVerifier::new();
-    let mut core = Core::new().unwrap();
+    let mut core = CompatRuntime::new().unwrap();
 
     b.iter_with_setup(
         || messages.clone(),
         |messages| {
-            core.run(verifier.send_all(messages)).unwrap();
+            core.block_on(verifier.send_all(messages)).unwrap();
         },
     );
     verifier.join();

@@ -41,6 +41,8 @@
 //! use exonum_explorer_service::ExplorerFactory;
 //! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 //!
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
 //!     // Add other services here
@@ -50,7 +52,9 @@
 //! let BlocksRange { blocks, range } = api
 //!     .public(ApiKind::Explorer)
 //!     .get("v1/blocks?count=10")
-//!     .unwrap();
+//!     .await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! [`exonum-explorer`]: https://docs.rs/exonum-explorer

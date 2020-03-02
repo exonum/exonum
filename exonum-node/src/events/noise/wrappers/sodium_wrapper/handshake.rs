@@ -21,7 +21,7 @@ use exonum::{
     messages::Verified,
 };
 use failure::bail;
-use futures::future::{done, Future};
+use futures_01::future::{done, Future};
 use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
 
@@ -161,7 +161,7 @@ impl NoiseHandshake {
 impl Handshake for NoiseHandshake {
     fn listen<S>(self, stream: S) -> HandshakeResult<S>
     where
-        S: AsyncRead + AsyncWrite + 'static,
+        S: AsyncRead + AsyncWrite + 'static + Send,
     {
         let peer_address = self.peer_address;
         let connect = self.connect.clone();
@@ -181,7 +181,7 @@ impl Handshake for NoiseHandshake {
 
     fn send<S>(self, stream: S) -> HandshakeResult<S>
     where
-        S: AsyncRead + AsyncWrite + 'static,
+        S: AsyncRead + AsyncWrite + 'static + Send,
     {
         let peer_address = self.peer_address;
         let connect = self.connect.clone();

@@ -19,10 +19,10 @@ use exonum::{
     merkledb::BinaryValue,
     messages::{SignedMessage, Verified},
 };
-use futures::{sync::mpsc, Future, Sink, Stream};
+use futures_01::{sync::mpsc, Future, Sink, Stream};
 use pretty_assertions::assert_eq;
 use tokio::util::FutureExt;
-use tokio_core::reactor::Core;
+use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
 use std::{
     net::SocketAddr,
@@ -70,8 +70,8 @@ impl TestHandler {
             .timeout(Duration::from_secs(30))
             .map_err(drop);
 
-        let mut core = Core::new().unwrap();
-        let (event, _) = core.run(future)?;
+        let mut core = CompatRuntime::new().unwrap();
+        let (event, _) = core.block_on(future)?;
         event.ok_or(())
     }
 
@@ -165,9 +165,9 @@ impl TestEvents {
         let (mut handler_part, network_part) = self.into_reactor(connect);
         let handshake_params = handshake_params.clone();
         let handle = thread::spawn(move || {
-            let mut core = Core::new().unwrap();
+            let mut core = CompatRuntime::new().unwrap();
             let fut = network_part.run(&core.handle(), &handshake_params);
-            core.run(fut).map_err(log_error).unwrap();
+            core.block_on(fut).map_err(log_error).unwrap();
         });
         handler_part.handle = Some(handle);
         handler_part

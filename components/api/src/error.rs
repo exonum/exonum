@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// API HTTP error struct.
-#[derive(Fail, Debug, Default)]
+#[derive(Fail, Debug)]
 pub struct Error {
     /// HTTP error code.
     pub http_code: HttpStatusCode,
@@ -32,6 +32,16 @@ pub struct Error {
     pub body: ErrorBody,
     /// Additional HTTP headers.
     pub headers: HeaderMap,
+}
+
+impl Default for Error {
+    fn default() -> Self {
+        Self {
+            http_code: HttpStatusCode::default(),
+            body: ErrorBody::default(),
+            headers: HeaderMap::new(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]

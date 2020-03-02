@@ -39,7 +39,8 @@
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();
 //! let mut testkit: TestKit = TestKitBuilder::validator()
@@ -54,7 +55,8 @@
 //! // Make request to the `current_time` endpoint.
 //! let response: Option<DateTime<Utc>> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
-//!     .get("v1/current_time")?;
+//!     .get("v1/current_time")
+//!     .await?;
 //! // Since no blocks were created yet, time is not available.
 //! assert!(response.is_none());
 //!
@@ -62,7 +64,8 @@
 //! testkit.create_blocks_until(Height(5));
 //! let response: Option<DateTime<Utc>> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
-//!     .get("v1/current_time")?;
+//!     .get("v1/current_time")
+//!     .await?;
 //! // At this moment, time should be available.
 //! assert!(response.is_some());
 //! # Ok(())
@@ -94,7 +97,8 @@
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();
 //! let mut testkit: TestKit = TestKitBuilder::validator()
@@ -110,7 +114,8 @@
 //! // Obtain validator times.
 //! let response: Vec<ValidatorTime> = api
 //!     .private(ApiKind::Service(TIME_SERVICE_NAME))
-//!     .get("v1/validators_times")?;
+//!     .get("v1/validators_times")
+//!     .await?;
 //! for validator in response {
 //!     assert!(validator.time.is_some());
 //! }
@@ -158,7 +163,10 @@ pub(crate) struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting time values for all validators.
-    fn current_time(state: &api::ServiceApiState<'_>, _query: ()) -> Result<Option<DateTime<Utc>>> {
+    async fn current_time(
+        state: api::ServiceApiState,
+        _query: (),
+    ) -> Result<Option<DateTime<Utc>>> {
         Ok(TimeSchema::new(state.service_data()).time.get())
     }
 
@@ -176,7 +184,7 @@ pub(crate) struct PrivateApi;
 
 impl PrivateApi {
     /// Endpoint for getting time values for all validators.
-    pub fn all_validators_times(state: &api::ServiceApiState<'_>) -> Result<Vec<ValidatorTime>> {
+    pub async fn all_validators_times(state: api::ServiceApiState) -> Result<Vec<ValidatorTime>> {
         let schema = TimeSchema::new(state.service_data());
         // All available times of the validators.
         let validators_times = schema
@@ -191,7 +199,9 @@ impl PrivateApi {
     }
 
     /// Endpoint for getting time values for current validators.
-    pub fn current_validators_time(state: &api::ServiceApiState<'_>) -> Result<Vec<ValidatorTime>> {
+    pub async fn current_validators_time(
+        state: api::ServiceApiState,
+    ) -> Result<Vec<ValidatorTime>> {
         let validator_keys = state.data().for_core().consensus_config().validator_keys;
         let schema = TimeSchema::new(state.service_data());
 
@@ -212,14 +222,10 @@ impl PrivateApi {
         builder
             .private_scope()
             .endpoint("v1/validators_times", {
-                move |state: &api::ServiceApiState<'_>, _query: ()| {
-                    Self::current_validators_time(state)
-                }
+                move |state: api::ServiceApiState, _query: ()| Self::current_validators_time(state)
             })
             .endpoint("v1/validators_times/all", {
-                move |state: &api::ServiceApiState<'_>, _query: ()| {
-                    Self::all_validators_times(state)
-                }
+                move |state: api::ServiceApiState, _query: ()| Self::all_validators_times(state)
             });
     }
 }

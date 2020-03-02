@@ -42,12 +42,13 @@
 //! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info")?;
+//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info").await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -69,12 +70,13 @@
 //! use exonum_system_api::{private::NodeStats, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! let info: NodeStats = api.private(ApiKind::System).get("v1/stats")?;
+//! let info: NodeStats = api.private(ApiKind::System).get("v1/stats").await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -98,7 +100,8 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! # let address = "127.0.0.1:8080".to_owned();
 //! # let public_key = Default::default();
 //! // Obtaining address and public key of target node skipped...
@@ -113,7 +116,8 @@
 //! let api = testkit.api();
 //! api.private(ApiKind::System)
 //!     .query(&connect_info)
-//!     .post("v1/peers")?;
+//!     .post("v1/peers")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -135,7 +139,8 @@
 //! use exonum_system_api::{private::ConsensusEnabledQuery, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
@@ -144,7 +149,8 @@
 //! let query = ConsensusEnabledQuery { enabled };
 //! api.private(ApiKind::System)
 //!     .query(&query)
-//!     .post("v1/consensus_status")?;
+//!     .post("v1/consensus_status")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -164,12 +170,15 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! api.private(ApiKind::System).post::<()>("v1/shutdown")?;
+//! api.private(ApiKind::System)
+//!     .post::<()>("v1/shutdown")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -182,7 +191,7 @@ use exonum::{
 };
 use exonum_api::{self as api, ApiBackend, ApiScope};
 use exonum_node::{ConnectInfo, ExternalMessage, SharedNodeState};
-use futures::Future;
+use futures::{future, prelude::*};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use std::{sync::Arc, time::SystemTime};
@@ -303,7 +312,7 @@ impl SystemApi {
 
     fn handle_info(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let shared_api_state = self.shared_api_state.clone();
-        api_scope.endpoint(name, move |_query: ()| -> api::Result<_> {
+        api_scope.endpoint(name, move |_query: ()| {
             let mut connected_peers = Vec::new();
 
             for connect_info in shared_api_state.outgoing_connections() {
@@ -320,13 +329,15 @@ impl SystemApi {
                 ));
             }
 
-            Ok(NodeInfo {
+            let info = NodeInfo {
                 consensus_status: Self::get_consensus_status(&shared_api_state),
                 connected_peers,
                 exonum_version: exonum_version().unwrap_or_else(|| Version::new(0, 0, 0)),
                 rust_version: rust_version().unwrap_or_else(|| Version::new(0, 0, 0)),
                 os_info: os_info(),
-            })
+            };
+
+            future::ok(info)
         });
         self
     }
@@ -340,42 +351,36 @@ impl SystemApi {
                 .duration_since(this.start_time)
                 .unwrap_or_default()
                 .as_secs();
-            Ok(NodeStats {
+            let stats = NodeStats {
                 height: schema.height().into(),
                 tx_pool_size: schema.transactions_pool_len(),
                 tx_count: schema.transactions_len(),
                 tx_cache_size: this.shared_api_state.tx_cache_size(),
                 uptime,
-            })
+            };
+
+            future::ok(stats)
         });
         self
     }
 
     fn handle_peers(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let sender = self.sender.clone();
-        api_scope.endpoint_mut(
-            name,
-            move |connect_info: ConnectInfo| -> api::FutureResult<()> {
-                let handler = sender
-                    .send_message(ExternalMessage::PeerAdd(connect_info))
-                    .map_err(|e| api::Error::internal(e).title("Failed to add peer"));
-                Box::new(handler)
-            },
-        );
+        api_scope.endpoint_mut(name, move |connect_info: ConnectInfo| {
+            sender
+                .send_message(ExternalMessage::PeerAdd(connect_info))
+                .map_err(|e| api::Error::internal(e).title("Failed to add peer"))
+        });
         self
     }
 
     fn handle_consensus_status(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let sender = self.sender.clone();
-        api_scope.endpoint_mut(
-            name,
-            move |query: ConsensusEnabledQuery| -> api::FutureResult<()> {
-                let handler = sender
-                    .send_message(ExternalMessage::Enable(query.enabled))
-                    .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"));
-                Box::new(handler)
-            },
-        );
+        api_scope.endpoint_mut(name, move |query: ConsensusEnabledQuery| {
+            sender
+                .send_message(ExternalMessage::Enable(query.enabled))
+                .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"))
+        });
         self
     }
 
@@ -383,19 +388,20 @@ impl SystemApi {
         // These backend-dependent uses are needed to provide realization of the support of empty
         // request which is not easy in the generic approach, so it will be harder to misuse
         // those features (and as a result get a completely backend-dependent code).
-        use actix_web::{HttpRequest, HttpResponse};
-        use exonum_api::backends::actix::{FutureResponse, RawHandler, RequestHandler};
+        use actix_web::HttpResponse;
+        use exonum_api::backends::actix::{RawHandler, RequestHandler};
 
         let sender = self.sender.clone();
-        let index = move |_: HttpRequest| -> FutureResponse {
-            let handler = sender
+        let index = move |_, _| {
+            sender
                 .send_message(ExternalMessage::Shutdown)
-                .map(|()| HttpResponse::Ok().json(()))
+                .map_ok(|_| HttpResponse::Ok().json(()))
                 .map_err(|e| {
-                    let e = api::Error::internal(e).title("Failed to handle shutdown");
-                    actix_web::Error::from(e)
-                });
-            Box::new(handler)
+                    api::Error::internal(e)
+                        .title("Failed to handle shutdown")
+                        .into()
+                })
+                .boxed_local()
         };
 
         let handler = RequestHandler {

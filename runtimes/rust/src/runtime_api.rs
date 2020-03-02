@@ -19,6 +19,7 @@ use exonum::{
     runtime::{versioning::Version, ArtifactId, RuntimeIdentifier},
 };
 use exonum_api::{self as api, ApiBuilder};
+use futures::future;
 use serde_derive::{Deserialize, Serialize};
 
 use std::collections::HashMap;
@@ -110,6 +111,30 @@ fn filter_exonum_proto_sources(
         .collect()
 }
 
+fn proto_sources(
+    exonum_sources: &[ProtoSourceFile],
+    filtered_sources: &HashMap<ArtifactId, Vec<ProtoSourceFile>>,
+    query: ProtoSourcesQuery,
+) -> api::Result<Vec<ProtoSourceFile>> {
+    if let ProtoSourcesQuery::Artifact { name, version } = query {
+        let artifact_id = ArtifactId::new(RuntimeIdentifier::Rust, name, version).map_err(|e| {
+            api::Error::bad_request()
+                .title("Invalid query")
+                .detail(format!("Invalid artifact query: {}", e))
+        })?;
+        filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
+            api::Error::not_found()
+                .title("Artifact sources not found")
+                .detail(format!(
+                    "Unable to find sources for artifact {}",
+                    artifact_id
+                ))
+        })
+    } else {
+        Ok(exonum_sources.to_vec())
+    }
+}
+
 /// Returns API builder instance with the appropriate endpoints for the specified
 /// Rust runtime instance.
 pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, ApiBuilder)> {
@@ -142,27 +167,8 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
         .public_scope()
         // This endpoint returns list of protobuf source files of the specified artifact,
         // otherwise it returns source files of Exonum itself.
-        .endpoint("proto-sources", {
-            move |query: ProtoSourcesQuery| -> api::Result<Vec<ProtoSourceFile>> {
-                if let ProtoSourcesQuery::Artifact { name, version } = query {
-                    let artifact_id = ArtifactId::new(RuntimeIdentifier::Rust, name, version)
-                        .map_err(|e| {
-                            api::Error::bad_request()
-                                .title("Invalid query")
-                                .detail(format!("Invalid artifact query: {}", e))
-                        })?;
-                    filtered_sources.get(&artifact_id).cloned().ok_or_else(|| {
-                        api::Error::not_found()
-                            .title("Artifact sources not found")
-                            .detail(format!(
-                                "Unable to find sources for artifact {}",
-                                artifact_id
-                            ))
-                    })
-                } else {
-                    Ok(exonum_sources.clone())
-                }
-            }
+        .endpoint("proto-sources", move |query| {
+            future::ready(proto_sources(&exonum_sources, &filtered_sources, query))
         });
 
     std::iter::once((["runtimes/", RustRuntime::NAME].concat(), builder))

@@ -26,7 +26,7 @@ pub use self::wrappers::sodium_wrapper::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum::crypto::x25519;
-use futures::future::Future;
+use futures_01::future::Future;
 use tokio_codec::Framed;
 use tokio_io::{
     io::{read_exact, write_all},
@@ -46,11 +46,11 @@ pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
 type HandshakeData<S> = (Framed<S, MessagesCodec>, Vec<u8>, x25519::PublicKey);
-type HandshakeResult<S> = Box<dyn Future<Item = HandshakeData<S>, Error = failure::Error>>;
+type HandshakeResult<S> = Box<dyn Future<Item = HandshakeData<S>, Error = failure::Error> + Send>;
 
 pub trait Handshake {
-    fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
-    fn send<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
+    fn listen<S: AsyncRead + AsyncWrite + 'static + Send>(self, stream: S) -> HandshakeResult<S>;
+    fn send<S: AsyncRead + AsyncWrite + 'static + Send>(self, stream: S) -> HandshakeResult<S>;
 }
 
 pub struct HandshakeRawMessage(pub Vec<u8>);

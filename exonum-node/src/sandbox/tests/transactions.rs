@@ -22,7 +22,6 @@ use exonum::{
     merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified},
 };
-use futures::Future;
 
 use std::time::Duration;
 
@@ -648,8 +647,7 @@ fn valid_txs_are_broadcast() {
     let tx = gen_timestamping_tx();
     sandbox
         .api_sender
-        .broadcast_transaction(tx.clone())
-        .wait()
+        .broadcast_transaction_blocking(tx.clone())
         .unwrap();
     sandbox.process_events();
     sandbox.broadcast(&tx);
@@ -661,8 +659,7 @@ fn incorrect_txs_are_not_broadcast() {
     let incorrect_tx = gen_incorrect_tx();
     sandbox
         .api_sender
-        .broadcast_transaction(incorrect_tx)
-        .wait()
+        .broadcast_transaction_blocking(incorrect_tx)
         .unwrap();
     sandbox.process_events();
     // If the transaction is broadcast, the sandbox will panic on drop.

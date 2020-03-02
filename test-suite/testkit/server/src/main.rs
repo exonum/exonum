@@ -17,7 +17,8 @@ use exonum_explorer_service::ExplorerFactory;
 use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::TestKitBuilder;
 
-fn main() {
+#[actix_rt::main]
+async fn main() {
     exonum::helpers::init_logger().unwrap();
 
     let artifact = CryptocurrencyService.artifact_id();
@@ -29,5 +30,6 @@ fn main() {
         .serve(
             "0.0.0.0:8000".parse().unwrap(),
             "0.0.0.0:9000".parse().unwrap(),
-        );
+        )
+        .await;
 }

@@ -332,7 +332,7 @@ use exonum::{
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
-use futures::{sync::mpsc, Future, Sink};
+use futures_01::{sync::mpsc, Future, Sink};
 use log::trace;
 
 use std::collections::{BTreeMap, HashMap, HashSet};

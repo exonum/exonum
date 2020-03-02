@@ -44,15 +44,16 @@ struct Api;
 
 impl Api {
     /// Returns the same number that was in query.
-    fn ping_pong(_state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<u64> {
+    async fn ping_pong(_state: ServiceApiState, ping: PingQuery) -> api::Result<u64> {
         Ok(ping.value)
     }
 
     /// Submits transaction to the service if it is active; otherwise, returns a 503 error.
-    fn submit_tx(state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<()> {
+    async fn submit_tx(state: ServiceApiState, ping: PingQuery) -> api::Result<()> {
         if let Some(broadcaster) = state.broadcaster() {
             broadcaster
                 .do_nothing((), ping.value)
+                .await
                 .map(drop)
                 .map_err(api::Error::internal)
         } else {
@@ -62,7 +63,7 @@ impl Api {
     }
 
     /// Returns `Gone` error.
-    fn gone(_state: &ServiceApiState<'_>, _ping: PingQuery) -> api::Result<u64> {
+    async fn gone(_state: ServiceApiState, _ping: PingQuery) -> api::Result<u64> {
         Err(api::Error::new(api::HttpStatusCode::GONE))
     }
 
@@ -93,23 +94,24 @@ impl Api {
         public_scope
             .endpoint_mut(
                 "moved-mutable",
-                move |state: &ServiceApiState<'_>, _query: PingQuery| -> api::Result<u64> {
+                move |state: ServiceApiState, _query: PingQuery| async move {
                     Err(state.moved_permanently("ping-pong-deprecated-mut").into())
+                        as api::Result<()>
                 },
             )
             .endpoint(
                 "moved-immutable",
-                move |state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
+                move |state: ServiceApiState, query: PingQuery| async move {
                     Err(state
                         .moved_permanently("ping-pong")
                         .with_query(query)
-                        .into())
+                        .into()) as api::Result<()>
                 },
             );
 
         public_scope.endpoint(
             "error",
-            move |_state: &ServiceApiState<'_>, query: PingQuery| -> api::Result<u64> {
+            move |_state: ServiceApiState, query: PingQuery| async move {
                 if query.value == 64 {
                     Ok(query.value)
                 } else {
@@ -130,7 +132,7 @@ struct ApiV2;
 impl ApiV2 {
     /// Re-envisioned version of `ping-pong` endpoint, designed to have better UX and push
     /// the boundaries of high performance and security.
-    fn ping_pong(_state: &ServiceApiState<'_>, ping: PingQuery) -> api::Result<u64> {
+    async fn ping_pong(_state: ServiceApiState, ping: PingQuery) -> api::Result<u64> {
         Ok(ping.value + 1)
     }
 

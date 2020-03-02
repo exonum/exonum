@@ -27,7 +27,7 @@ use exonum::{
     helpers::{Height, Round},
     messages::{AnyTx, Verified},
 };
-use futures::{
+use futures_01::{
     sink::Wait,
     sync::mpsc::{self, Sender},
     Async, Future, Poll, Stream,
@@ -131,8 +131,8 @@ pub struct HandlerPart<H: EventHandler> {
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
 
-impl<H: EventHandler + 'static> HandlerPart<H> {
-    pub fn run(self) -> Box<dyn Future<Item = (), Error = ()>> {
+impl<H: EventHandler + 'static + Send> HandlerPart<H> {
+    pub fn run(self) -> Box<dyn Future<Item = (), Error = ()> + Send> {
         let mut handler = self.handler;
         let aggregator = EventsAggregator::new(
             self.internal_rx,
@@ -290,6 +290,6 @@ where
     }
 }
 
-fn to_box<F: Future + 'static>(f: F) -> Box<dyn Future<Item = (), Error = F::Error>> {
+fn to_box<F: Future + Send + 'static>(f: F) -> Box<dyn Future<Item = (), Error = F::Error> + Send> {
     Box::new(f.map(drop))
 }

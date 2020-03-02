@@ -20,22 +20,27 @@ use exonum::{
     messages::{SignedMessage, Verified},
 };
 use failure::{bail, ensure, format_err};
-use futures::{
+use futures_01::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
-    sync::mpsc,
-    unsync, Future, IntoFuture, Sink, Stream,
+    sync::{self, mpsc},
+    Future, IntoFuture, Sink, Stream,
 };
 use log::{error, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_codec::Framed;
-use tokio_core::reactor::Handle;
+use tokio_compat::runtime::current_thread::Handle;
 use tokio_retry::{
     strategy::{jitter, FixedInterval},
     Retry,
 };
 
-use std::{cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 
 use super::{error::log_error, to_box};
 use crate::{
@@ -104,18 +109,18 @@ struct ConnectionPoolEntry {
 
 #[derive(Clone, Debug)]
 struct ConnectionPool {
-    peers: Rc<RefCell<HashMap<PublicKey, ConnectionPoolEntry>>>,
+    peers: Arc<RwLock<HashMap<PublicKey, ConnectionPoolEntry>>>,
 }
 
 impl ConnectionPool {
     fn new() -> Self {
         ConnectionPool {
-            peers: Rc::new(RefCell::new(HashMap::new())),
+            peers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     fn count_outgoing(&self) -> usize {
-        let peers = self.peers.borrow();
+        let peers = self.peers.read().unwrap();
         peers
             .iter()
             .filter(|(_, e)| !e.address.is_incoming())
@@ -128,17 +133,17 @@ impl ConnectionPool {
         address: ConnectedPeerAddr,
         sender: mpsc::Sender<SignedMessage>,
     ) {
-        let mut peers = self.peers.borrow_mut();
+        let mut peers = self.peers.write().unwrap();
         peers.insert(*key, ConnectionPoolEntry { sender, address });
     }
 
     fn contains(&self, address: &PublicKey) -> bool {
-        let peers = self.peers.borrow();
+        let peers = self.peers.read().unwrap();
         peers.get(address).is_some()
     }
 
     fn remove(&self, address: &PublicKey) -> Option<ConnectedPeerAddr> {
-        let mut peers = self.peers.borrow_mut();
+        let mut peers = self.peers.write().unwrap();
         peers.remove(address).map(|o| o.address)
     }
 
@@ -156,9 +161,9 @@ impl ConnectionPool {
         &self,
         address: &PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = failure::Error> + Send {
         let address = *address;
-        let sender_tx = self.peers.borrow();
+        let sender_tx = self.peers.read().unwrap();
         let write_pool = self.clone();
 
         if let Some(entry) = sender_tx.get(&address) {
@@ -184,7 +189,7 @@ impl ConnectionPool {
         &self,
         key: &PublicKey,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = failure::Error> + Send {
         if self.remove(key).is_some() {
             let send_disconnected = network_tx
                 .clone()
@@ -268,7 +273,7 @@ impl NetworkHandler {
         // Incoming connections limiter
         let incoming_connections_limit = self.network_config.max_incoming_connections;
         // The reference counter is used to automatically count the number of the open connections.
-        let incoming_connections_counter: Rc<()> = Rc::default();
+        let incoming_connections_counter: Arc<()> = Arc::default();
 
         server
             .map_err(into_failure)
@@ -284,7 +289,7 @@ impl NetworkHandler {
                 let handshake = NoiseHandshake::responder(&handshake_params, &listen_address);
                 let holder = incoming_connections_counter.clone();
                 // Check incoming connections count
-                let connections_count = Rc::strong_count(&incoming_connections_counter) - 1;
+                let connections_count = Arc::strong_count(&incoming_connections_counter) - 1;
                 if connections_count >= incoming_connections_limit {
                     warn!(
                         "Rejected incoming connection with peer={}, \
@@ -329,8 +334,7 @@ impl NetworkHandler {
                     })
                     .map_err(log_error);
 
-                self.handle.spawn(listener);
-                Ok(())
+                self.handle.spawn(listener).map_err(into_failure)
             })
     }
 
@@ -338,7 +342,7 @@ impl NetworkHandler {
         &self,
         key: PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = failure::Error> + Send {
         let handshake_params = handshake_params.clone();
         let handle = self.handle.clone();
         let network_tx = self.network_tx.clone();
@@ -378,11 +382,10 @@ impl NetworkHandler {
                             let addr = match socket.get_ref().peer_addr() {
                                 Ok(addr) => addr,
                                 Err(e) => {
-                                    return Box::new(err(format_err!(
+                                    return to_box(err::<(), _>(format_err!(
                                         "Couldn't take peer addr from socket = {}",
                                         e
-                                    )))
-                                        as Box<dyn Future<Error = failure::Error, Item = ()>>;
+                                    )));
                                 }
                             };
                             let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
@@ -429,9 +432,8 @@ impl NetworkHandler {
 
         let outgoing = Self::process_outgoing_messages(sink, connection.receiver_rx);
 
-        handle.spawn(incoming);
-        handle.spawn(outgoing);
-        Ok(())
+        handle.spawn(incoming).map_err(into_failure)?;
+        handle.spawn(outgoing).map_err(into_failure)
     }
 
     fn process_outgoing_messages<S>(
@@ -455,9 +457,9 @@ impl NetworkHandler {
         pool: ConnectionPool,
         key: &PublicKey,
         network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = ()>
+    ) -> impl Future<Item = (), Error = ()> + Send
     where
-        S: Stream<Item = Vec<u8>, Error = failure::Error>,
+        S: Stream<Item = Vec<u8>, Error = failure::Error> + Send,
     {
         let key = *key;
         network_tx
@@ -519,8 +521,8 @@ impl NetworkHandler {
     pub fn request_handler(
         self,
         receiver: mpsc::Receiver<NetworkRequest>,
-        cancel_handler: unsync::oneshot::Sender<()>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+        cancel_handler: sync::oneshot::Sender<()>,
+    ) -> impl Future<Item = (), Error = failure::Error> + Send {
         let mut cancel_sender = Some(cancel_handler);
         let handle = self.handle.clone();
 
@@ -541,8 +543,7 @@ impl NetworkHandler {
             }
             .map_err(log_error);
 
-            handle.spawn(fut);
-            Ok(())
+            handle.spawn(fut).map_err(log_error)
         });
 
         handler.map_err(|_| format_err!("Error while processing outgoing Network Requests"))
@@ -568,7 +569,7 @@ impl NetworkHandler {
         &self,
         key: PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = failure::Error> + Send {
         let pool = self.pool.clone();
         let connect = self.handshake_params.connect.clone();
         self.connect(key, &self.handshake_params)
@@ -585,7 +586,7 @@ impl NetworkHandler {
         address: &ConnectedPeerAddr,
         message: Verified<Connect>,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> {
+    ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> + Send {
         let peer_connected = NetworkEvent::PeerConnected(address.clone(), message);
         network_tx
             .clone()
@@ -633,7 +634,7 @@ impl NetworkPart {
         // `cancel_sender` is converted to future when we receive
         // `NetworkRequest::Shutdown` causing its being completed with error.
         // After that completes `cancel_handler` and event loop stopped.
-        let (cancel_sender, cancel_handler) = unsync::oneshot::channel::<()>();
+        let (cancel_sender, cancel_handler) = sync::oneshot::channel::<()>();
 
         let handler = NetworkHandler::new(
             handle.clone(),

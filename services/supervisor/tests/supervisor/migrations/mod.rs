@@ -107,21 +107,23 @@ fn testkit_with_supervisor_and_service_no_migrations(validator_count: u16) -> Te
 }
 
 /// Sends a `MigrationRequest` to supervisor through API.
-fn request_migration(api: &TestKitApi, request: MigrationRequest) -> Hash {
+async fn request_migration(api: &TestKitApi, request: MigrationRequest) -> Hash {
     let hash: Hash = api
         .private(ApiKind::Service("supervisor"))
         .query(&request)
         .post("migrate")
+        .await
         .unwrap();
     hash
 }
 
 /// Obtains a migration state through API.
-fn migration_state(api: &TestKitApi, request: MigrationRequest) -> MigrationState {
+async fn migration_state(api: &TestKitApi, request: MigrationRequest) -> MigrationState {
     let query: MigrationInfoQuery = request.into();
     api.private(ApiKind::Service("supervisor"))
         .query(&query)
         .get("migration-status")
+        .await
         .unwrap()
 }
 
@@ -164,7 +166,7 @@ fn obtain_reference_hash(testkit: &mut TestKit, request: &MigrationRequest) -> H
 
 /// Waits for `MigrationStatus` to change from pending and returns a new status.
 /// Panics if reaches deadline height and state is still `Pending`.
-fn wait_while_pending(
+async fn wait_while_pending(
     testkit: &mut TestKit,
     deadline_height: Height,
     request: MigrationRequest,
@@ -172,7 +174,7 @@ fn wait_while_pending(
     let api = testkit.api();
     while testkit.height() <= deadline_height.next() {
         testkit.create_block();
-        let migration_state = migration_state(&api, request.clone());
+        let migration_state = migration_state(&api, request.clone()).await;
 
         match migration_state.inner {
             AsyncEventState::Pending => { /* Not ready yet. */ }
@@ -185,13 +187,13 @@ fn wait_while_pending(
 
 /// Waits for the migration associated with provides request will result
 /// in a success. Panics otherwise.
-fn wait_for_migration_success(
+async fn wait_for_migration_success(
     testkit: &mut TestKit,
     deadline_height: Height,
     request: MigrationRequest,
     version: Version,
 ) {
-    let state = wait_while_pending(testkit, deadline_height, request);
+    let state = wait_while_pending(testkit, deadline_height, request).await;
     if let AsyncEventState::Succeed = state.inner {
         assert_eq!(state.version, version);
     } else {
@@ -201,12 +203,12 @@ fn wait_for_migration_success(
 
 /// Waits for the migration associated with provides request will result
 /// in a failure. Panics otherwise.
-fn wait_for_migration_fail(
+async fn wait_for_migration_fail(
     testkit: &mut TestKit,
     deadline_height: Height,
     request: MigrationRequest,
 ) -> ExecutionError {
-    let state = wait_while_pending(testkit, deadline_height, request);
+    let state = wait_while_pending(testkit, deadline_height, request).await;
     if let AsyncEventState::Failed { error, .. } = state.inner {
         error
     } else {
@@ -216,12 +218,12 @@ fn wait_for_migration_fail(
 
 /// Waits for the migration associated with provides request will result
 /// in a timeout. Panics otherwise.
-fn wait_for_migration_timeout(
+async fn wait_for_migration_timeout(
     testkit: &mut TestKit,
     deadline_height: Height,
     request: MigrationRequest,
 ) {
-    let state = wait_while_pending(testkit, deadline_height, request);
+    let state = wait_while_pending(testkit, deadline_height, request).await;
     if let AsyncEventState::Timeout = state.inner {
         // That's expected
     } else {
@@ -231,9 +233,9 @@ fn wait_for_migration_timeout(
 
 /// Creates a migration request and checks that transaction with this request
 /// is executed successfully.
-fn send_migration_request(testkit: &mut TestKit, request: MigrationRequest) {
+async fn send_migration_request(testkit: &mut TestKit, request: MigrationRequest) {
     let api = testkit.api();
-    let tx_hash = request_migration(&api, request);
+    let tx_hash = request_migration(&api, request).await;
     let block = testkit.create_block();
 
     block[tx_hash]
@@ -250,8 +252,8 @@ const DEADLINE_HEIGHT: Height = Height(10);
 ///
 /// Expected behavior is that migration is completed successfully and schema
 /// is updated to the next version of data.
-#[test]
-fn migration() {
+#[actix_rt::test]
+async fn migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
     // Stop service instance before running the migration.
@@ -265,14 +267,15 @@ fn migration() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     wait_for_migration_success(
         &mut testkit,
         deadline_height,
         request,
         Version::new(0, 2, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -301,8 +304,8 @@ fn migration() {
 }
 
 /// This test applies two migrations to one service, one after another.
-#[test]
-fn migration_two_scripts_sequential() {
+#[actix_rt::test]
+async fn migration_two_scripts_sequential() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
     // Stop service instance before running the migration.
@@ -316,14 +319,15 @@ fn migration_two_scripts_sequential() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     wait_for_migration_success(
         &mut testkit,
         deadline_height,
         request,
         Version::new(0, 2, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -338,14 +342,15 @@ fn migration_two_scripts_sequential() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     wait_for_migration_success(
         &mut testkit,
         deadline_height,
         request,
         Version::new(0, 5, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -359,8 +364,8 @@ fn migration_two_scripts_sequential() {
 ///
 /// Expected behavior is that migration is failed and no changes are applied to
 /// data.
-#[test]
-fn migration_fail() {
+#[actix_rt::test]
+async fn migration_fail() {
     let mut testkit = {
         // Initialize builder;
         let builder = TestKitBuilder::validator();
@@ -399,9 +404,9 @@ fn migration_fail() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
-    let error = wait_for_migration_fail(&mut testkit, deadline_height, request);
+    let error = wait_for_migration_fail(&mut testkit, deadline_height, request).await;
 
     assert_eq!(
         error,
@@ -412,8 +417,8 @@ fn migration_fail() {
 
 /// This test checks that migration that contains two migration scripts completes
 /// successfully in two steps.
-#[test]
-fn complex_migration() {
+#[actix_rt::test]
+async fn complex_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
     // Stop service instance before running the migration.
@@ -428,7 +433,7 @@ fn complex_migration() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // After the first migration step, version should be "0.2".
     wait_for_migration_success(
@@ -436,7 +441,8 @@ fn complex_migration() {
         deadline_height,
         request.clone(),
         Version::new(0, 2, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -447,7 +453,7 @@ fn complex_migration() {
     let new_deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
     request.deadline_height = new_deadline_height;
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Now we finally should have version "0.5".
     wait_for_migration_success(
@@ -455,7 +461,8 @@ fn complex_migration() {
         new_deadline_height,
         request,
         Version::new(0, 5, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -465,8 +472,8 @@ fn complex_migration() {
 
 /// This test checks that attempt to request a migration for service that doesn't support
 /// migrations results in a migration failure.
-#[test]
-fn no_migration_support() {
+#[actix_rt::test]
+async fn no_migration_support() {
     let mut testkit = testkit_with_supervisor_and_service_no_migrations(1);
 
     // Stop service instance before running the migration.
@@ -482,12 +489,12 @@ fn no_migration_support() {
 
     // Despite the fact that migration should fail, the transaction with request
     // should be executed successfully.
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Migration should not start and fail on the **next height**,
     // so we use it as a strict deadline.
     let next_height = testkit.height().next();
-    let error = wait_for_migration_fail(&mut testkit, next_height, request);
+    let error = wait_for_migration_fail(&mut testkit, next_height, request).await;
 
     assert_eq!(
         error,
@@ -502,8 +509,8 @@ fn no_migration_support() {
 ///
 /// Expected behavior is that migration is completed successfully and schema
 /// is updated to the next version of data.
-#[test]
-fn migration_consensus() {
+#[actix_rt::test]
+async fn migration_consensus() {
     let validators_amount = 5;
     let mut testkit = testkit_with_supervisor_and_service(validators_amount);
 
@@ -518,7 +525,7 @@ fn migration_consensus() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
@@ -539,7 +546,7 @@ fn migration_consensus() {
 
     // Check that before obtaining confirmations, migration state is pending.
     let api = testkit.api();
-    let migration_state = migration_state(&api, request.clone());
+    let migration_state = migration_state(&api, request.clone()).await;
     assert!(migration_state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
@@ -550,7 +557,8 @@ fn migration_consensus() {
         deadline_height,
         request,
         Version::new(0, 2, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -564,8 +572,8 @@ fn migration_consensus() {
 /// send their confirmation.
 ///
 /// Expected behavior is that migration is failed due to timeout.
-#[test]
-fn migration_no_consensus() {
+#[actix_rt::test]
+async fn migration_no_consensus() {
     let validators_amount = 5;
     let mut testkit = testkit_with_supervisor_and_service(validators_amount);
 
@@ -580,7 +588,7 @@ fn migration_no_consensus() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
@@ -601,13 +609,13 @@ fn migration_no_consensus() {
 
     // Check that before obtaining confirmations, migration state is pending.
     let api = testkit.api();
-    let migration_state = migration_state(&api, request.clone());
+    let migration_state = migration_state(&api, request.clone()).await;
     assert!(migration_state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
     // Now wait for migration timeout.
-    wait_for_migration_timeout(&mut testkit, deadline_height, request);
+    wait_for_migration_timeout(&mut testkit, deadline_height, request).await;
 
     // After that check that schema did not change.
     let snapshot = testkit.snapshot();
@@ -622,8 +630,8 @@ fn migration_no_consensus() {
 /// migration fails and no changes are performed to schema.
 ///
 /// Expected behavior is that migration is failed.
-#[test]
-fn migration_hash_divergence() {
+#[actix_rt::test]
+async fn migration_hash_divergence() {
     let validators_amount = 5;
     let mut testkit = testkit_with_supervisor_and_service(validators_amount);
 
@@ -638,7 +646,7 @@ fn migration_hash_divergence() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Obtain the expected migration hash and send confirmations from other nodes.
     let reference_hash = obtain_reference_hash(&mut testkit, &request);
@@ -676,13 +684,13 @@ fn migration_hash_divergence() {
 
     // Check that before obtaining confirmations, migration state is pending.
     let api = testkit.api();
-    let migration_state = migration_state(&api, request.clone());
+    let migration_state = migration_state(&api, request.clone()).await;
     assert!(migration_state.is_pending());
 
     testkit.create_block_with_transactions(confirmations);
 
     // Now wait for migration timeout.
-    let error = wait_for_migration_fail(&mut testkit, deadline_height, request);
+    let error = wait_for_migration_fail(&mut testkit, deadline_height, request).await;
 
     assert_eq!(
         error,
@@ -697,8 +705,8 @@ fn migration_hash_divergence() {
 }
 
 /// Test for a fast-forward migration (0.1.0 - 0.1.1)
-#[test]
-fn fast_forward_migration() {
+#[actix_rt::test]
+async fn fast_forward_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
     // Stop service instance before running the migration.
@@ -712,19 +720,20 @@ fn fast_forward_migration() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     wait_for_migration_success(
         &mut testkit,
         deadline_height,
         request,
         Version::new(0, 1, 1),
-    );
+    )
+    .await;
 }
 
 /// This test checks mixed migration scenario: two data migrations and one fast-forward.
-#[test]
-fn mixed_migration() {
+#[actix_rt::test]
+async fn mixed_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
     // Stop service instance before running the migration.
@@ -739,7 +748,7 @@ fn mixed_migration() {
         deadline_height,
     };
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // After the first migration step, version should be "0.2".
     wait_for_migration_success(
@@ -747,7 +756,8 @@ fn mixed_migration() {
         deadline_height,
         request.clone(),
         Version::new(0, 2, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -758,7 +768,7 @@ fn mixed_migration() {
     let new_deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
     request.deadline_height = new_deadline_height;
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Now we should have version "0.5".
     wait_for_migration_success(
@@ -766,7 +776,8 @@ fn mixed_migration() {
         new_deadline_height,
         request.clone(),
         Version::new(0, 5, 0),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
@@ -777,7 +788,7 @@ fn mixed_migration() {
     let even_newer_deadline_height = Height(DEADLINE_HEIGHT.0 * 3);
     request.deadline_height = even_newer_deadline_height;
 
-    send_migration_request(&mut testkit, request.clone());
+    send_migration_request(&mut testkit, request.clone()).await;
 
     // Now we finally should have version "0.5.1".
     wait_for_migration_success(
@@ -785,7 +796,8 @@ fn mixed_migration() {
         even_newer_deadline_height,
         request,
         Version::new(0, 5, 1),
-    );
+    )
+    .await;
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());

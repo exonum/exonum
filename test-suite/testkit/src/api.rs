@@ -16,10 +16,8 @@
 
 pub use exonum_api::ApiAccess;
 
-use actix::{Addr, System};
-use actix_net::server::{Server, StopServer};
 use actix_web::{
-    server::{HttpServer, IntoHttpHandler},
+    test::{self, TestServer},
     App,
 };
 use exonum::{
@@ -27,19 +25,16 @@ use exonum::{
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
-use futures::Future;
 use log::{info, trace};
 use reqwest::{
-    Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response, StatusCode,
+    redirect::Policy as RedirectPolicy, Client, ClientBuilder, RequestBuilder as ReqwestBuilder,
+    Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{
     collections::HashMap,
     fmt::{self, Display},
-    net,
-    sync::mpsc,
-    thread::{self, JoinHandle},
 };
 
 use crate::TestKit;
@@ -74,13 +69,37 @@ impl fmt::Display for ApiKind {
     }
 }
 
-/// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
+/// API encapsulation for the testkit. Allows to execute and asynchronously retrieve results
 /// for REST-ful endpoints of services.
 ///
 /// Note that `TestKitApi` instantiation spawns a new HTTP server. Hence, it is advised to reuse
 /// existing instances unless it is impossible. The latter may be the case if changes
 /// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
 /// instantiated.
+///
+/// The HTTP server uses `actix_rt` under the hood, so in order to execute asynchronous methods,
+/// the user must use this API inside the `actix_rt` runtime.
+/// The easiest way to do that is to use `#[actix_rt::test]` instead of `#[test]`.
+///
+/// # Example
+///
+/// ```
+/// #[actix_rt::test]
+/// async fn test_api() {
+///     let testkit = TestKitBuilder::validator().build();
+///     let api = testkit.api();
+///
+///     // By default we only have Rust runtime endpoints.
+///     use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
+///
+///     let proto_sources: Vec<ProtoSourceFile> = api
+///         .public(ApiKind::RustRuntime)
+///         .query(&ProtoSourcesQuery::Core)
+///         .get("proto-sources")
+///         .await
+///         .expect("Request to the valid endpoint failed");
+/// }
+/// ```
 pub struct TestKitApi {
     test_server: TestServer,
     test_client: Client,
@@ -119,13 +138,13 @@ impl TestKitApi {
     }
 
     /// Sends a transaction to the node.
-    pub fn send<T>(&self, transaction: T)
+    pub async fn send<T>(&self, transaction: T)
     where
         T: Into<Verified<AnyTx>>,
     {
         self.api_sender
             .broadcast_transaction(transaction.into())
-            .wait()
+            .await
             .expect("Cannot broadcast transaction");
     }
 
@@ -239,7 +258,7 @@ where
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a query string parameters.
-    pub fn get<R>(self, endpoint: &str) -> api::Result<R>
+    pub async fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -268,16 +287,16 @@ where
         if let Some(modifier) = self.modifier {
             builder = modifier(builder);
         }
-        let response = builder.send().expect("Unable to send request");
+        let response = builder.send().await.expect("Unable to send request");
         Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result(response)
+        Self::response_to_api_result(response).await
     }
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a JSON in the request body.
-    pub fn post<R>(self, endpoint: &str) -> api::Result<R>
+    pub async fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -301,9 +320,9 @@ where
         if let Some(modifier) = self.modifier {
             builder = modifier(builder);
         }
-        let response = builder.send().expect("Unable to send request");
+        let response = builder.send().await.expect("Unable to send request");
         Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result(response)
+        Self::response_to_api_result(response).await
     }
 
     // Checks that response contains headers expected by the request author.
@@ -326,12 +345,12 @@ where
     }
 
     /// Converts reqwest Response to `api::ApiResult`.
-    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
+    async fn response_to_api_result<R>(response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
         let code = response.status();
-        let body = response.text().expect("Unable to get response text");
+        let body = response.text().await.expect("Unable to get response text");
         trace!("Body: {}", body);
         if code == StatusCode::OK {
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");
@@ -345,89 +364,16 @@ where
 
 /// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
-    let server = TestServer::with_factory(move || {
+    let server = test::start(move || {
         App::new()
-            .scope("public/api", |scope| {
-                trace!("Create public/api");
-                aggregator.extend_backend(ApiAccess::Public, scope)
-            })
-            .scope("private/api", |scope| {
-                trace!("Create private/api");
-                aggregator.extend_backend(ApiAccess::Private, scope)
-            })
+            .service(
+                aggregator.extend_backend(ApiAccess::Public, actix_web::web::scope("public/api")),
+            )
+            .service(
+                aggregator.extend_backend(ApiAccess::Private, actix_web::web::scope("private/api")),
+            )
     });
 
     info!("Test server created on {}", server.addr());
     server
-}
-
-/// The custom implementation of the test server, because there is an error in the default
-/// implementation. It does not wait for the http server thread to complete during drop.
-struct TestServer {
-    addr: net::SocketAddr,
-    backend: Addr<Server>,
-    system: System,
-    handle: Option<JoinHandle<()>>,
-}
-
-impl TestServer {
-    /// Start new test server with application factory
-    fn with_factory<F, H>(factory: F) -> Self
-    where
-        F: Fn() -> H + Send + Clone + 'static,
-        H: IntoHttpHandler + 'static,
-    {
-        let (tx, rx) = mpsc::channel();
-
-        // run server in separate thread
-        let handle = thread::spawn(move || {
-            let sys = System::new("actix-test-server");
-            let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let local_addr = tcp.local_addr().unwrap();
-
-            let srv = HttpServer::new(factory)
-                .disable_signals()
-                .listen(tcp)
-                .keep_alive(5)
-                .client_shutdown(100) // Decreases waiting interval during server shutdown
-                .workers(1)
-                .start();
-
-            tx.send((System::current(), local_addr, srv)).unwrap();
-            sys.run();
-        });
-
-        let (system, addr, backend) = rx.recv().unwrap();
-
-        Self {
-            addr,
-            backend,
-            handle: Some(handle),
-            system,
-        }
-    }
-
-    /// Construct test server url.
-    fn url(&self, uri: &str) -> String {
-        if uri.starts_with('/') {
-            format!("http://localhost:{}{}", self.addr.port(), uri)
-        } else {
-            format!("http://localhost:{}/{}", self.addr.port(), uri)
-        }
-    }
-
-    /// Construct test server url.
-    fn addr(&self) -> net::SocketAddr {
-        self.addr
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        // Stop the HTTP server dropping all current connections.
-        let _ = self.backend.send(StopServer { graceful: false }).wait();
-        self.system.stop();
-        // Wait server thread.
-        let _ = self.handle.take().unwrap().join();
-    }
 }

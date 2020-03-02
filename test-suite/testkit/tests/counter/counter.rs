@@ -33,7 +33,7 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
-use futures::{Future, IntoFuture};
+use futures::FutureExt;
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
@@ -158,11 +158,12 @@ impl CounterWithProof {
 struct CounterApi;
 
 impl CounterApi {
-    fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
+    async fn increment(state: ServiceApiState, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
+            .await
             .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
@@ -172,7 +173,7 @@ impl CounterApi {
         Ok(schema.counter.get().unwrap_or_default())
     }
 
-    fn count_with_proof(state: &ServiceApiState<'_>) -> api::Result<CounterWithProof> {
+    async fn count_with_proof(state: ServiceApiState) -> api::Result<CounterWithProof> {
         let proof = state
             .data()
             .proof_for_service_index("counter")
@@ -184,12 +185,13 @@ impl CounterApi {
         })
     }
 
-    fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
+    async fn reset(state: ServiceApiState) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
         // The first `()` is the empty context, the second one is the `reset` arg.
         let tx_hash = state
             .generic_broadcaster()
             .reset((), ())
+            .await
             .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
         Ok(TransactionResponse { tx_hash })
     }
@@ -198,13 +200,15 @@ impl CounterApi {
         builder
             .private_scope()
             .endpoint("count", |state, _query: ()| {
-                Self::count(state.service_data())
+                let count = Self::count(state.service_data());
+                async move { count }
             })
             .endpoint_mut("reset", |state, _query: ()| Self::reset(state));
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {
-                Self::count(state.service_data())
+                let count = Self::count(state.service_data());
+                async move { count }
             })
             .endpoint_mut("count", Self::increment);
         builder
@@ -220,14 +224,22 @@ impl CounterApi {
         let service_keys = builder.blockchain().service_keypair().to_owned();
         builder.public_scope().endpoint_mut(
             "incorrect-tx",
-            move |_state: &ServiceApiState, by: u64| {
-                let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
-                let hash = incorrect_tx.object_hash();
-                api_sender
-                    .clone()
-                    .broadcast_transaction(incorrect_tx)
-                    .map(move |()| hash)
-                    .map_err(api::Error::internal)
+            move |_state: ServiceApiState, by: u64| {
+                let api_sender = api_sender.clone();
+                let service_keys = service_keys.clone();
+                async move {
+                    let service_keys = service_keys.clone();
+                    let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
+                    let hash = incorrect_tx.object_hash();
+
+                    api_sender
+                        .clone()
+                        .broadcast_transaction(incorrect_tx)
+                        .await
+                        .map(move |_| hash)
+                        .map_err(api::Error::internal)
+                }
+                .boxed_local()
             },
         );
 
@@ -235,7 +247,7 @@ impl CounterApi {
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
         let blockchain = builder.blockchain().clone();
-        let handler = move |request: HttpRequest| -> api::Result<u64> {
+        let handler = move |request: HttpRequest| {
             let auth_header = request
                 .headers()
                 .get("Authorization")
@@ -249,13 +261,10 @@ impl CounterApi {
             let snapshot = blockchain.snapshot();
             Self::count(snapshot.as_ref())
         };
-        let handler: Arc<RawHandler> = Arc::new(move |request| {
-            Box::new(
-                handler(request)
-                    .into_future()
-                    .from_err()
-                    .map(|v| HttpResponse::Ok().json(v)),
-            )
+        let handler: Arc<RawHandler> = Arc::new(move |request, _payload| {
+            let result = handler(request).map(|v| HttpResponse::Ok().json(v));
+
+            async move { result.map_err(From::from) }.boxed_local()
         });
 
         builder
