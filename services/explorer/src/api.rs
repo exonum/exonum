@@ -47,18 +47,18 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
 //!     .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlocksRange = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/blocks?count=2"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/blocks?count=2");
+//! let response: BlocksRange = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.range, Height(4)..Height(6));
 //! // Blocks are returned in reverse order, from the latest
 //! // to the earliest.
@@ -86,18 +86,19 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
-//! # fn main() -> Result<(), failure::Error> {
+//! #
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with_default_rust_service(ExplorerFactory)
 //! #    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlockInfo = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/block?height=3"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/block?height=3");
+//! let response: BlockInfo = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.block.height, Height(3));
 //! // Precommits and median precommit time are always returned.
 //! assert!(response.precommits.is_some());
@@ -150,7 +151,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
@@ -162,9 +164,9 @@
 //! let response: TransactionInfo = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/transactions"))
 //!     .query(&TransactionQuery { hash: tx.object_hash() })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let response = response.as_committed().unwrap();
 //! assert_eq!(response.location().block_height(), Height(1));
 //! # Ok(())
@@ -218,7 +220,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
 //!    .with_default_rust_service(ExplorerFactory)
@@ -233,9 +236,9 @@
 //!         hash: tx.object_hash(),
 //!         with_proof: false,
 //!     })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Error!");
 //! # Ok(())
@@ -280,7 +283,8 @@
 //! #     }
 //! # }
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
 //!    .with_default_rust_service(ExplorerFactory)
@@ -295,9 +299,9 @@
 //!         service_id: MyService::INSTANCE_ID,
 //!         with_proof: false,
 //!     })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Not a good start");
 //! # Ok(())
@@ -362,7 +366,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
@@ -374,9 +379,9 @@
 //! let response: TransactionResponse = reqwest::Client::new()
 //!     .post(&api.public_url("api/explorer/v1/transactions"))
 //!     .json(&TransactionHex { tx_body })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.tx_hash, tx.object_hash());
 //! # Ok(())
 //! # }
