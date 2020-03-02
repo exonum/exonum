@@ -220,6 +220,7 @@ impl ServiceApiScope {
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
         self.inner.endpoint(name, move |query: Q| {
+            // TODO Try to avoid handler and descriptor extra cloning here. [ECR-4269]
             let handler = handler.clone();
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
@@ -227,7 +228,6 @@ impl ServiceApiScope {
             async move {
                 let state = maybe_state?;
                 let descriptor = state.instance().clone();
-                // TODO Try to avoid descriptor cloning here. [ECR-4269]
                 handler(state, query)
                     .await
                     .map_err(|err| err.source(descriptor.to_string()))

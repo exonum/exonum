@@ -17,7 +17,7 @@
 use actix_cors::{Cors, CorsFactory};
 use actix_web::{dev::Server, App, HttpServer};
 use futures::{
-    future::try_join_all,
+    future::{join_all, try_join_all},
     stream::{TryStream, TryStreamExt},
 };
 
@@ -44,10 +44,9 @@ impl WebServerConfig {
     }
 
     fn cors_factory(&self) -> CorsFactory {
-        match self.allow_origin.clone() {
-            Some(origin) => CorsFactory::from(origin),
-            None => Cors::new().finish(),
-        }
+        self.allow_origin
+            .clone()
+            .map_or_else(Cors::default, CorsFactory::from)
     }
 }
 
@@ -116,9 +115,7 @@ impl ApiManager {
     async fn stop_servers(&mut self) {
         log::trace!("Servers stop requested.");
 
-        for server in self.servers.drain(..) {
-            server.stop(true).await;
-        }
+        join_all(self.servers.drain(..).map(|server| server.stop(true))).await;
     }
 
     /// Starts API manager actor with the specified endpoints update stream.

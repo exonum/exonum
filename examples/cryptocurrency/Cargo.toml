@@ -33,8 +33,9 @@ serde_json = "1.0"
 [dev-dependencies]
 exonum-cli = { version = "1.0.0-rc.1", path = "../../cli" }
 exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../services/explorer" }
-# exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
+exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit" }
 
+actix-rt = "1.0.0"
 assert_matches = "1.2.0"
 pretty_assertions = "0.6.1"
 rand = "0.7"

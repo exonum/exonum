@@ -351,7 +351,7 @@ fn main() {
 
     let blockchain = node.blockchain().clone();
     let handle = thread::spawn(move || {
-        futures::executor::block_on(examine_runtime(blockchain, shutdown_handle))
+        futures::executor::block_on(examine_runtime(blockchain, shutdown_handle));
     });
 
     node.run().unwrap();

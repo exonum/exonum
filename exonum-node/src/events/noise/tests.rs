@@ -387,7 +387,7 @@ fn run_handshake_listener(
                         };
 
                         handshake
-                            .map(|_| ())
+                            .map(drop)
                             .or_else(|e| err_sender.send(e).map(|_| ()))
                             .map_err(|e| panic!("{:?}", e))
                     })
