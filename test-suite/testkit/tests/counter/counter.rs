@@ -33,7 +33,7 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
@@ -224,23 +224,13 @@ impl CounterApi {
         let service_keys = builder.blockchain().service_keypair().to_owned();
         builder.public_scope().endpoint_mut(
             "incorrect-tx",
-            // FIXME: improve code quality
             move |_state: ServiceApiState, by: u64| {
-                let api_sender = api_sender.clone();
-                let service_keys = service_keys.clone();
-                async move {
-                    let service_keys = service_keys.clone();
-                    let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
-                    let hash = incorrect_tx.object_hash();
-
-                    api_sender
-                        .clone()
-                        .broadcast_transaction(incorrect_tx)
-                        .await
-                        .map(move |_| hash)
-                        .map_err(api::Error::internal)
-                }
-                .boxed_local()
+                let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
+                let hash = incorrect_tx.object_hash();
+                api_sender
+                    .broadcast_transaction(incorrect_tx)
+                    .map_ok(move |_| hash)
+                    .map_err(api::Error::internal)
             },
         );
 
@@ -264,7 +254,6 @@ impl CounterApi {
         };
         let handler: Arc<RawHandler> = Arc::new(move |request, _payload| {
             let result = handler(request).map(|v| HttpResponse::Ok().json(v));
-
             async move { result.map_err(From::from) }.boxed_local()
         });
 
