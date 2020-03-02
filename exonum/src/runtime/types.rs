@@ -242,8 +242,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             is_valid_identifier(&self.name),
-            "Artifact name ({}) contains an illegal character, use only: `a-zA-Z0-9` and `/_.-`",
-            &self.name,
+            "Artifact name contains an illegal character, use only: `a-zA-Z0-9` and `/_.-`"
         );
         Ok(())
     }
@@ -352,13 +351,10 @@ impl InstanceSpec {
     /// Checks that the instance name contains only allowed characters and is not empty.
     pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
         let name = name.as_ref();
-        ensure!(
-            !name.is_empty(),
-            "Service instance name should not be empty"
-        );
+        ensure!(!name.is_empty(), "Service name is empty");
         ensure!(
             is_valid_index_name_component(name),
-            "Service instance name ({}) contains illegal character, use only: a-zA-Z0-9 and one of _-", name
+            "Service name contains illegal character, use only: a-zA-Z0-9 and _-"
         );
         Ok(())
     }
@@ -1089,11 +1085,11 @@ mod tests {
             ("ava:test:0.0.1", "invalid digit found in string"),
             (
                 "123:I am a service!:1.0.0",
-                "Artifact name (I am a service!) contains an illegal character",
+                "Artifact name contains an illegal character",
             ),
             (
                 "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}:1.0.0",
-                "Artifact name (\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}) contains an illegal character",
+                "Artifact name contains an illegal character",
             ),
             ("1:test:1", "Expected dot"),
             ("1:test:3.141593", "Expected dot"),
@@ -1125,18 +1121,18 @@ mod tests {
         let specs = [
             (
                 InstanceSpec::new(1, "", "0:my-service:1.0.0"),
-                "Service instance name should not be empty",
+                "Service name is empty",
             ),
             (
                 InstanceSpec::new(2,
                     "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
                     "0:my-service:1.0.0"
                 ),
-                "Service instance name (\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}) contains illegal character",
+                "Service name contains illegal character",
             ),
             (
                 InstanceSpec::new(3, "space service", "1:java.runtime.service:1.0.0"),
-                "Service instance name (space service) contains illegal character",
+                "Service name contains illegal character",
             ),
             (
                 InstanceSpec::new(4, "foo_service", ""),
@@ -1144,7 +1140,7 @@ mod tests {
             ),
             (
                 InstanceSpec::new(5, "dot.service", "1:java.runtime.service:1.0.0"),
-                "Service instance name (dot.service) contains illegal character",
+                "Service name contains illegal character",
             ),
             (
                 InstanceSpec::new(6, "foo_service", ":test:1.0.0"),

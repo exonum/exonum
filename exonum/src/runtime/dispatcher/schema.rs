@@ -173,7 +173,11 @@ impl<T: Access> Schema<T> {
 
     /// Checks if the provided artifact can currently be unloaded. Returns an error if the unloading
     /// is impossible.
-    fn check_unloading_artifact(
+    pub fn check_unloading_artifact(&self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        self.do_check_unloading_artifact(artifact).map(drop)
+    }
+
+    fn do_check_unloading_artifact(
         &self,
         artifact: &ArtifactId,
     ) -> Result<ArtifactState, ExecutionError> {
@@ -281,7 +285,7 @@ impl Schema<&Fork> {
 
     /// Unloads the provided artifact.
     pub(super) fn unload_artifact(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        let mut state = self.check_unloading_artifact(artifact)?;
+        let mut state = self.do_check_unloading_artifact(artifact)?;
         state.status = ArtifactStatus::Unloading;
         self.artifacts().put(artifact, state);
         self.pending_artifacts().insert(artifact);

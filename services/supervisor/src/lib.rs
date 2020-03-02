@@ -14,7 +14,7 @@
 
 //! Supervisor is an [Exonum][exonum] service capable of the following activities:
 //!
-//! - Deploying service artifacts
+//! - Deploying service artifacts and unloading unused artifacts
 //! - Instantiating services
 //! - Changing configuration of instantiated services
 //! - Changing a state of instantiated services: stopping, freezing, resuming,
@@ -47,14 +47,14 @@
 //! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
 //! of the nodes should receive a [`DeployRequest`] message through API.
 //!
-//! To request a config change, one node should receive a [`ConfigPropose`] message through API.
+//! To request a config change, one node should submit a [`ConfigPropose`] message through API.
 //! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
-//! should also receive [`ConfigVote`] messages with a hash of the proposed configuration.
+//! should also submit [`ConfigVote`] messages with a hash of the proposed configuration.
 //! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
 //! This node votes for the configuration propose automatically.
 //!
-//! The operation of changing a service state except for data migrations is treated similarly
-//! to a configuration change and follows the same rules.
+//! Starting, resuming or freezing a service, or unloading an artifact
+//! are treated similarly to a configuration change and follow the same rules.
 //!
 //! ## Migrations Management
 //!
@@ -150,7 +150,7 @@ pub use self::{
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
         DeployResult, FreezeService, MigrationRequest, MigrationResult, ResumeService,
-        ServiceConfig, StartService, StopService, SupervisorConfig,
+        ServiceConfig, StartService, StopService, SupervisorConfig, UnloadArtifact,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -304,6 +304,13 @@ fn update_configs(
                 context
                     .supervisor_extensions()
                     .initiate_resuming_service(resume_service.instance_id, resume_service.params)?;
+            }
+
+            ConfigChange::UnloadArtifact(unload_artifact) => {
+                log::trace!("Unloading artifact `{}`", unload_artifact.artifact_id);
+                context
+                    .supervisor_extensions()
+                    .unload_artifact(&unload_artifact.artifact_id)?;
             }
         }
     }
