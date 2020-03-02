@@ -13,6 +13,12 @@
 // limitations under the License.
 
 //! Specifications of Rust and non-Rust artifacts for use in deployment.
+//!
+//! Two consumers of the specifications produced by this module are the [testkit]
+//! and the node builder from the [`exonum-cli` crate].
+//!
+//! [testkit]: https://crates.io/crates/exonum-testkit
+//! [`exonum-cli` crate]: https://crates.io/crates/exonum-cli
 
 use exonum::{
     blockchain::config::{GenesisConfigBuilder, InstanceInitParams},
@@ -45,7 +51,29 @@ pub struct Simple(());
 #[derive(Debug)]
 pub struct Migrating(());
 
-/// Deploy specification for a Rust artifact. The spec can include 0 or more instantiated services.
+/// Deploy specification for a Rust artifact. The spec can include zero or more instantiated services.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum_derive::*;
+/// # use exonum::runtime::InstanceId;
+/// # use exonum_rust_runtime::{spec::Spec, DefaultInstance, Service, ServiceFactory};
+/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// #[service_factory(artifact_name = "my-service")]
+/// pub struct MyService;
+/// impl Service for MyService {}
+///
+/// impl DefaultInstance for MyService {
+///     const INSTANCE_ID: InstanceId = 100;
+///     const INSTANCE_NAME: &'static str = "my-service";
+/// }
+///
+/// let spec = Spec::new(MyService)
+///     .with_default_instance()
+///     .with_instance(200, "other-service", 42_u64);
+/// // Deploy `spec` somewhere...
+/// ```
 #[derive(Debug)]
 pub struct Spec<T, Kind> {
     service: T,
@@ -75,6 +103,9 @@ impl<T: ServiceFactory, Kind> Spec<T, Kind> {
 impl<T: DefaultInstance, Kind> Spec<T, Kind> {
     /// Adds a built-in service instance with the default identifiers
     /// to instantiate at the genesis block.
+    ///
+    /// Calling this method several times still results in a *single* default instance added
+    /// to the blockchain upon creation.
     pub fn with_default_instance(mut self) -> Self {
         self.default_instance = Some(self.service.default_instance());
         self
@@ -180,8 +211,33 @@ impl<T: ServiceFactory + MigrateData> Deploy for JustFactory<T, Migrating> {
     }
 }
 
-/// Deploy specification for a non-Rust artifact. The spec can include 0 or more
+/// Deploy specification for a non-Rust artifact. The spec can include zero or more
 /// instantiated services.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::runtime::{versioning::Version, ArtifactId};
+/// # use exonum_derive::*;
+/// # use exonum_rust_runtime::spec::ForeignSpec;
+/// # use serde_derive::*;
+/// #
+/// # #[derive(Serialize, Deserialize, BinaryValue)]
+/// # #[binary_value(codec = "bincode")]
+/// # struct ArtifactSpec {}
+/// #
+/// # fn main() -> Result<(), failure::Error> {
+/// const MY_RUNTIME_ID: u32 = 42;
+/// let artifact = ArtifactId::new(MY_RUNTIME_ID, "test", Version::new(1, 0, 0))?;
+/// let spec = ForeignSpec::new(artifact)
+///     .with_deploy_spec(ArtifactSpec {
+///         // Runtime-specific data necessary to deploy the artifact
+///     })
+///     .with_instance(100, "test-service", ());
+/// // Deploy `spec` somewhere...
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct ForeignSpec {
     artifact: ArtifactId,
