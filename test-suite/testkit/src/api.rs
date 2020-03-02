@@ -18,7 +18,7 @@ pub use exonum_api::ApiAccess;
 
 use actix_web::{
     test::{self, TestServer},
-    App,
+    web, App,
 };
 use exonum::{
     blockchain::ApiSender,
@@ -365,13 +365,9 @@ where
 /// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = test::start(move || {
-        App::new()
-            .service(
-                aggregator.extend_backend(ApiAccess::Public, actix_web::web::scope("public/api")),
-            )
-            .service(
-                aggregator.extend_backend(ApiAccess::Private, actix_web::web::scope("private/api")),
-            )
+        let public_apis = aggregator.extend_backend(ApiAccess::Public, web::scope("public/api"));
+        let private_apis = aggregator.extend_backend(ApiAccess::Private, web::scope("private/api"));
+        App::new().service(public_apis).service(private_apis)
     });
 
     info!("Test server created on {}", server.addr());
