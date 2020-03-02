@@ -73,7 +73,7 @@
 //!   could be fixed by the node admin.
 //!
 //! 6. If the artifact is not associated with any services, it can be *unloaded*. Unloading
-//!   the artifact may free resources associated with in in the corresponding runtime.
+//!   the artifact may free resources associated with it in the corresponding runtime.
 //!   Like other lifecycle events, unloading an artifact is controlled by the supervisor service.
 //!
 //! # Service Lifecycle
@@ -426,7 +426,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     ///   of the data migration in a service.
     ///
     /// The default implementation does nothing. While this may be inefficient, this implementation
-    /// is logically accurate. Indeed, the runtime retains resources associated with the artifact
+    /// is logically sound. Indeed, the runtime retains resources associated with the artifact
     /// (until the node is restarted), but on the blockchain level, the artifact is considered
     /// unloaded.
     ///
