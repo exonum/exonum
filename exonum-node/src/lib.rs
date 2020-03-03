@@ -112,8 +112,8 @@ mod messages;
 mod plugin;
 mod proto;
 mod requests;
-//#[cfg(test)]
-//mod sandbox;
+#[cfg(test)]
+mod sandbox;
 mod schema;
 mod state;
 

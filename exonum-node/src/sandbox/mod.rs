@@ -33,7 +33,7 @@ use exonum::{
     runtime::{ArtifactId, SnapshotExt},
 };
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
-use futures_01::{sync::mpsc, Async, Future, Sink, Stream};
+use futures::{channel::mpsc, prelude::*};
 
 use std::{
     cell::{Ref, RefCell, RefMut},
@@ -57,7 +57,7 @@ use crate::{
     connect_list::ConnectList,
     events::{
         Event, EventHandler, InternalEvent, InternalRequest, NetworkEvent, NetworkRequest,
-        TimeoutRequest,
+        SyncSender, TimeoutRequest,
     },
     messages::{
         BlockRequest, BlockResponse, Connect, ExonumMessage, Message, PeersRequest,
@@ -116,66 +116,53 @@ impl SandboxInner {
         self.process_events();
     }
 
+    fn next_event<T>(rx: &mut mpsc::Receiver<T>) -> Option<T> {
+        rx.next().now_or_never().flatten()
+    }
+
     fn process_network_requests(&mut self) {
-        let network_getter = futures_01::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(network)) = self.network_requests_rx.poll()? {
-                match network {
-                    NetworkRequest::SendMessage(peer, msg) => {
-                        let msg = Message::from_signed(msg).expect("Expected valid message.");
-                        self.sent.push_back((peer, msg))
-                    }
-                    NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
+        while let Some(network) = Self::next_event(&mut self.network_requests_rx) {
+            match network {
+                NetworkRequest::SendMessage(peer, msg) => {
+                    let msg = Message::from_signed(msg).expect("Expected valid message.");
+                    self.sent.push_back((peer, msg))
                 }
+                NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
             }
-            Ok(())
-        });
-        network_getter.wait().unwrap();
+        }
     }
 
     fn process_internal_requests(&mut self) {
-        let internal_getter = futures_01::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(internal)) = self.internal_requests_rx.poll()? {
-                match internal {
-                    InternalRequest::Timeout(t) => self.timers.push(t),
+        while let Some(internal) = Self::next_event(&mut self.internal_requests_rx) {
+            match internal {
+                InternalRequest::Timeout(t) => self.timers.push(t),
 
-                    InternalRequest::JumpToRound(height, round) => self
-                        .handler
-                        .handle_event(InternalEvent::jump_to_round(height, round).into()),
+                InternalRequest::JumpToRound(height, round) => self
+                    .handler
+                    .handle_event(InternalEvent::jump_to_round(height, round).into()),
 
-                    InternalRequest::VerifyMessage(raw) => {
-                        let msg = SignedMessage::from_bytes(raw.into())
-                            .and_then(SignedMessage::into_verified::<ExonumMessage>)
-                            .map(Message::from)
-                            .unwrap();
+                InternalRequest::VerifyMessage(raw) => {
+                    let msg = SignedMessage::from_bytes(raw.into())
+                        .and_then(SignedMessage::into_verified::<ExonumMessage>)
+                        .map(Message::from)
+                        .unwrap();
 
-                        self.handler
-                            .handle_event(InternalEvent::message_verified(msg).into())
-                    }
-
-                    InternalRequest::Shutdown => unreachable!(),
+                    self.handler
+                        .handle_event(InternalEvent::message_verified(msg).into())
                 }
+
+                InternalRequest::Shutdown => unreachable!(),
             }
-            Ok(())
-        });
-        internal_getter.wait().unwrap();
+        }
     }
 
     fn process_api_requests(&mut self) {
-        let api_getter = futures_01::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(api)) = self.api_requests_rx.poll()? {
-                self.handler.handle_event(api.into());
-            }
-            Ok(())
-        });
-        api_getter.wait().unwrap();
-
-        let tx_getter = futures_01::lazy(|| -> Result<(), ()> {
-            while let Async::Ready(Some(tx)) = self.transactions_rx.poll()? {
-                self.handler.handle_event(tx.into());
-            }
-            Ok(())
-        });
-        tx_getter.wait().unwrap();
+        while let Some(api) = Self::next_event(&mut self.api_requests_rx) {
+            self.handler.handle_event(api.into());
+        }
+        while let Some(tx) = Self::next_event(&mut self.transactions_rx) {
+            self.handler.handle_event(tx.into());
+        }
     }
 }
 
@@ -867,10 +854,10 @@ impl Sandbox {
         let inner = self.inner.into_inner();
 
         let node_sender = NodeSender {
-            network_requests: network_channel.0.clone().wait(),
-            internal_requests: internal_channel.0.clone().wait(),
-            transactions: tx_channel.0.clone().wait(),
-            api_requests: api_channel.0.clone().wait(),
+            network_requests: SyncSender::new(network_channel.0.clone()),
+            internal_requests: SyncSender::new(internal_channel.0.clone()),
+            transactions: SyncSender::new(tx_channel.0.clone()),
+            api_requests: SyncSender::new(api_channel.0.clone()),
         };
         let peers = inner
             .handler
@@ -1180,10 +1167,10 @@ fn sandbox_with_services_uninitialized(
     let internal_channel = mpsc::channel(100);
     let api_channel = mpsc::channel(100);
     let node_sender = NodeSender {
-        network_requests: network_channel.0.clone().wait(),
-        internal_requests: internal_channel.0.clone().wait(),
-        transactions: tx_channel.0.clone().wait(),
-        api_requests: api_channel.0.clone().wait(),
+        network_requests: SyncSender::new(network_channel.0.clone()),
+        internal_requests: SyncSender::new(internal_channel.0.clone()),
+        transactions: SyncSender::new(tx_channel.0.clone()),
+        api_requests: SyncSender::new(api_channel.0.clone()),
     };
     let api_state = SharedNodeState::new(5000);
 
