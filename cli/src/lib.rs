@@ -271,11 +271,11 @@ impl NodeBuilder {
     }
 
     /// Configures the node using parameters provided by user from stdin and then runs it.
-    pub fn run(mut self) -> Result<(), failure::Error> {
+    pub async fn run(mut self) -> Result<(), failure::Error> {
         // Store temporary directory until the node is done.
         let _temp_dir = self.temp_dir.take();
         if let Some(node) = self.execute_command()? {
-            node.run()
+            node.run().await
         } else {
             Ok(())
         }

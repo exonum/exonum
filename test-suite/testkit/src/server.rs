@@ -85,7 +85,7 @@ use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
 use exonum_api::{self as api, ApiAggregator, ApiBuilder};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
-use futures_01::{sync::oneshot, Future};
+use futures::{channel::oneshot, executor};
 use serde::{Deserialize, Serialize};
 
 use std::{
@@ -111,7 +111,7 @@ impl TestKitActor {
             system.run()
         });
 
-        let testkit = actor_rx.wait().expect("Failed spawning testkit server");
+        let testkit = executor::block_on(actor_rx).expect("Failed spawning testkit server");
         api_aggregator.insert("testkit", Self::api(testkit));
         (api_aggregator, join_handle)
     }

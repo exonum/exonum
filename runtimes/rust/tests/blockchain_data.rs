@@ -30,7 +30,7 @@ use exonum::{
     },
 };
 use exonum_derive::{FromAccess, ServiceDispatcher, ServiceFactory};
-use futures_01::sync::mpsc;
+use futures::channel::mpsc;
 
 use std::collections::BTreeMap;
 

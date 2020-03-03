@@ -24,9 +24,11 @@ use exonum::{
 };
 use exonum_node::{generate_testnet_config, Node, NodeBuilder, ShutdownHandle};
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, ServiceFactory};
+use futures::{future, TryFutureExt};
 use structopt::StructOpt;
+use tokio::{task::JoinHandle, time::delay_for};
 
-use std::{sync::Arc, thread, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use crate::services::{MainService, MainServiceInterface, TogglingSupervisor};
 
@@ -34,7 +36,7 @@ mod services;
 
 #[derive(Debug)]
 struct RunHandle {
-    node_thread: thread::JoinHandle<()>,
+    node_task: JoinHandle<()>,
     service_keys: KeyPair,
     shutdown_handle: ShutdownHandle,
 }
@@ -42,25 +44,26 @@ struct RunHandle {
 impl RunHandle {
     fn new(node: Node, service_keys: KeyPair) -> Self {
         let shutdown_handle = node.shutdown_handle();
+        let node_task = node.run().unwrap_or_else(|e| panic!("{}", e));
         Self {
-            node_thread: thread::spawn(|| node.run().unwrap()),
+            node_task: tokio::spawn(node_task),
             shutdown_handle,
             service_keys,
         }
     }
 
-    fn join(self) -> KeyPair {
-        futures::executor::block_on(self.shutdown_handle.shutdown())
+    async fn join(self) -> KeyPair {
+        self.shutdown_handle
+            .shutdown()
+            .await
             .expect("Cannot shut down node");
-        self.node_thread
-            .join()
-            .expect("Node panicked during shutdown");
+        self.node_task.await.expect("Node panicked during shutdown");
         self.service_keys
     }
 }
 
 fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Arc<TemporaryDB>) {
-    let mut node_threads = Vec::with_capacity(count as usize);
+    let mut node_handles = Vec::with_capacity(count as usize);
     let inspected_db = Arc::new(TemporaryDB::new());
 
     let configs = generate_testnet_config(count, start_port);
@@ -89,9 +92,9 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Arc<TemporaryDB>) 
             })
             .build();
 
-        node_threads.push(RunHandle::new(node, service_keys));
+        node_handles.push(RunHandle::new(node, service_keys));
     }
-    (node_threads, inspected_db)
+    (node_handles, inspected_db)
 }
 
 fn get_height(db: &TemporaryDB) -> Height {
@@ -112,7 +115,8 @@ struct Args {
     max_height: Option<u64>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().ok();
 
@@ -126,7 +130,7 @@ fn main() {
         if args.max_height.map_or(false, |max| height >= Height(max)) {
             break;
         }
-        thread::sleep(Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
     }
 
     let snapshot = db.snapshot();
@@ -134,7 +138,7 @@ fn main() {
     let transactions = core_schema.transactions();
     let height = core_schema.height();
 
-    let keys: Vec<_> = nodes.into_iter().map(RunHandle::join).collect();
+    let keys = future::join_all(nodes.into_iter().map(RunHandle::join)).await;
     let mut committed_timestamps = 0;
     for (node_i, keys) in keys.into_iter().enumerate() {
         let timestamps = (1..=height.0)

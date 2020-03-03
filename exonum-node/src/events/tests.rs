@@ -150,14 +150,14 @@ impl TestEvents {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
-        let network_requests_tx = channel.network_requests.0.clone();
+        let network_requests_tx = channel.network_requests.0;
 
         let network_part = NetworkPart {
             our_connect_message: connect,
             listen_address: self.listen_address,
             network_config,
             max_message_len: ConsensusConfig::DEFAULT_MAX_MESSAGE_LEN,
-            network_requests: channel.network_requests,
+            network_requests: channel.network_requests.1,
             network_tx,
             connect_list: self.connect_list,
         };

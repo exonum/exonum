@@ -23,3 +23,7 @@ exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 futures = "0.3.4"
 log = "0.4.6"
 structopt = "0.3.9"
+
+[dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

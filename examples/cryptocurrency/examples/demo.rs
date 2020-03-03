@@ -17,11 +17,14 @@ use failure::Error;
 
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
-fn main() -> Result<(), Error> {
+#[tokio::main]
+async fn main() -> Result<(), Error> {
     exonum::helpers::init_logger()?;
+
     NodeBuilder::development_node()?
         // Starts cryptocurrency instance with given id and name
         // immediately after genesis block creation.
         .with_default_rust_service(CryptocurrencyService)
         .run()
+        .await
 }

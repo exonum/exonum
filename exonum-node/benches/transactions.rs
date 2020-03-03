@@ -29,13 +29,13 @@ use exonum::{
     messages::Verified,
     runtime::{AnyTx, CallInfo},
 };
-use futures_01::{stream, sync::mpsc::Sender, sync::oneshot, Future, Sink};
-use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
-
-use std::{
-    sync::{Arc, RwLock},
-    thread::{self, JoinHandle},
+use futures::{
+    channel::{mpsc, oneshot},
+    stream, SinkExt,
 };
+use tokio::{runtime, task::JoinHandle};
+
+use std::sync::{Arc, RwLock};
 
 use exonum_node::{
     EventsPoolCapacity, ExternalMessage, NodeChannel,
@@ -126,14 +126,14 @@ impl EventHandler for MessagesHandlerRef {
 }
 
 struct MessageVerifier {
-    tx_sender: Option<Sender<InternalRequest>>,
+    tx_sender: Option<mpsc::Sender<InternalRequest>>,
     tx_handler: MessagesHandlerRef,
-    network_thread: JoinHandle<()>,
-    handler_thread: JoinHandle<()>,
+    network_task: JoinHandle<()>,
+    handler_task: JoinHandle<()>,
     // We retain sender references in order to not shut down the event loop prematurely.
-    external_tx_sender: Option<Sender<Verified<AnyTx>>>,
-    api_sender: Option<Sender<ExternalMessage>>,
-    network_sender: Option<Sender<NetworkEvent>>,
+    external_tx_sender: Option<mpsc::Sender<Verified<AnyTx>>>,
+    api_sender: Option<mpsc::Sender<ExternalMessage>>,
+    network_sender: Option<mpsc::Sender<NetworkEvent>>,
 }
 
 impl MessageVerifier {
@@ -148,27 +148,17 @@ impl MessageVerifier {
             transactions_rx: channel.transactions.1,
             api_rx: channel.api_requests.1,
         };
-
-        let handler_thread = thread::spawn(move || {
-            let mut core = CompatRuntime::new().unwrap();
-            core.block_on(handler_part.run()).unwrap();
-        });
+        let handler_task = tokio::spawn(handler_part.run());
 
         let internal_part = InternalPart {
             internal_tx: channel.internal_events.0,
             internal_requests_rx: channel.internal_requests.1,
         };
-
-        let network_thread = thread::spawn(move || {
-            let mut core = CompatRuntime::new().unwrap();
-            let handle = core.handle();
-
-            core.block_on(internal_part.run(handle)).unwrap();
-        });
+        let network_task = tokio::spawn(internal_part.run());
 
         MessageVerifier {
-            handler_thread,
-            network_thread,
+            handler_task,
+            network_task,
             tx_sender: Some(channel.internal_requests.0.clone()),
             tx_handler: handler,
             external_tx_sender: Some(channel.transactions.0),
@@ -177,28 +167,28 @@ impl MessageVerifier {
         }
     }
 
-    fn send_all(&self, messages: Vec<Vec<u8>>) -> impl Future<Item = (), Error = ()> {
-        let tx_sender = self.tx_sender.as_ref().unwrap().clone();
+    async fn send_all(&mut self, messages: Vec<Vec<u8>>) {
         let finish_signal = self.tx_handler.reset(messages.len());
-
+        let tx_sender = self.tx_sender.as_mut().unwrap();
+        let messages = messages
+            .into_iter()
+            .map(|raw| Ok(InternalRequest::VerifyMessage(raw)));
         tx_sender
-            .send_all(stream::iter_ok(
-                messages.into_iter().map(InternalRequest::VerifyMessage),
-            ))
-            .map(drop)
-            .map_err(drop)
-            .and_then(|()| finish_signal.map_err(drop))
+            .send_all(&mut stream::iter(messages))
+            .await
+            .unwrap();
+        finish_signal.await.unwrap();
     }
 
     /// Stops the transaction verifier.
-    fn join(mut self) {
+    async fn join(mut self) {
         self.tx_sender = None;
-        self.network_thread.join().unwrap();
+        self.network_task.await.unwrap();
 
         self.external_tx_sender = None;
         self.api_sender = None;
         self.network_sender = None;
-        self.handler_thread.join().unwrap();
+        self.handler_task.await.unwrap();
     }
 }
 
@@ -216,17 +206,16 @@ fn bench_verify_messages_simple(b: &mut Bencher<'_>, &size: &usize) {
 
 fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
-
-    let verifier = MessageVerifier::new();
-    let mut core = CompatRuntime::new().unwrap();
+    let mut verifier = MessageVerifier::new();
+    let mut rt = runtime::Runtime::new().unwrap();
 
     b.iter_with_setup(
         || messages.clone(),
         |messages| {
-            core.block_on(verifier.send_all(messages)).unwrap();
+            rt.block_on(verifier.send_all(messages));
         },
     );
-    verifier.join();
+    rt.block_on(verifier.join());
 }
 
 fn bench_verify_transactions(c: &mut Criterion) {

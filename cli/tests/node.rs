@@ -30,7 +30,6 @@ use tokio::time::delay_for;
 
 use std::{
     net::{Ipv4Addr, SocketAddr, TcpListener},
-    thread,
     time::Duration,
 };
 
@@ -113,9 +112,7 @@ async fn node_basic_workflow() -> Result<(), failure::Error> {
         .execute_command()?
         .unwrap();
     let shutdown_handle = node.shutdown_handle();
-    let node_thread = thread::spawn(|| {
-        node.run().ok();
-    });
+    let node_task = tokio::spawn(node.run());
     delay_for(Duration::from_secs(2)).await;
 
     let client = reqwest::Client::new();
@@ -165,6 +162,6 @@ async fn node_basic_workflow() -> Result<(), failure::Error> {
     assert_eq!(answer, 42);
 
     shutdown_handle.shutdown().await?;
-    node_thread.join().ok();
+    node_task.await??;
     Ok(())
 }

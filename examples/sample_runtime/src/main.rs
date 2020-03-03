@@ -34,6 +34,7 @@ use exonum_node::{NodeApiConfig, NodeBuilder, NodeConfig, ShutdownHandle};
 use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 
+use futures::TryFutureExt;
 use std::{cell::Cell, collections::BTreeMap, thread, time::Duration};
 
 /// Service instance with a counter.
@@ -321,7 +322,8 @@ async fn examine_runtime(blockchain: Blockchain, shutdown_handle: ShutdownHandle
     shutdown_handle.shutdown().await.unwrap();
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     exonum::helpers::init_logger().unwrap();
 
     println!("Creating database in temporary dir...");
@@ -350,10 +352,8 @@ fn main() {
     println!("Blockchain is ready for transactions!");
 
     let blockchain = node.blockchain().clone();
-    let handle = thread::spawn(move || {
-        futures::executor::block_on(examine_runtime(blockchain, shutdown_handle));
-    });
-
-    node.run().unwrap();
-    handle.join().unwrap();
+    let node_task = node.run().unwrap_or_else(|e| panic!("{}", e));
+    let node_task = tokio::spawn(node_task);
+    examine_runtime(blockchain, shutdown_handle).await;
+    node_task.await.unwrap();
 }

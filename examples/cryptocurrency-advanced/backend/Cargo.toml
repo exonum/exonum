@@ -27,6 +27,10 @@ protobuf = "2.8.0"
 serde = "1.0.0"
 serde_derive = "1.0.0"
 
+[dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+
 [dev-dependencies]
 exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../../services/explorer" }
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../../test-suite/testkit" }

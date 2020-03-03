@@ -136,22 +136,21 @@ use exonum_api::{
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
-use futures::{compat::Stream01CompatExt, FutureExt, StreamExt, TryStreamExt};
-use futures_01::{sync::mpsc, Stream};
+use futures::{channel::mpsc, future, prelude::*, stream, StreamExt};
 
 #[cfg(feature = "exonum-node")]
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fmt, io, iter, mem,
+    fmt, iter, mem,
     net::SocketAddr,
+    pin::Pin,
     sync::{Arc, Mutex},
 };
 
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
-    poll_events::{poll_events, poll_latest},
     server::TestKitActor,
 };
 
@@ -160,7 +159,6 @@ mod builder;
 mod checkpoint_db;
 pub mod migrations;
 mod network;
-mod poll_events;
 pub mod server;
 
 type ApiNotifierChannel = (
@@ -202,7 +200,7 @@ type ApiNotifierChannel = (
 pub struct TestKit {
     blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
-    events_stream: Box<dyn futures_01::Stream<Item = (), Error = ()> + Send + Sync>,
+    events_stream: Pin<Box<dyn Stream<Item = ()> + Send>>,
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
@@ -276,24 +274,19 @@ impl TestKit {
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
 
-        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
-            Box::new(api_channel.1.and_then(move |transaction| {
-                let _guard = processing_lock_.lock().unwrap();
-                let snapshot = db.snapshot();
-                if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
-                    log::warn!(
-                        "Did not add transaction {:?} to pool because it is incorrect. {}",
-                        transaction.payload(),
-                        error
-                    );
-                } else {
-                    BlockchainMut::add_transactions_into_db_pool(
-                        db.as_ref(),
-                        iter::once(transaction),
-                    );
-                }
-                Ok(())
-            }));
+        let events_stream = Box::pin(api_channel.1.map(move |transaction| {
+            let _guard = processing_lock_.lock().unwrap();
+            let snapshot = db.snapshot();
+            if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                log::warn!(
+                    "Did not add transaction {:?} to pool because it is incorrect. {}",
+                    transaction.payload(),
+                    error
+                );
+            } else {
+                BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(transaction));
+            }
+        }));
 
         Self {
             blockchain,
@@ -345,8 +338,11 @@ impl TestKit {
     /// which is off by default.
     #[cfg(feature = "exonum-node")]
     pub fn poll_control_messages(&mut self) -> Vec<ExternalMessage> {
-        use crate::poll_events::poll_all;
-        poll_all(&mut self.control_channel.1)
+        let mut buffer = vec![];
+        while let Some(message) = self.control_channel.1.next().now_or_never().flatten() {
+            buffer.push(message);
+        }
+        buffer
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -356,7 +352,12 @@ impl TestKit {
 
     /// Updates API aggregator for the testkit and caches it for further use.
     fn update_aggregator(&mut self) -> ApiAggregator {
-        if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
+        let mut maybe_update = None;
+        while let Some(update) = self.api_notifier_channel.1.next().now_or_never().flatten() {
+            maybe_update = Some(update);
+        }
+
+        if let Some(update) = maybe_update {
             let mut aggregator = self.create_api_aggregator();
             aggregator.extend(update.endpoints);
             self.api_aggregator = aggregator;
@@ -367,7 +368,9 @@ impl TestKit {
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) {
-        poll_events(&mut self.events_stream);
+        while let Some(()) = self.events_stream.next().now_or_never().flatten() {
+            // Do nothing; all work is done in the stream itself.
+        }
     }
 
     /// Returns a snapshot of the current blockchain state.
@@ -752,16 +755,11 @@ impl TestKit {
             server_restart_max_retries: 5,
             server_restart_retry_timeout: 500,
         };
-        let manager_fut = ApiManager::new(api_manager_config)
-            .run(endpoints_rx.compat().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::Other,
-                    "Unable to receive `UpdateEndpoints` event",
-                )
-            }))
-            .map(drop);
 
-        futures::future::join(manager_fut, events_stream).await;
+        let manager_task = ApiManager::new(api_manager_config)
+            .run(endpoints_rx)
+            .unwrap_or_else(drop);
+        future::join(manager_task, events_stream).await;
         actor_handle.join().unwrap().unwrap();
     }
 
@@ -773,13 +771,9 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    pub(crate) fn remove_events_stream(&mut self) -> impl std::future::Future<Output = ()> {
-        let stream = mem::replace(
-            &mut self.events_stream,
-            Box::new(futures_01::stream::empty()),
-        );
-
-        stream.compat().for_each(|_| async {})
+    pub(crate) fn remove_events_stream(&mut self) -> impl Future<Output = ()> {
+        let stream = mem::replace(&mut self.events_stream, Box::pin(stream::empty()));
+        stream.for_each(|_| async {})
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
