@@ -107,7 +107,7 @@ impl ExonumCommand for Run {
             node_config_path: self.node_config,
         };
 
-        Ok(StandardResult::Run(run_config))
+        Ok(StandardResult::Run(Box::new(run_config)))
     }
 }
 

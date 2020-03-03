@@ -261,7 +261,7 @@ fn gen_random_transactions(count: usize) -> Vec<Transaction> {
         .collect()
 }
 
-fn bench<T: ExecuteTransaction>(bencher: &mut Bencher, prefixed: bool) {
+fn bench<T: ExecuteTransaction>(bencher: &mut Bencher<'_>, prefixed: bool) {
     const PREFIX: &str = "moderately_long_prefix";
 
     let transactions = gen_random_transactions(TX_COUNT);

@@ -40,6 +40,12 @@ const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const LOCAL_MIGRATION_RESULTS: &str = "dispatcher_local_migration_results";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
 
+#[derive(Debug)]
+pub(super) enum ArtifactAction {
+    Deploy(Vec<u8>),
+    Unload,
+}
+
 /// Information about a modified service instance.
 #[derive(Debug, ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::details::ModifiedInstanceInfo")]
@@ -61,9 +67,9 @@ impl MigrationTransition {
         use PbMigrationTransition::*;
         match value {
             None => NONE,
-            Some(MigrationTransition::Start) => START,
-            Some(MigrationTransition::Commit) => COMMIT,
-            Some(MigrationTransition::Rollback) => ROLLBACK,
+            Some(Self::Start) => START,
+            Some(Self::Commit) => COMMIT,
+            Some(Self::Rollback) => ROLLBACK,
         }
     }
 
@@ -71,9 +77,9 @@ impl MigrationTransition {
         use PbMigrationTransition::*;
         Ok(match pb {
             NONE => None,
-            START => Some(MigrationTransition::Start),
-            COMMIT => Some(MigrationTransition::Commit),
-            ROLLBACK => Some(MigrationTransition::Rollback),
+            START => Some(Self::Start),
+            COMMIT => Some(Self::Commit),
+            ROLLBACK => Some(Self::Rollback),
         })
     }
 }
@@ -87,8 +93,8 @@ enum MigrationOutcome {
 impl From<MigrationOutcome> for MigrationTransition {
     fn from(value: MigrationOutcome) -> Self {
         match value {
-            MigrationOutcome::Rollback => MigrationTransition::Rollback,
-            MigrationOutcome::Commit(_) => MigrationTransition::Commit,
+            MigrationOutcome::Rollback => Self::Rollback,
+            MigrationOutcome::Commit(_) => Self::Commit,
         }
     }
 }
@@ -149,8 +155,6 @@ impl<T: Access> Schema<T> {
                 .and_then(|instance_name| instances.get(&instance_name)),
 
             InstanceQuery::Name(instance_name) => instances.get(instance_name),
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 
@@ -165,6 +169,65 @@ impl<T: Access> Schema<T> {
     /// and is cleared after the migration is flushed or rolled back.
     pub fn local_migration_result(&self, instance_name: &str) -> Option<MigrationStatus> {
         self.local_migration_results().get(instance_name)
+    }
+
+    /// Checks if the provided artifact can currently be unloaded. Returns an error if the unloading
+    /// is impossible.
+    pub fn check_unloading_artifact(&self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        self.do_check_unloading_artifact(artifact).map(drop)
+    }
+
+    fn do_check_unloading_artifact(
+        &self,
+        artifact: &ArtifactId,
+    ) -> Result<ArtifactState, ExecutionError> {
+        let state = self.artifacts().get(artifact).ok_or_else(|| {
+            let msg = format!(
+                "Requested to unload artifact `{}`, which is not deployed",
+                artifact
+            );
+            CoreError::ArtifactNotDeployed.with_description(msg)
+        })?;
+
+        if state.status != ArtifactStatus::Active {
+            let msg = format!(
+                "Requested to unload artifact `{}`, which has non-active status: {}",
+                artifact, state.status
+            );
+            return Err(CoreError::ArtifactNotDeployed.with_description(msg));
+        }
+
+        // Check that the artifact has no dependent services. A service is dependent on
+        // the artifact if it references it as the current artifact, or its migration target.
+        for instance in self.instances().values() {
+            if instance.associated_artifact() == Some(artifact) {
+                let msg = format!(
+                    "Cannot unload artifact `{}`: service `{}` references it \
+                     as the current artifact",
+                    artifact,
+                    instance.spec.as_descriptor()
+                );
+                return Err(CoreError::CannotUnloadArtifact.with_description(msg));
+            }
+
+            let status = instance
+                .pending_status
+                .as_ref()
+                .or_else(|| instance.status.as_ref());
+            if let Some(InstanceStatus::Migrating(migration)) = status {
+                if migration.target == *artifact {
+                    let msg = format!(
+                        "Cannot unload artifact `{}`: service `{}` references it \
+                         as the data migration target",
+                        artifact,
+                        instance.spec.as_descriptor()
+                    );
+                    return Err(CoreError::CannotUnloadArtifact.with_description(msg));
+                }
+            }
+        }
+
+        Ok(state)
     }
 }
 
@@ -195,9 +258,36 @@ impl Schema<&Fork> {
         // Add artifact to registry with pending status.
         self.artifacts().put(
             artifact,
-            ArtifactState::new(deploy_spec, ArtifactStatus::Pending),
+            ArtifactState::new(deploy_spec, ArtifactStatus::Deploying),
         );
         // Add artifact to pending artifacts queue.
+        self.pending_artifacts().insert(artifact);
+        Ok(())
+    }
+
+    /// Adds artifact specification to the set of the active artifacts.
+    pub(super) fn add_active_artifact(
+        &mut self,
+        artifact: &ArtifactId,
+        deploy_spec: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        // Check that the artifact is absent among the deployed artifacts.
+        if self.artifacts().contains(artifact) {
+            return Err(CoreError::ArtifactAlreadyDeployed.into());
+        }
+
+        self.artifacts().put(
+            artifact,
+            ArtifactState::new(deploy_spec, ArtifactStatus::Active),
+        );
+        Ok(())
+    }
+
+    /// Unloads the provided artifact.
+    pub(super) fn unload_artifact(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        let mut state = self.do_check_unloading_artifact(artifact)?;
+        state.status = ArtifactStatus::Unloading;
+        self.artifacts().put(artifact, state);
         self.pending_artifacts().insert(artifact);
         Ok(())
     }
@@ -383,15 +473,19 @@ impl Schema<&Fork> {
 
     /// Adds information about a pending service instance to the schema.
     pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), CoreError> {
-        self.artifacts()
+        let artifact_state = self
+            .artifacts()
             .get(&spec.artifact)
             .ok_or(CoreError::ArtifactNotDeployed)?;
+        if artifact_state.status != ArtifactStatus::Active {
+            return Err(CoreError::ArtifactNotDeployed);
+        }
 
-        // Check that instance name doesn't exist.
+        // Check that the instance name doesn't exist.
         if self.instances().contains(&spec.name) {
             return Err(CoreError::ServiceNameExists);
         }
-        // Check that instance identifier doesn't exist.
+        // Check that the instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
         let mut instance_ids = self.instance_ids();
         if instance_ids.contains(&spec.id) {
@@ -476,8 +570,17 @@ impl Schema<&Fork> {
             let mut state = artifacts
                 .get(&artifact)
                 .expect("Artifact marked as pending is not saved in `artifacts`");
-            state.status = ArtifactStatus::Active;
-            artifacts.put(&artifact, state);
+
+            match state.status {
+                ArtifactStatus::Deploying => {
+                    state.status = ArtifactStatus::Active;
+                    artifacts.put(&artifact, state);
+                }
+                ArtifactStatus::Unloading => {
+                    artifacts.remove(&artifact);
+                }
+                _ => { /* should be unreachable */ }
+            }
         }
 
         // Commit new statuses for pending instances.
@@ -494,17 +597,19 @@ impl Schema<&Fork> {
     }
 
     /// Takes pending artifacts from queue.
-    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, Vec<u8>)> {
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, ArtifactAction)> {
         let mut index = self.pending_artifacts();
         let artifacts = self.artifacts();
         let pending_artifacts = index
             .iter()
             .map(|artifact| {
-                let deploy_spec = artifacts
-                    .get(&artifact)
-                    .expect("Artifact marked as pending is not saved in `artifacts`")
-                    .deploy_spec;
-                (artifact, deploy_spec)
+                let action = if let Some(state) = artifacts.get(&artifact) {
+                    debug_assert_eq!(state.status, ArtifactStatus::Active);
+                    ArtifactAction::Deploy(state.deploy_spec)
+                } else {
+                    ArtifactAction::Unload
+                };
+                (artifact, action)
             })
             .collect();
         index.clear();

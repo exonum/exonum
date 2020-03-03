@@ -39,7 +39,7 @@ use crate::{
     },
 };
 
-use self::schema::{MigrationTransition, ModifiedInstanceInfo};
+use self::schema::{ArtifactAction, MigrationTransition, ModifiedInstanceInfo};
 use super::{
     error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
     migrations::{
@@ -98,8 +98,6 @@ impl CommittedServices {
                 let resolved_id = *self.instance_names.get(name)?;
                 (resolved_id, self.instances.get(&resolved_id)?)
             }
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
         Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
@@ -128,10 +126,8 @@ impl MigrationThread {
             Ok(Ok(hash)) => Ok(hash),
             Ok(Err(MigrationError::Custom(description))) => Err(description),
             Ok(Err(MigrationError::Helper(e))) => {
-                // TODO: Is panicking OK here?
                 panic!("Migration terminated with database error: {}", e);
             }
-            Ok(Err(MigrationError::__NonExhaustive)) => unreachable!("Never actually constructed"),
             Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
         MigrationStatus(result)
@@ -267,11 +263,12 @@ impl Dispatcher {
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
+
             self.deploy_artifact(artifact.clone(), state.deploy_spec)
                 .unwrap_or_else(|err| {
                     panic!(
-                        "BUG: Can't restore state, artifact {:?} has not been deployed now, \
-                         but was deployed previously. Reported error: {}",
+                        "BUG: Cannot restore blockchain state; artifact `{}` failed to deploy \
+                         after successful previous deployment. Reported error: {}",
                         artifact, err
                     );
                 });
@@ -297,6 +294,28 @@ impl Dispatcher {
         for runtime in self.runtimes.values_mut() {
             runtime.on_resume();
         }
+    }
+
+    /// Adds a built-in artifact to the dispatcher. Unlike artifacts added via `commit_artifact` +
+    /// `deploy_artifact`, this method skips artifact commitment; the artifact
+    /// is synchronously deployed and marked as `Active`.
+    ///
+    /// # Panics
+    ///
+    /// This method treats errors during artifact deployment as fatal and panics on them.
+    pub(crate) fn add_builtin_artifact(
+        &mut self,
+        fork: &Fork,
+        artifact: ArtifactId,
+        payload: Vec<u8>,
+    ) {
+        Schema::new(fork)
+            .add_active_artifact(&artifact, payload.clone())
+            .unwrap_or_else(|err| {
+                panic!("Cannot deploy a built-in artifact: {}", err);
+            });
+        self.deploy_artifact(artifact, payload)
+            .unwrap_or_else(|err| panic!("Cannot deploy a built-in artifact: {}", err));
     }
 
     /// Add a built-in service with the predefined identifier.
@@ -329,7 +348,6 @@ impl Dispatcher {
         if should_rollback && res.is_ok() {
             res = Err(CoreError::IncorrectCall.into());
         }
-
         res
     }
 
@@ -397,6 +415,13 @@ impl Dispatcher {
         Schema::new(fork)
             .add_pending_artifact(artifact, deploy_spec)
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
+    }
+
+    pub(crate) fn unload_artifact(
+        fork: &Fork,
+        artifact: &ArtifactId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork).unload_artifact(artifact)
     }
 
     /// Initiates migration of an existing stopped service to a newer artifact.
@@ -675,9 +700,20 @@ impl Dispatcher {
 
         let patch = fork.into_patch();
 
-        // Block futures with pending deployments.
-        for (artifact, deploy_spec) in pending_artifacts {
-            self.block_until_deployed(artifact, deploy_spec);
+        // Process changed artifacts, blocking on futures with pending deployments.
+        for (artifact, action) in pending_artifacts {
+            match action {
+                ArtifactAction::Deploy(deploy_spec) => {
+                    self.block_until_deployed(artifact, deploy_spec);
+                }
+                ArtifactAction::Unload => {
+                    let runtime = self
+                        .runtimes
+                        .get_mut(&artifact.runtime_id)
+                        .expect("BUG: Cannot obtain runtime for an unloaded artifact");
+                    runtime.unload_artifact(&artifact);
+                }
+            }
         }
 
         // Notify runtime about changes in service instances.
@@ -950,9 +986,7 @@ impl Mailbox {
 pub type ThenFn = Box<dyn FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send>;
 
 /// Action to be performed by the dispatcher.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
+#[non_exhaustive]
 pub enum Action {
     /// Start artifact deployment.
     StartDeploy {
@@ -964,21 +998,16 @@ pub enum Action {
         /// For example, this closure may create a transaction with the deployment confirmation.
         then: ThenFn,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl fmt::Debug for Action {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Action::StartDeploy { artifact, spec, .. } => formatter
+            Self::StartDeploy { artifact, spec, .. } => formatter
                 .debug_struct("StartDeploy")
                 .field("artifact", artifact)
                 .field("spec", spec)
                 .finish(),
-            Action::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -986,7 +1015,7 @@ impl fmt::Debug for Action {
 impl Action {
     fn execute(self, dispatcher: &mut Dispatcher) {
         match self {
-            Action::StartDeploy {
+            Self::StartDeploy {
                 artifact,
                 spec,
                 then,
@@ -995,8 +1024,6 @@ impl Action {
                     error!("Deploying artifact {:?} failed: {}", artifact, e);
                 });
             }
-
-            Action::__NonExhaustive => unreachable!(),
         }
     }
 }

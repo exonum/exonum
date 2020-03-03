@@ -147,21 +147,19 @@ async fn test_transfer_from_nonexisting_wallet() {
 
     api.transfer(&tx).await;
     testkit.create_block_with_tx_hashes(&[tx.object_hash()]);
-    api.assert_tx_status(
-        tx.object_hash(),
-        &json!({
-            "type": "service_error",
-            "code": 1,
-            "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`.",
-            "runtime_id": 0,
-            "call_site": {
-                "call_type": "method",
-                "instance_id": SERVICE_ID,
-                "method_id": 0,
-            },
-        }),
-    )
-    .await;
+    let expected_status = json!({
+        "type": "service_error",
+        "code": 1,
+        "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`.",
+        "runtime_id": 0,
+        "call_site": {
+            "call_type": "method",
+            "instance_id": SERVICE_ID,
+            "method_id": 0,
+        },
+    });
+    api.assert_tx_status(tx.object_hash(), &expected_status)
+        .await;
 
     // Check that Bob's balance doesn't change.
     let wallet = api.get_wallet(tx_bob.author()).await.unwrap();
@@ -200,21 +198,19 @@ async fn test_transfer_to_nonexisting_wallet() {
 
     api.transfer(&tx).await;
     testkit.create_block_with_tx_hashes(&[tx.object_hash()]);
-    api.assert_tx_status(
-        tx.object_hash(),
-        &json!({
-            "type": "service_error",
-            "code": 2,
-            "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`.",
-            "runtime_id": 0,
-            "call_site": {
-                "call_type": "method",
-                "instance_id": SERVICE_ID,
-                "method_id": 0,
-            },
-        }),
-    )
-    .await;
+    let expected_status = json!({
+        "type": "service_error",
+        "code": 2,
+        "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`.",
+        "runtime_id": 0,
+        "call_site": {
+            "call_type": "method",
+            "instance_id": SERVICE_ID,
+            "method_id": 0,
+        },
+    });
+    api.assert_tx_status(tx.object_hash(), &expected_status)
+        .await;
 
     // Check that Alice's balance doesn't change.
     let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
@@ -242,21 +238,19 @@ async fn test_transfer_overcharge() {
 
     api.transfer(&tx).await;
     testkit.create_block();
-    api.assert_tx_status(
-        tx.object_hash(),
-        &json!({
-            "type": "service_error",
-            "code": 3,
-            "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`.",
-            "runtime_id": 0,
-            "call_site": {
-                "call_type": "method",
-                "instance_id": SERVICE_ID,
-                "method_id": 0,
-            },
-        }),
-    )
-    .await;
+    let expected_status = json!({
+        "type": "service_error",
+        "code": 3,
+        "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`.",
+        "runtime_id": 0,
+        "call_site": {
+            "call_type": "method",
+            "instance_id": SERVICE_ID,
+            "method_id": 0,
+        },
+    });
+    api.assert_tx_status(tx.object_hash(), &expected_status)
+        .await;
 
     let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);

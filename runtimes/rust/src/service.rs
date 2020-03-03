@@ -22,7 +22,10 @@ use exonum::{
         InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures::future::{BoxFuture, FutureExt};
+use futures::{
+    executor::block_on,
+    future::{BoxFuture, FutureExt},
+};
 
 use std::fmt::{self, Debug};
 
@@ -158,6 +161,7 @@ pub trait ServiceFactory: Send + Debug + 'static {
     fn create_instance(&self) -> Box<dyn Service>;
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T> From<T> for Box<dyn ServiceFactory>
 where
     T: ServiceFactory,
@@ -335,8 +339,7 @@ impl<'a> AfterCommitContext<'a> {
 ///             // Broadcast a `do_something` transaction with
 ///             // the specified payload. We swallow an error in this case
 ///             // (in a more thorough setup, it could be logged).
-///             let task = broadcaster.publish_string((), "!".to_owned());
-///             futures::executor::block_on(task).ok();
+///             broadcaster.blocking().publish_string((), "!".to_owned()).ok();
 ///         }
 ///     }
 /// }
@@ -425,7 +428,7 @@ impl GenericCall<()> for BlockingBroadcaster {
     type Output = Result<Hash, SendError>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
-        futures::executor::block_on(self.0.generic_call((), method, args))
+        block_on(self.0.generic_call((), method, args))
     }
 }
 

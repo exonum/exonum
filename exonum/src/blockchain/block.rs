@@ -189,6 +189,7 @@ impl Block {
 /// messages related to this block.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
 #[protobuf_convert(source = "schema::proofs::BlockProof")]
+#[non_exhaustive]
 pub struct BlockProof {
     /// Block header containing such information as the ID of the node which
     /// proposed the block, the height of the block, the number of transactions
@@ -196,21 +197,12 @@ pub struct BlockProof {
     pub block: Block,
     /// List of `Precommit` messages for the block.
     pub precommits: Vec<Verified<Precommit>>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl BlockProof {
     /// Creates a new `BlockProof` object.
     pub fn new(block: Block, precommits: Vec<Verified<Precommit>>) -> Self {
-        Self {
-            block,
-            precommits,
-            non_exhaustive: (),
-        }
+        Self { block, precommits }
     }
 
     /// Verifies that the block in this proof is endorsed by the Byzantine majority of provided
@@ -269,6 +261,7 @@ impl BlockProof {
 
 /// Errors that can occur during verification of `BlockProof`s, `IndexProof`s and `CallProof`s.
 #[derive(Debug, Fail)]
+#[non_exhaustive]
 pub enum ProofError {
     /// The block is authorized by an insufficient number of precommits.
     #[fail(display = "Insufficient number of precommits")]
@@ -313,16 +306,12 @@ pub enum ProofError {
     /// properly functioning Exonum node.
     #[fail(display = "call status embedded in the proof is malformed")]
     MalformedStatus,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[fail(display = "")]
-    __NonExhaustive,
 }
 
 /// Proof of authenticity for a single index within the database.
 #[derive(Debug, Clone, Serialize, Deserialize, ProtobufConvert)]
 #[protobuf_convert(source = "schema::proofs::IndexProof")]
+#[non_exhaustive]
 pub struct IndexProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]
@@ -332,11 +321,6 @@ pub struct IndexProof {
     /// in the form `$service_name.$name_within_service`, e.g., `cryptocurrency.wallets`.
     /// The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
     pub index_proof: MapProof<String, Hash>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl IndexProof {
@@ -345,7 +329,6 @@ impl IndexProof {
         Self {
             block_proof,
             index_proof,
-            non_exhaustive: (),
         }
     }
 
@@ -396,6 +379,7 @@ impl IndexProof {
 /// [core schema]: struct.Schema.html
 /// [`ExecutionError`]: ../runtime/struct.ExecutionError.html
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CallProof {
     /// Proof of authenticity for the block header.
     #[serde(flatten)]
@@ -411,9 +395,6 @@ pub struct CallProof {
     /// If the call is successful, the error description should be `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_description: Option<String>,
-
-    #[serde(skip, default)]
-    _non_exhaustive: (),
 }
 
 impl CallProof {
@@ -426,7 +407,6 @@ impl CallProof {
             block_proof,
             call_proof,
             error_description,
-            _non_exhaustive: (),
         }
     }
 

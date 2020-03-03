@@ -117,14 +117,16 @@ impl TimeProvider for MockTimeProvider {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl From<MockTimeProvider> for Arc<dyn TimeProvider> {
     fn from(time_provider: MockTimeProvider) -> Self {
-        Arc::new(time_provider) as Arc<dyn TimeProvider>
+        Arc::new(time_provider)
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl From<SystemTimeProvider> for Arc<dyn TimeProvider> {
     fn from(time_provider: SystemTimeProvider) -> Self {
-        Arc::new(time_provider) as Arc<dyn TimeProvider>
+        Arc::new(time_provider)
     }
 }

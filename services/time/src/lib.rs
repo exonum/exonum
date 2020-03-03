@@ -40,7 +40,7 @@
 //!
 //! # Examples
 //!
-//! ## Use with TestKit
+//! ## Use with `TestKit`
 //!
 //! ```
 //! use chrono::{TimeZone, Utc};
@@ -103,11 +103,23 @@
 //!
 //! [at GitHub]: https://github.com/exonum/exonum/blob/master/services/time/examples/simple_service/main.rs
 
-#![deny(
-    unsafe_code,
-    bare_trait_objects,
+#![warn(
+    missing_debug_implementations,
     missing_docs,
-    missing_debug_implementations
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub mod api;
@@ -148,8 +160,8 @@ impl Service for TimeService {
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi.wire(builder);
-        api::PrivateApi.wire(builder);
+        api::PublicApi::wire(builder);
+        api::PrivateApi::wire(builder);
     }
 }
 

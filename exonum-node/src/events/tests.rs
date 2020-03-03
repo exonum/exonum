@@ -54,8 +54,8 @@ impl TestHandler {
         listen_address: SocketAddr,
         network_requests_tx: mpsc::Sender<NetworkRequest>,
         network_events_rx: mpsc::Receiver<NetworkEvent>,
-    ) -> TestHandler {
-        TestHandler {
+    ) -> Self {
+        Self {
             handle: None,
             listen_address,
             network_events_rx,
@@ -152,8 +152,8 @@ struct TestEvents {
 }
 
 impl TestEvents {
-    fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> TestEvents {
-        TestEvents {
+    fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> Self {
+        Self {
             listen_address,
             network_config: NetworkConfiguration::default(),
             events_config: EventsPoolCapacity::default(),
@@ -201,7 +201,7 @@ pub fn connect_message(addr: SocketAddr, keypair: &KeyPair) -> Verified<Connect>
 }
 
 pub fn raw_message(payload_len: usize) -> SignedMessage {
-    let buffer = vec![0u8; payload_len];
+    let buffer = vec![0_u8; payload_len];
     let keys = KeyPair::random();
     SignedMessage::new(buffer, keys.public_key(), keys.secret_key())
 }
@@ -228,7 +228,7 @@ impl HandshakeParams {
             keypair.secret_key(),
         );
 
-        let mut params = HandshakeParams::new(
+        let mut params = Self::new(
             &keypair,
             SharedConnectList::default(),
             connect,
@@ -255,7 +255,7 @@ impl ConnectionParams {
             public_key: keypair.public_key(),
         };
 
-        ConnectionParams {
+        Self {
             connect,
             address,
             handshake_params,

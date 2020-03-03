@@ -213,7 +213,7 @@ mod explanation {
     where
         T: GenericCall<Ctx>,
     {
-        type Output = <T as GenericCall<Ctx>>::Output;
+        type Output = <Self as GenericCall<Ctx>>::Output;
 
         fn create_wallet(&self, context: Ctx, wallet: CreateWallet) -> Self::Output {
             const DESCRIPTOR: MethodDescriptor<'static> = MethodDescriptor {
@@ -267,8 +267,8 @@ mod explanation {
     fn custom_stub() {
         let len = PayloadSize.create_wallet((), "Alice".into());
         assert_eq!(len, 5);
-        let len = PayloadSize.transfer((), 42);
-        assert_eq!(len, 8);
+        let other_len = PayloadSize.transfer((), 42);
+        assert_eq!(other_len, 8);
     }
 }
 

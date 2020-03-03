@@ -18,7 +18,7 @@ pub use exonum_api::ApiAccess;
 
 use actix_web::{
     test::{self, TestServer},
-    App,
+    web, App,
 };
 use exonum::{
     blockchain::ApiSender,
@@ -61,10 +61,10 @@ pub enum ApiKind {
 impl fmt::Display for ApiKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApiKind::System => write!(formatter, "api/system"),
-            ApiKind::Explorer => write!(formatter, "api/explorer"),
-            ApiKind::RustRuntime => write!(formatter, "api/runtimes/rust"),
-            ApiKind::Service(name) => write!(formatter, "api/services/{}", name),
+            Self::System => write!(formatter, "api/system"),
+            Self::Explorer => write!(formatter, "api/explorer"),
+            Self::RustRuntime => write!(formatter, "api/runtimes/rust"),
+            Self::Service(name) => write!(formatter, "api/services/{}", name),
         }
     }
 }
@@ -125,7 +125,7 @@ impl TestKitApi {
             .redirect(RedirectPolicy::none())
             .build()
             .unwrap();
-        TestKitApi {
+        Self {
             test_server: create_test_server(aggregator),
             test_client,
             api_sender,
@@ -288,7 +288,7 @@ where
             builder = modifier(builder);
         }
         let response = builder.send().await.expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
+        Self::verify_headers(&self.expected_headers, &response);
         Self::response_to_api_result(response).await
     }
 
@@ -311,7 +311,7 @@ where
         trace!("POST {}", url);
 
         let builder = self.test_client.post(&url);
-        let mut builder = if let Some(ref query) = self.query.as_ref() {
+        let mut builder = if let Some(query) = self.query.as_ref() {
             trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
             builder.json(query)
         } else {
@@ -321,14 +321,14 @@ where
             builder = modifier(builder);
         }
         let response = builder.send().await.expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
+        Self::verify_headers(&self.expected_headers, &response);
         Self::response_to_api_result(response).await
     }
 
     // Checks that response contains headers expected by the request author.
-    fn verify_headers(expected_headers: HashMap<String, String>, response: &Response) {
+    fn verify_headers(expected_headers: &HashMap<String, String>, response: &Response) {
         let headers = response.headers();
-        for (header, expected_value) in expected_headers.iter() {
+        for (header, expected_value) in expected_headers {
             let header_value = headers.get(header).unwrap_or_else(|| {
                 panic!(
                     "Response {:?} was expected to have header {}, but it isn't present",
@@ -365,13 +365,9 @@ where
 /// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     let server = test::start(move || {
-        App::new()
-            .service(
-                aggregator.extend_backend(ApiAccess::Public, actix_web::web::scope("public/api")),
-            )
-            .service(
-                aggregator.extend_backend(ApiAccess::Private, actix_web::web::scope("private/api")),
-            )
+        let public_apis = aggregator.extend_backend(ApiAccess::Public, web::scope("public/api"));
+        let private_apis = aggregator.extend_backend(ApiAccess::Private, web::scope("private/api"));
+        App::new().service(public_apis).service(private_apis)
     });
 
     info!("Test server created on {}", server.addr());

@@ -77,18 +77,18 @@ impl Command {
 impl ExonumCommand for Command {
     fn execute(self) -> Result<StandardResult, Error> {
         match self {
-            Command::GenerateTemplate(command) => command.execute(),
-            Command::GenerateConfig(command) => command.execute(),
-            Command::Finalize(command) => command.execute(),
-            Command::Run(command) => command.execute(),
-            Command::RunDev(command) => command.execute(),
-            Command::Maintenance(command) => command.execute(),
+            Self::GenerateTemplate(command) => command.execute(),
+            Self::GenerateConfig(command) => command.execute(),
+            Self::Finalize(command) => command.execute(),
+            Self::Run(command) => command.execute(),
+            Self::RunDev(command) => command.execute(),
+            Self::Maintenance(command) => command.execute(),
         }
     }
 }
 
 /// Output of any of the standard Exonum Core configuration commands.
-#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
 pub enum StandardResult {
     /// `generate-template` command output.
     GenerateTemplate {
@@ -110,7 +110,7 @@ pub enum StandardResult {
         node_config_path: PathBuf,
     },
     /// `run` command output.
-    Run(NodeRunConfig),
+    Run(Box<NodeRunConfig>),
     /// `maintenance` command output.
     Maintenance {
         /// Path to a node configuration file.

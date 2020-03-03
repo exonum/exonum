@@ -89,12 +89,8 @@ pub(crate) enum HandleTxError {
 impl fmt::Display for HandleTxError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            HandleTxError::AlreadyProcessed => {
-                formatter.write_str("Transaction is already processed")
-            }
-            HandleTxError::Invalid(e) => {
-                write!(formatter, "Transaction failed preliminary checks: {}", e)
-            }
+            Self::AlreadyProcessed => formatter.write_str("Transaction is already processed"),
+            Self::Invalid(e) => write!(formatter, "Transaction failed preliminary checks: {}", e),
         }
     }
 }
@@ -648,16 +644,16 @@ impl NodeHandler {
         let has_consensus = self.state.add_precommit(msg.clone());
 
         // Request propose
-        if self.state.propose(msg.payload().propose_hash()).is_none() {
-            self.request(RequestData::Propose(*msg.payload().propose_hash()), from);
+        if self.state.propose(&msg.payload().propose_hash).is_none() {
+            self.request(RequestData::Propose(msg.payload().propose_hash), from);
         }
 
         // Request prevotes
         // TODO: If Precommit sender in on a greater height, then it cannot have +2/3 prevotes.
         // So can we get rid of useless sending RequestPrevotes message? (ECR-171)
-        if msg.payload().round() > self.state.locked_round() {
+        if msg.payload().round > self.state.locked_round() {
             self.request(
-                RequestData::Prevotes(msg.payload().round(), *msg.payload().propose_hash()),
+                RequestData::Prevotes(msg.payload().round, msg.payload().propose_hash),
                 from,
             );
         }
@@ -665,9 +661,9 @@ impl NodeHandler {
         // Has majority precommits
         if has_consensus {
             self.handle_majority_precommits(
-                msg.payload().round(),
-                msg.payload().propose_hash(),
-                msg.payload().block_hash(),
+                msg.payload().round,
+                &msg.payload().propose_hash,
+                &msg.payload().block_hash,
             );
         }
     }

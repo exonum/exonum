@@ -47,18 +47,18 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
 //!     .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlocksRange = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/blocks?count=2"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/blocks?count=2");
+//! let response: BlocksRange = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.range, Height(4)..Height(6));
 //! // Blocks are returned in reverse order, from the latest
 //! // to the earliest.
@@ -86,18 +86,19 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
-//! # fn main() -> Result<(), failure::Error> {
+//! #
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with_default_rust_service(ExplorerFactory)
 //! #    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlockInfo = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/block?height=3"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/block?height=3");
+//! let response: BlockInfo = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.block.height, Height(3));
 //! // Precommits and median precommit time are always returned.
 //! assert!(response.precommits.is_some());
@@ -150,7 +151,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
@@ -162,9 +164,9 @@
 //! let response: TransactionInfo = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/transactions"))
 //!     .query(&TransactionQuery { hash: tx.object_hash() })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let response = response.as_committed().unwrap();
 //! assert_eq!(response.location().block_height(), Height(1));
 //! # Ok(())
@@ -218,7 +220,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
 //!    .with_default_rust_service(ExplorerFactory)
@@ -233,9 +236,9 @@
 //!         hash: tx.object_hash(),
 //!         with_proof: false,
 //!     })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Error!");
 //! # Ok(())
@@ -280,7 +283,8 @@
 //! #     }
 //! # }
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
 //!    .with_default_rust_service(ExplorerFactory)
@@ -295,9 +299,9 @@
 //!         service_id: MyService::INSTANCE_ID,
 //!         with_proof: false,
 //!     })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Not a good start");
 //! # Ok(())
@@ -362,7 +366,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[actix_rt::main]
+//! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
 //!    .with_default_rust_service(MyService)
@@ -374,9 +379,9 @@
 //! let response: TransactionResponse = reqwest::Client::new()
 //!     .post(&api.public_url("api/explorer/v1/transactions"))
 //!     .json(&TransactionHex { tx_body })
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.tx_hash, tx.object_hash());
 //! # Ok(())
 //! # }
@@ -402,7 +407,8 @@ use exonum::{
     runtime::ExecutionStatus,
 };
 use exonum_explorer::{median_precommits_time, BlockchainExplorer};
-use exonum_rust_runtime::api::{self, ServiceApiScope, ServiceApiState};
+use exonum_rust_runtime::api::{self, ServiceApiScope};
+use futures::{future, Future, FutureExt, TryFutureExt};
 use hex::FromHex;
 use serde_json::json;
 
@@ -422,8 +428,8 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    async fn blocks(state: ServiceApiState, query: BlocksQuery) -> api::Result<BlocksRange> {
-        let explorer = BlockchainExplorer::from_schema(state.data().for_core());
+    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> api::Result<BlocksRange> {
+        let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(api::Error::bad_request()
                 .title("Invalid block request")
@@ -490,8 +496,8 @@ impl ExplorerApi {
         })
     }
 
-    async fn block(state: ServiceApiState, query: BlockQuery) -> api::Result<BlockInfo> {
-        let explorer = BlockchainExplorer::from_schema(state.data().for_core());
+    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> api::Result<BlockInfo> {
+        let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             api::Error::not_found()
                 .title("Failed to get block info")
@@ -503,11 +509,11 @@ impl ExplorerApi {
         })
     }
 
-    async fn transaction_info(
-        state: ServiceApiState,
+    fn transaction_info(
+        schema: Schema<&dyn Snapshot>,
         query: TransactionQuery,
     ) -> api::Result<TransactionInfo> {
-        BlockchainExplorer::from_schema(state.data().for_core())
+        BlockchainExplorer::from_schema(schema)
             .transaction(&query.hash)
             .ok_or_else(|| {
                 let description = serde_json::to_string(&json!({ "type": "unknown" })).unwrap();
@@ -518,7 +524,7 @@ impl ExplorerApi {
     }
 
     fn get_status(
-        schema: Schema<&dyn Snapshot>,
+        schema: &Schema<&dyn Snapshot>,
         block_height: Height,
         call_in_block: CallInBlock,
         with_proof: bool,
@@ -541,11 +547,10 @@ impl ExplorerApi {
         })
     }
 
-    async fn transaction_status(
-        state: ServiceApiState,
-        query: TransactionStatusQuery,
+    fn transaction_status(
+        schema: &Schema<&dyn Snapshot>,
+        query: &TransactionStatusQuery,
     ) -> api::Result<CallStatusResponse> {
-        let schema = state.data().for_core();
         let tx_location = schema
             .transactions_locations()
             .get(&query.hash)
@@ -557,47 +562,33 @@ impl ExplorerApi {
 
         let call_in_block = CallInBlock::transaction(tx_location.position_in_block());
         let block_height = tx_location.block_height();
-        Self::get_status(
-            state.data().for_core(),
-            block_height,
-            call_in_block,
-            query.with_proof,
-        )
+        Self::get_status(schema, block_height, call_in_block, query.with_proof)
     }
 
     /// Returns call status of `before_transactions` hook.
-    async fn before_transactions_status(
-        state: ServiceApiState,
-        query: CallStatusQuery,
+    fn before_transactions_status(
+        schema: &Schema<&dyn Snapshot>,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let call_in_block = CallInBlock::before_transactions(query.service_id);
-        Self::get_status(
-            state.data().for_core(),
-            query.height,
-            call_in_block,
-            query.with_proof,
-        )
+        Self::get_status(schema, query.height, call_in_block, query.with_proof)
     }
 
     /// Returns call status of `after_transactions` hook.
-    async fn after_transactions_status(
-        state: ServiceApiState,
-        query: CallStatusQuery,
+    fn after_transactions_status(
+        schema: &Schema<&dyn Snapshot>,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
         let call_in_block = CallInBlock::after_transactions(query.service_id);
-        Self::get_status(
-            state.data().for_core(),
-            query.height,
-            call_in_block,
-            query.with_proof,
-        )
+        Self::get_status(schema, query.height, call_in_block, query.with_proof)
     }
 
-    async fn add_transaction(
-        state: ServiceApiState,
-        sender: ApiSender,
+    fn add_transaction(
+        snapshot: &dyn Snapshot,
+        sender: &ApiSender,
         query: TransactionHex,
-    ) -> api::Result<TransactionResponse> {
+    ) -> impl Future<Output = api::Result<TransactionResponse>> {
+        // Synchronous part of message verification.
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
@@ -606,38 +597,54 @@ impl ExplorerApi {
             Ok((verified, tx_hash))
         };
 
-        let (verified, tx_hash) = verify_message(state.snapshot(), query.tx_body).map_err(|e| {
-            api::Error::bad_request()
-                .title("Failed to add transaction to memory pool")
-                .detail(e.to_string())
-        })?;
+        let (verified, tx_hash) = match verify_message(snapshot, query.tx_body) {
+            Ok((verified, tx_hash)) => (verified, tx_hash),
+            Err(err) => {
+                let err = api::Error::bad_request()
+                    .title("Failed to add transaction to memory pool")
+                    .detail(err.to_string());
+                return future::err(err).left_future();
+            }
+        };
 
         sender
             .broadcast_transaction(verified)
-            .await
-            .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))?;
-        Ok(TransactionResponse { tx_hash })
+            .map_ok(move |_| TransactionResponse { tx_hash })
+            .map_err(|err| api::Error::internal(err).title("Failed to add transaction"))
+            .right_future()
     }
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
-            .endpoint("v1/blocks", Self::blocks)
-            .endpoint("v1/block", Self::block)
-            .endpoint("v1/call_status/transaction", Self::transaction_status)
-            .endpoint(
-                "v1/call_status/after_transactions",
-                Self::after_transactions_status,
-            )
-            .endpoint(
-                "v1/call_status/before_transactions",
-                Self::before_transactions_status,
-            )
-            .endpoint("v1/transactions", Self::transaction_info);
+            .endpoint("v1/blocks", |state, query| {
+                future::ready(Self::blocks(state.data().for_core(), query))
+            })
+            .endpoint("v1/block", |state, query| {
+                future::ready(Self::block(state.data().for_core(), query))
+            })
+            .endpoint("v1/call_status/transaction", |state, query| {
+                future::ready(Self::transaction_status(&state.data().for_core(), &query))
+            })
+            .endpoint("v1/call_status/after_transactions", |state, query| {
+                future::ready(Self::after_transactions_status(
+                    &state.data().for_core(),
+                    &query,
+                ))
+            })
+            .endpoint("v1/call_status/before_transactions", |state, query| {
+                future::ready(Self::before_transactions_status(
+                    &state.data().for_core(),
+                    &query,
+                ))
+            })
+            .endpoint("v1/transactions", |state, query| {
+                future::ready(Self::transaction_info(state.data().for_core(), query))
+            });
 
-        api_scope.endpoint_mut("v1/transactions", {
-            let tx_sender = self.blockchain.sender().to_owned();
-            move |state, query| Self::add_transaction(state, tx_sender.clone(), query)
+        let tx_sender = self.blockchain.sender().to_owned();
+        api_scope.endpoint_mut("v1/transactions", move |state, query| {
+            Self::add_transaction(state.snapshot(), &tx_sender, query)
         });
         self
     }

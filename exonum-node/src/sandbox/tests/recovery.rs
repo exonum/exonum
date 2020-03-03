@@ -22,7 +22,7 @@ use exonum::{
 
 use std::time::Duration;
 
-use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, SandboxBuilder};
+use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, Sandbox, SandboxBuilder};
 
 /// Scenario:
 /// - Node sends `Propose` and `Prevote`.
@@ -217,6 +217,7 @@ fn should_save_precommit_to_consensus_cache() {
 /// - Node restarts.
 /// - Node should recover in same round and locked on same `Propose`.
 #[test]
+#[allow(clippy::too_many_lines)] // fine for tests
 fn test_recover_consensus_messages_in_other_round() {
     let sandbox = timestamping_sandbox();
 
@@ -364,21 +365,21 @@ fn should_restore_peers_after_restart() {
     let address1 = sandbox.address(v1);
 
     let time = sandbox.time();
-    let connect_from_0 = sandbox.create_connect(
+    let connect_from_0 = Sandbox::create_connect(
         &public_key0,
         address0,
         time.into(),
         &user_agent(),
         &secret_key0,
     );
-    let connect_from_1 = sandbox.create_connect(
+    let connect_from_1 = Sandbox::create_connect(
         &public_key1,
         address1,
         time.into(),
         &user_agent(),
         &secret_key1,
     );
-    let peers_request = sandbox.create_peers_request(public_key1, public_key0, &secret_key1);
+    let peers_request = Sandbox::create_peers_request(public_key1, public_key0, &secret_key1);
 
     // check that peers are absent
     sandbox.recv(&peers_request);

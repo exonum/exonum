@@ -28,7 +28,7 @@ impl<T: Database> CheckpointDb<T> {
     /// Creates a new checkpointed database that uses the specified `db` as the underlying
     /// data storage.
     pub fn new(db: T) -> Self {
-        CheckpointDb {
+        Self {
             inner: Arc::new(RwLock::new(CheckpointDbInner::new(db))),
         }
     }
@@ -78,6 +78,7 @@ impl<T: Database> Database for CheckpointDb<T> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T: Database> From<CheckpointDb<T>> for Arc<dyn Database> {
     fn from(db: CheckpointDb<T>) -> Arc<dyn Database> {
         Arc::new(db)
@@ -86,7 +87,7 @@ impl<T: Database> From<CheckpointDb<T>> for Arc<dyn Database> {
 
 impl<T: Database> From<T> for CheckpointDb<T> {
     fn from(db: T) -> Self {
-        CheckpointDb::new(db)
+        Self::new(db)
     }
 }
 
@@ -147,7 +148,7 @@ struct CheckpointDbInner<T> {
 
 impl<T: Database> CheckpointDbInner<T> {
     fn new(db: T) -> Self {
-        CheckpointDbInner {
+        Self {
             db,
             backup_stack: Vec::new(),
         }
@@ -221,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::cognitive_complexity)]
+    #[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
     fn interleaved_rollbacks() {
         let db = CheckpointDb::new(TemporaryDB::new());
         let handler = db.handler();

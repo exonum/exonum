@@ -1036,3 +1036,64 @@ fn service_freezing() {
         ]
     );
 }
+
+#[test]
+fn unloading_artifact() {
+    let genesis_config = create_genesis_config_with_supervisor();
+    let (mut blockchain, events_handle) =
+        create_runtime(Blockchain::build_for_tests(), genesis_config.clone());
+    drop(events_handle.take());
+
+    // Deploy test service artifact.
+    let test_service_artifact = TestServiceImpl.artifact_id();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+    execute_transaction(
+        &mut blockchain,
+        keypair.deploy_artifact(
+            ToySupervisorService::INSTANCE_ID,
+            DeployArtifact {
+                test_service_artifact: test_service_artifact.clone(),
+                spec: vec![],
+            },
+        ),
+    )
+    .unwrap();
+    drop(events_handle.take());
+
+    // Unload test service artifact.
+    execute_transaction(
+        &mut blockchain,
+        keypair.unload_artifact(
+            ToySupervisorService::INSTANCE_ID,
+            test_service_artifact.clone(),
+        ),
+    )
+    .unwrap();
+
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::UnloadArtifact(test_service_artifact),
+            RuntimeEvent::AfterCommit(Height(3)),
+        ]
+    );
+
+    // Emulate node restart and check that the service artifact is not requested to be deployed.
+    let (_, events_handle) = create_runtime(blockchain.as_ref().clone(), genesis_config);
+
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::InitializeRuntime,
+            RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
+            RuntimeEvent::CommitService(
+                Height(3),
+                ToySupervisorService.default_instance().instance_spec,
+                InstanceStatus::Active,
+            ),
+            RuntimeEvent::ResumeRuntime,
+        ]
+    );
+}

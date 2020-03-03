@@ -63,6 +63,7 @@ impl SignedMessage {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "messages::Precommit")]
+#[non_exhaustive]
 pub struct Precommit {
     /// ID of the validator endorsing the block.
     pub validator: ValidatorId,
@@ -76,10 +77,6 @@ pub struct Precommit {
     pub block_hash: Hash,
     /// Local time of the validator node when the `Precommit` was created.
     pub time: DateTime<Utc>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    non_exhaustive: (),
 }
 
 impl Precommit {
@@ -99,32 +96,7 @@ impl Precommit {
             propose_hash,
             block_hash,
             time,
-            non_exhaustive: (),
         }
-    }
-    /// The validator id.
-    pub fn validator(&self) -> ValidatorId {
-        self.validator
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the corresponding `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
-    /// Hash of the new block.
-    pub fn block_hash(&self) -> &Hash {
-        &self.block_hash
-    }
-    /// Time of the `Precommit`.
-    pub fn time(&self) -> DateTime<Utc> {
-        self.time
     }
 }
 
@@ -133,20 +105,14 @@ impl Precommit {
 /// This type is intentionally kept as minimal as possible to ensure compatibility
 /// even if the consensus details change. Most of consensus messages are defined separately
 /// in the `exonum-node` crate; they are not public.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(BinaryValue, ObjectHash)]
+#[non_exhaustive]
 pub enum CoreMessage {
     /// Transaction message.
     AnyTx(AnyTx),
     /// Precommit message.
     Precommit(Precommit),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl ProtobufConvert for CoreMessage {
@@ -155,13 +121,12 @@ impl ProtobufConvert for CoreMessage {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            CoreMessage::AnyTx(any_tx) => {
+            Self::AnyTx(any_tx) => {
                 pb.set_any_tx(any_tx.to_pb());
             }
-            CoreMessage::Precommit(precommit) => {
+            Self::Precommit(precommit) => {
                 pb.set_precommit(precommit.to_pb());
             }
-            CoreMessage::__NonExhaustive => unreachable!("Never actually constructed"),
         }
         pb
     }
@@ -169,10 +134,10 @@ impl ProtobufConvert for CoreMessage {
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
         let msg = if pb.has_any_tx() {
             let tx = AnyTx::from_pb(pb.take_any_tx())?;
-            CoreMessage::AnyTx(tx)
+            Self::AnyTx(tx)
         } else if pb.has_precommit() {
             let precommit = Precommit::from_pb(pb.take_precommit())?;
-            CoreMessage::Precommit(precommit)
+            Self::Precommit(precommit)
         } else {
             failure::bail!("Incorrect protobuf representation of CoreMessage")
         };
@@ -183,13 +148,13 @@ impl ProtobufConvert for CoreMessage {
 
 impl From<AnyTx> for CoreMessage {
     fn from(tx: AnyTx) -> Self {
-        CoreMessage::AnyTx(tx)
+        Self::AnyTx(tx)
     }
 }
 
 impl From<Precommit> for CoreMessage {
     fn from(precommit: Precommit) -> Self {
-        CoreMessage::Precommit(precommit)
+        Self::Precommit(precommit)
     }
 }
 

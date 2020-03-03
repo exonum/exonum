@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use failure::Fail;
-use futures::{compat::Future01CompatExt, Future};
+use futures::{compat::Future01CompatExt, executor::block_on, Future};
 use futures_01::{sync::mpsc, Future as _, Sink};
 
 use std::fmt;
@@ -26,19 +26,19 @@ pub struct ApiSender<T = Verified<AnyTx>>(mpsc::Sender<T>);
 
 impl<T> Clone for ApiSender<T> {
     fn clone(&self) -> Self {
-        ApiSender(self.0.clone())
+        Self(self.0.clone())
     }
 }
 
 impl<T: Send + 'static> ApiSender<T> {
     /// Creates new `ApiSender` with the given channel.
     pub fn new(inner: mpsc::Sender<T>) -> Self {
-        ApiSender(inner)
+        Self(inner)
     }
 
     /// Creates a dummy sender which is not connected to anything and thus cannot send messages.
     pub fn closed() -> Self {
-        ApiSender(mpsc::channel(0).0)
+        Self(mpsc::channel(0).0)
     }
 
     /// Sends a message to the node asynchronously.
@@ -61,7 +61,7 @@ impl<T: Send + 'static> ApiSender<T> {
     ///
     /// The failure means that the node is being shut down.
     pub fn send_message_blocking(&self, message: T) -> Result<(), SendError> {
-        futures::executor::block_on(self.send_message(message))
+        block_on(self.send_message(message))
     }
 }
 

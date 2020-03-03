@@ -35,7 +35,7 @@ where
     S: Stream,
 {
     pub fn new(stream: S) -> Self {
-        TakeWhileReady {
+        Self {
             stream,
             exhausted: false,
         }

@@ -82,6 +82,12 @@ message ResumeService {
   bytes params = 3;
 }
 
+// Request to unload an unused artifact.
+message UnloadArtifact {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact_id = 1;
+}
+
 // This message contains one atomic configuration change.
 message ConfigChange {
   oneof kind {
@@ -97,6 +103,8 @@ message ConfigChange {
     ResumeService resume_service = 5;
     // Request to freeze an existing service instance.
     FreezeService freeze_service = 6;
+    // Request to unload an unused artifact.
+    UnloadArtifact unload_artifact = 7;
   }
 }
 

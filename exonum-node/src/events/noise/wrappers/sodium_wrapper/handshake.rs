@@ -57,7 +57,7 @@ impl HandshakeParams {
         let (_, secret_key) =
             into_x25519_keypair(keypair.public_key(), keypair.secret_key().to_owned()).unwrap();
 
-        HandshakeParams {
+        Self {
             secret_key,
             max_message_len,
             remote_key: None,
@@ -83,7 +83,7 @@ pub struct NoiseHandshake {
 impl NoiseHandshake {
     pub fn initiator(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
         let noise = NoiseWrapper::initiator(params);
-        NoiseHandshake {
+        Self {
             noise,
             peer_address: *peer_address,
             max_message_len: params.max_message_len,
@@ -94,7 +94,7 @@ impl NoiseHandshake {
 
     pub fn responder(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
         let noise = NoiseWrapper::responder(params);
-        NoiseHandshake {
+        Self {
             noise,
             peer_address: *peer_address,
             max_message_len: params.max_message_len,

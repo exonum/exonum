@@ -115,6 +115,7 @@ impl Default for TemporaryDB {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl From<TemporaryDB> for Arc<dyn Database> {
     fn from(db: TemporaryDB) -> Self {
         Arc::new(db)

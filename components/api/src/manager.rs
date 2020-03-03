@@ -15,7 +15,7 @@
 //! Module responsible for actix web API management after new service is deployed.
 
 use actix_cors::{Cors, CorsFactory};
-use actix_web::{dev::Server, App, HttpServer};
+use actix_web::{dev::Server, web, App, HttpServer};
 use futures::{
     future::{join_all, try_join_all},
     stream::{TryStream, TryStreamExt},
@@ -146,7 +146,7 @@ impl ApiManager {
         let server = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())
-                .service(aggregator.extend_backend(access, actix_web::web::scope("api")))
+                .service(aggregator.extend_backend(access, web::scope("api")))
         })
         .disable_signals()
         .bind(listen_address)?

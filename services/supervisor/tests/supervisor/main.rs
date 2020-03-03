@@ -349,6 +349,7 @@ async fn test_start_service_instance_with_already_passed_deadline_height() {
     let block = testkit.create_block();
 
     let expected_err = ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
+        .with_description_containing("height for config proposal (2) is in the past")
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
@@ -433,7 +434,7 @@ async fn test_empty_service_instance_name() {
     let block = testkit.create_block();
 
     let expected_err = ErrorMatch::from_fail(&ServiceError::InvalidInstanceName)
-        .with_description_containing("Service instance name should not be empty")
+        .with_description_containing("Service name is empty")
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
@@ -452,10 +453,9 @@ async fn test_bad_service_instance_name() {
     let hash = start_service(&api, request).await;
     let block = testkit.create_block();
 
-    let expected_description =
-        "Service instance name (\u{2764}) contains illegal character, use only: a-zA-Z0-9 and one of _-";
+    let expected_msg = "Service name `\u{2764}` is invalid";
     let expected_err = ErrorMatch::from_fail(&ServiceError::InvalidInstanceName)
-        .with_description_containing(expected_description)
+        .with_description_containing(expected_msg)
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
@@ -905,6 +905,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
     let confirmation = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
     let block = testkit.create_block_with_transaction(confirmation);
     let expected_err = ErrorMatch::from_fail(&ArtifactError::DeployRequestNotRegistered)
+        .with_description_containing("Deploy of artifact `0:inc:1.0.0` is not registered")
         .for_service(SUPERVISOR_INSTANCE_ID);
     assert_eq!(*block[0].status().unwrap_err(), expected_err);
 }

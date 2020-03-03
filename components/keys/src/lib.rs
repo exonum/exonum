@@ -41,22 +41,17 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // `filter(..).map(..)` often looks more shorter and readable.
-    clippy::filter_map,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // Variant name ends with the enum name. Similar behavior to similar_names.
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
-    clippy::use_self,
-    clippy::default_trait_access,
-    // Too much work to fix this issues.
-    clippy::missing_errors_doc
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
@@ -87,13 +82,12 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 
 /// Container for all key pairs held by an Exonum node.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Keys {
     /// Consensus keypair.
     pub consensus: KeyPair,
     /// Service keypair.
     pub service: KeyPair,
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl Keys {
@@ -103,7 +97,6 @@ impl Keys {
         Self {
             consensus: KeyPair::random(),
             service: KeyPair::random(),
-            non_exhaustive: (),
         }
     }
 
@@ -121,7 +114,6 @@ impl Keys {
         Self {
             consensus: consensus_keys.into(),
             service: service_keys.into(),
-            non_exhaustive: (),
         }
     }
 }
@@ -134,7 +126,7 @@ impl Keys {
 
     /// Consensus private key.
     pub fn consensus_sk(&self) -> &SecretKey {
-        &self.consensus.secret_key()
+        self.consensus.secret_key()
     }
 
     /// Service public key.
@@ -144,7 +136,7 @@ impl Keys {
 
     /// Service secret key.
     pub fn service_sk(&self) -> &SecretKey {
-        &self.service.secret_key()
+        self.service.secret_key()
     }
 }
 
@@ -172,10 +164,7 @@ pub struct EncryptedMasterKey {
 }
 
 impl EncryptedMasterKey {
-    fn encrypt(
-        key: &secret_tree::Seed,
-        pass_phrase: impl AsRef<[u8]>,
-    ) -> Result<EncryptedMasterKey, Error> {
+    fn encrypt(key: &secret_tree::Seed, pass_phrase: impl AsRef<[u8]>) -> Result<Self, Error> {
         let mut rng = thread_rng();
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
@@ -186,7 +175,7 @@ impl EncryptedMasterKey {
             .erase(&pwbox)
             .map_err(|_| Error::new(ErrorKind::Other, "Couldn't convert a pw box"))?;
 
-        Ok(EncryptedMasterKey { key: encrypted_key })
+        Ok(Self { key: encrypted_key })
     }
 
     fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<SensitiveData, Error> {

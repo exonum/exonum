@@ -609,10 +609,8 @@ impl<'a, V> CheckedListProof<'a, V> {
 }
 
 /// An error that is returned when the list proof is invalid.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Fail)]
+#[non_exhaustive]
 pub enum ListProofError {
     /// Proof contains a hash in a place where a value was expected.
     #[fail(display = "proof contains a hash in a place where a value was expected")]
@@ -650,11 +648,6 @@ pub enum ListProofError {
     /// exceeds the maximum possible list length (`2**56`).
     #[fail(display = "proof does not satisfy built-in constraints on element positions")]
     OutOfBounds,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[fail(display = "")]
-    __NonExhaustive,
 }
 
 #[cfg(test)]
