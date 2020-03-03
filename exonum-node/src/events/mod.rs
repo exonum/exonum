@@ -38,8 +38,8 @@ use std::{
 
 use crate::{messages::Message, ExternalMessage, NodeTimeout};
 
-//#[cfg(test)]
-//mod tests;
+#[cfg(test)]
+mod tests;
 
 #[derive(Debug)]
 pub struct SyncSender<T>(mpsc::Sender<T>);

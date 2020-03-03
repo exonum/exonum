@@ -33,8 +33,8 @@ use crate::events::codec::MessagesCodec;
 pub mod error;
 pub mod wrappers;
 
-//#[cfg(test)]
-//mod tests;
+#[cfg(test)]
+mod tests;
 
 pub const MAX_MESSAGE_LENGTH: usize = 65_535;
 pub const TAG_LENGTH: usize = 16;
