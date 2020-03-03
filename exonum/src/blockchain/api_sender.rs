@@ -13,8 +13,7 @@
 // limitations under the License.
 
 use failure::Fail;
-use futures::{compat::Future01CompatExt, executor::block_on, Future};
-use futures_01::{sync::mpsc, Future as _, Sink};
+use futures::{channel::mpsc, executor, Future, SinkExt};
 
 use std::fmt;
 
@@ -46,13 +45,8 @@ impl<T: Send + 'static> ApiSender<T> {
     /// # Return value
     ///
     /// The failure means that the node is being shut down.
-    pub fn send_message(&self, message: T) -> impl Future<Output = Result<(), SendError>> {
-        self.0
-            .clone()
-            .send(message)
-            .map(drop)
-            .map_err(|_| SendError(()))
-            .compat()
+    pub async fn send_message(&mut self, message: T) -> Result<(), SendError> {
+        self.0.send(message).await.map_err(|_| SendError(()))
     }
 
     /// Sends a message to the node synchronously.
@@ -61,7 +55,8 @@ impl<T: Send + 'static> ApiSender<T> {
     ///
     /// The failure means that the node is being shut down.
     pub fn send_message_blocking(&self, message: T) -> Result<(), SendError> {
-        block_on(self.send_message(message))
+        let mut this = self.clone();
+        executor::block_on(async move { this.send_message(message).await })
     }
 }
 
@@ -76,7 +71,8 @@ impl ApiSender {
         &self,
         tx: Verified<AnyTx>,
     ) -> impl Future<Output = Result<(), SendError>> {
-        self.send_message(tx)
+        let mut this = self.clone();
+        async move { this.send_message(tx).await }
     }
 
     /// Sends a transaction over the channel synchronously. If this sender is connected to a node,

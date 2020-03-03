@@ -20,20 +20,14 @@ use exonum::{
     messages::{SignedMessage, Verified},
 };
 use failure::{bail, ensure, format_err};
-use futures_01::{
-    future::{self, err, Either},
+use futures::{
+    channel::{mpsc, oneshot},
+    future,
+    prelude::*,
     stream::{SplitSink, SplitStream},
-    sync::{self, mpsc},
-    Future, IntoFuture, Sink, Stream,
 };
-use log::{error, trace, warn};
 use tokio::net::{TcpListener, TcpStream};
-use tokio_codec::Framed;
-use tokio_compat::runtime::current_thread::Handle;
-use tokio_retry::{
-    strategy::{jitter, FixedInterval},
-    Retry,
-};
+use tokio_util::codec::Framed;
 
 use std::{
     collections::HashMap,
@@ -42,12 +36,12 @@ use std::{
     time::Duration,
 };
 
-use super::{error::log_error, to_box};
+use super::error::log_error;
 use crate::{
     events::{
         codec::MessagesCodec,
         error::into_failure,
-        noise::{Handshake, HandshakeParams, NoiseHandshake},
+        noise::{Handshake, HandshakeData, HandshakeParams, NoiseHandshake},
     },
     messages::{Connect, Message, Service},
     state::SharedConnectList,
@@ -115,7 +109,7 @@ struct ConnectionPool {
 impl ConnectionPool {
     fn new() -> Self {
         Self {
-            peers: Arc::new(RwLock::new(HashMap::new())),
+            peers: Arc::default(),
         }
     }
 
@@ -127,14 +121,9 @@ impl ConnectionPool {
             .count()
     }
 
-    fn add(
-        &self,
-        key: &PublicKey,
-        address: ConnectedPeerAddr,
-        sender: mpsc::Sender<SignedMessage>,
-    ) {
+    fn add(&self, key: PublicKey, address: ConnectedPeerAddr, sender: mpsc::Sender<SignedMessage>) {
         let mut peers = self.peers.write().unwrap();
-        peers.insert(*key, ConnectionPoolEntry { sender, address });
+        peers.insert(key, ConnectionPoolEntry { sender, address });
     }
 
     fn contains(&self, address: &PublicKey) -> bool {
@@ -149,62 +138,46 @@ impl ConnectionPool {
 
     fn add_incoming_address(
         &self,
-        key: &PublicKey,
-        address: &ConnectedPeerAddr,
+        key: PublicKey,
+        address: ConnectedPeerAddr,
     ) -> mpsc::Receiver<SignedMessage> {
-        let (sender_tx, receiver_rx) = mpsc::channel::<SignedMessage>(OUTGOING_CHANNEL_SIZE);
-        self.add(key, address.clone(), sender_tx);
+        let (sender_tx, receiver_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
+        self.add(key, address, sender_tx);
         receiver_rx
     }
 
-    fn send_message(
-        &self,
-        address: &PublicKey,
-        message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> + Send {
-        let address = *address;
-        let sender_tx = self.peers.read().unwrap();
-        let write_pool = self.clone();
+    async fn send_message(&self, peer_key: &PublicKey, message: SignedMessage) {
+        let maybe_sender = {
+            // Ensure that we don't hold lock across the `await` point.
+            let peers = self.peers.read().unwrap();
+            peers.get(peer_key).map(|peer| peer.sender.clone())
+        };
 
-        if let Some(entry) = sender_tx.get(&address) {
-            let sender = &entry.sender;
-            Either::A(
-                sender
-                    .clone()
-                    .send(message)
-                    .map(drop)
-                    .or_else(move |e| {
-                        log_error(e);
-                        write_pool.remove(&address);
-                        Ok(())
-                    })
-                    .map(drop),
-            )
-        } else {
-            Either::B(future::ok(()))
+        if let Some(mut sender) = maybe_sender {
+            if let Err(e) = sender.send(message).await {
+                log_error(e);
+                self.remove(peer_key);
+            }
         }
     }
 
-    fn disconnect_with_peer(
+    async fn disconnect_with_peer(
         &self,
-        key: &PublicKey,
-        network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = failure::Error> + Send {
-        if self.remove(key).is_some() {
-            let send_disconnected = network_tx
-                .clone()
-                .send(NetworkEvent::PeerDisconnected(*key))
-                .map_err(|_| format_err!("can't send disconnect"))
-                .map(drop);
-            Either::A(send_disconnected)
-        } else {
-            Either::B(future::ok(()))
+        key: PublicKey,
+        network_tx: &mut mpsc::Sender<NetworkEvent>,
+    ) {
+        if self.remove(&key).is_some()
+            && network_tx
+                .send(NetworkEvent::PeerDisconnected(key))
+                .await
+                .is_err()
+        {
+            log::warn!("Cannot send disconnect for peer {}", key);
         }
     }
 }
 
 struct Connection {
-    handle: Handle,
     socket: Framed<TcpStream, MessagesCodec>,
     receiver_rx: mpsc::Receiver<SignedMessage>,
     address: ConnectedPeerAddr,
@@ -213,14 +186,12 @@ struct Connection {
 
 impl Connection {
     fn new(
-        handle: Handle,
         socket: Framed<TcpStream, MessagesCodec>,
         receiver_rx: mpsc::Receiver<SignedMessage>,
         address: ConnectedPeerAddr,
         key: PublicKey,
     ) -> Self {
         Self {
-            handle,
             socket,
             receiver_rx,
             address,
@@ -233,7 +204,6 @@ impl Connection {
 struct NetworkHandler {
     listen_address: SocketAddr,
     pool: ConnectionPool,
-    handle: Handle,
     network_config: NetworkConfiguration,
     network_tx: mpsc::Sender<NetworkEvent>,
     handshake_params: HandshakeParams,
@@ -242,7 +212,6 @@ struct NetworkHandler {
 
 impl NetworkHandler {
     fn new(
-        handle: Handle,
         address: SocketAddr,
         connection_pool: ConnectionPool,
         network_config: NetworkConfiguration,
@@ -251,7 +220,6 @@ impl NetworkHandler {
         connect_list: SharedConnectList,
     ) -> Self {
         Self {
-            handle,
             listen_address: address,
             pool: connection_pool,
             network_config,
@@ -261,245 +229,207 @@ impl NetworkHandler {
         }
     }
 
-    fn listener(self) -> impl Future<Item = (), Error = failure::Error> {
-        let listen_address = self.listen_address;
-        let server = TcpListener::bind(&listen_address).unwrap().incoming();
-        let pool = self.pool.clone();
-
-        let handshake_params = self.handshake_params.clone();
-        let network_tx = self.network_tx.clone();
-        let handle = self.handle.clone();
+    async fn listener(self) -> Result<(), failure::Error> {
+        let mut listener = TcpListener::bind(&self.listen_address).await?;
+        let mut incoming_connections = listener.incoming();
 
         // Incoming connections limiter
         let incoming_connections_limit = self.network_config.max_incoming_connections;
         // The reference counter is used to automatically count the number of the open connections.
         let incoming_connections_counter: Arc<()> = Arc::default();
 
-        server
-            .map_err(into_failure)
-            .for_each(move |incoming_connection| {
-                let address = incoming_connection
-                    .peer_addr()
-                    .expect("Remote peer address resolve failed");
-                let conn_addr = ConnectedPeerAddr::In(address);
-                let pool = pool.clone();
-                let network_tx = network_tx.clone();
-                let handle = handle.clone();
+        while let Some(mut socket) = incoming_connections.try_next().await? {
+            // Check incoming connections count.
+            let holder = Arc::clone(&incoming_connections_counter);
+            let connections_count = Arc::strong_count(&incoming_connections_counter) - 1;
 
-                let handshake = NoiseHandshake::responder(&handshake_params, &listen_address);
-                let holder = incoming_connections_counter.clone();
-                // Check incoming connections count
-                let connections_count = Arc::strong_count(&incoming_connections_counter) - 1;
-                if connections_count >= incoming_connections_limit {
-                    warn!(
-                        "Rejected incoming connection with peer={}, \
-                         connections limit reached.",
-                        address
-                    );
+            let peer_address = match socket.peer_addr() {
+                Ok(address) => address,
+                Err(err) => {
+                    log::warn!("Peer address resolution failed: {}", err);
+                    continue;
+                }
+            };
+
+            if connections_count >= incoming_connections_limit {
+                log::warn!(
+                    "Rejected incoming connection with peer={}, connections limit reached.",
+                    peer_address
+                );
+                continue;
+            }
+
+            let pool = self.pool.clone();
+            let connect_list = self.connect_list.clone();
+            let network_tx = self.network_tx.clone();
+            let handshake = NoiseHandshake::responder(&self.handshake_params);
+
+            let task = async move {
+                let HandshakeData {
+                    codec,
+                    raw_message,
+                    peer_key,
+                } = handshake.listen(&mut socket).await?;
+
+                let connect = Self::parse_connect_msg(raw_message, &peer_key)?;
+                let peer_key = connect.author();
+                if pool.contains(&peer_key) {
+                    // We've already connected to the peer; ignore this connection.
                     return Ok(());
                 }
 
-                let connect_list = self.connect_list.clone();
-                let listener = handshake
-                    .listen(incoming_connection)
-                    .and_then(move |(socket, raw, key)| (Ok(socket), Self::parse_connect_msg(Some(raw), &key)))
-                    .and_then(move |(socket, message)| {
-                        if pool.contains(&message.author()) {
-                            Box::new(future::ok(()))
-                        } else if connect_list.is_peer_allowed(&message.author()) {
-                            let receiver_rx =
-                                pool.add_incoming_address(&message.author(), &conn_addr);
-                            let connection = Connection::new(
-                                handle.clone(),
-                                socket,
-                                receiver_rx,
-                                conn_addr,
-                                message.author(),
-                            );
-                            to_box(Self::handle_connection(
-                                connection,
-                                message,
-                                pool,
-                                &network_tx,
-                            ))
-                        } else {
-                            warn!( "Rejecting incoming connection with peer={} public_key={}, peer is not in the ConnectList",
-                                   address, message.author()
-                            );
-                            Box::new(future::ok(()))
-                        }
-                    })
-                    .map(|_| {
-                        drop(holder);
-                    })
-                    .map_err(log_error);
+                if connect_list.is_peer_allowed(&peer_key) {
+                    let conn_addr = ConnectedPeerAddr::In(peer_address);
+                    let receiver_rx = pool.add_incoming_address(peer_key, conn_addr.clone());
+                    let socket = Framed::new(socket, codec);
+                    let connection = Connection::new(socket, receiver_rx, conn_addr, peer_key);
+                    Self::handle_connection(connection, connect, pool, network_tx).await?;
+                } else {
+                    bail!(
+                        "Rejecting incoming connection with peer={} public_key={}, \
+                         the peer is not in the connect list",
+                        peer_address,
+                        peer_key
+                    );
+                }
 
-                self.handle.spawn(listener).map_err(into_failure)
-            })
+                drop(holder);
+                Ok(())
+            };
+
+            tokio::spawn(task.unwrap_or_else(|err| log::warn!("{}", err)));
+        }
+        Ok(())
     }
 
     fn connect(
         &self,
         key: PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (), Error = failure::Error> + Send {
-        let handshake_params = handshake_params.clone();
-        let handle = self.handle.clone();
-        let network_tx = self.network_tx.clone();
-        let network_config = self.network_config;
-        let timeout = self.network_config.tcp_connect_retry_timeout;
-        let max_tries = self.network_config.tcp_connect_max_retries as usize;
+    ) -> impl Future<Output = Result<(), failure::Error>> {
+        // Resolve peer key to an address.
+        let maybe_address = self.connect_list.find_address_by_key(&key);
+        let unresolved_address = if let Some(address) = maybe_address {
+            address
+        } else {
+            let err = format_err!("Trying to connect to peer not from ConnectList key={}", key);
+            return future::err(err).left_future();
+        };
+
         let max_connections = self.network_config.max_outgoing_connections;
-        let strategy = FixedInterval::from_millis(timeout)
-            .map(jitter)
-            .take(max_tries);
+        let (sender_tx, receiver_rx) = mpsc::channel(OUTGOING_CHANNEL_SIZE);
+        let network_config = self.network_config;
+        let mut handshake_params = handshake_params.clone();
+        handshake_params.set_remote_key(key);
+        let pool = self.pool.clone();
+        let network_tx = self.network_tx.clone();
 
-        let unresolved_address = self.connect_list.find_address_by_key(&key);
-
-        if let Some(unresolved_address) = unresolved_address {
-            let action = {
-                let unresolved_address = unresolved_address.clone();
-                move || tokio_dns::TcpStream::connect(unresolved_address.as_str())
+        // TODO: use retries.
+        async move {
+            let mut socket = TcpStream::connect(&unresolved_address).await?;
+            let peer_address = match socket.peer_addr() {
+                Ok(addr) => addr,
+                Err(err) => {
+                    let err = format_err!("Couldn't take peer addr from socket = {}", err);
+                    return Err(err);
+                }
             };
 
-            let (sender_tx, receiver_rx) = mpsc::channel::<SignedMessage>(OUTGOING_CHANNEL_SIZE);
-            let pool = self.pool.clone();
-            Either::A(
-                Retry::spawn(strategy, action)
-                    .map_err(into_failure)
-                    .and_then(move |socket| Self::configure_socket(socket, network_config))
-                    .and_then(move |outgoing_connection| {
-                        Self::build_handshake_initiator(outgoing_connection, key, &handshake_params)
-                    })
-                    .and_then(move |(socket, raw, key)| {
-                        (Ok(socket), Self::parse_connect_msg(Some(raw), &key))
-                    })
-                    .and_then(move |(socket, message)| {
-                        let connection_limit_reached = pool.count_outgoing() >= max_connections;
-                        if pool.contains(&message.author()) || connection_limit_reached {
-                            Box::new(future::ok(()))
-                        } else {
-                            let addr = match socket.get_ref().peer_addr() {
-                                Ok(addr) => addr,
-                                Err(e) => {
-                                    return to_box(err::<(), _>(format_err!(
-                                        "Couldn't take peer addr from socket = {}",
-                                        e
-                                    )));
-                                }
-                            };
-                            let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
-                            pool.add(&key, conn_addr.clone(), sender_tx);
-                            let connection = Connection::new(
-                                handle,
-                                socket,
-                                receiver_rx,
-                                conn_addr,
-                                message.author(),
-                            );
-                            to_box(Self::handle_connection(
-                                connection,
-                                message,
-                                pool,
-                                &network_tx,
-                            ))
-                        }
-                    })
-                    .map(drop),
-            )
-        } else {
-            Either::B(err(format_err!(
-                "Trying to connect to peer not from ConnectList key={}",
-                key
-            )))
+            Self::configure_socket(&mut socket, network_config)?;
+
+            let HandshakeData {
+                codec,
+                raw_message,
+                peer_key,
+            } = NoiseHandshake::initiator(&handshake_params)
+                .send(&mut socket)
+                .await?;
+
+            let connect = Self::parse_connect_msg(raw_message, &peer_key)?;
+            let connection_limit_reached = pool.count_outgoing() >= max_connections;
+            if pool.contains(&key) || connection_limit_reached {
+                return Ok(());
+            }
+
+            let conn_addr = ConnectedPeerAddr::Out(unresolved_address, peer_address);
+            pool.add(key, conn_addr.clone(), sender_tx);
+            let socket = Framed::new(socket, codec);
+            let connection = Connection::new(socket, receiver_rx, conn_addr, key);
+            Self::handle_connection(connection, connect, pool, network_tx).await
         }
+        .right_future()
     }
 
     fn process_messages(
-        pool: &ConnectionPool,
-        handle: &Handle,
+        pool: ConnectionPool,
         connection: Connection,
-        network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> Result<(), failure::Error> {
+        network_tx: mpsc::Sender<NetworkEvent>,
+    ) {
         let (sink, stream) = connection.socket.split();
 
-        let incoming = Self::process_incoming_messages(
-            stream,
-            pool.clone(),
-            &connection.key,
-            network_tx.clone(),
-        );
-
+        let incoming = Self::process_incoming_messages(stream, pool, connection.key, network_tx);
         let outgoing = Self::process_outgoing_messages(sink, connection.receiver_rx);
-
-        handle.spawn(incoming).map_err(into_failure)?;
-        handle.spawn(outgoing).map_err(into_failure)
+        tokio::spawn(incoming);
+        tokio::spawn(outgoing);
     }
 
-    fn process_outgoing_messages<S>(
-        sink: SplitSink<S>,
+    async fn process_outgoing_messages<S>(
+        sink: SplitSink<S, SignedMessage>,
         receiver_rx: mpsc::Receiver<SignedMessage>,
-    ) -> impl Future<Item = (), Error = ()>
-    where
-        S: Sink<SinkItem = SignedMessage, SinkError = failure::Error>,
+    ) where
+        S: Sink<SignedMessage, Error = failure::Error>,
     {
-        receiver_rx
-            .map_err(|_| format_err!("Receiver is gone."))
-            .forward(sink)
-            .map(drop)
-            .map_err(|e| {
-                error!("Connection terminated: {}: {}", e, e.find_root_cause());
-            })
+        if let Err(err) = receiver_rx.map(Ok).forward(sink).await {
+            log::error!("Connection terminated: {}: {}", err, err.find_root_cause());
+        }
     }
 
-    fn process_incoming_messages<S>(
+    async fn process_incoming_messages<S>(
         stream: SplitStream<S>,
         pool: ConnectionPool,
-        key: &PublicKey,
-        network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = ()> + Send
-    where
-        S: Stream<Item = Vec<u8>, Error = failure::Error> + Send,
+        key: PublicKey,
+        mut network_tx: mpsc::Sender<NetworkEvent>,
+    ) where
+        S: Stream<Item = Result<Vec<u8>, failure::Error>>,
     {
-        let key = *key;
-        network_tx
-            .clone()
+        let forward_outcome = (&mut network_tx)
             .sink_map_err(into_failure)
-            .send_all(stream.map(NetworkEvent::MessageReceived))
-            .then(move |_| pool.disconnect_with_peer(&key, &network_tx))
-            .map_err(|e| {
-                error!("Connection terminated: {}: {}", e, e.find_root_cause());
-            })
+            .send_all(&mut stream.map_ok(NetworkEvent::MessageReceived))
+            .await;
+        if let Err(err) = forward_outcome {
+            log::error!("Connection terminated: {}: {}", err, err.find_root_cause());
+        }
+        pool.disconnect_with_peer(key, &mut network_tx).await;
     }
 
     fn configure_socket(
-        socket: TcpStream,
+        socket: &mut TcpStream,
         network_config: NetworkConfiguration,
-    ) -> Result<TcpStream, failure::Error> {
+    ) -> Result<(), failure::Error> {
         socket.set_nodelay(network_config.tcp_nodelay)?;
         let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
         socket.set_keepalive(duration)?;
-        Ok(socket)
+        Ok(())
     }
 
-    fn handle_connection(
+    async fn handle_connection(
         connection: Connection,
-        message: Verified<Connect>,
+        connect: Verified<Connect>,
         pool: ConnectionPool,
-        network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        trace!("Established connection with peer={:?}", connection.address);
-        let handle = connection.handle.clone();
-        Self::send_peer_connected_event(&connection.address, message, network_tx).and_then(
-            move |network_tx| Self::process_messages(&pool, &handle, connection, &network_tx),
-        )
+        mut network_tx: mpsc::Sender<NetworkEvent>,
+    ) -> Result<(), failure::Error> {
+        let address = connection.address.clone();
+        log::trace!("Established connection with peer {:?}", address);
+
+        Self::send_peer_connected_event(address, connect, &mut network_tx).await?;
+        Self::process_messages(pool, connection, network_tx);
+        Ok(())
     }
 
     fn parse_connect_msg(
-        raw: Option<Vec<u8>>,
+        raw: Vec<u8>,
         key: &x25519::PublicKey,
     ) -> Result<Verified<Connect>, failure::Error> {
-        let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
         let connect: Verified<Connect> = match message {
             Message::Service(Service::Connect(connect)) => connect,
@@ -514,151 +444,110 @@ impl NetworkHandler {
             author == *key,
             "Connect message public key doesn't match with the received peer key"
         );
-
         Ok(connect)
     }
 
-    pub fn request_handler(
-        self,
-        receiver: mpsc::Receiver<NetworkRequest>,
-        cancel_handler: sync::oneshot::Sender<()>,
-    ) -> impl Future<Item = (), Error = failure::Error> + Send {
+    pub async fn handle_requests(
+        mut self,
+        mut receiver: mpsc::Receiver<NetworkRequest>,
+        cancel_handler: oneshot::Sender<()>,
+    ) -> Result<(), failure::Error> {
         let mut cancel_sender = Some(cancel_handler);
-        let handle = self.handle.clone();
 
-        let handler = receiver.for_each(move |request| {
-            let fut = match request {
+        while let Some(request) = receiver.next().await {
+            match request {
                 NetworkRequest::SendMessage(key, message) => {
-                    to_box(self.handle_send_message(&key, message))
+                    self.handle_send_message(key, message).await?;
                 }
                 NetworkRequest::DisconnectWithPeer(peer) => {
-                    to_box(self.pool.disconnect_with_peer(&peer, &self.network_tx))
+                    self.pool
+                        .disconnect_with_peer(peer, &mut self.network_tx)
+                        .await;
                 }
-                NetworkRequest::Shutdown => to_box(
-                    cancel_sender
-                        .take()
-                        .ok_or_else(|| format_err!("shutdown twice"))
-                        .into_future(),
-                ),
+                NetworkRequest::Shutdown => {
+                    if cancel_sender.take().is_none() {
+                        bail!("Shut down twice");
+                    }
+                }
             }
-            .map_err(log_error);
-
-            handle.spawn(fut).map_err(log_error)
-        });
-
-        handler.map_err(|_| format_err!("Error while processing outgoing Network Requests"))
+        }
+        Ok(())
     }
 
-    fn handle_send_message(
-        &self,
-        address: &PublicKey,
+    async fn handle_send_message(
+        &mut self,
+        address: PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        let pool = self.pool.clone();
-
-        if pool.contains(address) {
-            to_box(pool.send_message(address, message))
+    ) -> Result<(), failure::Error> {
+        if self.pool.contains(&address) {
+            self.pool.send_message(&address, message).await;
+            Ok(())
         } else if self.can_create_connections() {
-            to_box(self.create_new_connection(*address, message))
+            self.create_new_connection(address, message).await
         } else {
-            to_box(self.send_unable_connect_event(address))
+            self.send_unable_connect_event(address).await
         }
     }
 
-    fn create_new_connection(
+    async fn create_new_connection(
         &self,
         key: PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> + Send {
-        let pool = self.pool.clone();
+    ) -> Result<(), failure::Error> {
         let connect = self.handshake_params.connect.clone();
-        self.connect(key, &self.handshake_params)
-            .and_then(move |_| {
-                if &message == connect.as_raw() {
-                    Either::A(future::ok(()))
-                } else {
-                    Either::B(pool.send_message(&key, message))
-                }
-            })
+        self.connect(key, &self.handshake_params).await?;
+        if message != *connect.as_raw() {
+            self.pool.send_message(&key, message).await;
+        }
+        Ok(())
     }
 
-    fn send_peer_connected_event(
-        address: &ConnectedPeerAddr,
+    async fn send_peer_connected_event(
+        address: ConnectedPeerAddr,
         message: Verified<Connect>,
-        network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> + Send {
-        let peer_connected = NetworkEvent::PeerConnected(address.clone(), message);
+        network_tx: &mut mpsc::Sender<NetworkEvent>,
+    ) -> Result<(), failure::Error> {
+        let peer_connected = NetworkEvent::PeerConnected(address, message);
         network_tx
-            .clone()
             .send(peer_connected)
-            .map_err(into_failure)
+            .await
+            .map_err(|_| format_err!("Cannot send `PeerConnected` notification"))
     }
 
     fn can_create_connections(&self) -> bool {
         self.pool.count_outgoing() < self.network_config.max_outgoing_connections
     }
 
-    fn send_unable_connect_event(
-        &self,
-        peer: &PublicKey,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        let event = NetworkEvent::UnableConnectToPeer(*peer);
+    async fn send_unable_connect_event(&mut self, peer: PublicKey) -> Result<(), failure::Error> {
+        let event = NetworkEvent::UnableConnectToPeer(peer);
         self.network_tx
-            .clone()
             .send(event)
-            .map(drop)
+            .await
             .map_err(|_| format_err!("can't send network event"))
-    }
-
-    fn build_handshake_initiator(
-        stream: TcpStream,
-        key: PublicKey,
-        handshake_params: &HandshakeParams,
-    ) -> impl Future<
-        Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>, x25519::PublicKey),
-        Error = failure::Error,
-    > {
-        let mut handshake_params = handshake_params.clone();
-        handshake_params.set_remote_key(key);
-        NoiseHandshake::initiator(&handshake_params, &stream.peer_addr().unwrap()).send(stream)
     }
 }
 
 impl NetworkPart {
-    pub fn run(
-        self,
-        handle: &Handle,
-        handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (), Error = failure::Error> {
-        let listen_address = self.listen_address;
-        // `cancel_sender` is converted to future when we receive
-        // `NetworkRequest::Shutdown` causing its being completed with error.
-        // After that completes `cancel_handler` and event loop stopped.
-        let (cancel_sender, cancel_handler) = sync::oneshot::channel::<()>();
+    pub async fn run(self, handshake_params: HandshakeParams) {
+        let (cancel_tx, cancel_rx) = oneshot::channel();
 
         let handler = NetworkHandler::new(
-            handle.clone(),
-            listen_address,
+            self.listen_address,
             ConnectionPool::new(),
             self.network_config,
-            self.network_tx.clone(),
-            handshake_params.clone(),
-            self.connect_list.clone(),
+            self.network_tx,
+            handshake_params,
+            self.connect_list,
         );
 
         let listener = handler.clone().listener();
-        let request_handler = handler.request_handler(self.network_requests.1, cancel_sender);
+        let request_handler = handler.handle_requests(self.network_requests.1, cancel_tx);
+        let handlers = future::join(listener, request_handler);
+        futures::pin_mut!(handlers);
 
-        let cancel_handler = cancel_handler.or_else(|e| {
-            trace!("Requests handler closed: {}", e);
-            Ok(())
+        let cancel_handler = cancel_rx.unwrap_or_else(|e| {
+            log::trace!("Requests handler closed: {}", e);
         });
-
-        listener
-            .join(request_handler)
-            .map(drop)
-            .select(cancel_handler)
-            .map_err(|(e, _)| e)
-            .map(drop)
+        future::select(handlers, cancel_handler).await;
     }
 }

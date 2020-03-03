@@ -18,7 +18,7 @@ use actix_cors::{Cors, CorsFactory};
 use actix_web::{dev::Server, web, App, HttpServer};
 use futures::{
     future::{join_all, try_join_all},
-    stream::{TryStream, TryStreamExt},
+    Stream, StreamExt,
 };
 
 use std::{collections::HashMap, io, net::SocketAddr};
@@ -121,9 +121,9 @@ impl ApiManager {
     /// Starts API manager actor with the specified endpoints update stream.
     pub async fn run<S>(mut self, mut endpoints_rx: S) -> io::Result<()>
     where
-        S: TryStream<Ok = UpdateEndpoints, Error = io::Error> + Unpin,
+        S: Stream<Item = UpdateEndpoints> + Unpin,
     {
-        while let Some(request) = endpoints_rx.try_next().await? {
+        while let Some(request) = endpoints_rx.next().await {
             log::info!("Server restart requested");
             self.stop_servers().await;
             self.endpoints = request.endpoints;

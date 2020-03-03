@@ -75,17 +75,15 @@ use exonum_api::{
     AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
     WebServerConfig,
 };
-use failure::{ensure, format_err, Error};
-use futures::{compat::Stream01CompatExt, stream::TryStreamExt};
-use futures_01::{sync::mpsc, Sink};
+use failure::{ensure, format_err};
+use futures::channel::mpsc;
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
 
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fmt, io,
+    fmt,
     net::SocketAddr,
     sync::Arc,
     thread,
@@ -95,10 +93,9 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        error::{into_failure, LogError},
-        noise::HandshakeParams,
-        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
-        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+        error::LogError, noise::HandshakeParams, EventHandler, HandlerPart, InternalEvent,
+        InternalPart, InternalRequest, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
+        TimeoutRequest,
     },
     messages::Connect,
     schema::NodeSchema,
@@ -115,8 +112,8 @@ mod messages;
 mod plugin;
 mod proto;
 mod requests;
-#[cfg(test)]
-mod sandbox;
+//#[cfg(test)]
+//mod sandbox;
 mod schema;
 mod state;
 
@@ -819,7 +816,7 @@ impl ShutdownHandle {
     /// # Return value
     ///
     /// The failure means that the node is already being shut down.
-    pub async fn shutdown(self) -> Result<(), SendError> {
+    pub async fn shutdown(mut self) -> Result<(), SendError> {
         self.inner.send_message(ExternalMessage::Shutdown).await
     }
 }
@@ -935,10 +932,10 @@ impl NodeChannel {
     /// Returns the channel for sending timeouts, networks and API requests.
     fn node_sender(&self) -> NodeSender {
         NodeSender {
-            internal_requests: self.internal_requests.0.clone().wait(),
-            network_requests: self.network_requests.0.clone().wait(),
-            transactions: self.transactions.0.clone().wait(),
-            api_requests: self.api_requests.0.clone().wait(),
+            internal_requests: SyncSender::new(self.internal_requests.0.clone()),
+            network_requests: SyncSender::new(self.network_requests.0.clone()),
+            transactions: SyncSender::new(self.transactions.0.clone()),
+            api_requests: SyncSender::new(self.api_requests.0.clone()),
         }
     }
 }
@@ -1125,33 +1122,26 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    fn run_handler(mut self, handshake_params: HandshakeParams) -> Result<(), Error> {
+    async fn run_handler(
+        mut self,
+        handshake_params: HandshakeParams,
+    ) -> Result<(), failure::Error> {
         self.handler.initialize();
 
         let (handler_part, network_part, internal_part) = self.into_reactor();
+        tokio::spawn(internal_part.run());
+        let network_task = tokio::spawn(network_part.run(handshake_params));
 
-        let network_thread = thread::spawn(move || {
-            let mut core = CompatRuntime::new().map_err(into_failure)?;
-            let handle = core.handle();
-
-            core.spawn(internal_part.run(handle));
-
-            let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.block_on(network_handler)
-                .map(drop)
-                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
-        });
-
-        let mut core = CompatRuntime::new().map_err(into_failure)?;
-        core.block_on(handler_part.run())
-            .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
-
-        network_thread.join().unwrap()
+        // FIXME: is joining appropriate here (vs select)?
+        handler_part.run().await;
+        network_task
+            .await
+            .map_err(|e| format_err!("Error in the network thread: {}", e))
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
     /// depending on the provided `NodeConfig`.
-    pub fn run(self) -> Result<(), failure::Error> {
+    pub async fn run(self) -> Result<(), failure::Error> {
         trace!("Running node.");
 
         // Runs NodeHandler.
@@ -1161,24 +1151,18 @@ impl Node {
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
-        self.run_handler(handshake_params)
+        self.run_handler(handshake_params).await
     }
 
     fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
         let connect_message = self.state().our_connect_message().clone();
         let connect_list = self.state().connect_list();
 
+        // FIXME: run on tokio?
         let api_manager = ApiManager::new(self.api_manager_config);
         let endpoints = self.channel.endpoints.1;
         thread::spawn(move || {
-            actix_rt::System::new("exonum-node").block_on(api_manager.run(
-                endpoints.compat().map_err(|_| {
-                    io::Error::new(
-                        io::ErrorKind::Other,
-                        "Unable to receive `UpdateEndpoints` event",
-                    )
-                }),
-            ))
+            actix_rt::System::new("exonum-node").block_on(api_manager.run(endpoints))
         });
 
         let (network_tx, network_rx) = self.channel.network_events;

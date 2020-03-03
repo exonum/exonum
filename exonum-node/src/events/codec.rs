@@ -19,7 +19,7 @@ use exonum::{
     messages::{SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
 };
 use failure::bail;
-use tokio_io::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder};
 
 use std::mem;
 
@@ -53,13 +53,11 @@ impl Decoder for MessagesCodec {
         }
 
         let len = LittleEndian::read_u32(buf) as usize;
-
         if buf.len() < NOISE_HEADER_LENGTH + len {
             return Ok(None);
         }
 
         let buf = self.session.decrypt_msg(len, buf)?;
-
         if buf.len() > self.max_message_len as usize {
             bail!(
                 "Received message is too long: received_len = {}, allowed_len = {}",
@@ -90,6 +88,7 @@ impl Encoder for MessagesCodec {
     }
 }
 
+/*
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
@@ -99,7 +98,7 @@ mod test {
         merkledb::BinaryValue,
         messages::{Verified, SIGNED_MESSAGE_MIN_SIZE},
     };
-    use tokio_io::codec::{Decoder, Encoder};
+    use tokio_util::codec::{Decoder, Encoder};
 
     use super::MessagesCodec;
     use crate::{
@@ -215,3 +214,4 @@ mod test {
         assert!(responder.decode_eof(&mut bytes).unwrap().is_none());
     }
 }
+*/
