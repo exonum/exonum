@@ -90,7 +90,7 @@ pub struct NetworkPart {
     pub listen_address: SocketAddr,
     pub network_config: NetworkConfiguration,
     pub max_message_len: u32,
-    pub network_requests: (mpsc::Sender<NetworkRequest>, mpsc::Receiver<NetworkRequest>),
+    pub network_requests: mpsc::Receiver<NetworkRequest>,
     pub network_tx: mpsc::Sender<NetworkEvent>,
     pub(crate) connect_list: SharedConnectList,
 }
@@ -541,7 +541,7 @@ impl NetworkPart {
         );
 
         let listener = handler.clone().listener();
-        let request_handler = handler.handle_requests(self.network_requests.1, cancel_tx);
+        let request_handler = handler.handle_requests(self.network_requests, cancel_tx);
         let handlers = future::join(listener, request_handler);
         futures::pin_mut!(handlers);
 

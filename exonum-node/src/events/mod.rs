@@ -27,7 +27,7 @@ use exonum::{
     helpers::{Height, Round},
     messages::{AnyTx, Verified},
 };
-use futures::{channel::mpsc, executor, future::BoxFuture, prelude::*};
+use futures::{channel::mpsc, executor, prelude::*};
 
 use std::{
     cmp::Ordering,
@@ -144,7 +144,7 @@ pub struct HandlerPart<H: EventHandler> {
 }
 
 impl<H: EventHandler + 'static + Send> HandlerPart<H> {
-    pub fn run(self) -> BoxFuture<'static, ()> {
+    pub async fn run(self) {
         let mut handler = self.handler;
         let mut aggregator = EventsAggregator::new(
             self.internal_rx,
@@ -153,12 +153,9 @@ impl<H: EventHandler + 'static + Send> HandlerPart<H> {
             self.api_rx,
         );
 
-        async move {
-            while let Some(event) = aggregator.next().await {
-                handler.handle_event(event);
-            }
+        while let Some(event) = aggregator.next().await {
+            handler.handle_event(event);
         }
-        .boxed()
     }
 }
 
