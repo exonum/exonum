@@ -33,6 +33,7 @@
 //! use exonum_node::{NodeBuilder, NodeConfig};
 //! use exonum_system_api::SystemApiPlugin;
 //!
+//! # async fn run_node() -> Result<(), failure::Error> {
 //! let node_config: NodeConfig = // ...
 //! #    unimplemented!();
 //! let node_keys = Keys::random();
@@ -44,7 +45,9 @@
 //!     .with_plugin(SystemApiPlugin)
 //!     // Add runtimes etc...
 //!     .build();
-//! node.run().unwrap();
+//! node.run().await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Use with the testkit:
