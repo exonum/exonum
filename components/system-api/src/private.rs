@@ -141,7 +141,7 @@
 //!     .build();
 //! let api = testkit.api();
 //! let enabled = true;
-//! let query = ConsensusEnabledQuery { enabled };
+//! let query = ConsensusEnabledQuery::new(enabled);
 //! api.private(ApiKind::System)
 //!     .query(&query)
 //!     .post("v1/consensus_status")?;
