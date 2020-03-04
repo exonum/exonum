@@ -20,8 +20,7 @@ use exonum::{
     runtime::{InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
 use exonum_merkledb::access::AccessExt;
-use exonum_rust_runtime::ServiceFactory;
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 
 use crate::{
     IncService as ConfigChangeService, SERVICE_ID as CONFIG_SERVICE_ID,
@@ -150,38 +149,26 @@ pub fn testkit_with_supervisor(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
+        .with(Supervisor::decentralized())
         .build()
 }
 
 pub fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_default_rust_service(ConfigChangeService)
+        .with(Supervisor::decentralized())
+        .with(Spec::new(ConfigChangeService).with_default_instance())
         .build()
 }
 
 pub fn testkit_with_supervisor_and_2_services(validator_count: u16) -> TestKit {
-    let service = ConfigChangeService;
-    let artifact = service.artifact_id();
+    let services = Spec::new(ConfigChangeService)
+        .with_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME, ())
+        .with_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_artifact(artifact.clone())
-        .with_instance(
-            artifact
-                .clone()
-                .into_default_instance(CONFIG_SERVICE_ID, CONFIG_SERVICE_NAME),
-        )
-        .with_instance(artifact.into_default_instance(SECOND_SERVICE_ID, SECOND_SERVICE_NAME))
-        .with_rust_service(service)
+        .with(Supervisor::decentralized())
+        .with(services)
         .build()
 }
 

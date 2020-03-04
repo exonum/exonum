@@ -19,6 +19,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Schema::call_errors` was removed in favor of more comprehensive
   `call_records` method. (#1792)
 
+#### exonum-cli
+
+- `NodeBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+
 #### exonum-system-api
 
 - Public api module has been removed. List of endpoints from private api has
@@ -29,6 +34,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `v1/peers` - adds a peer to the Exonum node;
   - `v1/consensus_status` - enables or disables consensus on the node;
   - `v1/shutdown` - shuts down the node.
+
+### exonum-testkit
+
+- `TestKitBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
 
 ### New Features
 

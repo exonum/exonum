@@ -105,16 +105,17 @@
 )]
 
 pub use crate::config_manager::DefaultConfigManager;
+pub use exonum_rust_runtime::spec::Spec;
 pub use structopt;
 
 use exonum::{
-    blockchain::config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
+    blockchain::config::{GenesisConfig, GenesisConfigBuilder},
     merkledb::RocksDB,
     runtime::{RuntimeInstance, WellKnownRuntime},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_node::{Node, NodeBuilder as CoreNodeBuilder};
-use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{spec::Deploy, RustRuntimeBuilder};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 use exonum_system_api::SystemApiPlugin;
 use structopt::StructOpt;
@@ -137,7 +138,7 @@ mod config_manager;
 pub struct NodeBuilder {
     rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
-    builtin_instances: Vec<InstanceInitParams>,
+    genesis_config: GenesisConfigBuilder,
     args: Option<Vec<OsString>>,
     temp_dir: Option<TempDir>,
 }
@@ -152,11 +153,9 @@ impl NodeBuilder {
     /// Creates a new builder.
     pub fn new() -> Self {
         Self {
-            rust_runtime: RustRuntimeBuilder::new()
-                .with_factory(Supervisor)
-                .with_factory(ExplorerFactory),
+            genesis_config: GenesisConfigBuilder::default(),
+            rust_runtime: RustRuntimeBuilder::new(),
             external_runtimes: vec![],
-            builtin_instances: vec![],
             args: None,
             temp_dir: None,
         }
@@ -196,9 +195,10 @@ impl NodeBuilder {
         Ok(this)
     }
 
-    /// Adds new Rust service to the list of available services.
-    pub fn with_rust_service(mut self, service: impl ServiceFactory) -> Self {
-        self.rust_runtime = self.rust_runtime.with_factory(service);
+    /// Adds a deploy spec to this builder. The spec may contain artifacts and service instances
+    /// to deploy at the blockchain start.
+    pub fn with(mut self, spec: impl Deploy) -> Self {
+        spec.deploy(&mut self.genesis_config, &mut self.rust_runtime);
         self
     }
 
@@ -208,22 +208,6 @@ impl NodeBuilder {
     pub fn with_external_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         self.external_runtimes.push(runtime.into());
         self
-    }
-
-    /// Adds a service instance that will be available immediately after creating a genesis block.
-    ///
-    /// For Rust services, the service factory needs to be separately supplied
-    /// via [`with_rust_service`](#method.with_rust_service).
-    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
-        self.builtin_instances.push(instance.into());
-        self
-    }
-
-    /// Adds a default Rust service instance that will be available immediately after creating a
-    /// genesis block.
-    pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
-        self.with_instance(service.default_instance())
-            .with_rust_service(service)
     }
 
     /// Executes a command received from the command line.
@@ -236,7 +220,7 @@ impl NodeBuilder {
     /// - `Ok(None)` if the command executed successfully and did not lead to node creation
     /// - `Err(_)` if an error occurred during command execution
     #[doc(hidden)] // unstable
-    pub fn execute_command(self) -> Result<Option<Node>, failure::Error> {
+    pub fn execute_command(mut self) -> Result<Option<Node>, failure::Error> {
         let command = if let Some(args) = self.args {
             Command::from_iter(args)
         } else {
@@ -244,8 +228,14 @@ impl NodeBuilder {
         };
 
         if let StandardResult::Run(run_config) = command.execute()? {
-            let genesis_config = Self::genesis_config(&run_config, self.builtin_instances);
+            // Deploy "default" services (supervisor and the explorer).
+            let supervisor = Self::supervisor_service(&run_config);
+            supervisor.deploy(&mut self.genesis_config, &mut self.rust_runtime);
+            Spec::new(ExplorerFactory)
+                .with_default_instance()
+                .deploy(&mut self.genesis_config, &mut self.rust_runtime);
 
+            let genesis_config = Self::genesis_config(&run_config, self.genesis_config);
             let db_options = &run_config.node_config.private_config.database;
             let database = RocksDB::open(run_config.db_path, db_options)?;
 
@@ -281,29 +271,15 @@ impl NodeBuilder {
         }
     }
 
-    fn genesis_config(
-        run_config: &NodeRunConfig,
-        default_instances: Vec<InstanceInitParams>,
-    ) -> GenesisConfig {
-        let mut builder = GenesisConfigBuilder::with_consensus_config(
-            run_config.node_config.public_config.consensus.clone(),
-        );
+    fn genesis_config(run_config: &NodeRunConfig, builder: GenesisConfigBuilder) -> GenesisConfig {
         // Add builtin services to genesis config.
-        builder = builder
-            .with_artifact(Supervisor.artifact_id())
-            .with_instance(Self::supervisor_service(run_config))
-            .with_artifact(ExplorerFactory.artifact_id())
-            .with_instance(ExplorerFactory.default_instance());
-        // Add default instances.
-        for instance in default_instances {
-            builder = builder
-                .with_artifact(instance.instance_spec.artifact.clone())
-                .with_instance(instance)
-        }
-        builder.build()
+        let mut config = builder.build();
+        // Override consensus config.
+        config.consensus_config = run_config.node_config.public_config.consensus.clone();
+        config
     }
 
-    fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {
+    fn supervisor_service(run_config: &NodeRunConfig) -> impl Deploy {
         let mode = run_config
             .node_config
             .public_config

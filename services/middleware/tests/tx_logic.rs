@@ -19,8 +19,8 @@ use exonum::{
     merkledb::{access::Access, Snapshot},
     runtime::{versioning::Version, CoreError, ErrorMatch, InstanceId, SnapshotExt},
 };
-use exonum_rust_runtime::{DefaultInstance, ServiceFactory, TxStub};
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_rust_runtime::{DefaultInstance, TxStub};
+use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 
 use exonum_middleware_service::{
     ArtifactReq, Batch, Error as TxError, MiddlewareInterface, MiddlewareInterfaceMut,
@@ -34,17 +34,16 @@ const MIDDLEWARE_ID: InstanceId = MiddlewareService::INSTANCE_ID;
 const INC_ID: InstanceId = 100;
 
 fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
-    let mut builder = TestKitBuilder::validator().with_default_rust_service(MiddlewareService);
+    let mut builder =
+        TestKitBuilder::validator().with(Spec::new(MiddlewareService).with_default_instance());
     for (i, version) in inc_versions.into_iter().enumerate() {
         let service_factory = IncFactory::new(version);
-        builder = builder
-            .with_artifact(service_factory.artifact_id())
-            .with_instance(
-                service_factory
-                    .artifact_id()
-                    .into_default_instance(INC_ID + i as InstanceId, format!("inc-{}", i)),
-            )
-            .with_rust_service(service_factory);
+        let spec = Spec::new(service_factory).with_instance(
+            INC_ID + i as InstanceId,
+            format!("inc-{}", i),
+            (),
+        );
+        builder = builder.with(spec);
     }
     builder.build()
 }

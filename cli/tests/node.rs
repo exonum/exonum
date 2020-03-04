@@ -20,7 +20,9 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_explorer_service::api::BlocksRange;
-use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service, ServiceFactory};
+use exonum_rust_runtime::{
+    api::ServiceApiBuilder, spec::Spec, DefaultInstance, Service, ServiceFactory,
+};
 use exonum_supervisor::api::DispatcherInfo;
 use futures::Future;
 use lazy_static::lazy_static;
@@ -89,12 +91,12 @@ fn node_basic_workflow() -> Result<(), failure::Error> {
         private_addr.to_string(),
     ];
 
-    let other_instance = SimpleService
-        .artifact_id()
-        .into_default_instance(200, "other");
     let node = NodeBuilder::with_args(args)
-        .with_default_rust_service(SimpleService)
-        .with_instance(other_instance)
+        .with(
+            Spec::new(SimpleService)
+                .with_default_instance()
+                .with_instance(200, "other", ()),
+        )
         .execute_command()?
         .unwrap();
     let shutdown_handle = node.shutdown_handle();

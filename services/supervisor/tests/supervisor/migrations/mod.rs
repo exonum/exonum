@@ -22,7 +22,7 @@ use exonum::{
     },
 };
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
     api::MigrationInfoQuery, AsyncEventState, ConfigPropose, ConfigurationError, MigrationError,
@@ -46,35 +46,20 @@ mod migration_service;
 fn testkit_with_supervisor_and_service(validator_count: u16) -> TestKit {
     // Initialize builder.
     let builder = TestKitBuilder::validator().with_validators(validator_count);
-
     // Add supervisor.
-    let builder = builder
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple());
+    let builder = builder.with(Supervisor::simple());
 
     // Add MigrationService with running instance.
-    let builder = builder.with_default_rust_service(MigrationService);
+    let builder = builder.with(Spec::new(MigrationService).with_default_instance());
 
     // Add migrating artifact for version 0.1.1.
-    let builder = builder
-        .with_migrating_rust_service(MigrationServiceV01_1)
-        .with_artifact(MigrationServiceV01_1.artifact_id());
-
+    let builder = builder.with(Spec::migrating(MigrationServiceV01_1));
     // Add migrating artifact for version 0.2.
-    let builder = builder
-        .with_migrating_rust_service(MigrationServiceV02)
-        .with_artifact(MigrationServiceV02.artifact_id());
-
+    let builder = builder.with(Spec::migrating(MigrationServiceV02));
     // Add artifact for version 0.5.
-    let builder = builder
-        .with_migrating_rust_service(MigrationServiceV05)
-        .with_artifact(MigrationServiceV05.artifact_id());
-
+    let builder = builder.with(Spec::migrating(MigrationServiceV05));
     // Add artifact for version 0.5.1.
-    let builder = builder
-        .with_migrating_rust_service(MigrationServiceV05_1)
-        .with_artifact(MigrationServiceV05_1.artifact_id());
+    let builder = builder.with(Spec::migrating(MigrationServiceV05_1));
 
     builder.build()
 }
@@ -85,23 +70,14 @@ fn testkit_with_supervisor_and_service_no_migrations(validator_count: u16) -> Te
     let builder = TestKitBuilder::validator().with_validators(validator_count);
 
     // Add supervisor.
-    let builder = builder
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple());
-
+    let builder = builder.with(Supervisor::simple());
     // Add MigrationService with running instance.
-    let builder = builder.with_default_rust_service(MigrationService);
+    let builder = builder.with(Spec::new(MigrationService).with_default_instance());
 
     // Add migrating artifact for version 0.2.
-    let builder = builder
-        .with_rust_service(MigrationServiceV02)
-        .with_artifact(MigrationServiceV02.artifact_id());
-
-    // Add artifact for version 0.5.
-    let builder = builder
-        .with_rust_service(MigrationServiceV05)
-        .with_artifact(MigrationServiceV05.artifact_id());
+    let builder = builder.with(Spec::migrating(MigrationServiceV02));
+    // Add non-migrating artifact for version 0.5.
+    let builder = builder.with(Spec::new(MigrationServiceV05));
 
     builder.build()
 }
@@ -361,32 +337,18 @@ fn migration_two_scripts_sequential() {
 /// data.
 #[test]
 fn migration_fail() {
-    let mut testkit = {
-        // Initialize builder;
-        let builder = TestKitBuilder::validator();
-
+    let mut testkit = TestKitBuilder::validator()
         // Add supervisor.
-        let builder = builder
-            .with_rust_service(Supervisor)
-            .with_artifact(Supervisor.artifact_id())
-            .with_instance(Supervisor::simple());
-
+        .with(Supervisor::simple())
         // Add MigrationService with running instance.
-        let builder = builder
-            .with_rust_service(MigrationServiceV05)
-            .with_artifact(MigrationServiceV05.artifact_id())
-            .with_instance(MigrationServiceV05.artifact_id().into_default_instance(
-                MigrationService::INSTANCE_ID,
-                MigrationService::INSTANCE_NAME,
-            ));
-
+        .with(Spec::new(MigrationServiceV05).with_instance(
+            MigrationService::INSTANCE_ID,
+            MigrationService::INSTANCE_NAME,
+            (),
+        ))
         // Add migrating artifact for version 0.7.
-        let builder = builder
-            .with_migrating_rust_service(FailingMigrationServiceV07)
-            .with_artifact(FailingMigrationServiceV07.artifact_id());
-
-        builder.build()
-    };
+        .with(Spec::migrating(FailingMigrationServiceV07))
+        .build();
 
     // Stop service instance before running the migration.
     stop_service(&mut testkit, MigrationService::INSTANCE_ID);

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_cli::NodeBuilder;
+use exonum_cli::{NodeBuilder, Spec};
 use failure::Error;
 
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
@@ -22,6 +22,6 @@ fn main() -> Result<(), Error> {
     NodeBuilder::development_node()?
         // Starts cryptocurrency instance with given id and name
         // immediately after genesis block creation.
-        .with_default_rust_service(CryptocurrencyService)
+        .with(Spec::new(CryptocurrencyService).with_default_instance())
         .run()
 }
