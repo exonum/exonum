@@ -27,7 +27,11 @@ serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
-actix-rt = "1.0.0"
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit", features = ["exonum-node"] }
-pretty_assertions = "0.6.1"
+
 failure = "0.1.5"
+pretty_assertions = "0.6.1"
+
+[dev-dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

@@ -39,7 +39,7 @@
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();
@@ -97,7 +97,7 @@
 //! # const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let time_service_factory = TimeServiceFactory::default();
 //! let time_service_artifact = time_service_factory.artifact_id();

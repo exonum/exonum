@@ -39,7 +39,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
     (testkit, api)
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_blocks_basic() {
     let (mut testkit, api) = init_testkit();
 
@@ -151,7 +151,7 @@ async fn test_explorer_blocks_basic() {
     );
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_api_block_request() {
     let (mut testkit, api) = init_testkit();
     testkit.create_block();
@@ -187,7 +187,7 @@ async fn create_sample_block(testkit: &mut TestKit) {
     testkit.create_block();
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_blocks_skip_empty_small() {
     let (mut testkit, api) = init_testkit();
     create_sample_block(&mut testkit).await;
@@ -239,7 +239,7 @@ async fn test_explorer_blocks_skip_empty_small() {
     assert_eq!(range.end, Height(5));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_blocks_skip_empty() {
     let (mut testkit, api) = init_testkit();
     for _ in 0..5 {
@@ -268,7 +268,7 @@ async fn test_explorer_blocks_skip_empty() {
     assert_eq!(range.end, Height(6));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_blocks_bounds() {
     let (mut testkit, api) = init_testkit();
     for _ in 0..5 {
@@ -338,7 +338,7 @@ async fn test_explorer_blocks_bounds() {
     assert!(result.is_err());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_blocks_loaded_info() {
     let (mut testkit, api) = init_testkit();
     testkit.create_blocks_until(Height(6));
@@ -371,7 +371,7 @@ async fn test_explorer_blocks_loaded_info() {
         .all(|info| info.time.is_none() && info.precommits.is_some()));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_transaction_info() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
@@ -441,7 +441,7 @@ async fn test_explorer_transaction_info() {
     assert!(status.is_ok());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_transaction_statuses() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
@@ -527,7 +527,7 @@ async fn test_explorer_transaction_statuses() {
 
 /// Checks that `ExplorerApi` accepts valid transactions and discards transactions with
 /// the incorrect instance ID.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
 
@@ -565,7 +565,7 @@ async fn test_explorer_add_invalid_transaction() {
     assert_eq!(response.body.source, "2:explorer");
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_api_with_before_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let key_pair = KeyPair::random();
@@ -639,7 +639,7 @@ async fn test_explorer_api_with_before_transactions_error() {
     assert!(response.0.is_ok());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_api_with_transaction_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 0);
@@ -669,7 +669,7 @@ async fn test_explorer_api_with_transaction_error() {
         .contains("Adding zero does nothing!"));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_explorer_api_with_after_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 42);

@@ -53,7 +53,7 @@
 //! use exonum_system_api::{private::{ConsensusStatus, NodeInfo}, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)

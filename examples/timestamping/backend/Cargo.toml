@@ -34,7 +34,6 @@ version = "0.2.13"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [dev-dependencies]
-actix-rt = "1.0.0"
 exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../../services/explorer" }
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../../test-suite/testkit" }
 

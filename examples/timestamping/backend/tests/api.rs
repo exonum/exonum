@@ -88,7 +88,7 @@ async fn assert_status(
     }
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_api_get_timestamp_nothing() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();
@@ -102,7 +102,7 @@ async fn test_api_get_timestamp_nothing() {
     assert!(entry.is_none());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_api_post_timestamp() {
     let (mut testkit, _) = init_testkit();
     let content = Timestamp::new(&Hash::zero(), "metadata");
@@ -119,7 +119,7 @@ async fn test_api_post_timestamp() {
     assert_eq!(tx.object_hash(), tx_info.tx_hash);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_api_get_timestamp_proof() {
     let (mut testkit, _) = init_testkit();
     let keypair = KeyPair::random();
@@ -141,7 +141,7 @@ async fn test_api_get_timestamp_proof() {
     // TODO: Implement proof validation. (ECR-1639)
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_api_get_timestamp_entry() {
     let (mut testkit, _) = init_testkit();
 
@@ -163,7 +163,7 @@ async fn test_api_get_timestamp_entry() {
     assert_eq!(entry.tx_hash, tx.object_hash());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_api_cannot_add_same_content_hash() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();
@@ -197,7 +197,7 @@ async fn test_api_cannot_add_same_content_hash() {
     .await;
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_api_get_configuration() {
     let (mut testkit, _) = init_testkit();
     let api = testkit.api();

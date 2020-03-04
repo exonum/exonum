@@ -77,14 +77,15 @@ impl fmt::Display for ApiKind {
 /// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
 /// instantiated.
 ///
-/// The HTTP server uses `actix_rt` under the hood, so in order to execute asynchronous methods,
-/// the user must use this API inside the `actix_rt` runtime.
-/// The easiest way to do that is to use `#[actix_rt::test]` instead of `#[test]`.
+/// The HTTP server uses `actix` under the hood, so in order to execute asynchronous methods,
+/// the user should use this API inside the `actix_rt` or `tokio` runtime.
+/// The easiest way to do that is to use `#[tokio::test]` or `#[actix_rt::test]` instead of
+/// `#[test]`.
 ///
 /// # Example
 ///
 /// ```
-/// #[actix_rt::test]
+/// #[tokio::test]
 /// async fn test_api() {
 ///     let testkit = TestKitBuilder::validator().build();
 ///     let api = testkit.api();

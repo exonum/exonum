@@ -274,7 +274,7 @@ fn discard_config_propose_from_auditor() {
 }
 
 /// Checks that config proposal sent through api is executed correctly.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_send_proposal_with_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
@@ -325,7 +325,7 @@ async fn test_send_proposal_with_api() {
 }
 
 /// Tests that deploy request with only one approval (initial) is executed successfully.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
@@ -366,7 +366,7 @@ async fn deploy_service() {
 
 /// Attempts to change config without `actual_from` height set.
 /// When `actual_from` is not set, it is expected to be treated as the next height.
-#[actix_rt::test]
+#[tokio::test]
 async fn actual_from_is_zero() {
     let initial_validator_count = 4;
     let expected_new_validator_number = initial_validator_count;

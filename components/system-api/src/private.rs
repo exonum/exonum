@@ -42,7 +42,7 @@
 //! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -70,7 +70,7 @@
 //! use exonum_system_api::{private::NodeStats, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -100,7 +100,7 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! # let address = "127.0.0.1:8080".to_owned();
 //! # let public_key = Default::default();
@@ -139,7 +139,7 @@
 //! use exonum_system_api::{private::ConsensusEnabledQuery, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -170,7 +170,7 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)

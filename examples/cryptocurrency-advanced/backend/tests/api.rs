@@ -55,7 +55,7 @@ fn author_address(tx: &Verified<AnyTx>) -> CallerAddress {
 }
 
 /// Check that the wallet creation transaction works when invoked via API.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_create_wallet() {
     let (mut testkit, api) = create_testkit();
     // Create and send a transaction via API
@@ -72,7 +72,7 @@ async fn test_create_wallet() {
 }
 
 /// Check that the transfer transaction works as intended.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_transfer() {
     // Create 2 wallets.
     let (mut testkit, api) = create_testkit();
@@ -122,7 +122,7 @@ async fn test_transfer() {
 }
 
 /// Check that a transfer from a non-existing wallet fails as expected.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_transfer_from_nonexisting_wallet() {
     let (mut testkit, api) = create_testkit();
 
@@ -173,7 +173,7 @@ async fn test_transfer_from_nonexisting_wallet() {
 }
 
 /// Check that a transfer to a non-existing wallet fails as expected.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_transfer_to_nonexisting_wallet() {
     let (mut testkit, api) = create_testkit();
 
@@ -218,7 +218,7 @@ async fn test_transfer_to_nonexisting_wallet() {
 }
 
 /// Check that an overcharge does not lead to changes in sender's and receiver's balances.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_transfer_overcharge() {
     let (mut testkit, api) = create_testkit();
 
@@ -258,7 +258,7 @@ async fn test_transfer_overcharge() {
     assert_eq!(wallet.balance, 100);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_unknown_wallet_request() {
     let (_testkit, api) = create_testkit();
     // Transaction is sent by API, but isn't committed.

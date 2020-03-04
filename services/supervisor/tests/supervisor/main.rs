@@ -271,7 +271,7 @@ fn available_services() -> RustRuntimeBuilder {
 }
 
 /// Just test that the Inc service works as intended.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_static_service() {
     let mut testkit = testkit_with_inc_service_and_static_instance();
     let api = testkit.api();
@@ -288,7 +288,7 @@ async fn test_static_service() {
 }
 
 /// Test a normal dynamic service workflow with one validator.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_dynamic_service_normal_workflow() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit).await;
@@ -308,7 +308,7 @@ async fn test_dynamic_service_normal_workflow() {
     assert_count(&api, instance_name, 2).await;
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_artifact_deploy_with_already_passed_deadline_height() {
     let mut testkit = testkit_with_inc_service();
 
@@ -335,7 +335,7 @@ async fn test_artifact_deploy_with_already_passed_deadline_height() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_start_service_instance_with_already_passed_deadline_height() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit).await;
@@ -354,7 +354,7 @@ async fn test_start_service_instance_with_already_passed_deadline_height() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_try_run_unregistered_service_instance() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
@@ -372,7 +372,7 @@ async fn test_try_run_unregistered_service_instance() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_bad_artifact_name() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
@@ -397,7 +397,7 @@ async fn test_bad_artifact_name() {
     assert!(!artifact_exists(&testkit, &bad_artifact.name));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_bad_runtime_id() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
@@ -420,7 +420,7 @@ async fn test_bad_runtime_id() {
     assert!(!artifact_exists(&testkit, &artifact.name));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_empty_service_instance_name() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit).await;
@@ -439,7 +439,7 @@ async fn test_empty_service_instance_name() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_bad_service_instance_name() {
     let mut testkit = testkit_with_inc_service();
     deploy_default(&mut testkit).await;
@@ -460,7 +460,7 @@ async fn test_bad_service_instance_name() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_start_service_instance_twice() {
     let instance_name = "inc";
     let mut testkit = testkit_with_inc_service();
@@ -497,7 +497,7 @@ async fn test_start_service_instance_twice() {
 }
 
 /// Checks that we can start several service instances in one request.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_start_two_services_in_one_request() {
     let instance_name_1 = "inc";
     let instance_name_2 = "inc2";
@@ -523,7 +523,7 @@ async fn test_start_two_services_in_one_request() {
     assert!(service_instance_exists(&testkit, instance_name_2));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
@@ -579,7 +579,7 @@ async fn test_restart_node_and_start_service_instance() {
     }
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = default_artifact();
@@ -618,7 +618,7 @@ async fn test_restart_node_during_artifact_deployment_with_two_validators() {
 }
 
 /// This test emulates a normal workflow with two validators.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = default_artifact();
@@ -692,7 +692,7 @@ async fn test_two_validators() {
 }
 
 /// This test emulates the case when the second validator doesn't send DeployRequest.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_multiple_validators_no_confirmation() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
 
@@ -719,7 +719,7 @@ async fn test_multiple_validators_no_confirmation() {
 }
 
 // Test that auditor can't send any requests.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_auditor_cant_send_requests() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
 
@@ -760,7 +760,7 @@ async fn test_auditor_cant_send_requests() {
 }
 
 /// This test emulates a normal workflow with a validator and an auditor.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_auditor_normal_workflow() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
     let artifact = default_artifact();
@@ -817,7 +817,7 @@ async fn test_auditor_normal_workflow() {
 
 /// This test emulates a deploy confirmation with 12 validators.
 /// Here we send confirmations by every validator and expect deploy to start.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_multiple_validators_deploy_confirm() {
     let validators_count = 12;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
@@ -912,7 +912,7 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
 
 /// Checks that service IDs are assigned sequentially starting from the
 /// ID next to max builtin ID.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_id_assignment() {
     let max_builtin_id = SUPERVISOR_INSTANCE_ID;
 
@@ -947,7 +947,7 @@ async fn test_id_assignment() {
 /// Checks that if builtin IDs space is sparse (here we have `Supervisor` with ID 0 and
 /// `IncService` with ID 100), the ID for the new service will be next to the max
 /// builtin ID (101 in our case).
-#[actix_rt::test]
+#[tokio::test]
 async fn test_id_assignment_sparse() {
     let max_builtin_id = 100;
     let inc_service = IncService;

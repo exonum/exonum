@@ -63,20 +63,20 @@ async fn configuration_number(api: &TestKitApi) -> u64 {
         .unwrap()
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_consensus_config_api() {
     let mut testkit = testkit_with_supervisor(1);
     let consensus_config = actual_consensus_config(&testkit.api()).await;
     assert_eq!(testkit.consensus_config(), consensus_config);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_config_proposal_api() {
     let mut testkit = testkit_with_supervisor(1);
     assert_eq!(current_config_proposal(&testkit.api()).await, None);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_confirm_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
@@ -119,7 +119,7 @@ async fn test_confirm_proposal_with_api() {
     assert_eq!(consensus_proposal, consensus_config);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_send_proposal_with_api() {
     let mut testkit = testkit_with_supervisor(2);
     let consensus_proposal = consensus_config_propose_first_variant(&testkit);
@@ -197,7 +197,7 @@ async fn apply_config(testkit: &mut TestKit) {
 }
 
 /// Checks that configuration number obtained via API is correct.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_configuration_number() {
     let mut testkit = testkit_with_supervisor(2);
 

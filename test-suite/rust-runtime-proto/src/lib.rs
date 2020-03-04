@@ -68,13 +68,13 @@ pub async fn assert_exonum_core_protos(api: &TestKitApi) {
     assert_eq!(response, expected_files);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn core_protos_with_service() {
     let (_, api) = testkit_with_rust_service();
     assert_exonum_core_protos(&api).await;
 }
 
-#[actix_rt::test]
+#[tokio::test]
 #[should_panic] // TODO: Remove `should_panic` after fix (ECR-3948)
 async fn core_protos_without_services() {
     let mut testkit = TestKitBuilder::validator().build();
@@ -82,7 +82,7 @@ async fn core_protos_without_services() {
 }
 
 /// Rust-runtime api returns correct source files of the specified artifact.
-#[actix_rt::test]
+#[tokio::test]
 async fn service_protos_with_service() {
     let (_, api) = testkit_with_rust_service();
 
@@ -104,7 +104,7 @@ async fn service_protos_with_service() {
 }
 
 /// Rust-runtime API should return error in case of an incorrect artifact.
-#[actix_rt::test]
+#[tokio::test]
 async fn service_protos_with_incorrect_service() {
     use exonum::runtime::{ArtifactId, RuntimeIdentifier};
 
