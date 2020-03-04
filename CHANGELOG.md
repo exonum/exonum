@@ -19,6 +19,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Schema::call_errors` was removed in favor of more comprehensive
   `call_records` method. (#1792)
 
+#### exonum-cli
+
+- `NodeBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+
 #### exonum-system-api
 
 - Public api module has been removed. List of endpoints from private api has
@@ -30,6 +35,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `v1/consensus_status` - enables or disables consensus on the node;
   - `v1/shutdown` - shuts down the node.
 
+### exonum-testkit
+
+- `TestKitBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+
 ### New Features
 
 #### exonum
@@ -40,6 +50,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Core and the explorer service now support retrieving call status with
   a cryptographic proof of authenticity. (#1792)
+  
+- Exonum now supports unloading of unused service artifacts. This operation
+  may be used to free resources associated with artifacts in the runtime
+  hosting them. (#1794)
 
 #### exonum-supervisor
 
@@ -47,6 +61,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `supervisor/services` endpoint has been added which obtains information
   about deployed artifacts and available services. (#1790)
+
+- Supervisor service supports artifact unloading. (#1798)
 
 #### exonum-rust-runtime
 

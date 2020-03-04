@@ -159,14 +159,13 @@ pub use self::{
 #[doc(hidden)] // Public for migration tests.
 pub use self::schema::SchemaImpl;
 
-use exonum::{
-    blockchain::config::InstanceInitParams,
-    runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
-};
+use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID};
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
+    api::ServiceApiBuilder,
+    spec::{Simple, Spec},
+    AfterCommitContext, Broadcaster, Service,
 };
 
 use crate::{configure::ConfigureMut, mode::Mode};
@@ -375,24 +374,22 @@ impl Supervisor {
         }
     }
 
-    /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
+    /// Creates a deploy spec for a builtin `Supervisor` instance with
     /// simple configuration.
-    pub fn simple() -> InstanceInitParams {
+    pub fn simple() -> Spec<Self, Simple> {
         Self::builtin_instance(Self::simple_config())
     }
 
     /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
     /// decentralized configuration.
-    pub fn decentralized() -> InstanceInitParams {
+    pub fn decentralized() -> Spec<Self, Simple> {
         Self::builtin_instance(Self::decentralized_config())
     }
 
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
-    pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
-        Self.artifact_id()
-            .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
-            .with_constructor(config)
+    pub fn builtin_instance(config: SupervisorConfig) -> Spec<Self, Simple> {
+        Spec::new(Self).with_instance(SUPERVISOR_INSTANCE_ID, Self::NAME, config)
     }
 }
 

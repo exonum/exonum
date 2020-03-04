@@ -46,10 +46,10 @@
 //! ```
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_default_rust_service(ExplorerFactory)
+//!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
 //! testkit.create_blocks_until(Height(5));
 //!
@@ -85,10 +85,10 @@
 //! ```
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! # fn main() -> Result<(), failure::Error> {
 //! # let mut testkit = TestKitBuilder::validator()
-//! #    .with_default_rust_service(ExplorerFactory)
+//! #    .with(Spec::new(ExplorerFactory).with_default_instance())
 //! #    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
@@ -127,7 +127,7 @@
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionQuery, TransactionInfo}, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
@@ -152,8 +152,8 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(ExplorerFactory)
-//!    .with_default_rust_service(MyService)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
 //! testkit.create_block_with_transaction(tx.clone());
@@ -193,7 +193,7 @@
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::TransactionStatusQuery, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
@@ -220,8 +220,8 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(MyService)
-//!    .with_default_rust_service(ExplorerFactory)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().cause_error(MyService::INSTANCE_ID, 0);
 //! testkit.create_block_with_transaction(tx.clone());
@@ -262,7 +262,7 @@
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::CallStatusQuery, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 //! # #[service_factory(artifact_name = "my-service")]
 //! struct MyService;
@@ -279,8 +279,8 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(MyService)
-//!    .with_default_rust_service(ExplorerFactory)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
@@ -332,7 +332,7 @@
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionHex, TransactionResponse}, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
@@ -357,8 +357,8 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(ExplorerFactory)
-//!    .with_default_rust_service(MyService)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
 //!

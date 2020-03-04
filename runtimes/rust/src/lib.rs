@@ -332,6 +332,7 @@ pub use self::{
 };
 
 pub mod api;
+pub mod spec;
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},

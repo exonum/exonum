@@ -58,16 +58,13 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
+//!     .with(Supervisor::simple())
 //!     .build();
 //!
 //! let consensus_config: ConsensusConfig = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
 //!     .get("consensus-config")?;
-//!
 //! # Ok(())
 //! # }
 //! ```
@@ -93,11 +90,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
@@ -130,11 +123,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let services_info: DispatcherInfo = testkit
 //!     .api()
@@ -191,11 +180,7 @@
 //! #
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! // In this example, we will try to deploy `SomeService` artifact.
 //! let deploy_request = DeployRequest::new(SomeService.artifact_id(), Height(10))
@@ -252,9 +237,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
+//!     .with(Supervisor::simple())
 //!     // Add some service that supports migrations...
 //!     .build();
 //!
@@ -325,11 +308,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(0));
@@ -391,9 +370,7 @@
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
+//! #         .with(Supervisor::simple())
 //! #         .build();
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(10));
@@ -452,11 +429,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let configuration_number: u64 = testkit
 //!     .api()
@@ -489,11 +462,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let config: SupervisorConfig = testkit
 //!     .api()
@@ -521,7 +490,7 @@
 //!
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_rust_runtime::{spec::{JustFactory, Spec}, ServiceFactory};
 //! use exonum_supervisor::{
 //!     api::DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor,
 //! };
@@ -539,10 +508,8 @@
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .with_rust_service(SomeService)
+//! #         .with(Supervisor::simple())
+//! #         .with(JustFactory::new(SomeService))
 //! #         .build();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.
@@ -589,11 +556,7 @@
 //!
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
 //! #     MigrationRequest {
 //! #         new_artifact: Supervisor.artifact_id(),

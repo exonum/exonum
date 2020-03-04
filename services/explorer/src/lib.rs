@@ -39,10 +39,10 @@
 //! ```
 //! use exonum_explorer::api::BlocksRange;
 //! use exonum_explorer_service::ExplorerFactory;
-//! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //!
 //! let mut testkit: TestKit = TestKitBuilder::validator()
-//!     .with_default_rust_service(ExplorerFactory)
+//!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     // Add other services here
 //!     .build();
 //! // The explorer endpoints can be accessed via `api()`:

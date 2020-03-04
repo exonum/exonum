@@ -22,7 +22,7 @@ use exonum::{
 };
 use exonum_api as api;
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::{json, Value};
 
 use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
@@ -32,8 +32,8 @@ mod counter;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(CounterService)
-        .with_default_rust_service(ExplorerFactory)
+        .with(Spec::new(CounterService).with_default_instance())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)

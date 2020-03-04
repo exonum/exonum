@@ -271,7 +271,7 @@ mod tests {
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{api, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, spec::Spec, Service};
     use pretty_assertions::assert_eq;
 
     use std::time::Duration;
@@ -310,14 +310,12 @@ mod tests {
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> TestKitApi {
-        let service = SampleService;
-        let artifact = service.artifact_id();
         let mut testkit = TestKitBuilder::validator()
-            .with_artifact(artifact.clone())
-            .with_instance(
-                artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
-            )
-            .with_rust_service(service)
+            .with(Spec::new(SampleService).with_instance(
+                TIMESTAMP_SERVICE_ID,
+                TIMESTAMP_SERVICE_NAME,
+                (),
+            ))
             .build();
         testkit.create_blocks_until(height);
         // Process incoming events in background.
