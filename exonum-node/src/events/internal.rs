@@ -59,9 +59,8 @@ impl InternalPart {
             let internal_tx = self.internal_tx.clone();
 
             match request {
-                InternalRequest::VerifyMessage(tx) => {
-                    let task = Self::verify_message(tx, internal_tx);
-                    tokio::spawn(task);
+                InternalRequest::VerifyMessage(raw) => {
+                    tokio::spawn(Self::verify_message(raw, internal_tx));
                 }
 
                 InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
@@ -69,11 +68,10 @@ impl InternalPart {
                         .duration_since(SystemTime::now())
                         .unwrap_or_else(|_| Duration::from_millis(0));
 
-                    let task = async move {
+                    tokio::spawn(async move {
                         delay_for(duration).await;
                         Self::send_event(internal_tx, InternalEvent::timeout(timeout)).await;
-                    };
-                    tokio::spawn(task);
+                    });
                 }
 
                 InternalRequest::JumpToRound(height, round) => {

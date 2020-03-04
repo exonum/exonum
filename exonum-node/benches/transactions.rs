@@ -33,7 +33,7 @@ use futures::{
     channel::{mpsc, oneshot},
     stream, SinkExt,
 };
-use tokio::{runtime, task::JoinHandle};
+use tokio::{runtime::Runtime, task::JoinHandle};
 
 use std::sync::{Arc, RwLock};
 
@@ -137,7 +137,7 @@ struct MessageVerifier {
 }
 
 impl MessageVerifier {
-    fn new() -> Self {
+    fn new(rt: &Runtime) -> Self {
         let channel = NodeChannel::new(&EventsPoolCapacity::default());
         let handler = MessagesHandlerRef::new();
 
@@ -148,13 +148,13 @@ impl MessageVerifier {
             transactions_rx: channel.transactions.1,
             api_rx: channel.api_requests.1,
         };
-        let handler_task = tokio::spawn(handler_part.run());
+        let handler_task = rt.spawn(handler_part.run());
 
         let internal_part = InternalPart {
             internal_tx: channel.internal_events.0,
             internal_requests_rx: channel.internal_requests.1,
         };
-        let network_task = tokio::spawn(internal_part.run());
+        let network_task = rt.spawn(internal_part.run());
 
         MessageVerifier {
             handler_task,
@@ -206,8 +206,8 @@ fn bench_verify_messages_simple(b: &mut Bencher<'_>, &size: &usize) {
 
 fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
-    let mut verifier = MessageVerifier::new();
-    let mut rt = runtime::Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
+    let mut verifier = MessageVerifier::new(&rt);
 
     b.iter_with_setup(
         || messages.clone(),
