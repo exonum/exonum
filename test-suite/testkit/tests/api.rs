@@ -40,7 +40,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 }
 
 /// Performs basic get request to detect that API works at all.
-#[actix_rt::test]
+#[tokio::test]
 async fn ping_pong() {
     let (_testkit, api) = init_testkit();
 
@@ -54,7 +54,7 @@ async fn ping_pong() {
     assert_eq!(ping.value, pong);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn submit_tx() {
     let (mut testkit, api) = init_testkit();
 
@@ -75,7 +75,7 @@ async fn submit_tx() {
 
 /// Checks that for deprecated endpoints the corresponding warning is added to the headers
 /// of the response.
-#[actix_rt::test]
+#[tokio::test]
 async fn deprecated() {
     let (_testkit, api) = init_testkit();
 
@@ -117,7 +117,7 @@ async fn deprecated() {
 }
 
 /// Checks that endpoints marked as `Gone` return the corresponding HTTP error.
-#[actix_rt::test]
+#[tokio::test]
 async fn gone() {
     let (_testkit, api) = init_testkit();
 
@@ -152,7 +152,7 @@ async fn gone() {
 
 /// Checks that endpoints marked as `MovedPermanently` return the corresponding HTTP error, and
 /// the response contains location in headers.
-#[actix_rt::test]
+#[tokio::test]
 async fn moved() {
     let (_testkit, api) = init_testkit();
 
@@ -188,7 +188,7 @@ async fn moved() {
 }
 
 /// Checks response from endpoint with new error type.
-#[actix_rt::test]
+#[tokio::test]
 async fn endpoint_with_new_error_type() {
     let (_testkit, api) = init_testkit();
 
@@ -225,7 +225,7 @@ async fn endpoint_with_new_error_type() {
     assert_eq!(error.body.error_code, Some(42));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn submit_tx_when_service_is_stopped() {
     let (mut testkit, api) = init_testkit();
     let keys = testkit.us().service_keypair();
@@ -248,7 +248,7 @@ async fn submit_tx_when_service_is_stopped() {
     assert!(block.is_empty());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn submit_tx_when_service_is_frozen() {
     let (mut testkit, api) = init_testkit();
     let keys = testkit.us().service_keypair();
@@ -271,7 +271,7 @@ async fn submit_tx_when_service_is_frozen() {
     assert!(block.is_empty());
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn error_after_migration() {
     let (mut testkit, api) = init_testkit();
     let keys = testkit.us().service_keypair();
@@ -372,12 +372,12 @@ async fn test_no_old_artifact_after_unload(unload: bool) {
     assert_eq!(pong, 11);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn no_old_artifact_after_unload() {
     test_no_old_artifact_after_unload(true).await;
 }
 
-#[actix_rt::test]
+#[tokio::test]
 #[should_panic(expected = "artifact `0:api-service:1.0.0` failed to deploy")]
 async fn no_old_artifact_without_unload() {
     test_no_old_artifact_after_unload(false).await;

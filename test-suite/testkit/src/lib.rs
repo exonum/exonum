@@ -739,10 +739,10 @@ impl TestKit {
     }
 
     async fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let events_stream = self.remove_events_stream();
+        let events_task = self.remove_events_stream();
         let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
 
-        let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
+        let (api_aggregator, actor_task) = TestKitActor::spawn(self).await;
         let mut servers = HashMap::new();
         servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
         servers.insert(
@@ -758,9 +758,12 @@ impl TestKit {
 
         let manager_task = ApiManager::new(api_manager_config)
             .run(endpoints_rx)
-            .unwrap_or_else(drop);
-        future::join(manager_task, events_stream).await;
-        actor_handle.join().unwrap().unwrap();
+            .unwrap_or_else(|e| {
+                log::error!("Error running testkit server API: {}", e);
+            });
+
+        // FIXME: what's the appropriate strategy here?
+        future::join3(events_task, manager_task, actor_task).await;
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.

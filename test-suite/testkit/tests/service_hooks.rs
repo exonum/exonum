@@ -35,7 +35,7 @@ mod supervisor;
 
 const SUPERVISOR_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
@@ -67,7 +67,7 @@ async fn test_after_commit() {
 }
 
 /// An auditor should not broadcast transactions.
-#[actix_rt::test]
+#[tokio::test]
 async fn test_after_commit_with_auditor() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::auditor()
@@ -94,7 +94,7 @@ async fn test_after_commit_with_auditor() {
     }
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn after_commit_not_called_after_service_stop() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
@@ -124,7 +124,7 @@ async fn after_commit_not_called_after_service_stop() {
     }
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn after_commit_during_service_freeze() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
@@ -152,7 +152,7 @@ async fn after_commit_during_service_freeze() {
     }
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn after_commit_during_migration() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
@@ -205,7 +205,7 @@ async fn after_commit_during_migration() {
     assert_matches!(service_state.status, Some(InstanceStatus::Stopped));
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn incorrect_txs_are_not_included_into_blocks() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
@@ -240,7 +240,7 @@ async fn incorrect_txs_are_not_included_into_blocks() {
     assert_eq!(block.len(), 6); // 5 old transactions + 1 generated after resume
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn restart_testkit() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
