@@ -59,6 +59,7 @@ pub use crate::{
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
+use actix_rt::System;
 use exonum::{
     blockchain::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
@@ -76,7 +77,7 @@ use exonum_api::{
     WebServerConfig,
 };
 use failure::{ensure, format_err};
-use futures::channel::mpsc;
+use futures::{channel::mpsc, TryFutureExt};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
 
@@ -93,9 +94,8 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        error::LogError, noise::HandshakeParams, EventHandler, HandlerPart, InternalEvent,
-        InternalPart, InternalRequest, NetworkEvent, NetworkPart, NetworkRequest, SyncSender,
-        TimeoutRequest,
+        error::LogError, noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart,
+        InternalRequest, NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
     schema::NodeSchema,
@@ -1127,16 +1127,7 @@ impl Node {
         handshake_params: HandshakeParams,
     ) -> Result<(), failure::Error> {
         self.handler.initialize();
-
-        let (handler_part, network_part, internal_part) = self.into_reactor();
-        tokio::spawn(internal_part.run());
-        let network_task = tokio::spawn(network_part.run(handshake_params));
-
-        // FIXME: is joining appropriate here (vs select)?
-        handler_part.run().await;
-        network_task
-            .await
-            .map_err(|e| format_err!("Error in the network thread: {}", e))
+        Reactor::new(self).run(handshake_params).await
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
@@ -1152,45 +1143,6 @@ impl Node {
             self.max_message_len,
         );
         self.run_handler(handshake_params).await
-    }
-
-    fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
-        let connect_message = self.state().our_connect_message().clone();
-        let connect_list = self.state().connect_list();
-
-        // FIXME: run on tokio?
-        let api_manager = ApiManager::new(self.api_manager_config);
-        let endpoints = self.channel.endpoints.1;
-        thread::spawn(move || {
-            actix_rt::System::new("exonum-node").block_on(api_manager.run(endpoints))
-        });
-
-        let (network_tx, network_rx) = self.channel.network_events;
-        let internal_requests_rx = self.channel.internal_requests.1;
-        let network_part = NetworkPart {
-            our_connect_message: connect_message,
-            listen_address: self.handler.system_state.listen_address(),
-            network_requests: self.channel.network_requests.1,
-            network_tx,
-            network_config: self.network_config,
-            max_message_len: self.max_message_len,
-            connect_list,
-        };
-
-        let (internal_tx, internal_rx) = self.channel.internal_events;
-        let handler_part = HandlerPart {
-            handler: self.handler,
-            internal_rx,
-            network_rx,
-            transactions_rx: self.channel.transactions.1,
-            api_rx: self.channel.api_requests.1,
-        };
-
-        let internal_part = InternalPart {
-            internal_tx,
-            internal_requests_rx,
-        };
-        (handler_part, network_part, internal_part)
     }
 
     /// Returns `State` of the node.
@@ -1211,6 +1163,73 @@ impl Node {
         ShutdownHandle {
             inner: ApiSender::new(self.channel.api_requests.0.clone()),
         }
+    }
+}
+
+struct Reactor {
+    handler_part: HandlerPart<NodeHandler>,
+    network_part: NetworkPart,
+    internal_part: InternalPart,
+}
+
+impl Reactor {
+    fn new(node: Node) -> Self {
+        let connect_message = node.state().our_connect_message().clone();
+        let connect_list = node.state().connect_list();
+
+        let api_manager = ApiManager::new(node.api_manager_config);
+        let endpoints = node.channel.endpoints.1;
+        let api_task = api_manager
+            .run(endpoints)
+            .unwrap_or_else(|e| log::error!("Error in actix thread: {}", e));
+        // Creating a separate thread here seems easier than making `Node::run()` return
+        // a non-`Send` future (which, e.g., precludes running nodes with `tokio::spawn`).
+        thread::spawn(|| {
+            System::new("exonum-node").block_on(api_task);
+        });
+
+        let (network_tx, network_rx) = node.channel.network_events;
+        let internal_requests_rx = node.channel.internal_requests.1;
+        let network_part = NetworkPart {
+            our_connect_message: connect_message,
+            listen_address: node.handler.system_state.listen_address(),
+            network_requests: node.channel.network_requests.1,
+            network_tx,
+            network_config: node.network_config,
+            max_message_len: node.max_message_len,
+            connect_list,
+        };
+
+        let (internal_tx, internal_rx) = node.channel.internal_events;
+        let handler_part = HandlerPart {
+            handler: node.handler,
+            internal_rx,
+            network_rx,
+            transactions_rx: node.channel.transactions.1,
+            api_rx: node.channel.api_requests.1,
+        };
+
+        let internal_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
+        };
+
+        Self {
+            handler_part,
+            network_part,
+            internal_part,
+        }
+    }
+
+    // FIXME: is joining appropriate here (vs select)? How about joining actix?
+    async fn run(self, handshake_params: HandshakeParams) -> Result<(), failure::Error> {
+        tokio::spawn(self.internal_part.run());
+        let network_task = tokio::spawn(self.network_part.run(handshake_params));
+
+        self.handler_part.run().await;
+        network_task
+            .await
+            .map_err(|e| format_err!("Error in the network thread: {}", e))
     }
 }
 
