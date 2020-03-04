@@ -22,7 +22,7 @@ exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
 exonum-explorer = { version = "1.0.0-rc.1", path = "../../components/explorer" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
-actix = "0.9.0"
+actix = { version = "0.9.0", default-features = false }
 actix-web = { version = "2.0.0", default-features = false }
 actix-web-actors = "2.0.0"
 failure = "0.1.5"
