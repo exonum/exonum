@@ -31,7 +31,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   are now exported from the `command` module directly. Similarly,
   `io` module was made private. (#1799)
 
-#### exonum-explorer 
+#### exonum-explorer
 
 - Data types were made non-exhaustive where appropriate. (#1799)
 
