@@ -28,7 +28,7 @@ use exonum::{
     helpers::{Height, Round},
     messages::{AnyTx, Verified},
 };
-use futures::{channel::mpsc, executor, prelude::*};
+use futures::{channel::mpsc, prelude::*};
 
 use std::{
     cmp::Ordering,
@@ -37,7 +37,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{messages::Message, ExternalMessage, NodeTimeout};
+use crate::{events::error::LogError, messages::Message, ExternalMessage, NodeTimeout};
 
 #[cfg(test)]
 mod tests;
@@ -45,13 +45,35 @@ mod tests;
 #[derive(Debug)]
 pub struct SyncSender<T>(mpsc::Sender<T>);
 
-impl<T> SyncSender<T> {
+impl<T: Send + 'static> SyncSender<T> {
     pub fn new(inner: mpsc::Sender<T>) -> Self {
         Self(inner)
     }
 
-    pub fn send(&mut self, message: T) -> Result<(), mpsc::SendError> {
-        executor::block_on(self.0.send(message))
+    // Since sandbox tests execute outside the `tokio` context, we detect this and block
+    // the future if necessary.
+    #[cfg(test)]
+    pub fn send(&mut self, message: T) {
+        use futures::executor::block_on;
+        use tokio::runtime::Handle;
+
+        if let Ok(handle) = Handle::try_current() {
+            let mut sender = self.0.clone();
+            handle.spawn(async move {
+                sender.send(message).await.log_error();
+            });
+        } else {
+            block_on(self.0.send(message)).log_error();
+        }
+    }
+
+    // Outside tests, `send()` is always called from an async context.
+    #[cfg(not(test))]
+    pub fn send(&mut self, message: T) {
+        let mut sender = self.0.clone();
+        tokio::spawn(async move {
+            sender.send(message).await.log_error();
+        });
     }
 }
 

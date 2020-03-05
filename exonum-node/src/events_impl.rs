@@ -18,8 +18,7 @@ use log::{info, trace, warn};
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 
 use crate::events::{
-    error::LogError, Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest,
-    NetworkEvent,
+    Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest, NetworkEvent,
 };
 
 impl EventHandler for NodeHandler {
@@ -102,7 +101,7 @@ impl NodeHandler {
 
     /// Schedule execution for later time.
     pub(crate) fn execute_later(&mut self, event: InternalRequest) {
-        self.channel.internal_requests.send(event).log_error();
+        self.channel.internal_requests.send(event);
     }
 
     /// Shutdown current node.

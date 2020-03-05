@@ -94,8 +94,8 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        error::LogError, noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart,
-        InternalRequest, NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+        noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart, InternalRequest,
+        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
     schema::NodeSchema,
@@ -646,7 +646,7 @@ impl NodeHandler {
     fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
         let message = message.into();
         let request = NetworkRequest::SendMessage(public_key, message);
-        self.channel.network_requests.send(request).log_error();
+        self.channel.network_requests.send(request);
     }
 
     /// Broadcasts given message to all peers.
@@ -678,10 +678,7 @@ impl NodeHandler {
     /// Adds a timeout request.
     fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
-        self.channel
-            .internal_requests
-            .send(request.into())
-            .log_error();
+        self.channel.internal_requests.send(request.into());
     }
 
     /// Adds request timeout if it isn't already requested.
