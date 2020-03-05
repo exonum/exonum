@@ -136,7 +136,13 @@ use exonum_api::{
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
-use futures::{channel::mpsc, future, prelude::*, stream, StreamExt};
+use futures::{
+    channel::mpsc,
+    future,
+    prelude::*,
+    stream::{self, BoxStream},
+    StreamExt,
+};
 
 #[cfg(feature = "exonum-node")]
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
@@ -145,7 +151,6 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt, iter, mem,
     net::SocketAddr,
-    pin::Pin,
     sync::{Arc, Mutex},
 };
 
@@ -200,7 +205,7 @@ type ApiNotifierChannel = (
 pub struct TestKit {
     blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
-    events_stream: Pin<Box<dyn Stream<Item = ()> + Send>>,
+    events_stream: BoxStream<'static, ()>,
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
@@ -274,7 +279,7 @@ impl TestKit {
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
 
-        let events_stream = Box::pin(api_channel.1.map(move |transaction| {
+        let events_stream = api_channel.1.map(move |transaction| {
             let _guard = processing_lock_.lock().unwrap();
             let snapshot = db.snapshot();
             if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
@@ -286,13 +291,13 @@ impl TestKit {
             } else {
                 BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(transaction));
             }
-        }));
+        });
 
         Self {
             blockchain,
             db_handler,
             api_sender,
-            events_stream,
+            events_stream: events_stream.boxed(),
             processing_lock,
             network,
             api_notifier_channel,
