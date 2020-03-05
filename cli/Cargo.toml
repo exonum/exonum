@@ -20,7 +20,7 @@ exonum-supervisor = { version = "1.0.0-rc.1", path = "../services/supervisor" }
 exonum-system-api = { version = "1.0.0-rc.1", path = "../components/system-api" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../runtimes/rust" }
 
-failure = "0.1"
+failure = { package = "anyhow", version = "1.0" }
 log = "0.4"
 rpassword = "4.0"
 serde = "1.0"

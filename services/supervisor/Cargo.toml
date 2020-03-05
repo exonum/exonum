@@ -14,7 +14,7 @@ description = "Exonum supervisor service."
 
 [dependencies]
 byteorder = { version = "1.2.7", features = [ "i128" ] }
-failure = "0.1.5"
+failure = { package = "anyhow", version = "1.0" }
 serde = "1.0.0"
 serde_derive = "1.0.0"
 serde_json = "1.0.0"

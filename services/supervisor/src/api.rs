@@ -601,10 +601,9 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
 };
-use failure::Fail;
 use serde_derive::{Deserialize, Serialize};
 
-use std::convert::TryFrom;
+use std::{convert::TryFrom, error::Error};
 
 use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, AsyncEventState, ConfigProposalWithHash,
@@ -735,7 +734,7 @@ impl DispatcherInfo {
 /// Private API specification of the supervisor service.
 trait PrivateApi {
     /// Error type for the current API implementation.
-    type Error: Fail;
+    type Error: Error;
 
     /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
     /// by the current node, and returns its hash.
@@ -768,7 +767,8 @@ trait PrivateApi {
 
 trait PublicApi {
     /// Error type for the current API implementation.
-    type Error: Fail;
+    type Error: Error;
+
     /// Returns an actual consensus configuration of the blockchain.
     fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
     /// Returns a pending propose config change.

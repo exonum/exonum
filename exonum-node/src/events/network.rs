@@ -446,7 +446,7 @@ impl NetworkHandler {
             .forward(sink)
             .map(drop)
             .map_err(|e| {
-                error!("Connection terminated: {}: {}", e, e.find_root_cause());
+                error!("Connection terminated: {}: {}", e, e.root_cause());
             })
     }
 
@@ -466,7 +466,7 @@ impl NetworkHandler {
             .send_all(stream.map(NetworkEvent::MessageReceived))
             .then(move |_| pool.disconnect_with_peer(&key, &network_tx))
             .map_err(|e| {
-                error!("Connection terminated: {}: {}", e, e.find_root_cause());
+                error!("Connection terminated: {}: {}", e, e.root_cause());
             })
     }
 

@@ -16,7 +16,7 @@
 //! for developing purposes.
 
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use failure::{Error, ResultExt};
+use failure::{Context, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 

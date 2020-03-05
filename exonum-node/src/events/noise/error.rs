@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::Fail;
 use snow::error::Error;
+use thiserror::Error;
 
-#[derive(Fail, Debug)]
+#[derive(Debug, Error)]
 pub enum NoiseError {
-    #[fail(display = "Wrong handshake message length {}", _0)]
+    #[error("Wrong handshake message length {}", _0)]
     WrongMessageLength(usize),
 
-    #[fail(display = "Snow error: {}", _0)]
-    Snow(Error),
+    #[error("Snow error: {}", _0)]
+    Snow(#[source] Error),
 }
 
 impl From<Error> for NoiseError {

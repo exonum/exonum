@@ -24,7 +24,7 @@ exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }
-failure = "0.1.5"
+failure = { package = "anyhow", version = "1.0" }
 futures = "0.1.25"
 hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
 log = "0.4.6"

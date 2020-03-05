@@ -14,7 +14,7 @@ description = "Exonum node keys management."
 
 [dependencies]
 rand = "0.7"
-failure = "0.1.5"
+failure = { package = "anyhow", version = "1.0" }
 pwbox = "0.2.1"
 secret-tree = "0.2.0"
 serde = "1.0"

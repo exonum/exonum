@@ -127,7 +127,7 @@
 pub use self::persistent_iter::{PersistentIter, PersistentIters, PersistentKeys};
 
 use exonum_crypto::Hash;
-use failure::Fail;
+use thiserror::Error;
 
 use std::{
     fmt,
@@ -583,14 +583,14 @@ impl MigrationHelper {
 }
 
 /// Errors emitted by `MigrationHelper` methods.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum MigrationError {
     /// Failed to merge migration changes to database.
-    #[fail(display = "Failed to merge migration changes to database: {}", _0)]
-    Merge(#[fail(cause)] crate::Error),
+    #[error("Failed to merge migration changes to database: {}", _0)]
+    Merge(#[source] crate::Error),
 
     /// Migration has been aborted.
-    #[fail(display = "Migration was aborted")]
+    #[error("Migration was aborted")]
     Aborted,
 }
 

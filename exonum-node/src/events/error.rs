@@ -29,7 +29,7 @@ pub trait LogError {
 }
 
 pub fn into_failure<E: StdError + Sync + Send + 'static>(error: E) -> Error {
-    Error::from_boxed_compat(Box::new(error))
+    Error::new(error)
 }
 
 impl<T, E> LogError for Result<T, E>

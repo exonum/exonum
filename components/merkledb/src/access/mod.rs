@@ -55,7 +55,8 @@
 //! [`CopyAccessExt`]: trait.CopyAccessExt.html
 //! [`FromAccess`]: trait.FromAccess.html
 
-use failure::{Error, Fail};
+use failure::Error;
+use thiserror::Error;
 
 use std::fmt;
 
@@ -232,12 +233,12 @@ impl<T: RawAccess> Access for Prefixed<T> {
 }
 
 /// Access error together with the location information.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub struct AccessError {
     /// Address of the index where the error has occurred.
     pub addr: IndexAddress,
     /// Error kind.
-    #[fail(cause)]
+    #[source]
     pub kind: AccessErrorKind,
 }
 
@@ -249,14 +250,11 @@ impl fmt::Display for AccessError {
 }
 
 /// Error that can be emitted during accessing an object from the database.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum AccessErrorKind {
     /// Index has wrong type.
-    #[fail(
-        display = "Wrong index type: expected {:?}, but got {:?}",
-        expected, actual
-    )]
+    #[error("Wrong index type: expected {:?}, but got {:?}", expected, actual)]
     WrongIndexType {
         /// Expected index type.
         expected: IndexType,
@@ -266,18 +264,15 @@ pub enum AccessErrorKind {
 
     /// Index name is reserved. It's forbidden for user to create indexes with names
     /// starting with `__` and not containing a dot `.`.
-    #[fail(display = "Index name is reserved")]
+    #[error("Index name is reserved")]
     ReservedName,
 
     /// Index name is empty.
-    #[fail(display = "Index name must not be empty")]
+    #[error("Index name must not be empty")]
     EmptyName,
 
     /// Index contains invalid characters.
-    #[fail(
-        display = "Invalid characters used in name ({}). Use {}",
-        name, allowed_chars
-    )]
+    #[error("Invalid characters used in name ({}). Use {}", name, allowed_chars)]
     InvalidCharsInName {
         /// Name that contains invalid chars.
         name: String,
@@ -286,12 +281,12 @@ pub enum AccessErrorKind {
     },
 
     /// Invalid tombstone location.
-    #[fail(display = "Invalid tombstone location. Tombstones can only be created in migrations")]
+    #[error("Invalid tombstone location. Tombstones can only be created in migrations")]
     InvalidTombstone,
 
     /// Custom error.
-    #[fail(display = "{}", _0)]
-    Custom(#[fail(cause)] Error),
+    #[error("{}", _0)]
+    Custom(#[source] Error),
 }
 
 /// Constructs an object atop the database. The constructed object provides access to data

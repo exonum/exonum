@@ -22,7 +22,7 @@ exonum-supervisor = { version = "1.0.0-rc.1", path = "../../../services/supervis
 exonum-time = { version = "1.0.0-rc.1", path = "../../../services/time" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
-failure = "0.1.5"
+failure = { package = "anyhow", version = "1.0" }
 log = "0.4.6"
 protobuf = "2.8.0"
 serde = "1.0.10"

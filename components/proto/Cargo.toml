@@ -14,8 +14,8 @@ description = "Helper traits and macros for serialization structs in protobuf."
 links = "exonum_protobuf_common"
 
 [dependencies]
+anyhow = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
-failure = "0.1.5"
 protobuf = { version = "2.8.1", features = ["with-serde"] }
 bit-vec = "0.6.1"
 serde = "1.0.101"

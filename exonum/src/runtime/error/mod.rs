@@ -48,8 +48,7 @@ pub use self::{
 use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_proto::ProtobufConvert;
-
-use failure::Fail;
+use thiserror::Error;
 
 use std::{
     fmt::{self, Display},
@@ -112,7 +111,7 @@ pub trait ExecutionFail {
 ///
 /// [`ErrorKind`]: enum.ErrorKind.html
 /// [`CallSite`]: struct.CallSite.html
-#[derive(Clone, Debug, Fail, BinaryValue)]
+#[derive(Clone, Debug, Error, BinaryValue)]
 #[cfg_attr(test, derive(PartialEq))]
 // ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
 // by the caller. It is useful for roundtrip tests, though.

@@ -14,7 +14,7 @@
 
 //! Loading and saving TOML-encoded configurations.
 
-use failure::{Error, ResultExt};
+use failure::{Context, Error};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use std::{
@@ -30,7 +30,7 @@ where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
-    let res = do_load(path).with_context(|_| format!("loading config from {}", path.display()))?;
+    let res = do_load(path).with_context(|| format!("loading config from {}", path.display()))?;
     Ok(res)
 }
 
@@ -43,7 +43,7 @@ where
     P: AsRef<Path>,
 {
     let path = path.as_ref();
-    do_save(value, path).with_context(|_| format!("saving config to {}", path.display()))?;
+    do_save(value, path).with_context(|| format!("saving config to {}", path.display()))?;
     Ok(())
 }
 

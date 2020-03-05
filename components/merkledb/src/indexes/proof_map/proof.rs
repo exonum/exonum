@@ -15,9 +15,9 @@
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36 (ECR-3827)
 
 use exonum_crypto::Hash;
-use failure::Fail;
 use serde::{Deserializer, Serializer};
 use serde_derive::{Deserialize, Serialize};
+use thiserror::Error;
 
 use std::{borrow::Cow, marker::PhantomData};
 
@@ -102,15 +102,15 @@ impl<'de> serde::Deserialize<'de> for ProofPath {
 }
 
 /// An error returned when a map proof is invalid.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
-    #[fail(display = "non-terminal node as a single key in proof")]
+    #[error("non-terminal node as a single key in proof")]
     NonTerminalNode(ProofPath),
 
     /// One path in the proof is a prefix of another path.
-    #[fail(display = "embedded paths in proof")]
+    #[error("embedded paths in proof")]
     EmbeddedPaths {
         /// Prefix key.
         prefix: ProofPath,
@@ -119,11 +119,11 @@ pub enum MapProofError {
     },
 
     /// One path is mentioned several times in the proof.
-    #[fail(display = "duplicate path in proof")]
+    #[error("duplicate path in proof")]
     DuplicatePath(ProofPath),
 
     /// Entries in the proof are not ordered by increasing path.
-    #[fail(display = "invalid path ordering")]
+    #[error("invalid path ordering")]
     InvalidOrdering(ProofPath, ProofPath),
 }
 

@@ -166,7 +166,8 @@
 
 pub use semver::{Version, VersionReq};
 
-use failure::{format_err, Fail};
+use failure::format_err;
+use thiserror::Error;
 
 use std::{fmt, str::FromStr};
 
@@ -320,18 +321,15 @@ pub trait RequireArtifact {
 }
 
 /// Artifact requirement error.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ArtifactReqError {
     /// No service with the specified identifier exists.
-    #[fail(display = "No service with the specified identifier exists")]
+    #[error("No service with the specified identifier exists")]
     NoService,
 
     /// Unexpected artifact name.
-    #[fail(
-        display = "Unexpected artifact name ({}), was expecting `{}`",
-        expected, actual
-    )]
+    #[error("Unexpected artifact name ({}), was expecting `{}`", expected, actual)]
     UnexpectedName {
         /// Expected artifact name.
         expected: String,
@@ -340,7 +338,7 @@ pub enum ArtifactReqError {
     },
 
     /// Incompatible artifact version.
-    #[fail(display = "Incompatible artifact version ({})", actual)]
+    #[error("Incompatible artifact version ({})", actual)]
     IncompatibleVersion {
         /// Actual artifact version.
         actual: Version,

@@ -15,8 +15,8 @@
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 use exonum_crypto::Hash;
-use failure::Fail;
 use serde_derive::*;
+use thiserror::Error;
 
 use std::cmp::Ordering;
 
@@ -609,44 +609,44 @@ impl<'a, V> CheckedListProof<'a, V> {
 }
 
 /// An error that is returned when the list proof is invalid.
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Fail)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Error)]
 #[non_exhaustive]
 pub enum ListProofError {
     /// Proof contains a hash in a place where a value was expected.
-    #[fail(display = "proof contains a hash in a place where a value was expected")]
+    #[error("proof contains a hash in a place where a value was expected")]
     UnexpectedLeaf,
 
     /// Proof contains a hash in the position which is impossible according to the list length.
-    #[fail(
-        display = "proof contains a hash in the position which is impossible according to the list length"
+    #[error(
+        "proof contains a hash in the position which is impossible according to the list length"
     )]
     UnexpectedBranch,
 
     /// Values or hashes in the proof are not ordered by their keys.
-    #[fail(display = "values or hashes in the proof are not ordered by their keys")]
+    #[error("values or hashes in the proof are not ordered by their keys")]
     Unordered,
 
     /// There are redundant hashes in the proof: the hash of the underlying list can be calculated
     /// without some of them.
-    #[fail(display = "redundant hash in the proof")]
+    #[error("redundant hash in the proof")]
     RedundantHash,
 
     /// Proof does not contain necessary information to compute the hash of the underlying list.
-    #[fail(display = "missing hash")]
+    #[error("missing hash")]
     MissingHash,
 
     /// Non-empty proof for an empty list.
     ///
     /// Empty lists should always have empty proofs, since there is no data to get values
     /// or hashes from.
-    #[fail(display = "non-empty proof for an empty list")]
+    #[error("non-empty proof for an empty list")]
     NonEmptyProof,
 
     /// Proof does not satisfy built-in constraints on element positions.
     ///
     /// For example, this error is generated if the list length indicated in the proof
     /// exceeds the maximum possible list length (`2**56`).
-    #[fail(display = "proof does not satisfy built-in constraints on element positions")]
+    #[error("proof does not satisfy built-in constraints on element positions")]
     OutOfBounds,
 }
 
