@@ -50,12 +50,15 @@ pub const DEFAULT_EXONUM_LISTEN_PORT: u16 = 6333;
 
 /// Generate public and private configs of the node.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct GenerateConfig {
     /// Path to node configuration template file.
     pub common_config: PathBuf,
+
     /// Path to a directory where public and private node configuration files
     /// will be saved.
     pub output_dir: PathBuf,
+
     /// External IP address of the node used for communications between nodes.
     ///
     /// If no port is provided, the default Exonum port 6333 is used.
@@ -65,15 +68,18 @@ pub struct GenerateConfig {
         parse(try_from_str = GenerateConfig::parse_external_address)
     )]
     pub peer_address: SocketAddr,
+
     /// Listen IP address of the node used for communications between nodes.
     ///
     /// If not provided it combined from all-zeros (0.0.0.0) IP address and
     /// the port number of the `peer-address`.
     #[structopt(long, short = "l")]
     pub listen_address: Option<SocketAddr>,
+
     /// Don't prompt for passwords when generating private keys.
     #[structopt(long, short = "n")]
     pub no_password: bool,
+
     /// Passphrase entry method for master key.
     ///
     /// Possible values are: `stdin`, `env{:ENV_VAR_NAME}`, `pass:PASSWORD`.
@@ -82,6 +88,7 @@ pub struct GenerateConfig {
     /// by default.
     #[structopt(long)]
     pub master_key_pass: Option<PassInputMethod>,
+
     /// Path to the master key file. If empty, file will be placed to <output_dir>.
     #[structopt(long)]
     pub master_key_path: Option<PathBuf>,

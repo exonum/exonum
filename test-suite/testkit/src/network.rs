@@ -138,6 +138,7 @@ impl TestNetwork {
             node.validator_id = config
                 .find_validator(|keys| keys.consensus_key == node.consensus_keypair().public_key());
         }
+
         // Verify that all validator keys have been assigned.
         let validators_count = self
             .nodes
@@ -145,9 +146,10 @@ impl TestNetwork {
             .filter(|x| x.validator_id.is_some())
             .count();
         assert_eq!(validators_count, config.validator_keys.len());
+
         // Modify us.
-        self.us.validator_id = config
-            .find_validator(|keys| keys.consensus_key == self.us.consensus_keypair().public_key());
+        let our_key = self.us.consensus_keypair().public_key();
+        self.us.validator_id = config.find_validator(|keys| keys.consensus_key == our_key);
     }
 
     /// Returns service public key of the validator with given id.
@@ -169,6 +171,7 @@ impl TestNetwork {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TestNode {
     keys: Keys,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     validator_id: Option<ValidatorId>,
 }
 

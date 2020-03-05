@@ -161,7 +161,7 @@
 //! let api = testkit.api();
 //! let response: TransactionInfo = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/transactions"))
-//!     .query(&TransactionQuery { hash: tx.object_hash() })
+//!     .query(&TransactionQuery::new(tx.object_hash()))
 //!     .send()?
 //!     .error_for_status()?
 //!     .json()?;
@@ -229,10 +229,7 @@
 //! let api = testkit.api();
 //! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/transaction"))
-//!     .query(&TransactionStatusQuery {
-//!         hash: tx.object_hash(),
-//!         with_proof: false,
-//!     })
+//!     .query(&TransactionStatusQuery::new(tx.object_hash()))
 //!     .send()?
 //!     .error_for_status()?
 //!     .json()?;
@@ -290,11 +287,7 @@
 //! let api = testkit.api();
 //! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/before_transactions"))
-//!     .query(&CallStatusQuery {
-//!         height: Height(2),
-//!         service_id: MyService::INSTANCE_ID,
-//!         with_proof: false,
-//!     })
+//!     .query(&CallStatusQuery::new(Height(2), MyService::INSTANCE_ID))
 //!     .send()?
 //!     .error_for_status()?
 //!     .json()?;
@@ -368,12 +361,11 @@
 //!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
-//! let tx_body = hex::encode(tx.to_bytes());
 //!
 //! let api = testkit.api();
 //! let response: TransactionResponse = reqwest::Client::new()
 //!     .post(&api.public_url("api/explorer/v1/transactions"))
-//!     .json(&TransactionHex { tx_body })
+//!     .json(&TransactionHex::new(&tx))
 //!     .send()?
 //!     .error_for_status()?
 //!     .json()?;
@@ -401,7 +393,7 @@ use exonum::{
     messages::SignedMessage,
     runtime::ExecutionStatus,
 };
-use exonum_explorer::{median_precommits_time, BlockchainExplorer};
+use exonum_explorer::BlockchainExplorer;
 use exonum_rust_runtime::api::{self, ServiceApiScope};
 use futures::{Future, IntoFuture};
 use hex::FromHex;
@@ -423,7 +415,7 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> api::Result<BlocksRange> {
+    fn blocks(schema: Schema<&dyn Snapshot>, query: &BlocksQuery) -> api::Result<BlocksRange> {
         let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(api::Error::bad_request()
@@ -460,23 +452,7 @@ impl ExplorerApi {
             .rev()
             .filter(|block| !query.skip_empty_blocks || !block.is_empty())
             .take(query.count)
-            .map(|block| BlockInfo {
-                txs: None,
-
-                time: if query.add_blocks_time {
-                    Some(median_precommits_time(&block.precommits()))
-                } else {
-                    None
-                },
-
-                precommits: if query.add_precommits {
-                    Some(block.precommits().to_vec())
-                } else {
-                    None
-                },
-
-                block: block.into_header(),
-            })
+            .map(|block| BlockInfo::summary(block, query))
             .collect();
 
         let height = if blocks.len() < query.count {
@@ -485,13 +461,10 @@ impl ExplorerApi {
             blocks.last().map_or(Height(0), |info| info.block.height)
         };
 
-        Ok(BlocksRange {
-            range: height..upper.next(),
-            blocks,
-        })
+        Ok(BlocksRange::new(height..upper.next(), blocks))
     }
 
-    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> api::Result<BlockInfo> {
+    fn block(schema: Schema<&dyn Snapshot>, query: &BlockQuery) -> api::Result<BlockInfo> {
         let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             api::Error::not_found()
@@ -506,7 +479,7 @@ impl ExplorerApi {
 
     fn transaction_info(
         schema: Schema<&dyn Snapshot>,
-        query: TransactionQuery,
+        query: &TransactionQuery,
     ) -> api::Result<TransactionInfo> {
         BlockchainExplorer::from_schema(schema)
             .transaction(&query.hash)
@@ -595,7 +568,7 @@ impl ExplorerApi {
         let send_transaction = move |(verified, tx_hash)| {
             sender
                 .broadcast_transaction(verified)
-                .map(move |_| TransactionResponse { tx_hash })
+                .map(move |_| TransactionResponse::new(tx_hash))
                 .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))
         };
 
@@ -615,10 +588,10 @@ impl ExplorerApi {
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
             .endpoint("v1/blocks", |state, query| {
-                Self::blocks(state.data().for_core(), query)
+                Self::blocks(state.data().for_core(), &query)
             })
             .endpoint("v1/block", |state, query| {
-                Self::block(state.data().for_core(), query)
+                Self::block(state.data().for_core(), &query)
             })
             .endpoint("v1/call_status/transaction", |state, query| {
                 Self::transaction_status(&state.data().for_core(), &query)
@@ -630,7 +603,7 @@ impl ExplorerApi {
                 Self::before_transactions_status(&state.data().for_core(), &query)
             })
             .endpoint("v1/transactions", |state, query| {
-                Self::transaction_info(state.data().for_core(), query)
+                Self::transaction_info(state.data().for_core(), &query)
             });
 
         let tx_sender = self.blockchain.sender().to_owned();

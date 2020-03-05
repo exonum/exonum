@@ -97,17 +97,16 @@ impl ServiceFactory {
         if let Some(ref proto_sources_mod) = self.proto_sources {
             quote! {
                 #cr::ArtifactProtobufSpec::new(
-                    #proto_sources_mod::PROTO_SOURCES.as_ref(),
-                    #proto_sources_mod::INCLUDES.as_ref()
+                    #proto_sources_mod::PROTO_SOURCES
+                        .iter()
+                        .map(|&(name, contents)| #cr::ProtoSourceFile::new(name, contents)),
+                    #proto_sources_mod::INCLUDES
+                        .iter()
+                        .map(|&(name, contents)| #cr::ProtoSourceFile::new(name, contents)),
                 )
             }
         } else {
-            quote! {
-                #cr::ArtifactProtobufSpec {
-                    sources: vec![],
-                    includes: vec![],
-                }
-            }
+            quote!(#cr::ArtifactProtobufSpec::default())
         }
     }
 }
@@ -129,7 +128,8 @@ impl ToTokens for ServiceFactory {
                         #cr::_reexports::RuntimeIdentifier::Rust as u32,
                         #artifact_name.to_string(),
                         #artifact_version.parse().expect("Cannot parse artifact version"),
-                    ).expect("Invalid artifact identifier")
+                    )
+                    .expect("Invalid artifact identifier")
                 }
 
                 fn artifact_protobuf_spec(&self) -> #cr::ArtifactProtobufSpec {
@@ -147,9 +147,7 @@ impl ToTokens for ServiceFactory {
 
 pub fn impl_service_factory(input: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse(input).unwrap();
-
     let service_factory = ServiceFactory::from_derive_input(&input)
         .unwrap_or_else(|e| panic!("ServiceFactory: {}", e));
-    let tokens = quote! {#service_factory};
-    tokens.into()
+    quote!(#service_factory).into()
 }

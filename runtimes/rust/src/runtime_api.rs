@@ -21,12 +21,13 @@ use exonum::{
 use exonum_api::{self as api, ApiBuilder};
 use serde_derive::{Deserialize, Serialize};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, iter};
 
-use super::RustRuntime;
+use crate::RustRuntime;
 
 /// Artifact Protobuf file sources.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ProtoSourceFile {
     /// File name.
     pub name: String,
@@ -34,9 +35,20 @@ pub struct ProtoSourceFile {
     pub content: String,
 }
 
+impl ProtoSourceFile {
+    /// Creates a new source file.
+    pub fn new(name: impl Into<String>, content: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            content: content.into(),
+        }
+    }
+}
+
 /// Protobuf sources query parameters.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum ProtoSourcesQuery {
     /// Query core Protobuf sources.
     Core,
@@ -51,6 +63,7 @@ pub enum ProtoSourcesQuery {
 
 /// Artifact Protobuf specification for the Exonum clients.
 #[derive(Debug, Default, Clone, PartialEq)]
+#[non_exhaustive]
 pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface.
     ///
@@ -66,38 +79,24 @@ impl ArtifactProtobufSpec {
     /// Creates a new artifact Protobuf specification instance from the given
     /// list of Protobuf sources and includes.
     pub fn new(
-        sources: impl IntoIterator<Item = impl Into<ProtoSourceFile>>,
-        includes: impl IntoIterator<Item = impl Into<ProtoSourceFile>>,
+        sources: impl IntoIterator<Item = ProtoSourceFile>,
+        includes: impl IntoIterator<Item = ProtoSourceFile>,
     ) -> Self {
         Self {
-            sources: sources.into_iter().map(Into::into).collect(),
-            includes: includes.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<&(&str, &str)> for ProtoSourceFile {
-    fn from(v: &(&str, &str)) -> Self {
-        Self {
-            name: v.0.to_owned(),
-            content: v.1.to_owned(),
+            sources: sources.into_iter().collect(),
+            includes: includes.into_iter().collect(),
         }
     }
 }
 
 fn exonum_proto_sources() -> Vec<ProtoSourceFile> {
-    let proto = EXONUM_PROTO_SOURCES
-        .as_ref()
-        .iter()
-        .map(From::from)
-        .collect::<Vec<_>>();
-    let includes = EXONUM_INCLUDES
-        .as_ref()
-        .iter()
-        .map(From::from)
-        .collect::<Vec<_>>();
-
-    proto.into_iter().chain(includes).collect()
+    let files = EXONUM_PROTO_SOURCES.iter().chain(&EXONUM_INCLUDES);
+    files
+        .map(|&(name, content)| ProtoSourceFile {
+            name: name.to_owned(),
+            content: content.to_owned(),
+        })
+        .collect()
 }
 
 fn filter_exonum_proto_sources(
@@ -113,7 +112,7 @@ fn filter_exonum_proto_sources(
 /// Returns API builder instance with the appropriate endpoints for the specified
 /// Rust runtime instance.
 pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, ApiBuilder)> {
-    let artifact_proto_sources = runtime
+    let artifact_proto_sources: HashMap<_, _> = runtime
         .available_artifacts
         .iter()
         .map(|(artifact_id, service_factory)| {
@@ -122,10 +121,11 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
                 service_factory.artifact_protobuf_spec(),
             )
         })
-        .collect::<HashMap<_, _>>();
+        .collect();
     let exonum_sources = exonum_proto_sources();
+
     // Cache filtered sources to avoid expensive operations in the endpoint handler.
-    let filtered_sources = artifact_proto_sources
+    let filtered_sources: HashMap<_, _> = artifact_proto_sources
         .into_iter()
         .map(|(artifact_id, sources)| {
             let mut proto = sources.sources;
@@ -135,7 +135,7 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
             ));
             (artifact_id, proto)
         })
-        .collect::<HashMap<_, _>>();
+        .collect();
 
     let mut builder = ApiBuilder::new();
     builder
@@ -165,5 +165,5 @@ pub fn endpoints(runtime: &RustRuntime) -> impl IntoIterator<Item = (String, Api
             }
         });
 
-    std::iter::once((["runtimes/", RustRuntime::NAME].concat(), builder))
+    iter::once((["runtimes/", RustRuntime::NAME].concat(), builder))
 }

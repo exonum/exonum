@@ -17,13 +17,9 @@
 //! and API endpoints associated with configuration.
 
 use exonum::runtime::{SnapshotExt, SUPERVISOR_INSTANCE_ID};
-use exonum_merkledb::BinaryValue;
 use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 
-use exonum_supervisor::{
-    supervisor_name, ConfigChange, ConfigPropose, Schema, ServiceConfig, Supervisor,
-    SupervisorConfig,
-};
+use exonum_supervisor::{supervisor_name, ConfigPropose, Schema, Supervisor, SupervisorConfig};
 
 use crate::{config_api::create_proposal, utils::CFG_CHANGE_HEIGHT};
 
@@ -75,18 +71,9 @@ fn configure_call() {
         .with(Supervisor::simple())
         .build();
 
-    // Change config to decentralized.
-    let configuration_change = ServiceConfig {
-        instance_id: SUPERVISOR_INSTANCE_ID,
-        params: Supervisor::decentralized_config().into_bytes(),
-    };
-
     // Create proposal.
-    let config_proposal = ConfigPropose {
-        actual_from: CFG_CHANGE_HEIGHT,
-        changes: vec![ConfigChange::Service(configuration_change)],
-        configuration_number: 0,
-    };
+    let config_proposal = ConfigPropose::new(0, CFG_CHANGE_HEIGHT)
+        .service_config(SUPERVISOR_INSTANCE_ID, Supervisor::decentralized_config());
 
     // Apply it (in simple mode no confirmations required).
     create_proposal(&testkit.api(), config_proposal);

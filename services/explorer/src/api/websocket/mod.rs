@@ -402,7 +402,7 @@ impl Server {
                 let tx_hash = verified.object_hash();
                 sender
                     .broadcast_transaction(verified)
-                    .map(move |()| TransactionResponse { tx_hash })
+                    .map(move |()| TransactionResponse::new(tx_hash))
                     .from_err()
             })
     }

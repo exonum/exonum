@@ -32,6 +32,7 @@ use crate::command::{
 
 /// Run application in development mode (generate configuration and db files automatically).
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RunDev {
     /// The path where configuration and db files will be generated.
     #[structopt(long, short = "a")]

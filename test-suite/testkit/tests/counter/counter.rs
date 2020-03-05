@@ -164,7 +164,7 @@ impl CounterApi {
             .generic_broadcaster()
             .increment((), value)
             .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
-        Ok(TransactionResponse { tx_hash })
+        Ok(TransactionResponse::new(tx_hash))
     }
 
     fn count(snapshot: impl Access) -> api::Result<u64> {
@@ -191,7 +191,7 @@ impl CounterApi {
             .generic_broadcaster()
             .reset((), ())
             .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
-        Ok(TransactionResponse { tx_hash })
+        Ok(TransactionResponse::new(tx_hash))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {

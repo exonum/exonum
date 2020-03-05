@@ -654,9 +654,7 @@ impl RustRuntime {
             if !self.api_notifier.is_closed() {
                 self.api_notifier
                     .clone()
-                    .send(UpdateEndpoints {
-                        endpoints: user_endpoints,
-                    })
+                    .send(UpdateEndpoints::new(user_endpoints))
                     .wait()
                     .ok();
             }

@@ -350,7 +350,7 @@ impl TestKit {
     fn update_aggregator(&mut self) -> ApiAggregator {
         if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
             let mut aggregator = self.create_api_aggregator();
-            aggregator.extend(update.endpoints);
+            aggregator.extend(update.into_endpoints());
             self.api_aggregator = aggregator;
         }
         self.api_aggregator.clone()
