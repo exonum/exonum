@@ -56,7 +56,7 @@
 //! [`structopt`][structopt] libraries.
 //!
 //! ```
-//! use exonum_cli::command::{run::Run, ExonumCommand};
+//! use exonum_cli::command::{Run, ExonumCommand};
 //! use serde::{Deserialize, Serialize};
 //! use structopt::StructOpt;
 //!
@@ -89,7 +89,7 @@
 //! You can also create own list of commands by implementing an enum with a similar principle:
 //!
 //! ```
-//! use exonum_cli::command::run::Run;
+//! use exonum_cli::command::Run;
 //! use structopt::StructOpt;
 //!
 //! // `MyRunCommand` defined as in the previous example...
