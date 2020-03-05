@@ -19,10 +19,29 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Schema::call_errors` was removed in favor of more comprehensive
   `call_records` method. (#1792)
 
+### exonum-api
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
 #### exonum-cli
 
 - `NodeBuilder` was refactored to use a more intuitive set of interfaces
   for adding built-in artifacts and services to the blockchain. (#1800)
+- Submodules of the `command` module were made private; the relevant data types
+  are now exported from the `command` module directly. Similarly,
+  `io` module was made private. (#1799)
+
+#### exonum-explorer 
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-rust-runtime
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-supervisor
+
+- Data types were made non-exhaustive where appropriate. (#1799)
 
 #### exonum-system-api
 
@@ -35,10 +54,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `v1/consensus_status` - enables or disables consensus on the node;
   - `v1/shutdown` - shuts down the node.
 
+- API data types were made non-exhaustive where appropriate. (#1799)
+
 ### exonum-testkit
 
 - `TestKitBuilder` was refactored to use a more intuitive set of interfaces
   for adding built-in artifacts and services to the blockchain. (#1800)
+
+- Data types were made non-exhaustive where appropriate. (#1799)
 
 ### New Features
 
@@ -69,6 +92,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Rust services support freezing. (#1780)
 
 - HTTP API of Rust services is now switched on during data migrations. (#1780)
+
+#### exonum-testkit
+
+- Testkit server now returns info on emulated nodes. (#1799)
 
 ### Internal Improvements
 
