@@ -127,7 +127,7 @@ impl SandboxInner {
                     let msg = Message::from_signed(msg).expect("Expected valid message.");
                     self.sent.push_back((peer, msg))
                 }
-                NetworkRequest::DisconnectWithPeer(_) | NetworkRequest::Shutdown => {}
+                NetworkRequest::DisconnectWithPeer(_) => {}
             }
         }
     }

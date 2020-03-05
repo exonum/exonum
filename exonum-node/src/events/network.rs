@@ -20,11 +20,7 @@ use exonum::{
     messages::{SignedMessage, Verified},
 };
 use failure::{bail, ensure, format_err};
-use futures::{
-    channel::{mpsc, oneshot},
-    future,
-    prelude::*,
-};
+use futures::{channel::mpsc, future, prelude::*};
 use rand::{thread_rng, Rng};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::Framed;
@@ -79,10 +75,7 @@ pub enum NetworkEvent {
 #[allow(dead_code)]
 pub enum NetworkRequest {
     SendMessage(PublicKey, SignedMessage),
-    // TODO: This variant is never constructed in main code. Is it necessary? (ECR-4118)
     DisconnectWithPeer(PublicKey),
-    // TODO: This variant is never constructed in main code. Is it necessary? (ECR-4118)
-    Shutdown,
 }
 
 #[derive(Debug)]
@@ -514,13 +507,7 @@ impl NetworkHandler {
         Ok(connect)
     }
 
-    pub async fn handle_requests(
-        self,
-        mut receiver: mpsc::Receiver<NetworkRequest>,
-        cancel_handler: oneshot::Sender<()>,
-    ) {
-        let mut cancel_sender = Some(cancel_handler);
-
+    pub async fn handle_requests(self, mut receiver: mpsc::Receiver<NetworkRequest>) {
         while let Some(request) = receiver.next().await {
             match request {
                 NetworkRequest::SendMessage(key, message) => {
@@ -541,11 +528,6 @@ impl NetworkHandler {
                                 .ok();
                         });
                     }
-                }
-
-                NetworkRequest::Shutdown => {
-                    cancel_sender.take();
-                    break;
                 }
             }
         }
@@ -606,7 +588,6 @@ impl NetworkHandler {
 
 impl NetworkPart {
     pub async fn run(self, handshake_params: HandshakeParams) {
-        let (cancel_tx, cancel_rx) = oneshot::channel();
         let our_key = handshake_params.connect.author();
 
         let handler = NetworkHandler::new(
@@ -618,14 +599,14 @@ impl NetworkPart {
             self.connect_list,
         );
 
-        let listener = handler.clone().listener();
-        let request_handler = handler.handle_requests(self.network_requests, cancel_tx);
-        let handlers = future::join(listener, request_handler);
-        futures::pin_mut!(handlers);
-
-        let cancel_handler = cancel_rx.unwrap_or_else(|_| {
-            log::trace!("Requests handler closed");
+        let listener = handler.clone().listener().unwrap_or_else(|e| {
+            log::error!("Listening to incoming peer connections failed: {}", e);
         });
-        future::select(handlers, cancel_handler).await;
+        futures::pin_mut!(listener);
+        let request_handler = handler.handle_requests(self.network_requests);
+        futures::pin_mut!(request_handler);
+
+        // FIXME: is `select` appropriate here?
+        future::select(listener, request_handler).await;
     }
 }

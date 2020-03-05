@@ -19,9 +19,13 @@ use exonum::{
     merkledb::BinaryValue,
     messages::{SignedMessage, Verified},
 };
-use futures::{channel::mpsc, prelude::*};
+use futures::{
+    channel::mpsc,
+    future::{self, AbortHandle},
+    prelude::*,
+};
 use pretty_assertions::assert_eq;
-use tokio::{task::JoinHandle, time::timeout};
+use tokio::time::timeout;
 
 use std::{
     net::SocketAddr,
@@ -38,7 +42,7 @@ use crate::{
 
 #[derive(Debug)]
 struct TestHandler {
-    handle: Option<JoinHandle<()>>,
+    abort_handle: AbortHandle,
     listen_address: SocketAddr,
     network_events_rx: mpsc::Receiver<NetworkEvent>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
@@ -49,9 +53,13 @@ impl TestHandler {
         listen_address: SocketAddr,
         network_requests_tx: mpsc::Sender<NetworkRequest>,
         network_events_rx: mpsc::Receiver<NetworkEvent>,
+        network_task: impl Future<Output = ()> + Send + 'static,
     ) -> Self {
+        let (network_task, abort_handle) = future::abortable(network_task);
+        // We consider aborting the task completely fine in tests.
+        tokio::spawn(network_task.unwrap_or_else(drop));
         Self {
-            handle: None,
+            abort_handle,
             listen_address,
             network_events_rx,
             network_requests_tx,
@@ -111,13 +119,11 @@ impl TestHandler {
             Err(()) => panic!("An error during wait for message occurred"),
         }
     }
+}
 
-    pub async fn shutdown(mut self) {
-        self.network_requests_tx
-            .send(NetworkRequest::Shutdown)
-            .await
-            .unwrap();
-        self.handle.take().expect("shutdown twice").await.unwrap();
+impl Drop for TestHandler {
+    fn drop(&mut self) {
+        self.abort_handle.abort();
     }
 }
 
@@ -144,13 +150,6 @@ impl TestEvents {
     }
 
     fn spawn(self, handshake_params: HandshakeParams, connect: Verified<Connect>) -> TestHandler {
-        let (mut handler_part, network_part) = self.into_reactor(connect);
-        let handle = tokio::spawn(network_part.run(handshake_params));
-        handler_part.handle = Some(handle);
-        handler_part
-    }
-
-    fn into_reactor(self, connect: Verified<Connect>) -> (TestHandler, NetworkPart) {
         let channel = NodeChannel::new(&self.events_config);
         let network_config = self.network_config;
         let (network_tx, network_rx) = channel.network_events;
@@ -166,8 +165,12 @@ impl TestEvents {
             connect_list: self.connect_list,
         };
 
-        let handler_part = TestHandler::new(self.listen_address, network_requests_tx, network_rx);
-        (handler_part, network_part)
+        TestHandler::new(
+            self.listen_address,
+            network_requests_tx,
+            network_rx,
+            network_part.run(handshake_params),
+        )
     }
 }
 
@@ -385,7 +388,7 @@ async fn test_network_reconnect() {
     assert_eq!(e2.wait_for_message().await, msg);
 
     e1.disconnect_with(second_key).await;
-    e2.shutdown().await;
+    drop(e2);
     assert_eq!(e1.wait_for_disconnect().await, second_key);
 
     // Handle second attempt.
