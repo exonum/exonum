@@ -131,9 +131,13 @@ struct TestEvents {
 
 impl TestEvents {
     fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> Self {
+        let mut network_config = NetworkConfiguration::default();
+        network_config.tcp_nodelay = true;
+        network_config.tcp_connect_retry_timeout = 100;
+
         Self {
             listen_address,
-            network_config: NetworkConfiguration::default(),
+            network_config,
             events_config: EventsPoolCapacity::default(),
             connect_list: connect_list.clone(),
         }
@@ -476,7 +480,8 @@ async fn test_send_first_not_connect() {
     let mut other_node = t2.spawn(other_node, connect_list);
 
     let message = raw_message(1000);
-    other_node.send_to(main_key, message.clone()).await; // should connect before send message
+    other_node.send_to(main_key, message.clone()).await;
+    // ^-- should connect before sending message
     assert_eq!(node.wait_for_connect().await, t2.connect);
     assert_eq!(node.wait_for_message().await, message);
 }
