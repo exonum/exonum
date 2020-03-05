@@ -176,20 +176,15 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # fn config_for_service() -> Vec<u8> {
-//! #     Vec::new()
-//! # }
+//! # fn config_for_artifact() -> Vec<u8> { Vec::new() }
 //! #
 //! # fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! // In this example, we will try to deploy `SomeService` artifact.
-//! let deploy_request = DeployRequest {
-//!     artifact: SomeService.artifact_id(),
-//!     spec: config_for_service(),
-//!     deadline_height: Height(10),
-//! };
+//! let deploy_request = DeployRequest::new(SomeService.artifact_id(), Height(10))
+//!     .with_spec(config_for_artifact());
 //!
 //! // `deploy_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
@@ -518,11 +513,7 @@
 //! #         .build();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.
-//! #     DeployRequest {
-//! #         artifact: SomeService.artifact_id(),
-//! #         spec: Vec::new(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     DeployRequest::new(SomeService.artifact_id(), Height(10));
 //! # // Request deploy, so we will be able to request its state.
 //! # let _hash: Hash = testkit
 //! #     .api()
@@ -714,6 +705,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
 
 /// Services info response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[non_exhaustive]
 pub struct DispatcherInfo {
     /// List of deployed artifacts.
     pub artifacts: Vec<ArtifactId>,

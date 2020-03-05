@@ -32,6 +32,7 @@ use crate::{
 /// Generate final node configuration using public configs
 /// of other nodes in the network.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Finalize {
     /// Path to a private part of a node configuration.
     pub private_config_path: PathBuf,

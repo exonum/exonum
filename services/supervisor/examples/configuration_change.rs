@@ -146,7 +146,7 @@ fn send_and_vote_for_propose(
         .map(|validator| {
             validator
                 .service_keypair()
-                .confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote { propose_hash })
+                .confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(propose_hash))
         })
         .collect();
 

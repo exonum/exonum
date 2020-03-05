@@ -27,6 +27,7 @@ use super::{proto, AsyncEventState, MigrationError};
 #[derive(ProtobufConvert, BinaryValue)]
 #[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::MigrationState")]
+#[non_exhaustive]
 pub struct MigrationState {
     /// Migration process state.
     #[serde(rename = "state")]

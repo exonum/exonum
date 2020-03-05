@@ -25,6 +25,7 @@ use crate::proto as pb_supervisor;
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AsyncEventState {
     /// Deployment is in process.
     Pending,

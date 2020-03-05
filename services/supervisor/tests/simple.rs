@@ -325,13 +325,8 @@ fn deploy_service() {
         .build();
 
     let deadline_height = Height(5);
-
     let artifact = DeployableService.artifact_id();
-    let deploy_request = DeployRequest {
-        artifact: artifact.clone(),
-        spec: Vec::new(),
-        deadline_height,
-    };
+    let deploy_request = DeployRequest::new(artifact.clone(), deadline_height);
 
     // Create deploy request
     let hash: Hash = testkit

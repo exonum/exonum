@@ -43,10 +43,10 @@
 //! `exonum-cli` also supports additional CLI commands for performing maintenance actions by node
 //! administrators and easier debugging.
 //!
-//! * `run-dev` command automatically generates network configuration with a single node and runs
-//! it. This command can be useful for fast testing of the services during development process.
-//! * `maintenance` command allows to clear node's consensus messages with `clear-cache`, and
-//! restart node's service migration script with `restart-migration`.
+//! - `run-dev` command automatically generates network configuration with a single node and runs
+//!   it. This command can be useful for fast testing of the services during development process.
+//! - `maintenance` command allows to clear node's consensus messages with `clear-cache`, and
+//!   restart node's service migration script with `restart-migration`.
 //!
 //! ## How to Extend Parameters
 //!
@@ -55,25 +55,51 @@
 //! additional parameters and use `flatten` macro attribute of [`serde`][serde] and
 //! [`structopt`][structopt] libraries.
 //!
-//! ```ignore
+//! ```
+//! use exonum_cli::command::{Run, ExonumCommand};
+//! use serde::{Deserialize, Serialize};
+//! use structopt::StructOpt;
+//!
 //! #[derive(Serialize, Deserialize, StructOpt)]
 //! struct MyRunCommand {
 //!     #[serde(flatten)]
 //!     #[structopt(flatten)]
-//!     default: Run
-//!     /// My awesome parameter
-//!     secret_number: i32
+//!     inner: Run,
+//!
+//!     /// My awesome parameter.
+//!     #[structopt(name = "secret", long, default_value = "0")]
+//!     secret_number: i32,
 //! }
+//!
+//! // Usage. We use `StructOpt::from_iter` for testing purposes;
+//! // the real app should use `StructOpt::from_args`.
+//! let command = MyRunCommand::from_iter(vec![
+//!     "executable",
+//!     "-c", "./node.toml",
+//!     "--db-path", "./db",
+//!     "--secret", "42",
+//! ]);
+//! assert_eq!(command.secret_number, 42);
+//! # drop(|| -> Result<(), failure::Error> {
+//! command.inner.execute()?;
+//! # Ok(())
+//! # });
 //! ```
 //!
 //! You can also create own list of commands by implementing an enum with a similar principle:
 //!
-//! ```ignore
+//! ```
+//! use exonum_cli::command::Run;
+//! use structopt::StructOpt;
+//!
+//! // `MyRunCommand` defined as in the previous example...
+//! # #[derive(StructOpt)] pub struct MyRunCommand {}
+//!
 //! #[derive(StructOpt)]
-//! enum MyCommands {
-//!     #[structopt(name = "run")
+//! pub enum MyCommands {
+//!     #[structopt(name = "run")]
 //!     DefaultRun(Run),
-//!     #[structopt(name = "my-run")
+//!     #[structopt(name = "my-run")]
 //!     MyAwesomeRun(MyRunCommand),
 //! }
 //! ```
@@ -104,7 +130,10 @@
     clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
-pub use crate::config_manager::DefaultConfigManager;
+pub use crate::{
+    config_manager::DefaultConfigManager,
+    io::{load_config_file, save_config_file},
+};
 pub use exonum_rust_runtime::spec::Spec;
 pub use structopt;
 
@@ -123,11 +152,11 @@ use tempfile::TempDir;
 
 use std::{env, ffi::OsString, iter, path::PathBuf};
 
-use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
+use crate::command::{Command, ExonumCommand, NodeRunConfig, StandardResult};
 
 pub mod command;
 pub mod config;
-pub mod io;
+mod io;
 pub mod password;
 
 mod config_manager;
@@ -286,6 +315,6 @@ impl NodeBuilder {
             .general
             .supervisor_mode
             .clone();
-        Supervisor::builtin_instance(SupervisorConfig { mode })
+        Supervisor::builtin_instance(SupervisorConfig::new(mode))
     }
 }

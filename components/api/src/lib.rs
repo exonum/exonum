@@ -83,6 +83,7 @@ use crate::backends::actix;
 /// Mutability of the endpoint. Used for auto-generated endpoints, e.g.
 /// in `moved_permanently` method.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[non_exhaustive]
 pub enum EndpointMutability {
     /// Endpoint should process POST requests.
     Mutable,
@@ -219,6 +220,7 @@ impl ApiBuilder {
 
 /// Exonum API access level, either private or public.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ApiAccess {
     /// Public API for end users.
     Public,
