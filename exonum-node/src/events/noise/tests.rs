@@ -249,7 +249,6 @@ const EMPTY_MESSAGE: &[u8] = &[0; 0];
 const STANDARD_MESSAGE: &[u8] = &[0; MAX_MESSAGE_LEN];
 
 #[test]
-#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty() {
     let addr: SocketAddr = "127.0.0.1:45003".parse().unwrap();
     let params = HandshakeParams::with_default_params();
@@ -257,13 +256,13 @@ fn test_noise_handshake_errors_ee_empty() {
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    listener_err.unwrap()
+    let (_, listener_res) = wait_for_handshake_result(addr, &params, bogus_message, None);
+    let listener_err = format!("{:#}", listener_res.unwrap_err());
+    assert!(listener_err.contains("Wrong handshake message length"));
 }
 
 #[test]
-#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_es_empty() {
     let addr: SocketAddr = "127.0.0.1:45004".parse().unwrap();
     let params = HandshakeParams::with_default_params();
@@ -271,13 +270,13 @@ fn test_noise_handshake_errors_es_empty() {
         HandshakeStep::StaticKeyExchange,
         EMPTY_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    listener_err.unwrap()
+    let (_, listener_res) = wait_for_handshake_result(addr, &params, bogus_message, None);
+    let listener_err = format!("{:#}", listener_res.unwrap_err());
+    assert!(listener_err.contains("Wrong handshake message length"));
 }
 
 #[test]
-#[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard() {
     let addr: SocketAddr = "127.0.0.1:45005".parse().unwrap();
     let params = HandshakeParams::with_default_params();
@@ -285,13 +284,13 @@ fn test_noise_handshake_errors_ee_standard() {
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    listener_err.unwrap()
+    let (_, listener_res) = wait_for_handshake_result(addr, &params, bogus_message, None);
+    let listener_err = format!("{:#}", listener_res.unwrap_err());
+    assert!(listener_err.contains("diffie-hellman error"));
 }
 
 #[test]
-#[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_errors_es_standard() {
     let addr: SocketAddr = "127.0.0.1:45006".parse().unwrap();
     let params = HandshakeParams::with_default_params();
@@ -299,13 +298,13 @@ fn test_noise_handshake_errors_es_standard() {
         HandshakeStep::StaticKeyExchange,
         STANDARD_MESSAGE,
     ));
-    let (_, listener_err) = wait_for_handshake_result(addr, &params, bogus_message, None);
 
-    listener_err.unwrap();
+    let (_, listener_res) = wait_for_handshake_result(addr, &params, bogus_message, None);
+    let listener_err = format!("{:#}", listener_res.unwrap_err());
+    assert!(listener_err.contains("decrypt error"));
 }
 
 #[test]
-#[should_panic(expected = "WrongMessageLength")]
 fn test_noise_handshake_errors_ee_empty_listen() {
     let addr: SocketAddr = "127.0.0.1:45007".parse().unwrap();
     let params = HandshakeParams::with_default_params();
@@ -313,13 +312,13 @@ fn test_noise_handshake_errors_ee_empty_listen() {
         HandshakeStep::EphemeralKeyExchange,
         EMPTY_MESSAGE,
     ));
-    let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    sender_err.unwrap();
+    let (sender_res, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
+    let sender_err = format!("{:#}", sender_res.unwrap_err());
+    assert!(sender_err.contains("Wrong handshake message length"));
 }
 
 #[test]
-#[should_panic(expected = "Dh")]
 fn test_noise_handshake_errors_ee_standard_listen() {
     let addr: SocketAddr = "127.0.0.1:45008".parse().unwrap();
     let params = HandshakeParams::with_default_params();
@@ -327,22 +326,22 @@ fn test_noise_handshake_errors_ee_standard_listen() {
         HandshakeStep::EphemeralKeyExchange,
         STANDARD_MESSAGE,
     ));
-    let (sender_err, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
 
-    sender_err.unwrap();
+    let (sender_res, _) = wait_for_handshake_result(addr, &params, None, bogus_message);
+    let sender_err = format!("{:#}", sender_res.unwrap_err());
+    assert!(sender_err.contains("diffie-hellman error"));
 }
 
 #[test]
-#[should_panic(expected = "Decrypt")]
 fn test_noise_handshake_wrong_remote_key() {
     let addr: SocketAddr = "127.0.0.1:45009".parse().unwrap();
     let mut params = HandshakeParams::with_default_params();
     let (remote_key, _) = gen_keypair_from_seed(&Seed::new([2; SEED_LENGTH]));
     params.set_remote_key(remote_key);
 
-    let (_, listener_err) = wait_for_handshake_result(addr, &params, None, None);
-
-    listener_err.unwrap();
+    let (_, listener_res) = wait_for_handshake_result(addr, &params, None, None);
+    let listener_err = format!("{:#}", listener_res.unwrap_err());
+    assert!(listener_err.contains("decrypt error"));
 }
 
 // We need check result from both: sender and responder.
