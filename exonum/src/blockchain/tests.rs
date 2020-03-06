@@ -532,7 +532,7 @@ fn deploy_already_deployed() {
     // Since `RuntimeInspector` transactions skip the `start_deploy`,
     // we expect transaction to panic (`commit_service` is called within transaction body).
     let expect_err = ErrorMatch::any_unexpected()
-        .with_description_containing("Artifact with the given identifier is already deployed");
+        .with_description_containing("Cannot deploy artifact `255:runtime-inspector:1.0.0` twice");
     assert_eq!(actual_err, expect_err);
 }
 
@@ -621,21 +621,21 @@ fn start_stop_service_instance() {
 #[test]
 fn test_check_tx() {
     let keys = exonum_crypto::KeyPair::random();
-
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
     );
 
     let snapshot = blockchain.snapshot();
-
     let correct_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID, &keys);
     Blockchain::check_tx(&snapshot, &correct_tx).expect("Correct transaction");
 
     let incorrect_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID + 1, &keys);
+    let unknown_msg = "Cannot dispatch transaction to unknown service with ID 1";
     assert_eq!(
-        Blockchain::check_tx(&snapshot, &incorrect_tx).expect_err("Incorrect transaction"),
+        Blockchain::check_tx(&snapshot, &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing(unknown_msg)
     );
 
     // Stop service instance to make correct_tx incorrect.
@@ -647,14 +647,16 @@ fn test_check_tx() {
 
     // Check that previously correct transaction become incorrect.
     let snapshot = blockchain.snapshot();
+    let not_active_msg = "Cannot dispatch transaction to non-active service";
     assert_eq!(
         Blockchain::check_tx(&snapshot, &correct_tx).unwrap_err(),
         ErrorMatch::from_fail(&CoreError::ServiceNotActive)
+            .with_description_containing(not_active_msg)
     );
 }
 
 #[test]
-#[should_panic(expected = "already used")]
+#[should_panic(expected = "Service with name `sample_instance` already exists")]
 fn finalize_duplicate_services() {
     let artifact = RuntimeInspector::default_artifact_id();
     let instance = InstanceInitParams::new(
@@ -668,7 +670,7 @@ fn finalize_duplicate_services() {
 }
 
 #[test]
-#[should_panic(expected = "already used")]
+#[should_panic(expected = "Service with name `sample_instance` already exists")]
 fn finalize_services_with_duplicate_names() {
     let artifact = RuntimeInspector::default_artifact_id();
 
@@ -691,7 +693,7 @@ fn finalize_services_with_duplicate_names() {
 }
 
 #[test]
-#[should_panic(expected = "already used")]
+#[should_panic(expected = "Service with numeric ID 10 already exists")]
 fn finalize_services_with_duplicate_ids() {
     let artifact = RuntimeInspector::default_artifact_id();
 

@@ -388,14 +388,22 @@ fn test_dispatcher_simple() {
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceIdExists));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ServiceIdExists)
+            .with_description_containing("Service with numeric ID 2 already exists")
+    );
 
     let conflicting_rust_service =
         InstanceSpec::from_raw_parts(RUST_SERVICE_ID + 1, RUST_SERVICE_NAME.into(), rust_artifact);
     let err = context
         .initiate_adding_service(conflicting_rust_service, vec![])
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNameExists));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ServiceNameExists)
+            .with_description_containing("Service with name `rust-service` already exists")
+    );
 
     // Activate services / artifacts.
     let patch = create_genesis_block(&mut dispatcher, fork);
@@ -608,7 +616,12 @@ fn test_service_freezing() {
         .supervisor_extensions()
         .initiate_freezing_service(SERVICE_ID)
         .expect_err("Service cannot be frozen from `Stopped` status");
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServiceNotActive));
+    let expected_msg = "transition is precluded by the current service status (stopped)";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ServiceNotActive)
+            .with_description_containing(expected_msg)
+    );
 }
 
 #[test]
@@ -1098,6 +1111,7 @@ fn stopped_service_workflow() {
     assert_eq!(
         actual_err,
         ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("Cannot stop unknown service with ID 0")
     );
 
     let artifact = ArtifactId::from_raw_parts(
@@ -1236,9 +1250,11 @@ fn stopped_service_workflow() {
     // Check that it is impossible to stop service twice.
     let actual_err = Dispatcher::initiate_stopping_service(&fork, instance_id)
         .expect_err("`initiate_stopping_service` should fail");
+    let bogus_transition_msg = "transition is precluded by the current service status (stopped)";
     assert_eq!(
         actual_err,
         ErrorMatch::from_fail(&CoreError::ServiceNotActive)
+            .with_description_containing(bogus_transition_msg)
     );
     assert!(!should_rollback);
 }
@@ -1303,7 +1319,12 @@ fn unload_artifact_workflow() {
     let err = context
         .initiate_adding_service(service, vec![])
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed));
+    let expected_msg = "from non-active artifact `2:good:1.0.0` (artifact status: unloading)";
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ArtifactNotDeployed)
+            .with_description_containing(expected_msg)
+    );
 
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
