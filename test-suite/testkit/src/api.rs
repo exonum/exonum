@@ -170,7 +170,7 @@ impl TestKitApi {
     }
 }
 
-type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b>;
+type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b>;
 
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
@@ -237,7 +237,7 @@ where
     /// Allows to modify a request before sending it by executing a provided closure.
     pub fn with<F>(self, f: F) -> Self
     where
-        F: Fn(ReqwestBuilder) -> ReqwestBuilder + 'b,
+        F: FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b,
     {
         Self {
             modifier: Some(Box::new(f)),
@@ -373,4 +373,20 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 
     info!("Test server created on {}", server.addr());
     server
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TestKitBuilder;
+
+    fn assert_send<T: Send>(_object: &T) {}
+
+    #[test]
+    fn assert_send_for_testkit_api() {
+        let mut testkit = TestKitBuilder::validator().build();
+        let api = testkit.api();
+        assert_send(&api.public(ApiKind::Explorer).get::<()>("v1/transactions"));
+        assert_send(&api.public(ApiKind::Explorer).post::<()>("v1/transactions"));
+    }
 }
