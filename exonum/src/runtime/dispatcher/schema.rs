@@ -328,7 +328,7 @@ impl Schema<&Fork> {
                  or frozen",
                 instance_state.spec.as_descriptor()
             );
-            return Err(CoreError::ServiceNotStopped.with_description(msg));
+            return Err(CoreError::InvalidServiceTransition.with_description(msg));
         }
 
         // There should be no pending status for the service.
@@ -593,7 +593,7 @@ impl Schema<&Fork> {
                 state.spec.as_descriptor(),
                 current_status
             );
-            Err(CoreError::ServiceNotActive.with_description(msg))
+            Err(CoreError::InvalidServiceTransition.with_description(msg))
         }
     }
 
@@ -637,7 +637,7 @@ impl Schema<&Fork> {
                 state.spec.as_descriptor(),
                 current_status
             );
-            Err(CoreError::ServiceNotStopped.with_description(msg))
+            Err(CoreError::InvalidServiceTransition.with_description(msg))
         }
     }
 

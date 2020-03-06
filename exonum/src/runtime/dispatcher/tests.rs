@@ -619,7 +619,7 @@ fn test_service_freezing() {
     let expected_msg = "transition is precluded by the current service status (stopped)";
     assert_eq!(
         err,
-        ErrorMatch::from_fail(&CoreError::ServiceNotActive)
+        ErrorMatch::from_fail(&CoreError::InvalidServiceTransition)
             .with_description_containing(expected_msg)
     );
 }
@@ -1253,7 +1253,7 @@ fn stopped_service_workflow() {
     let bogus_transition_msg = "transition is precluded by the current service status (stopped)";
     assert_eq!(
         actual_err,
-        ErrorMatch::from_fail(&CoreError::ServiceNotActive)
+        ErrorMatch::from_fail(&CoreError::InvalidServiceTransition)
             .with_description_containing(bogus_transition_msg)
     );
     assert!(!should_rollback);

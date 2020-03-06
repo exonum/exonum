@@ -357,7 +357,7 @@ fn test_migration_workflow(freeze_service: bool) {
         .unwrap_err();
     assert_eq!(
         err,
-        ErrorMatch::from_fail(&CoreError::ServiceNotStopped)
+        ErrorMatch::from_fail(&CoreError::InvalidServiceTransition)
             .with_description_containing("Data migration cannot be initiated")
     );
 
