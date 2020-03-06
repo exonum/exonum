@@ -197,8 +197,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// #     access::CopyAccessExt, Database, TemporaryDB, BinaryValue, MapProof, ObjectHash,
 /// # };
 /// # use exonum_crypto::hash;
-/// # use failure::Error;
-/// # fn main() -> Result<(), Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut map = fork.get_proof_map("index");
 /// let (h1, h2, h3) = (hash(&[1]), hash(&[2]), hash(&[3]));

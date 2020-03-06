@@ -14,7 +14,7 @@ description = "Cryptography related types, constants, traits and functions."
 links = "exonum_protobuf_crypto"
 
 [dependencies]
-failure = { package = "anyhow", version = "1.0" }
+anyhow = "1.0.26"
 hex = "0.4.0"
 serde = "1.0.101"
 serde_derive = "1.0.101"

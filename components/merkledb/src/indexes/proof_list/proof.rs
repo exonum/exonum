@@ -14,6 +14,7 @@
 
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
 use exonum_crypto::Hash;
 use serde_derive::*;
 use thiserror::Error;
@@ -63,8 +64,7 @@ impl HashedEntry {
 /// # use exonum_merkledb::{
 /// #     access::CopyAccessExt, Database, TemporaryDB, BinaryValue, ListProof, ObjectHash,
 /// # };
-/// # use failure::Error;
-/// # fn main() -> Result<(), Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// let fork = { let db = TemporaryDB::new(); db.fork() };
 /// let mut list = fork.get_proof_list("index");
 /// list.extend(vec![100_u32, 200_u32, 300_u32]);

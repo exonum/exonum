@@ -14,9 +14,9 @@
 
 use std::{borrow::Cow, fmt::Debug, io::Write};
 
+use anyhow::format_err;
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use criterion::{black_box, Bencher, Criterion};
-use failure::{self, format_err};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 
 use exonum_crypto::{self, hash, Hash};
@@ -43,7 +43,7 @@ impl BinaryValue for SimpleData {
         buffer
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let bytes = bytes.as_ref();
         let id = LittleEndian::read_u16(&bytes[0..2]);
         let class = LittleEndian::read_i16(&bytes[2..4]);
@@ -79,7 +79,7 @@ impl BinaryValue for CursorData {
         buf
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut cursor = bytes.as_ref();
         let id = cursor.read_u16::<LittleEndian>()?;
         let class = cursor.read_i16::<LittleEndian>()?;

@@ -55,7 +55,6 @@
 //! [`CopyAccessExt`]: trait.CopyAccessExt.html
 //! [`FromAccess`]: trait.FromAccess.html
 
-use failure::Error;
 use thiserror::Error;
 
 use std::fmt;
@@ -286,7 +285,7 @@ pub enum AccessErrorKind {
 
     /// Custom error.
     #[error("{}", _0)]
-    Custom(#[source] Error),
+    Custom(#[source] anyhow::Error),
 }
 
 /// Constructs an object atop the database. The constructed object provides access to data

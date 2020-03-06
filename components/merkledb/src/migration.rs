@@ -64,7 +64,8 @@
 //! # use exonum_merkledb::{access::{AccessExt, CopyAccessExt}, Database, SystemSchema, TemporaryDB};
 //! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
-//! # fn main() -> Result<(), failure::Error> {
+//! #
+//! # fn main() -> anyhow::Result<()> {
 //! let db = Arc::new(TemporaryDB::new());
 //! // Create initial data in the database.
 //! let fork = db.fork();

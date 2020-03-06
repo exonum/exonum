@@ -165,8 +165,8 @@ extern crate serde_derive;
 // Re-export the crypto crate for use in the `ObjectHash` derive macro.
 #[doc(hidden)]
 pub mod _reexports {
+    pub use anyhow::Error;
     pub use exonum_crypto::{hash, Hash};
-    pub use failure::Error;
 }
 
 pub use self::{
