@@ -22,7 +22,6 @@ pub mod error;
 pub mod internal;
 pub mod network;
 pub mod noise;
-mod retries;
 
 use exonum::{
     helpers::{Height, Round},

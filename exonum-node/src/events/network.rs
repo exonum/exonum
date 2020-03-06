@@ -21,12 +21,14 @@ use exonum::{
 };
 use failure::{bail, ensure, format_err};
 use futures::{channel::mpsc, future, prelude::*};
+use futures_retry::{ErrorHandler, FutureRetry, RetryPolicy};
 use rand::{thread_rng, Rng};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_util::codec::Framed;
 
 use std::{
     collections::HashMap,
+    io,
     net::SocketAddr,
     ops,
     sync::{Arc, RwLock},
@@ -38,7 +40,6 @@ use crate::{
         codec::MessagesCodec,
         error::{into_failure, LogError},
         noise::{Handshake, HandshakeData, HandshakeParams, NoiseHandshake},
-        retries::{retry_future, FixedInterval},
     },
     messages::{Connect, Message, Service},
     state::SharedConnectList,
@@ -46,6 +47,45 @@ use crate::{
 };
 
 const OUTGOING_CHANNEL_SIZE: usize = 10;
+
+#[derive(Debug)]
+struct ErrorAction {
+    retry_timeout: Duration,
+    max_retries: usize,
+    description: String,
+}
+
+impl ErrorAction {
+    fn new(config: &NetworkConfiguration, description: String) -> Self {
+        Self {
+            retry_timeout: Duration::from_millis(config.tcp_connect_retry_timeout),
+            max_retries: config.tcp_connect_max_retries as usize,
+            description,
+        }
+    }
+}
+
+impl ErrorHandler<io::Error> for ErrorAction {
+    type OutError = io::Error;
+
+    fn handle(&mut self, attempt: usize, e: io::Error) -> RetryPolicy<io::Error> {
+        log::info!(
+            "{} failed [Attempt: {}/{}]: {}",
+            self.description,
+            attempt,
+            self.max_retries,
+            e
+        );
+
+        if attempt >= self.max_retries {
+            RetryPolicy::ForwardError(e)
+        } else {
+            let jitter = thread_rng().gen_range(0.5, 1.0);
+            let timeout = self.retry_timeout.mul_f64(jitter);
+            RetryPolicy::WaitRetry(timeout)
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum ConnectedPeerAddr {
@@ -367,19 +407,20 @@ impl NetworkHandler {
         let network_tx = self.network_tx.clone();
 
         let network_config = self.network_config;
-        let retries = FixedInterval::new(Duration::from_millis(
-            network_config.tcp_connect_retry_timeout,
-        ));
-        let retries = retries
-            .take(network_config.tcp_connect_max_retries as usize)
-            .map(|delay| {
-                let jitter = thread_rng().gen_range(0.5, 1.0);
-                delay.mul_f64(jitter)
-            });
+        let description = format!(
+            "Connecting to {} (remote address = {})",
+            key, unresolved_address
+        );
+        let on_error = ErrorAction::new(&network_config, description);
 
         async move {
-            let mut socket =
-                retry_future(retries, || TcpStream::connect(&unresolved_address)).await?;
+            let connect = || TcpStream::connect(&unresolved_address);
+            // The second component in returned value / error is the number of retries,
+            // which we ignore.
+            let (mut socket, _) = FutureRetry::new(connect, on_error)
+                .await
+                .map_err(|(err, _)| err)?;
+
             let peer_address = match socket.peer_addr() {
                 Ok(addr) => addr,
                 Err(err) => {
