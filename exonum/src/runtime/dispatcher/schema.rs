@@ -14,6 +14,7 @@
 
 //! Information schema for the runtime dispatcher.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
 use exonum_crypto::Hash;
 use exonum_derive::*;
 use exonum_merkledb::{
@@ -73,7 +74,7 @@ impl MigrationTransition {
         }
     }
 
-    fn from_pb(pb: PbMigrationTransition) -> Result<Option<Self>, failure::Error> {
+    fn from_pb(pb: PbMigrationTransition) -> anyhow::Result<Option<Self>> {
         use PbMigrationTransition::*;
         Ok(match pb {
             NONE => None,

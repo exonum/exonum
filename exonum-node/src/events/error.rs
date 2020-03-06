@@ -15,7 +15,7 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use failure::Error;
+use anyhow::Error;
 use log::error;
 
 use std::{error::Error as StdError, fmt::Display};

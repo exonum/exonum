@@ -350,8 +350,8 @@ fn wait_for_handshake_result(
     params: &HandshakeParams,
     sender_message: Option<BogusMessage>,
     responder_message: Option<BogusMessage>,
-) -> (Result<(), failure::Error>, Result<(), failure::Error>) {
-    let (err_tx, err_rx) = mpsc::channel::<failure::Error>(0);
+) -> (anyhow::Result<()>, anyhow::Result<()>) {
+    let (err_tx, err_rx) = mpsc::channel(0);
 
     let remote_params = params.clone();
 
@@ -371,9 +371,9 @@ fn wait_for_handshake_result(
 fn run_handshake_listener(
     addr: &SocketAddr,
     params: &HandshakeParams,
-    err_sender: Sender<failure::Error>,
+    err_sender: Sender<anyhow::Error>,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), failure::Error> {
+) -> anyhow::Result<()> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
@@ -407,7 +407,7 @@ fn send_handshake(
     addr: &SocketAddr,
     params: &HandshakeParams,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), failure::Error> {
+) -> anyhow::Result<()> {
     let mut core = Core::new().unwrap();
     let handle = core.handle();
 
@@ -458,7 +458,7 @@ impl NoiseErrorHandshake {
     fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Self), Error = anyhow::Error> {
         let inner = self.inner.take().unwrap();
 
         inner
@@ -472,7 +472,7 @@ impl NoiseErrorHandshake {
     fn write_handshake_msg<S: AsyncWrite + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Self), Error = anyhow::Error> {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;
 

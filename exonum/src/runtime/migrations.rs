@@ -475,7 +475,7 @@ impl From<InitMigrationError> for ExecutionError {
 /// }
 ///
 /// // Check that the migration scripts are selected properly.
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// let scripts = TokenService.migration_scripts(&Version::new(0, 3, 0))?;
 /// assert_eq!(scripts.len(), 2);
 /// assert_eq!(*scripts[0].end_version(), Version::new(0, 4, 0));

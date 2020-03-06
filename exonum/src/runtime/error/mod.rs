@@ -45,6 +45,7 @@ pub use self::{
     error_match::ErrorMatch, execution_status::ExecutionStatus,
 };
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
 use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_proto::ProtobufConvert;
@@ -223,7 +224,7 @@ impl ProtobufConvert for CallSite {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         use errors_proto::CallSite_Type::*;
 
         let call_type = match pb.get_call_type() {

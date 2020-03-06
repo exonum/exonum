@@ -12,14 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::proto;
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+use anyhow::ensure;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use failure::ensure;
 use protobuf::Message;
 
 use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
+
+use crate::proto;
 
 /// Protobuf-encodable type to store small maps of non-scalar keys and values.
 ///
@@ -41,7 +43,7 @@ struct KeyValue {
 
 fn pair_to_key_value_pb<K, V>(
     pair: (&K, &V),
-) -> Result<crate::proto::schema::key_value_sequence::KeyValue, failure::Error>
+) -> anyhow::Result<crate::proto::schema::key_value_sequence::KeyValue>
 where
     K: BinaryValue,
     V: BinaryValue,
@@ -55,7 +57,7 @@ where
 
 fn key_value_pb_to_pair<K, V>(
     pb: crate::proto::schema::key_value_sequence::KeyValue,
-) -> Result<(K, V), failure::Error>
+) -> anyhow::Result<(K, V)>
 where
     K: BinaryValue,
     V: BinaryValue,
@@ -79,18 +81,18 @@ where
             .0
             .iter()
             .map(pair_to_key_value_pb)
-            .collect::<Result<Vec<_>, failure::Error>>()
+            .collect::<anyhow::Result<Vec<_>>>()
             .expect("Map contains invalid utf-8 keys")
             .into();
         proto_struct
     }
 
-    fn from_pb(proto_struct: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(proto_struct: Self::ProtoStruct) -> anyhow::Result<Self> {
         let values = proto_struct
             .entries
             .into_iter()
             .map(key_value_pb_to_pair)
-            .collect::<Result<Vec<(K, V)>, failure::Error>>()?;
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         let check_key_ordering = |k: &[(K, V)]| {
             let (prev_key, key) = (&k[0].0, &k[1].0);
@@ -118,7 +120,7 @@ where
             .expect("Error while serializing value")
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut pb = <Self as ProtobufConvert>::ProtoStruct::new();
         pb.merge_from_bytes(bytes.as_ref())?;
         Self::from_pb(pb)
@@ -168,8 +170,7 @@ mod tests {
         let mut map = PbKeyValueSequence::new();
         map.set_entries(RepeatedField::from_vec(vec![kv.clone(), kv2.clone()]));
 
-        let res: Result<OrderedMap<String, Vec<u8>>, failure::Error> =
-            ProtobufConvert::from_pb(map);
+        let res = OrderedMap::<String, Vec<u8>>::from_pb(map);
         res.unwrap_err()
             .to_string()
             .contains("Invalid keys ordering");
@@ -178,8 +179,7 @@ mod tests {
         let mut map = PbKeyValueSequence::new();
         map.set_entries(RepeatedField::from_vec(vec![kv2.clone(), kv, kv2]));
 
-        let res: Result<OrderedMap<String, Vec<u8>>, failure::Error> =
-            ProtobufConvert::from_pb(map);
+        let res = OrderedMap::<String, Vec<u8>>::from_pb(map);
         res.unwrap_err()
             .to_string()
             .contains("Invalid keys ordering");

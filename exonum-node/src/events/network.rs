@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::{bail, ensure, format_err};
 use exonum::{
     crypto::{
         x25519::{self, into_x25519_public_key},
@@ -19,7 +20,6 @@ use exonum::{
     },
     messages::{SignedMessage, Verified},
 };
-use failure::{bail, ensure, format_err};
 use futures::{
     future::{self, err, Either},
     stream::{SplitSink, SplitStream},
@@ -156,7 +156,7 @@ impl ConnectionPool {
         &self,
         address: &PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let address = *address;
         let sender_tx = self.peers.borrow();
         let write_pool = self.clone();
@@ -184,7 +184,7 @@ impl ConnectionPool {
         &self,
         key: &PublicKey,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         if self.remove(key).is_some() {
             let send_disconnected = network_tx
                 .clone()
@@ -256,7 +256,7 @@ impl NetworkHandler {
         }
     }
 
-    fn listener(self) -> impl Future<Item = (), Error = failure::Error> {
+    fn listener(self) -> impl Future<Item = (), Error = anyhow::Error> {
         let listen_address = self.listen_address;
         let server = TcpListener::bind(&listen_address).unwrap().incoming();
         let pool = self.pool.clone();
@@ -338,7 +338,7 @@ impl NetworkHandler {
         &self,
         key: PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let handshake_params = handshake_params.clone();
         let handle = self.handle.clone();
         let network_tx = self.network_tx.clone();
@@ -382,7 +382,7 @@ impl NetworkHandler {
                                         "Couldn't take peer addr from socket = {}",
                                         e
                                     )))
-                                        as Box<dyn Future<Error = failure::Error, Item = ()>>;
+                                        as Box<dyn Future<Error = anyhow::Error, Item = ()>>;
                                 }
                             };
                             let conn_addr = ConnectedPeerAddr::Out(unresolved_address, addr);
@@ -417,7 +417,7 @@ impl NetworkHandler {
         handle: &Handle,
         connection: Connection,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> Result<(), failure::Error> {
+    ) -> Result<(), anyhow::Error> {
         let (sink, stream) = connection.socket.split();
 
         let incoming = Self::process_incoming_messages(
@@ -439,7 +439,7 @@ impl NetworkHandler {
         receiver_rx: mpsc::Receiver<SignedMessage>,
     ) -> impl Future<Item = (), Error = ()>
     where
-        S: Sink<SinkItem = SignedMessage, SinkError = failure::Error>,
+        S: Sink<SinkItem = SignedMessage, SinkError = anyhow::Error>,
     {
         receiver_rx
             .map_err(|_| format_err!("Receiver is gone."))
@@ -457,7 +457,7 @@ impl NetworkHandler {
         network_tx: mpsc::Sender<NetworkEvent>,
     ) -> impl Future<Item = (), Error = ()>
     where
-        S: Stream<Item = Vec<u8>, Error = failure::Error>,
+        S: Stream<Item = Vec<u8>, Error = anyhow::Error>,
     {
         let key = *key;
         network_tx
@@ -473,7 +473,7 @@ impl NetworkHandler {
     fn configure_socket(
         socket: TcpStream,
         network_config: NetworkConfiguration,
-    ) -> Result<TcpStream, failure::Error> {
+    ) -> Result<TcpStream, anyhow::Error> {
         socket.set_nodelay(network_config.tcp_nodelay)?;
         let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
         socket.set_keepalive(duration)?;
@@ -485,7 +485,7 @@ impl NetworkHandler {
         message: Verified<Connect>,
         pool: ConnectionPool,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         trace!("Established connection with peer={:?}", connection.address);
         let handle = connection.handle.clone();
         Self::send_peer_connected_event(&connection.address, message, network_tx).and_then(
@@ -496,7 +496,7 @@ impl NetworkHandler {
     fn parse_connect_msg(
         raw: Option<Vec<u8>>,
         key: &x25519::PublicKey,
-    ) -> Result<Verified<Connect>, failure::Error> {
+    ) -> anyhow::Result<Verified<Connect>> {
         let raw = raw.ok_or_else(|| format_err!("Incoming socket closed"))?;
         let message = Message::from_raw_buffer(raw)?;
         let connect: Verified<Connect> = match message {
@@ -520,7 +520,7 @@ impl NetworkHandler {
         self,
         receiver: mpsc::Receiver<NetworkRequest>,
         cancel_handler: unsync::oneshot::Sender<()>,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let mut cancel_sender = Some(cancel_handler);
         let handle = self.handle.clone();
 
@@ -552,7 +552,7 @@ impl NetworkHandler {
         &self,
         address: &PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let pool = self.pool.clone();
 
         if pool.contains(address) {
@@ -568,7 +568,7 @@ impl NetworkHandler {
         &self,
         key: PublicKey,
         message: SignedMessage,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let pool = self.pool.clone();
         let connect = self.handshake_params.connect.clone();
         self.connect(key, &self.handshake_params)
@@ -585,7 +585,7 @@ impl NetworkHandler {
         address: &ConnectedPeerAddr,
         message: Verified<Connect>,
         network_tx: &mpsc::Sender<NetworkEvent>,
-    ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = failure::Error> {
+    ) -> impl Future<Item = mpsc::Sender<NetworkEvent>, Error = anyhow::Error> {
         let peer_connected = NetworkEvent::PeerConnected(address.clone(), message);
         network_tx
             .clone()
@@ -600,7 +600,7 @@ impl NetworkHandler {
     fn send_unable_connect_event(
         &self,
         peer: &PublicKey,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let event = NetworkEvent::UnableConnectToPeer(*peer);
         self.network_tx
             .clone()
@@ -615,7 +615,7 @@ impl NetworkHandler {
         handshake_params: &HandshakeParams,
     ) -> impl Future<
         Item = (Framed<TcpStream, MessagesCodec>, Vec<u8>, x25519::PublicKey),
-        Error = failure::Error,
+        Error = anyhow::Error,
     > {
         let mut handshake_params = handshake_params.clone();
         handshake_params.set_remote_key(key);
@@ -628,7 +628,7 @@ impl NetworkPart {
         self,
         handle: &Handle,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Item = (), Error = failure::Error> {
+    ) -> impl Future<Item = (), Error = anyhow::Error> {
         let listen_address = self.listen_address;
         // `cancel_sender` is converted to future when we receive
         // `NetworkRequest::Shutdown` causing its being completed with error.

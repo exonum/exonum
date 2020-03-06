@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::ensure;
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use failure::ensure;
 
 use super::ExecutionError;
 use crate::proto::schema::errors as errors_proto;
@@ -56,7 +56,7 @@ impl ProtobufConvert for ExecutionStatus {
         inner
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let inner = if pb.has_error() {
             ensure!(!pb.has_ok(), "ExecutionStatus has both of variants.");
             Err(ExecutionError::from_pb(pb.take_error())?)

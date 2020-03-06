@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+use anyhow::{bail, ensure, format_err};
 use exonum_crypto::{Hash, KeyPair, PublicKey, SecretKey, HASH_SIZE};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
@@ -21,7 +23,6 @@ use exonum_merkledb::{
     BinaryKey, BinaryValue, ObjectHash,
 };
 use exonum_proto::ProtobufConvert;
-use failure::{bail, ensure, format_err};
 use protobuf::well_known_types::Empty;
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
@@ -129,7 +130,7 @@ impl AnyTx {
     }
 
     /// Parse transaction arguments as a specific type.
-    pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
+    pub fn parse<T: BinaryValue>(&self) -> anyhow::Result<T> {
         T::from_bytes(Cow::Borrowed(&self.arguments))
     }
 }
@@ -158,7 +159,7 @@ impl AnyTx {
 ///
 /// ```
 /// # use exonum::runtime::ArtifactId;
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// // Typical Rust artifact.
 /// let rust_artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>()?;
 /// // Typical Java artifact.
@@ -189,7 +190,7 @@ impl ArtifactId {
         runtime_id: impl Into<u32>,
         name: impl Into<String>,
         version: Version,
-    ) -> Result<Self, failure::Error> {
+    ) -> anyhow::Result<Self> {
         let artifact = Self::from_raw_parts(runtime_id.into(), name.into(), version);
         artifact.validate()?;
         Ok(artifact)
@@ -227,7 +228,7 @@ impl ArtifactId {
 }
 
 impl ValidateInput for ArtifactId {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     /// Checks that the artifact name contains only allowed characters and is not empty.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -261,7 +262,7 @@ impl Display for ArtifactId {
 }
 
 impl FromStr for ArtifactId {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let split = s.splitn(3, ':').collect::<Vec<_>>();
@@ -275,7 +276,7 @@ impl FromStr for ArtifactId {
                 artifact.validate()?;
                 Ok(artifact)
             }
-            _ => Err(failure::format_err!(
+            _ => Err(anyhow::format_err!(
                 "Wrong `ArtifactId` format, should be in form \"runtime_id:name:version\""
             )),
         }
@@ -337,7 +338,7 @@ impl InstanceSpec {
         id: InstanceId,
         name: impl Into<String>,
         artifact: impl AsRef<str>,
-    ) -> Result<Self, failure::Error> {
+    ) -> anyhow::Result<Self> {
         let spec = Self::from_raw_parts(id, name.into(), artifact.as_ref().parse()?);
         spec.validate()?;
         Ok(spec)
@@ -349,7 +350,7 @@ impl InstanceSpec {
     }
 
     /// Checks that the instance name contains only allowed characters and is not empty.
-    pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
+    pub fn is_valid_name(name: impl AsRef<str>) -> anyhow::Result<()> {
         let name = name.as_ref();
         ensure!(!name.is_empty(), "Service name is empty");
         ensure!(
@@ -366,7 +367,7 @@ impl InstanceSpec {
 }
 
 impl ValidateInput for InstanceSpec {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         self.artifact.validate()?;
@@ -437,7 +438,7 @@ impl ProtobufConvert for ArtifactStatus {
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         use self::schema::lifecycle::ArtifactState_Status::*;
 
         Ok(match pb {
@@ -609,7 +610,7 @@ impl InstanceStatus {
 
     pub(super) fn from_pb(
         mut pb: schema::lifecycle::InstanceStatus,
-    ) -> Result<Option<Self>, failure::Error> {
+    ) -> anyhow::Result<Option<Self>> {
         use schema::lifecycle::InstanceStatus_Simple::*;
 
         if pb.has_simple() {
@@ -635,7 +636,7 @@ impl ProtobufConvert for InstanceStatus {
         Self::create_pb(Some(self))
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let maybe_self = Self::from_pb(pb)?;
         maybe_self
             .ok_or_else(|| format_err!("Cannot create `InstanceStatus` from `None` serialization"))
@@ -714,7 +715,7 @@ mod pb_optional_version {
     use super::*;
 
     #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
-    pub fn from_pb(pb: String) -> Result<Option<Version>, failure::Error> {
+    pub fn from_pb(pb: String) -> anyhow::Result<Option<Version>> {
         if pb.is_empty() {
             Ok(None)
         } else {
@@ -821,7 +822,7 @@ impl ProtobufConvert for MigrationStatus {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let inner = if pb.has_hash() {
             Ok(Hash::from_pb(pb.take_hash())?)
         } else if pb.has_error() {
@@ -929,7 +930,7 @@ impl ProtobufConvert for Caller {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         Ok(if pb.has_transaction_author() {
             let author = PublicKey::from_pb(pb.take_transaction_author())?;
             Self::Transaction { author }
@@ -993,7 +994,7 @@ impl ProtobufConvert for CallerAddress {
         self.0.to_pb()
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         Hash::from_pb(pb).map(Self)
     }
 }

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
 use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
@@ -138,7 +139,6 @@ impl Block {
     /// # use exonum::blockchain::{Block, BlockHeaderKey, AdditionalHeaders};
     /// # use exonum::helpers::Height;
     /// # use exonum::merkledb::BinaryValue;
-    /// # use failure::Error;
     /// # use std::borrow::Cow;
     /// // Suppose we store a list of active service IDs in a block.
     /// // We can do this by defining a corresponding BlockHeaderKey implementation.
@@ -148,7 +148,7 @@ impl Block {
     ///
     /// # impl BinaryValue for ActiveServices {
     /// #     fn to_bytes(&self) -> Vec<u8> { vec![] }
-    /// #     fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, Error> {
+    /// #     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
     /// #         Ok(Self { service_ids: vec![] })
     /// #     }
     /// # }
@@ -174,7 +174,7 @@ impl Block {
     /// let services = block.get_header::<ActiveServices>().unwrap();
     /// assert!(services.is_none());
     /// ```
-    pub fn get_header<K: BlockHeaderKey>(&self) -> Result<Option<K::Value>, failure::Error> {
+    pub fn get_header<K: BlockHeaderKey>(&self) -> anyhow::Result<Option<K::Value>> {
         self.additional_headers
             .get::<K>()
             .map(|bytes: &[u8]| K::Value::from_bytes(Cow::Borrowed(bytes)))
