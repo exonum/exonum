@@ -71,7 +71,7 @@ impl DefaultInstance for SimpleService {
 }
 
 #[test]
-fn node_basic_workflow() -> Result<(), failure::Error> {
+fn node_basic_workflow() -> anyhow::Result<()> {
     let public_addr = PUBLIC_ADDRS[0];
     let public_api_root = format!("http://{}/api", public_addr);
     let public_addr = public_addr.to_string();

@@ -14,7 +14,7 @@
 
 //! This module contains utilities for passphrase entry.
 
-use failure::{bail, Context, Error};
+use anyhow::{bail, Context, Error};
 use rpassword::read_password_from_tty;
 use serde_derive::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -115,7 +115,7 @@ impl PassInputMethod {
 }
 
 impl FromStr for PassInputMethod {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {

@@ -14,7 +14,7 @@
 
 //! Loading and saving TOML-encoded configurations.
 
-use failure::{Context, Error};
+use anyhow::{Context, Error};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use std::{

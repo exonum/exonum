@@ -66,7 +66,7 @@ Running an Exonum node with default settings:
 use exonum_cli::NodeBuilder;
 use exonum_cryptocurrency_advanced as cryptocurrency;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
         .with_service(cryptocurrency::CryptocurrencyService)

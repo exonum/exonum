@@ -30,7 +30,7 @@ mod maintenance;
 mod run;
 mod run_dev;
 
-use failure::Error;
+use anyhow::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
