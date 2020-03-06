@@ -14,6 +14,7 @@
 
 //! Timestamping transactions.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
 use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;

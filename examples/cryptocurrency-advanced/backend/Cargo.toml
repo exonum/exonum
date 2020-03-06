@@ -22,7 +22,7 @@ exonum-proto = { version = "1.0.0-rc.1", path = "../../../components/proto" }
 exonum-cli = { version = "1.0.0-rc.1", path = "../../../cli" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../../runtimes/rust" }
 
-failure = { package = "anyhow", version = "1.0" }
+anyhow = "1.0.26"
 protobuf = "2.8.0"
 serde = "1.0.0"
 serde_derive = "1.0.0"

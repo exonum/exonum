@@ -14,6 +14,7 @@
 
 //! Cryptocurrency transactions.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
 use exonum::{
     crypto::Hash,
     runtime::{CallerAddress as Address, CommonError, ExecutionContext, ExecutionError},

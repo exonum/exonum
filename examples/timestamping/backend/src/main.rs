@@ -17,7 +17,7 @@ use exonum_time::TimeServiceFactory;
 
 use exonum_timestamping::TimestampingService;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
         .with(Spec::new(TimeServiceFactory::default()))

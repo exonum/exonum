@@ -23,7 +23,7 @@ protobuf = "2.10.1"
 pretty_assertions = "0.6.1"
 
 [dev-dependencies]
-failure = { package = "anyhow", version = "1.0" }
+anyhow = "1.0.26"
 
 [build-dependencies]
 exonum-build = { version = "1.0.0-rc.1", path = "../../components/build" }
