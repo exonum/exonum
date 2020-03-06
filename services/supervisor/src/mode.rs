@@ -21,10 +21,10 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
+use anyhow::format_err;
 use exonum::{crypto::Hash, helpers::byzantine_quorum};
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{fmt, str::FromStr};
@@ -55,7 +55,7 @@ impl ProtobufConvert for Mode {
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let result = match pb {
             proto::SupervisorMode::SIMPLE => Self::Simple,
             proto::SupervisorMode::DECENTRALIZED => Self::Decentralized,
@@ -136,7 +136,7 @@ impl fmt::Display for Mode {
 }
 
 impl FromStr for Mode {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {

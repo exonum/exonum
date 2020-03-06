@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::format_err;
 use exonum::{helpers::Height, runtime::ExecutionError};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto as pb_supervisor;
@@ -109,7 +109,7 @@ impl ProtobufConvert for AsyncEventState {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         use pb_supervisor::AsyncEventState_Type::*;
         let state = match pb.get_state() {
             PENDING => Self::Pending,

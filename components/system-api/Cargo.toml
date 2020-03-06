@@ -27,6 +27,6 @@ serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
+anyhow = "1.0.26"
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit", features = ["exonum-node"] }
 pretty_assertions = "0.6.1"
-failure = { package = "anyhow", version = "1.0" }

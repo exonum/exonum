@@ -34,7 +34,6 @@ actix-net = "0.2.6"
 actix = "0.7.9"
 actix-web = { version = "0.7.18", default-features = false }
 chrono = "0.4.6"
-failure = { package = "anyhow", version = "1.0" }
 futures = "0.1.25"
 log = "0.4.6"
 reqwest = "0.9.8"

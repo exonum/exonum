@@ -47,7 +47,7 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
 //! # use exonum_testkit::{Spec, TestKitBuilder};
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
@@ -86,7 +86,7 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
 //! # use exonum_testkit::{Spec, TestKitBuilder};
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with(Spec::new(ExplorerFactory).with_default_instance())
 //! #    .build();
@@ -150,7 +150,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -218,7 +218,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -277,7 +277,7 @@
 //! #     }
 //! # }
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -355,7 +355,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -556,7 +556,7 @@ impl ExplorerApi {
         sender: &ApiSender,
         query: TransactionHex,
     ) -> api::FutureResult<TransactionResponse> {
-        let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
+        let verify_message = |snapshot: &dyn Snapshot, hex: String| -> anyhow::Result<_> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
             let verified = msg.into_verified()?;

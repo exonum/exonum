@@ -24,7 +24,7 @@
 use exonum_cli::{NodeBuilder, Spec};
 use exonum_time::TimeServiceFactory;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
 
     let time_service = TimeServiceFactory::default();

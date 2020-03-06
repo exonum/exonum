@@ -42,7 +42,7 @@
 //! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
@@ -69,7 +69,7 @@
 //! use exonum_system_api::{private::NodeStats, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
@@ -98,7 +98,7 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! # let address = "127.0.0.1:8080".to_owned();
 //! # let public_key = Default::default();
 //! // Obtaining address and public key of target node skipped...
@@ -135,7 +135,7 @@
 //! use exonum_system_api::{private::ConsensusEnabledQuery, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
@@ -164,7 +164,7 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();

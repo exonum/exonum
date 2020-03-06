@@ -23,8 +23,8 @@ exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
 exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 
+anyhow = "1.0.26"
 chrono = { version = "0.4.6", features = ["serde"] }
-failure = { package = "anyhow", version = "1.0" }
 protobuf = "2.8.0"
 serde = "1.0"
 serde_derive = "1.0"

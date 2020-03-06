@@ -56,7 +56,7 @@
 //! use exonum_supervisor::Supervisor;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Supervisor::simple())
 //!     .build();
@@ -88,7 +88,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -121,7 +121,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -178,7 +178,7 @@
 //! #
 //! # fn config_for_artifact() -> Vec<u8> { Vec::new() }
 //! #
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -235,7 +235,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Supervisor::simple())
 //!     // Add some service that supports migrations...
@@ -306,7 +306,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -366,7 +366,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
@@ -427,7 +427,7 @@
 //! use exonum_supervisor::Supervisor;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -460,7 +460,7 @@
 //! use exonum_supervisor::{mode::Mode, Supervisor, SupervisorConfig};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -505,7 +505,7 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with(Supervisor::simple())
@@ -554,7 +554,7 @@
 //! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.

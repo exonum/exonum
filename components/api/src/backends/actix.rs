@@ -24,7 +24,7 @@ use actix_web::{
     error::ResponseError, http::header, AsyncResponder, FromRequest, HttpMessage, HttpResponse,
     Query,
 };
-use failure::{ensure, format_err, Error};
+use anyhow::{ensure, format_err};
 use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
 use serde::{de::DeserializeOwned, Serialize};
 
@@ -287,16 +287,16 @@ pub(crate) fn create_app(
 
 /// Actix system runtime handle.
 pub struct SystemRuntime {
-    system_thread: JoinHandle<Result<(), Error>>,
+    system_thread: JoinHandle<anyhow::Result<()>>,
     system: System,
 }
 
 impl SystemRuntime {
     /// Starts actix system runtime along with all web runtimes.
-    pub fn start(manager: ApiManager) -> Result<Self, Error> {
+    pub fn start(manager: ApiManager) -> anyhow::Result<Self> {
         // Creates a system thread.
         let (system_tx, system_rx) = mpsc::unbounded();
-        let system_thread = thread::spawn(move || -> Result<(), Error> {
+        let system_thread = thread::spawn(move || -> anyhow::Result<()> {
             let system = System::new("http-server");
             system_tx.unbounded_send(System::current())?;
             manager.start();
@@ -325,7 +325,7 @@ impl SystemRuntime {
     }
 
     /// Stops the actix system runtime along with all web runtimes.
-    pub fn stop(self) -> Result<(), Error> {
+    pub fn stop(self) -> anyhow::Result<()> {
         // Stop actix system runtime.
         self.system.stop();
         self.system_thread.join().map_err(|e| {

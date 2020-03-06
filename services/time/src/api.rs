@@ -39,7 +39,7 @@
 //! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let time_service = TimeServiceFactory::default();
 //! let time_service = Spec::new(time_service)
 //!     .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
@@ -89,7 +89,7 @@
 //! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let time_service = TimeServiceFactory::default();
 //! let time_service = Spec::new(time_service)
 //!     .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
