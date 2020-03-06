@@ -14,7 +14,7 @@
 
 //! Timestamping database schema.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
 use chrono::{DateTime, Utc};
 use exonum::crypto::Hash;
 use exonum::merkledb::{

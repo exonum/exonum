@@ -39,7 +39,7 @@ mod tx_tests;
 
 /// Persistent data.
 pub mod schema {
-    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
     use exonum::{
         crypto::PublicKey,
         merkledb::{
@@ -114,7 +114,7 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
-    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
     use exonum::crypto::PublicKey;
     use exonum_derive::{BinaryValue, ObjectHash};
     use exonum_proto::ProtobufConvert;

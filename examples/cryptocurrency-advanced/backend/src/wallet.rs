@@ -14,7 +14,7 @@
 
 //! Cryptocurrency wallet.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
 use exonum::{crypto::Hash, runtime::CallerAddress as Address};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;

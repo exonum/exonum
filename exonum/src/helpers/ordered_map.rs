@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
 use anyhow::ensure;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
