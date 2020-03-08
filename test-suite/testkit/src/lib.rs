@@ -456,23 +456,18 @@ impl TestKit {
             validator_id,
             new_block_height,
             tx_hashes,
-            &mut BTreeMap::new(),
+            &BTreeMap::new(),
         );
 
         let precommits: Vec<_> = self
             .network()
             .validators()
             .iter()
-            .map(|v| v.create_precommit(new_block_height, block_hash))
+            .map(|validator| validator.create_precommit(new_block_height, block_hash))
             .collect();
 
         self.blockchain
-            .commit(
-                patch,
-                block_hash,
-                precommits.into_iter(),
-                &mut BTreeMap::new(),
-            )
+            .commit(patch, block_hash, precommits.into_iter())
             .unwrap();
         drop(guard);
 

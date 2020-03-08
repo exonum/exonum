@@ -120,10 +120,8 @@ fn setup_blockchain_for_index_proofs() -> Box<dyn Snapshot> {
     blockchain.merge(fork.into_patch()).unwrap();
 
     let (block_hash, patch) =
-        blockchain.create_patch(ValidatorId(0), Height(1), &[], &mut BTreeMap::new());
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+        blockchain.create_patch(ValidatorId(0), Height(1), &[], &BTreeMap::new());
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
     blockchain.snapshot()
 }
 

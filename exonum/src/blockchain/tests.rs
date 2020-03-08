@@ -355,16 +355,10 @@ fn execute_transaction(
         Schema::new(&snapshot).next_height()
     };
 
-    let (block_hash, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
-        height,
-        &[tx_hash],
-        &mut BTreeMap::new(),
-    );
+    let (block_hash, patch) =
+        blockchain.create_patch(ValidatorId::zero(), height, &[tx_hash], &BTreeMap::new());
 
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     let location = schema.transactions_locations().get(&tx_hash).unwrap();
@@ -428,7 +422,7 @@ fn after_transactions_failure_causes_genesis_failure() {
 
 #[test]
 fn handling_tx_panic_error() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -470,7 +464,7 @@ fn handling_tx_panic_error() {
 #[test]
 #[should_panic]
 fn handling_tx_merkledb_error() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -494,7 +488,7 @@ fn initialize_service_ok() {
 
 #[test]
 fn deploy_available() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let artifact_id = ArtifactId::from_raw_parts(
         RuntimeInspector::ID,
@@ -515,7 +509,7 @@ fn deploy_available() {
 
 #[test]
 fn deploy_already_deployed() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -539,7 +533,7 @@ fn deploy_already_deployed() {
 #[test]
 #[should_panic(expected = "assertion failed: self.available.contains(&artifact)")]
 fn deploy_unavailable_artifact() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -560,7 +554,7 @@ fn deploy_unavailable_artifact() {
 
 #[test]
 fn start_stop_service_instance() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -620,7 +614,7 @@ fn start_stop_service_instance() {
 /// instance IDs.
 #[test]
 fn test_check_tx() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -753,12 +747,8 @@ fn blockchain_height() {
     assert_eq!(schema.next_height(), Height(1));
 
     // Create one block.
-    let (_, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
-        Height::zero(),
-        &[],
-        &mut BTreeMap::new(),
-    );
+    let (_, patch) =
+        blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new());
     blockchain.merge(patch).unwrap();
 
     // Check that height is 1.
@@ -770,7 +760,7 @@ fn blockchain_height() {
 
 #[test]
 fn state_aggregation() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -795,4 +785,40 @@ fn state_aggregation() {
         .keys()
         .collect();
     assert_eq!(actual_indexes, expected_indexes);
+}
+
+#[test]
+fn no_data_race_for_transaction_pool() {
+    let keys = KeyPair::random();
+    let mut blockchain = create_blockchain(
+        RuntimeInspector::default(),
+        vec![InitAction::Noop.into_default_instance()],
+    );
+
+    let tx = Transaction::AddValue(10).sign(TEST_SERVICE_ID, &keys);
+    let tx_hash = tx.object_hash();
+    let mut tx_cache = BTreeMap::new();
+    tx_cache.insert(tx_hash, tx.clone());
+    let (block_hash, patch) =
+        blockchain.create_patch(ValidatorId(0), Height(1), &[tx_hash], &tx_cache);
+
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    let is_known = super::get_transaction(&tx_hash, &schema.transactions(), &tx_cache).is_some();
+    assert!(is_known);
+    let is_in_pool =
+        schema.transactions_pool().contains(&tx_hash) || tx_cache.contains_key(&tx_hash);
+    assert!(is_in_pool);
+
+    // Move transaction to persistent pool while the block is being accepted.
+    let fork = blockchain.fork();
+    Schema::new(&fork).add_transaction_into_pool(tx);
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    // Accept the block and check that the core schema remains logically consistent.
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    assert_eq!(schema.transactions_len(), 1);
+    assert_eq!(schema.transactions_pool_len(), 0);
 }

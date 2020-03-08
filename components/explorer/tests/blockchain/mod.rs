@@ -139,9 +139,8 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
 
-    let mut tx_cache = BTreeMap::new();
     let (block_hash, patch) =
-        blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &mut tx_cache);
+        blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &BTreeMap::new());
     let consensus_keys = consensus_keys();
 
     let precommit = Verified::from_value(
@@ -158,6 +157,6 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     );
 
     blockchain
-        .commit(patch, block_hash, vec![precommit], &mut tx_cache)
+        .commit(patch, block_hash, vec![precommit])
         .unwrap();
 }

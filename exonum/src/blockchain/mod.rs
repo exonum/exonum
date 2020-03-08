@@ -257,12 +257,8 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch).unwrap();
 
-        let (_, patch) = self.create_patch(
-            ValidatorId::zero(),
-            Height::zero(),
-            &[],
-            &mut BTreeMap::new(),
-        );
+        let (_, patch) =
+            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new());
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -281,7 +277,7 @@ impl BlockchainMut {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
+        tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
     ) -> (Hash, Patch) {
         self.create_patch_inner(self.fork(), proposer_id, height, tx_hashes, tx_cache)
     }
@@ -293,7 +289,7 @@ impl BlockchainMut {
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
+        tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
     ) -> (Hash, Patch) {
         // Skip execution for genesis block.
         if height > Height(0) {
@@ -368,7 +364,7 @@ impl BlockchainMut {
         height: Height,
         index: u32,
         fork: &mut Fork,
-        tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
+        tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
     ) {
         let schema = Schema::new(&*fork);
         let transaction = get_transaction(&tx_hash, &schema.transactions(), tx_cache)
@@ -382,42 +378,28 @@ impl BlockchainMut {
             schema.save_error(height, CallInBlock::transaction(index), e);
         }
         schema.commit_transaction(&tx_hash, height, transaction);
-        tx_cache.remove(&tx_hash);
         let location = TxLocation::new(height, index);
         schema.transactions_locations().put(&tx_hash, location);
         fork.flush();
     }
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
-    /// hash and Precommit messages. After that invokes `after_commit`
-    /// for each service in the increasing order of their identifiers.
-    pub fn commit<I>(
-        &mut self,
-        patch: Patch,
-        block_hash: Hash,
-        precommits: I,
-        tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), Error>
+    /// hash and `Precommit` messages. Runtimes are then notified about the committed block.
+    pub fn commit<I>(&mut self, patch: Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {
         let fork: Fork = patch.into();
-        let mut schema = Schema::new(&fork);
+        let schema = Schema::new(&fork);
         schema.precommits(&block_hash).extend(precommits);
-        let txs_in_block = schema.last_block().tx_count;
-        schema.update_transaction_count(u64::from(txs_in_block));
-
-        let tx_hashes = tx_cache.keys().cloned().collect::<Vec<Hash>>();
-        for tx_hash in tx_hashes {
-            if let Some(tx) = tx_cache.remove(&tx_hash) {
-                if !schema.transactions().contains(&tx_hash) {
-                    schema.add_transaction_into_pool(tx);
-                }
-            }
-        }
-
         let patch = self.dispatcher.commit_block_and_notify_runtimes(fork);
         self.merge(patch)?;
+
+        // TODO: this makes `commit` non-atomic; can this be avoided?
+        let new_fork = self.fork();
+        Schema::new(&new_fork).update_transaction_count();
+        self.merge(new_fork.into_patch())?;
+
         Ok(())
     }
 

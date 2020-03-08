@@ -123,12 +123,7 @@ fn create_consensus_config_and_blockchain_base(
 }
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
-    blockchain.create_patch(
-        ValidatorId::zero(),
-        Height(height),
-        txs,
-        &mut BTreeMap::new(),
-    )
+    blockchain.create_patch(ValidatorId::zero(), Height(height), txs, &BTreeMap::new())
 }
 
 mod timestamping {
@@ -535,9 +530,7 @@ fn prepare_blockchain(
         let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
-        blockchain
-            .commit(patch, block_hash, iter::empty(), &mut BTreeMap::new())
-            .unwrap();
+        blockchain.commit(patch, block_hash, iter::empty()).unwrap();
     }
 }
 

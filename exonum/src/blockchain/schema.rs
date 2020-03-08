@@ -304,25 +304,46 @@ where
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
+    ///
+    /// **NB.** This method does not remove transactions from the `transactions_pool`.
+    /// The pool is updated during block commit in `update_transaction_count` in order to avoid
+    /// data race between commit and adding transactions into the pool.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash, height: Height, tx: Verified<AnyTx>) {
         if !self.transactions().contains(hash) {
             self.transactions().put(hash, tx)
-        }
-
-        if self.transactions_pool().contains(hash) {
-            self.transactions_pool().remove(hash);
-            let txs_pool_len = self.transactions_pool_len_index().get().unwrap();
-            self.transactions_pool_len_index().set(txs_pool_len - 1);
         }
 
         self.block_transactions(height).push(*hash);
     }
 
     /// Updates transaction count of the blockchain.
-    pub(crate) fn update_transaction_count(&mut self, count: u64) {
+    pub(crate) fn update_transaction_count(&mut self) {
+        let block_transactions = self.block_transactions(self.height());
+        let count = block_transactions.len();
+
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
+
+        // Determine the number of committed transactions present in the pool (besides the pool,
+        // transactions can be taken from the non-persistent cache). Remove the committed transactions
+        // from the pool.
+        let mut pool = self.transactions_pool();
+        let pool_count = block_transactions
+            .iter()
+            .filter(|tx_hash| {
+                if pool.contains(tx_hash) {
+                    pool.remove(tx_hash);
+                    true
+                } else {
+                    false
+                }
+            })
+            .count();
+
+        let mut pool_len_index = self.transactions_pool_len_index();
+        let new_pool_len = pool_len_index.get().unwrap_or(0) - pool_count as u64;
+        pool_len_index.set(new_pool_len);
     }
 
     /// Saves an error to the blockchain.
