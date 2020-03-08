@@ -9,10 +9,6 @@ readme = "README.md"
 description = "The crate for soak testing of Exonum node."
 publish = false
 
-[[bin]]
-name = "toggle"
-path = "src/toggle.rs"
-
 [dependencies]
 exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
 exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
