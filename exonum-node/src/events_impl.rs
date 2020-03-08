@@ -13,10 +13,11 @@
 // limitations under the License.
 
 use exonum::blockchain::Schema;
-use log::{info, trace, warn};
+use log::{info, warn};
+
+use std::mem;
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-
 use crate::events::{
     error::LogError, Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest,
     NetworkEvent,
@@ -97,6 +98,10 @@ impl NodeHandler {
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
             NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
             NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
+            NodeTimeout::FlushPool => {
+                self.flush_txs_into_pool();
+                self.maybe_add_flush_pool_timeout();
+            }
         }
     }
 
@@ -117,27 +122,25 @@ impl NodeHandler {
 
     fn flush_txs_into_pool(&mut self) {
         let tx_cache_size = self.state().tx_cache_len();
-
         if tx_cache_size == 0 {
-            //No need to do anything.
-            trace!("Transaction cache is empty.");
             return;
+        } else {
+            info!(
+                "Flushing {} transactions from pool to storage",
+                tx_cache_size
+            );
         }
 
         let fork = self.blockchain.fork();
         let mut schema = Schema::new(&fork);
-
-        for tx in self.state().tx_cache().values() {
-            schema.add_transaction_into_pool(tx.clone());
+        for (_, tx) in mem::take(self.state.tx_cache_mut()) {
+            schema.add_transaction_into_pool(tx);
         }
 
-        if self.blockchain.merge(fork.into_patch()).is_ok() {
-            info!(
-                "Flushed {} transactions from cache to persistent pool",
-                tx_cache_size
-            )
-        } else {
-            warn!("Failed to flush transactions from cache to persistent pool.")
+        info!("before flush");
+        if self.blockchain.merge(fork.into_patch()).is_err() {
+            warn!("Failed to flush transactions from cache to persistent pool.");
         }
+        info!("flushed");
     }
 }

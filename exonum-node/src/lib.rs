@@ -156,6 +156,8 @@ pub(crate) enum NodeTimeout {
     UpdateApiState,
     /// Exchange peers timeout.
     PeerExchange,
+    /// Flush uncommitted transactions into the database.
+    FlushPool,
 }
 
 /// A helper trait that provides the node with information about the state of the system such
@@ -313,13 +315,44 @@ impl Default for EventsPoolCapacity {
 
 /// Memory pool configuration parameters.
 ///
-/// The internal structure of this type is an implementation detail. For most applications,
-/// you should use the value returned by `Default::default()`.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+/// # Examples
+///
+/// For most applications, you should use the value returned by `MemoryPoolConfig::default()`, maybe
+/// overwriting some fields afterwards:
+///
+/// ```
+/// # use exonum_node::MemoryPoolConfig;
+/// let mut pool_config = MemoryPoolConfig::default();
+/// // Increase flush pool interval to 100 milliseconds.
+/// pool_config.flush_pool_timeout = Some(100);
+/// // Use the config somewhere...
+/// ```
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    events_pool_capacity: EventsPoolCapacity,
+    pub events_pool_capacity: EventsPoolCapacity,
+
+    /// Interval between flushing the transaction pool to the persistent storage.
+    ///
+    /// This value influences how fast transactions appear in the persistent pool after they
+    /// have been initially processed by the node. With `None` setting, transactions will not
+    /// be persisted at all before appearing in a block, which may negatively influence
+    /// some applications (e.g., the `GET transactions` endpoint of the explorer service).
+    /// On the other hand, setting `flush_pool_timeout` too low may lead to node hiccups
+    /// during high transaction load.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub flush_pool_timeout: Option<Milliseconds>,
+}
+
+impl Default for MemoryPoolConfig {
+    fn default() -> Self {
+        Self {
+            events_pool_capacity: EventsPoolCapacity::default(),
+            flush_pool_timeout: Some(25),
+        }
+    }
 }
 
 /// Configuration for the `Node`.
@@ -462,48 +495,32 @@ impl NodeHandler {
         api_state: SharedNodeState,
         config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
-        let (last_hash, last_height) = {
-            let block = blockchain.as_ref().last_block();
-            (block.object_hash(), block.height.next())
-        };
-
+        let last_block = blockchain.as_ref().last_block();
         let snapshot = blockchain.snapshot();
         let consensus_config = Schema::new(&snapshot).consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
-        let validator_id = consensus_config
-            .validator_keys
-            .iter()
-            .position(|pk| pk.consensus_key == config.keys.consensus_pk())
-            .map(|id| ValidatorId(id as u16));
-        info!("Validator id = '{:?}'", validator_id);
-        let connect = Verified::from_value(
-            Connect::new(
-                external_address,
-                system_state.current_time().into(),
-                &user_agent(),
-            ),
-            config.keys.consensus_pk(),
-            config.keys.consensus_sk(),
+        let connect = Connect::new(
+            external_address,
+            system_state.current_time().into(),
+            &user_agent(),
         );
-
-        let connect_list = config.connect_list;
         let peers = NodeSchema::new(&blockchain.snapshot())
             .peers_cache()
             .iter()
             .collect();
+        let peer_discovery = config.peer_discovery.clone();
+
         let state = State::new(
-            validator_id,
-            connect_list,
+            config,
             consensus_config,
             connect,
             peers,
-            last_hash,
-            last_height,
+            &last_block,
             system_state.current_time(),
-            config.keys,
         );
 
+        let validator_id = state.validator_id();
         let node_role = NodeRole::new(validator_id);
         let is_enabled = api_state.is_enabled();
         api_state.set_node_role(node_role);
@@ -515,7 +532,7 @@ impl NodeHandler {
             system_state,
             state,
             channel: sender,
-            peer_discovery: config.peer_discovery,
+            peer_discovery,
             is_enabled,
             node_role,
             config_manager,
@@ -638,6 +655,7 @@ impl NodeHandler {
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
+        self.maybe_add_flush_pool_timeout();
     }
 
     /// Sends the given message to a peer by its public key.
@@ -764,6 +782,13 @@ impl NodeHandler {
         let time = self.system_state.current_time()
             + Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
+    }
+
+    fn maybe_add_flush_pool_timeout(&mut self) {
+        if let Some(timeout) = self.state().flush_pool_timeout() {
+            let time = self.system_state.current_time() + timeout;
+            self.add_timeout(NodeTimeout::FlushPool, time);
+        }
     }
 
     /// Returns hash of the last block.

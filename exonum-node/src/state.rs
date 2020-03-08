@@ -37,7 +37,7 @@ use crate::{
     consensus::RoundAction,
     events::network::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose},
-    ConnectInfo,
+    Configuration, ConnectInfo,
 };
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -93,6 +93,7 @@ pub(crate) struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
+    flush_pool_timeout: Option<Duration>,
 
     // An in-memory set of transaction hashes, rejected by a node
     // within block.
@@ -447,29 +448,36 @@ impl SharedConnectList {
 
 impl State {
     /// Creates state with the given parameters.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
-        validator_id: Option<ValidatorId>,
-        connect_list: ConnectList,
-        config: ConsensusConfig,
-        connect: Verified<Connect>,
+        config: Configuration,
+        consensus_config: ConsensusConfig,
+        connect: Connect,
         peers: HashMap<PublicKey, Verified<Connect>>,
-        last_hash: Hash,
-        last_height: Height,
+        last_block: &Block,
         height_start_time: SystemTime,
-        keys: Keys,
     ) -> Self {
+        let validator_id = consensus_config
+            .validator_keys
+            .iter()
+            .position(|pk| pk.consensus_key == config.keys.consensus_pk());
+
+        let our_connect_message = Verified::from_value(
+            connect,
+            config.keys.consensus_pk(),
+            config.keys.consensus_sk(),
+        );
+
         Self {
-            validator_state: validator_id.map(ValidatorState::new),
-            connect_list: SharedConnectList::from_connect_list(connect_list),
+            validator_state: validator_id.map(|id| ValidatorState::new(ValidatorId(id as u16))),
+            connect_list: SharedConnectList::from_connect_list(config.connect_list),
             peers,
             connections: HashMap::new(),
-            height: last_height,
+            height: last_block.height.next(),
             height_start_time,
             round: Round::zero(),
             locked_round: Round::zero(),
             locked_propose: None,
-            last_hash,
+            last_hash: last_block.object_hash(),
 
             proposes: HashMap::new(),
             blocks: HashMap::new(),
@@ -484,19 +492,17 @@ impl State {
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
 
-            our_connect_message: connect,
+            our_connect_message,
 
             requests: HashMap::new(),
-
-            config,
+            config: consensus_config,
 
             incomplete_block: None,
-
             tx_cache: BTreeMap::new(),
-
+            flush_pool_timeout: config.mempool.flush_pool_timeout.map(Duration::from_millis),
             invalid_txs: HashSet::default(),
 
-            keys,
+            keys: config.keys,
         }
     }
 
@@ -1290,6 +1296,11 @@ impl State {
     /// Returns mutable reference to the transactions cache.
     pub(super) fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
         &mut self.tx_cache
+    }
+
+    /// Returns interval between flushing transaction pool to the database, if any.
+    pub(super) fn flush_pool_timeout(&self) -> Option<Duration> {
+        self.flush_pool_timeout
     }
 
     /// Returns mutable reference to the invalid transactions cache.

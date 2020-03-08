@@ -664,21 +664,21 @@ impl Sandbox {
         let snapshot = self.blockchain().snapshot();
         let schema = snapshot.for_core();
         let schema_transactions = schema.transactions();
+
         txs.into_iter()
             .filter(|elem| {
                 let hash_elem = elem.object_hash();
+
                 if unique_set.contains(&hash_elem) {
                     return false;
                 }
                 unique_set.insert(hash_elem);
-                if contains_transaction(
+
+                !contains_transaction(
                     &hash_elem,
                     &schema_transactions,
                     self.node_state().tx_cache(),
-                ) {
-                    return false;
-                }
-                true
+                )
             })
             .cloned()
             .collect()
