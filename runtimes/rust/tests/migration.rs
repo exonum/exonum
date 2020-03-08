@@ -626,5 +626,6 @@ fn resume_active_service_error() {
     assert_eq!(
         actual_err,
         ErrorMatch::from_fail(&CoreError::InvalidServiceTransition)
+            .with_description_containing("Cannot resume service `2:withdrawal`")
     );
 }

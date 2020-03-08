@@ -728,7 +728,11 @@ fn conflicting_service_instances() {
     )
     .unwrap_err();
     // Alternative instance was discarded.
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("unknown service with ID 3")
+    );
 }
 
 #[test]
