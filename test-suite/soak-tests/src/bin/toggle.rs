@@ -62,7 +62,7 @@ fn main() {
     let supervisor = Spec::new(TogglingSupervisor).with_default_instance();
     let nodes = run_nodes(args.node_count, 2_000, |genesis, rt| {
         main_service.clone().deploy(genesis, rt);
-        supervisor.clone().deploy(genesis, rt)
+        supervisor.clone().deploy(genesis, rt);
     });
 
     loop {
