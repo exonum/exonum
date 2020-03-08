@@ -28,8 +28,6 @@ use exonum_derive::*;
 use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory};
 use serde_derive::*;
 
-use std::collections::BTreeMap;
-
 pub const SERVICE_ID: InstanceId = 118;
 
 #[derive(Clone, Debug)]
@@ -139,8 +137,7 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
 
-    let (block_hash, patch) =
-        blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &BTreeMap::new());
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &());
     let consensus_keys = consensus_keys();
 
     let precommit = Verified::from_value(

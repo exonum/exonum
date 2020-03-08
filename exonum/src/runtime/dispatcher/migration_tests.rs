@@ -288,7 +288,7 @@ impl Rig {
         let height = CoreSchema::new(&fork).next_height();
         let (block_hash, patch) =
             self.blockchain
-                .create_patch_inner(fork, ValidatorId(0), height, &[], &BTreeMap::new());
+                .create_patch_inner(fork, ValidatorId(0), height, &[], &());
         self.blockchain.commit(patch, block_hash, vec![]).unwrap();
         self.blockchain.as_ref().last_block()
     }

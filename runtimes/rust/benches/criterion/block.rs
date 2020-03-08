@@ -52,7 +52,7 @@ use exonum::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempfile::TempDir;
 
-use std::{collections::BTreeMap, iter, sync::Arc};
+use std::{iter, sync::Arc};
 
 use exonum_rust_runtime::{DefaultInstance, RustRuntime};
 
@@ -123,7 +123,7 @@ fn create_consensus_config_and_blockchain_base(
 }
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
-    blockchain.create_patch(ValidatorId::zero(), Height(height), txs, &BTreeMap::new())
+    blockchain.create_patch(ValidatorId::zero(), Height(height), txs, &())
 }
 
 mod timestamping {

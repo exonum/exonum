@@ -13,7 +13,9 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{contains_transaction, Blockchain, BlockchainMut, ProposerId, Schema},
+    blockchain::{
+        Blockchain, BlockchainMut, PersistentCache, ProposerId, Schema, TransactionCache,
+    },
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, Fork, ObjectHash, Patch},
@@ -294,15 +296,11 @@ impl NodeHandler {
             let block_height = block.height;
             let incomplete_block = IncompleteBlock::new(block, transactions, precommits);
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
+            let txs_pool = Schema::new(snapshot.as_ref()).transactions_pool();
 
             let has_unknown_txs = self
                 .state
-                .create_incomplete_block(
-                    incomplete_block,
-                    &schema.transactions(),
-                    &schema.transactions_pool(),
-                )
+                .create_incomplete_block(incomplete_block, &snapshot, &txs_pool)
                 .has_unknown_txs();
 
             let known_nodes = self.remove_request(&RequestData::Block(block_height));
@@ -758,8 +756,8 @@ impl NodeHandler {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        if contains_transaction(&hash, &schema.transactions(), self.state.tx_cache()) {
+        let tx_pool = PersistentCache::new(&snapshot, self.state.tx_cache());
+        if tx_pool.contains_transaction(hash) {
             return Err(HandleTxError::AlreadyProcessed);
         }
 

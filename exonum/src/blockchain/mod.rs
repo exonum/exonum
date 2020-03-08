@@ -31,8 +31,9 @@ pub(crate) use crate::runtime::ExecutionError;
 
 use exonum_crypto::{Hash, KeyPair};
 use exonum_merkledb::{
-    access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
-    Snapshot, SystemSchema, TemporaryDB,
+    access::{Access, RawAccess},
+    Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot, SystemSchema,
+    TemporaryDB,
 };
 use failure::Error;
 
@@ -51,6 +52,92 @@ mod builder;
 mod schema;
 #[cfg(test)]
 pub mod tests;
+
+/// Container for transactions allowing to look them up by hash digest.
+///
+/// By default, transaction caches are *ephemeral*; they are not saved on node restart.
+/// However, Exonum nodes do have an ability to save uncommitted transactions to the persistent
+/// cache (although this API is not stable). Reading transactions from such a cache is possible
+/// via [`PersistentCache`].
+///
+/// [`PersistentCache`]: struct.PersistentCache.html
+pub trait TransactionCache {
+    /// Gets a transaction from this cache. `None` is returned if the transaction is not
+    /// in the cache.
+    fn get_transaction(&self, hash: Hash) -> Option<Verified<AnyTx>>;
+
+    /// Checks if the cache contains a transaction with the specified hash.
+    ///
+    /// The default implementation calls `get_transaction()` and checks that the returned
+    /// value is `Some(_)`.
+    fn contains_transaction(&self, hash: Hash) -> bool {
+        self.get_transaction(hash).is_some()
+    }
+}
+
+/// Cache that does not contain any transactions.
+impl TransactionCache for () {
+    fn get_transaction(&self, _hash: Hash) -> Option<Verified<AnyTx>> {
+        None
+    }
+
+    fn contains_transaction(&self, _hash: Hash) -> bool {
+        false
+    }
+}
+
+/// Cache backed up by a B-tree map.
+impl TransactionCache for BTreeMap<Hash, Verified<AnyTx>> {
+    fn get_transaction(&self, hash: Hash) -> Option<Verified<AnyTx>> {
+        self.get(&hash).cloned()
+    }
+
+    fn contains_transaction(&self, hash: Hash) -> bool {
+        self.contains_key(&hash)
+    }
+}
+
+/// Persistent transaction cache that uses both a provided ephemeral cache and the cache
+/// persisting in the node database.
+#[derive(Debug)]
+pub struct PersistentCache<'a, C: ?Sized, T: RawAccess> {
+    cache: &'a C,
+    transactions: MapIndex<T, Hash, Verified<AnyTx>>,
+}
+
+impl<'a, C, T> PersistentCache<'a, C, T>
+where
+    C: TransactionCache + ?Sized,
+    T: RawAccess,
+{
+    /// Creates a new cache using the provided access to the storage and the ephemeral cache.
+    pub fn new<A>(access: A, cache: &'a C) -> Self
+    where
+        A: Access<Base = T>,
+    {
+        let schema = Schema::new(access);
+        Self {
+            cache,
+            transactions: schema.transactions(),
+        }
+    }
+}
+
+impl<C, T> TransactionCache for PersistentCache<'_, C, T>
+where
+    C: TransactionCache + ?Sized,
+    T: RawAccess,
+{
+    fn get_transaction(&self, hash: Hash) -> Option<Verified<AnyTx>> {
+        self.cache
+            .get_transaction(hash)
+            .or_else(|| self.transactions.get(&hash))
+    }
+
+    fn contains_transaction(&self, hash: Hash) -> bool {
+        self.cache.contains_transaction(hash) || self.transactions.contains(&hash)
+    }
+}
 
 /// Shared Exonum blockchain instance.
 ///
@@ -243,7 +330,6 @@ impl BlockchainMut {
         // We need to activate services before calling `create_patch()`; unlike all other blocks,
         // initial services are considered immediately active in the genesis block, i.e.,
         // their state should be included into `patch` created below.
-        // TODO Unify block creation logic [ECR-3879]
         let errors = self.dispatcher.after_transactions(&mut fork);
 
         // If there was at least one error during the genesis block creation, the block shouldn't be
@@ -257,8 +343,7 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch).unwrap();
 
-        let (_, patch) =
-            self.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new());
+        let (_, patch) = self.create_patch(ValidatorId::zero(), Height::zero(), &[], &());
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -272,25 +357,40 @@ impl BlockchainMut {
 
     /// Executes the given transactions from the pool. Collects the resulting changes
     /// from the current storage state and returns them with the hash of the resulting block.
-    pub fn create_patch(
+    ///
+    /// # Arguments
+    ///
+    /// - `tx_cache` is an ephemeral [transaction cache] used to retrieve transactions
+    ///   by their hash. It isn't necessary to wrap this cache in [`PersistentCache`];
+    ///   this will be done within the method.
+    ///
+    /// [transaction cache]: trait.TransactionCache.html
+    /// [`PersistentCache`]: struct.PersistentCache.html
+    pub fn create_patch<C>(
         &self,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> (Hash, Patch) {
+        tx_cache: &C,
+    ) -> (Hash, Patch)
+    where
+        C: TransactionCache + ?Sized,
+    {
         self.create_patch_inner(self.fork(), proposer_id, height, tx_hashes, tx_cache)
     }
 
     /// Version of `create_patch` that supports user-provided fork. Used in tests.
-    pub(crate) fn create_patch_inner(
+    pub(crate) fn create_patch_inner<C>(
         &self,
         mut fork: Fork,
         proposer_id: ValidatorId,
         height: Height,
         tx_hashes: &[Hash],
-        tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> (Hash, Patch) {
+        tx_cache: &C,
+    ) -> (Hash, Patch)
+    where
+        C: TransactionCache + ?Sized,
+    {
         // Skip execution for genesis block.
         if height > Height(0) {
             let errors = self.dispatcher.before_transactions(&mut fork);
@@ -358,16 +458,18 @@ impl BlockchainMut {
         (patch, block)
     }
 
-    fn execute_transaction(
+    fn execute_transaction<C>(
         &self,
         tx_hash: Hash,
         height: Height,
         index: u32,
         fork: &mut Fork,
-        tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
-    ) {
-        let schema = Schema::new(&*fork);
-        let transaction = get_transaction(&tx_hash, &schema.transactions(), tx_cache)
+        tx_cache: &C,
+    ) where
+        C: TransactionCache + ?Sized,
+    {
+        let transaction = PersistentCache::new(&*fork, tx_cache)
+            .get_transaction(tx_hash)
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();
 
@@ -442,25 +544,4 @@ impl BlockchainMut {
     pub fn shutdown(&mut self) {
         self.dispatcher.shutdown();
     }
-}
-
-/// Returns transaction from the persistent pool. If transaction is not present in the pool, tries
-/// to return it from the transactions cache.
-#[doc(hidden)]
-pub fn get_transaction<T: RawAccess>(
-    hash: &Hash,
-    txs: &MapIndex<T, Hash, Verified<AnyTx>>,
-    tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
-) -> Option<Verified<AnyTx>> {
-    txs.get(hash).or_else(|| tx_cache.get(hash).cloned())
-}
-
-/// Check that transaction exists in the persistent pool or in the transaction cache.
-#[doc(hidden)]
-pub fn contains_transaction<T: RawAccess>(
-    hash: &Hash,
-    txs: &MapIndex<T, Hash, Verified<AnyTx>>,
-    tx_cache: &BTreeMap<Hash, Verified<AnyTx>>,
-) -> bool {
-    txs.contains(hash) || tx_cache.contains_key(hash)
 }

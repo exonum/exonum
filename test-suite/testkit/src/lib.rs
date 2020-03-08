@@ -143,7 +143,7 @@ use tokio_core::reactor::Core;
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt, iter, mem,
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -452,12 +452,9 @@ impl TestKit {
         let validator_id = self.leader().validator_id().unwrap();
 
         let guard = self.processing_lock.lock().unwrap();
-        let (block_hash, patch) = self.blockchain.create_patch(
-            validator_id,
-            new_block_height,
-            tx_hashes,
-            &BTreeMap::new(),
-        );
+        let (block_hash, patch) =
+            self.blockchain
+                .create_patch(validator_id, new_block_height, tx_hashes, &());
 
         let precommits: Vec<_> = self
             .network()

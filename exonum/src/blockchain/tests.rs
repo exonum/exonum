@@ -30,7 +30,7 @@ use std::{
 use crate::{
     blockchain::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, Schema,
+        Blockchain, BlockchainMut, PersistentCache, Schema, TransactionCache,
     },
     helpers::{Height, ValidatorId},
     messages::Verified,
@@ -355,8 +355,7 @@ fn execute_transaction(
         Schema::new(&snapshot).next_height()
     };
 
-    let (block_hash, patch) =
-        blockchain.create_patch(ValidatorId::zero(), height, &[tx_hash], &BTreeMap::new());
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId::zero(), height, &[tx_hash], &());
 
     blockchain.commit(patch, block_hash, vec![]).unwrap();
     let snapshot = blockchain.snapshot();
@@ -747,8 +746,7 @@ fn blockchain_height() {
     assert_eq!(schema.next_height(), Height(1));
 
     // Create one block.
-    let (_, patch) =
-        blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[], &BTreeMap::new());
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[], &());
     blockchain.merge(patch).unwrap();
 
     // Check that height is 1.
@@ -803,9 +801,9 @@ fn no_data_race_for_transaction_pool() {
         blockchain.create_patch(ValidatorId(0), Height(1), &[tx_hash], &tx_cache);
 
     let snapshot = blockchain.snapshot();
-    let schema = Schema::new(&snapshot);
-    let is_known = super::get_transaction(&tx_hash, &schema.transactions(), &tx_cache).is_some();
+    let is_known = PersistentCache::new(&snapshot, &tx_cache).contains_transaction(tx_hash);
     assert!(is_known);
+    let schema = Schema::new(&snapshot);
     let is_in_pool =
         schema.transactions_pool().contains(&tx_hash) || tx_cache.contains_key(&tx_hash);
     assert!(is_in_pool);

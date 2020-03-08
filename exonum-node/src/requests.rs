@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{get_transaction, Schema},
+    blockchain::{PersistentCache, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
     merkledb::BinaryValue,
     messages::Verified,
@@ -101,14 +101,14 @@ impl NodeHandler {
 
     fn send_transactions_by_hash(&mut self, author: PublicKey, hashes: &[Hash]) {
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
         let mut txs = Vec::new();
         let mut txs_size = 0;
         let unoccupied_message_size =
             self.state.config().max_message_len as usize - TX_RES_EMPTY_SIZE;
 
         for hash in hashes {
-            if let Some(tx) = get_transaction(hash, &schema.transactions(), self.state.tx_cache()) {
+            let tx_cache = PersistentCache::new(&snapshot, self.state.tx_cache());
+            if let Some(tx) = tx_cache.get_transaction(*hash) {
                 let raw = tx.as_raw().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
                     let txs_response = self.sign_message(TransactionsResponse::new(

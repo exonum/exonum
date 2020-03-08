@@ -16,11 +16,11 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{contains_transaction, Block, ConsensusConfig, ValidatorKeys},
+    blockchain::{Block, ConsensusConfig, PersistentCache, TransactionCache, ValidatorKeys},
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
-    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch},
+    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch, Snapshot},
     messages::{AnyTx, Precommit, Verified},
 };
 use failure::bail;
@@ -1075,16 +1075,17 @@ impl State {
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
     /// - Block contains a transaction that is incorrect.
-    pub(super) fn create_incomplete_block<S: RawAccess>(
+    pub(super) fn create_incomplete_block(
         &mut self,
         mut incomplete_block: IncompleteBlock,
-        txs_map: &MapIndex<S, Hash, Verified<AnyTx>>,
-        txs_pool: &KeySetIndex<S, Hash>,
+        snapshot: &dyn Snapshot,
+        txs_pool: &KeySetIndex<&dyn Snapshot, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
+        let tx_cache = PersistentCache::new(snapshot, &self.tx_cache);
 
         for hash in &incomplete_block.transactions {
-            if contains_transaction(hash, txs_map, &self.tx_cache) {
+            if tx_cache.contains_transaction(*hash) {
                 if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
                     panic!("Received block with already committed transaction");
                 }
