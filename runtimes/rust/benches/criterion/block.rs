@@ -527,7 +527,7 @@ fn prepare_blockchain(
         let tx_hashes = prepare_txs(blockchain, transactions[start..end].to_vec());
         assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
-        let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
+        let (block_hash, patch) = execute_block(blockchain, i as u64 + 1, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
         blockchain.commit(patch, block_hash, iter::empty()).unwrap();
