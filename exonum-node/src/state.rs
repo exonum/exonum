@@ -362,7 +362,7 @@ impl BlockState {
     }
 
     /// Returns block's transactions.
-    pub fn txs(&self) -> &Vec<Hash> {
+    pub fn txs(&self) -> &[Hash] {
         &self.txs
     }
 
@@ -779,9 +779,10 @@ impl State {
         self.blocks.get(hash)
     }
 
-    /// Returns a mutable block with the specified hash.
-    pub(super) fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
-        self.blocks.get_mut(hash)
+    pub(super) fn take_block_for_commit(&mut self, hash: &Hash) -> BlockState {
+        self.blocks
+            .remove(hash)
+            .expect("Cannot retrieve block for commit")
     }
 
     /// Updates mode's round.

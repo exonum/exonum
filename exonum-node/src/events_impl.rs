@@ -120,7 +120,7 @@ impl NodeHandler {
         self.blockchain.shutdown();
     }
 
-    fn flush_txs_into_pool(&mut self) {
+    pub(crate) fn flush_txs_into_pool(&mut self) {
         let tx_cache_size = self.state().tx_cache_len();
         if tx_cache_size == 0 {
             return;
@@ -137,10 +137,8 @@ impl NodeHandler {
             schema.add_transaction_into_pool(tx);
         }
 
-        info!("before flush");
         if self.blockchain.merge(fork.into_patch()).is_err() {
             warn!("Failed to flush transactions from cache to persistent pool.");
         }
-        info!("flushed");
     }
 }
