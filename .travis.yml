@@ -150,6 +150,7 @@ jobs:
     - cargo run -p exonum-supervisor --example configuration_change
     - cargo run -p exonum-time --example simple_service
     - cargo run -p exonum-soak-tests --bin toggle -- -H 10
+    - cargo run -p exonum-soak-tests --bin send_txs -- -T 100
     - cargo run -p exonum-keys --example key-generator -- -p passphrase -s a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344
 
   # Integration tests.
