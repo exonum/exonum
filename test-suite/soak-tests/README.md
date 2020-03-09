@@ -6,8 +6,11 @@ This is an internal crate for subjecting Exonum networks to [soak tests].
 
 The crate exposes the following binaries:
 
-- [`toggle`](src/toggle.rs). Tests repeatedly switching a service on and off.
+- [`toggle`](src/bin/toggle.rs). Tests repeatedly switching a service on and off.
   The service generates transactions in the `after_commit` hook.
+
+- [`send_txs`](src/bin/send_txs.rs). Tests sending transactions to a service
+  via `Blockchain::sender()`.
 
 ## Usage
 
