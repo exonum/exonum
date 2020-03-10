@@ -19,7 +19,7 @@ use exonum::{
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
 
 #[exonum_interface(auto_ids)]
 pub trait MainServiceInterface<Ctx> {
@@ -71,6 +71,12 @@ impl Service for MainService {
             }
         }
     }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("ping", |_state, _query: ()| async { Ok("pong".to_owned()) });
+    }
 }
 
 impl DefaultInstance for MainService {
@@ -92,6 +98,12 @@ impl Service for TogglingSupervisor {
             4 => extensions.initiate_resuming_service(MainService::INSTANCE_ID, ()),
             _ => Ok(()),
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("ping", |_state, _query: ()| async { Ok("pong".to_owned()) });
     }
 }
 
