@@ -2,7 +2,7 @@
 
 import unittest
 
-import re
+import re, time
 from exonum_client import ExonumClient
 from exonum_client.crypto import KeyPair
 from exonum_launcher.configuration import Configuration
@@ -25,7 +25,14 @@ class RegularDeployTest(unittest.TestCase):
     """Tests for Exonum deploy process in regular mode."""
 
     def setUp(self):
-        self.network = run_4_nodes("exonum-cryptocurrency-advanced")
+        self.network = run_4_nodes("cryptocurrency-migration")
+        wait_network_to_start(self.network)
+
+    def wait_for_api_restart(self):
+        """Waits until the API servers of nodes are restarted after the set
+        of active services has changed."""
+
+        time.sleep(0.25)
         wait_network_to_start(self.network)
 
     def test_deploy_regular_without_instance(self):
@@ -38,11 +45,10 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-            explorer = launcher.explorer()
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
 
+            explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
@@ -58,12 +64,11 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-            explorer = launcher.explorer()
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
 
             # invalid artifact should not be deployed
+            explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, False)
@@ -74,18 +79,16 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config_dict = generate_config(
             self.network, deadline_height=0
         )
-
         cryptocurrency_advanced_config = Configuration(
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-            explorer = launcher.explorer()
-
             launcher.deploy_all()
             with self.assertRaises(ExecutionFailError):
                 launcher.wait_for_deploy()
 
             # artifact should not be deployed because of exceeded deadline height
+            explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, False)
@@ -102,13 +105,13 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-            explorer = launcher.explorer()
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
             launcher.wait_for_start()
 
+            self.wait_for_api_restart()
+            explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
@@ -148,13 +151,13 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-            explorer = launcher.explorer()
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
             launcher.wait_for_start()
 
+            self.wait_for_api_restart()
+            explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
@@ -211,6 +214,7 @@ class RegularDeployTest(unittest.TestCase):
             launcher.start_all()
             launcher.wait_for_start()
 
+            self.wait_for_api_restart()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
@@ -227,11 +231,13 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
             launcher.wait_for_start()
+
+        # The changes restart the HTTP servers of the nodes, so we wait for the servers to restart.
+        wait_network_to_start(self.network)
 
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
@@ -260,11 +266,13 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
             launcher.wait_for_start()
+
+        # The changes restart the HTTP servers of the nodes, so we wait for the servers to restart.
+        self.wait_for_api_restart()
 
         for validator_id in range(self.network.validators_count()):
             host, public_port, private_port = self.network.api_address(validator_id)
@@ -293,7 +301,6 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             with self.assertRaises(RuntimeError):
@@ -319,6 +326,7 @@ class RegularDeployTest(unittest.TestCase):
             launcher.start_all()
             launcher.wait_for_start()
 
+            self.wait_for_api_restart()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.check_deployed(artifact)
                 self.assertEqual(deployed, True)
@@ -354,7 +362,6 @@ class RegularDeployTest(unittest.TestCase):
             cryptocurrency_advanced_config_dict
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
-
             launcher.deploy_all()
             launcher.wait_for_deploy()
             with self.assertRaises(RuntimeError):
@@ -400,6 +407,7 @@ class RegularDeployTest(unittest.TestCase):
 
     def tearDown(self):
         outputs = self.network.stop()
+        self.network.deinitialize()
         assert_processes_exited_successfully(self, outputs)
 
 
@@ -407,7 +415,7 @@ class DevDeployTest(unittest.TestCase):
     """Tests for Exonum deploy process in dev mode."""
 
     def setUp(self):
-        self.network = run_dev_node("exonum-cryptocurrency-advanced")
+        self.network = run_dev_node("cryptocurrency-migration")
         wait_network_to_start(self.network)
 
     def test_deploy_run_dev(self):
@@ -455,4 +463,5 @@ class DevDeployTest(unittest.TestCase):
 
     def tearDown(self):
         outputs = self.network.stop()
+        self.network.deinitialize()
         assert_processes_exited_successfully(self, outputs)

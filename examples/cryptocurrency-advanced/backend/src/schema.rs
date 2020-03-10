@@ -38,6 +38,7 @@ pub(crate) struct SchemaImpl<T: Access> {
 
 /// Public part of the cryptocurrency schema.
 #[derive(Debug, FromAccess, RequireArtifact)]
+#[require_artifact(name = "exonum-cryptocurrency")]
 pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, Address, Wallet>,

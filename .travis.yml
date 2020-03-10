@@ -170,6 +170,7 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo build -p exonum-testkit-server
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --example cryptocurrency-migration --force
     - cargo build -p exonum-cryptocurrency --example demo
     script:
     - python3 -m exonum_tests -v
