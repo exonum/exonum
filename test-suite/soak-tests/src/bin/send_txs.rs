@@ -83,7 +83,7 @@ impl TimingStats {
     }
 }
 
-// FIXME: refactor using the `tokio` runtime once #1804 is merged.
+// FIXME: refactor using the `tokio` runtime once #1804 is merged. (ECR-4320)
 fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().ok();

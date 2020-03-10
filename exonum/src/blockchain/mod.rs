@@ -497,7 +497,7 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block_and_notify_runtimes(fork);
         self.merge(patch)?;
 
-        // TODO: this makes `commit` non-atomic; can this be avoided?
+        // TODO: this makes `commit` non-atomic; can this be avoided? (ECR-4319)
         let new_fork = self.fork();
         Schema::new(&new_fork).update_transaction_count();
         self.merge(new_fork.into_patch())?;
