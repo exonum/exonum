@@ -126,7 +126,7 @@ impl NodeHandler {
             return;
         } else {
             info!(
-                "Flushing {} transactions from pool to storage",
+                "Flushing {} transactions from cache to persistent pool",
                 tx_cache_size
             );
         }

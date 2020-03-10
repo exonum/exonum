@@ -16,7 +16,7 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{Block, ConsensusConfig, PersistentCache, TransactionCache, ValidatorKeys},
+    blockchain::{Block, ConsensusConfig, PersistentPool, TransactionCache, ValidatorKeys},
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
@@ -361,7 +361,7 @@ impl BlockState {
         self.patch.take().expect("Patch is already committed")
     }
 
-    /// Returns block's transactions.
+    /// Returns hashes of the transactions in the block.
     pub fn txs(&self) -> &[Hash] {
         &self.txs
     }
@@ -1082,7 +1082,7 @@ impl State {
         txs_pool: &KeySetIndex<&dyn Snapshot, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
-        let tx_cache = PersistentCache::new(snapshot, &self.tx_cache);
+        let tx_cache = PersistentPool::new(snapshot, &self.tx_cache);
 
         for hash in &incomplete_block.transactions {
             if tx_cache.contains_transaction(*hash) {

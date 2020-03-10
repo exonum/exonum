@@ -23,7 +23,7 @@ use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        PersistentCache, Schema, TransactionCache, ValidatorKeys,
+        PersistentPool, Schema, TransactionCache, ValidatorKeys,
     },
     crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
     helpers::{user_agent, Height, Round, ValidatorId},
@@ -663,7 +663,7 @@ impl Sandbox {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain().snapshot();
         let node_state = self.node_state();
-        let tx_cache = PersistentCache::new(&snapshot, node_state.tx_cache());
+        let tx_cache = PersistentPool::new(&snapshot, node_state.tx_cache());
 
         txs.into_iter()
             .filter(|transaction| {

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{PersistentCache, Schema, TransactionCache},
+    blockchain::{PersistentPool, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
     merkledb::BinaryValue,
     messages::Verified,
@@ -107,7 +107,7 @@ impl NodeHandler {
             self.state.config().max_message_len as usize - TX_RES_EMPTY_SIZE;
 
         for hash in hashes {
-            let tx_cache = PersistentCache::new(&snapshot, self.state.tx_cache());
+            let tx_cache = PersistentPool::new(&snapshot, self.state.tx_cache());
             if let Some(tx) = tx_cache.get_transaction(*hash) {
                 let raw = tx.as_raw().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {

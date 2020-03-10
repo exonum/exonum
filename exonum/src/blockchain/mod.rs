@@ -58,9 +58,9 @@ pub mod tests;
 /// By default, transaction caches are *ephemeral*; they are not saved on node restart.
 /// However, Exonum nodes do have an ability to save uncommitted transactions to the persistent
 /// cache (although this API is not stable). Reading transactions from such a cache is possible
-/// via [`PersistentCache`].
+/// via [`PersistentPool`].
 ///
-/// [`PersistentCache`]: struct.PersistentCache.html
+/// [`PersistentPool`]: struct.PersistentPool.html
 pub trait TransactionCache {
     /// Gets a transaction from this cache. `None` is returned if the transaction is not
     /// in the cache.
@@ -80,10 +80,6 @@ impl TransactionCache for () {
     fn get_transaction(&self, _hash: Hash) -> Option<Verified<AnyTx>> {
         None
     }
-
-    fn contains_transaction(&self, _hash: Hash) -> bool {
-        false
-    }
 }
 
 /// Cache backed up by a B-tree map.
@@ -97,15 +93,15 @@ impl TransactionCache for BTreeMap<Hash, Verified<AnyTx>> {
     }
 }
 
-/// Persistent transaction cache that uses both a provided ephemeral cache and the cache
+/// Persistent transaction pool that uses both a provided ephemeral cache and the cache
 /// persisting in the node database.
 #[derive(Debug)]
-pub struct PersistentCache<'a, C: ?Sized, T: RawAccess> {
+pub struct PersistentPool<'a, C: ?Sized, T: RawAccess> {
     cache: &'a C,
     transactions: MapIndex<T, Hash, Verified<AnyTx>>,
 }
 
-impl<'a, C, T> PersistentCache<'a, C, T>
+impl<'a, C, T> PersistentPool<'a, C, T>
 where
     C: TransactionCache + ?Sized,
     T: RawAccess,
@@ -123,7 +119,7 @@ where
     }
 }
 
-impl<C, T> TransactionCache for PersistentCache<'_, C, T>
+impl<C, T> TransactionCache for PersistentPool<'_, C, T>
 where
     C: TransactionCache + ?Sized,
     T: RawAccess,
@@ -361,11 +357,11 @@ impl BlockchainMut {
     /// # Arguments
     ///
     /// - `tx_cache` is an ephemeral [transaction cache] used to retrieve transactions
-    ///   by their hash. It isn't necessary to wrap this cache in [`PersistentCache`];
+    ///   by their hash. It isn't necessary to wrap this cache in [`PersistentPool`];
     ///   this will be done within the method.
     ///
     /// [transaction cache]: trait.TransactionCache.html
-    /// [`PersistentCache`]: struct.PersistentCache.html
+    /// [`PersistentPool`]: struct.PersistentPool.html
     pub fn create_patch<C>(
         &self,
         proposer_id: ValidatorId,
@@ -468,7 +464,7 @@ impl BlockchainMut {
     ) where
         C: TransactionCache + ?Sized,
     {
-        let transaction = PersistentCache::new(&*fork, tx_cache)
+        let transaction = PersistentPool::new(&*fork, tx_cache)
             .get_transaction(tx_hash)
             .unwrap_or_else(|| panic!("BUG: Cannot find transaction {:?} in database", tx_hash));
         fork.flush();

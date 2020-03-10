@@ -334,7 +334,7 @@ pub struct MemoryPoolConfig {
     /// notification channel before a send will fail.
     pub events_pool_capacity: EventsPoolCapacity,
 
-    /// Interval between flushing the transaction pool to the persistent storage.
+    /// Interval in milliseconds between flushing the transaction cache to the persistent pool.
     ///
     /// This value influences how fast transactions appear in the persistent pool after they
     /// have been initially processed by the node. With `None` setting, transactions will not

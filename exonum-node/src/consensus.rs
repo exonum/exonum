@@ -13,9 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{
-        Blockchain, BlockchainMut, PersistentCache, ProposerId, Schema, TransactionCache,
-    },
+    blockchain::{Blockchain, BlockchainMut, PersistentPool, ProposerId, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, Fork, ObjectHash, Patch},
@@ -756,7 +754,7 @@ impl NodeHandler {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
-        let tx_pool = PersistentCache::new(&snapshot, self.state.tx_cache());
+        let tx_pool = PersistentPool::new(&snapshot, self.state.tx_cache());
         if tx_pool.contains_transaction(hash) {
             return Err(HandleTxError::AlreadyProcessed);
         }

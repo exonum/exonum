@@ -30,7 +30,7 @@ use std::{
 use crate::{
     blockchain::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, PersistentCache, Schema, TransactionCache,
+        Blockchain, BlockchainMut, PersistentPool, Schema, TransactionCache,
     },
     helpers::{Height, ValidatorId},
     messages::Verified,
@@ -801,7 +801,7 @@ fn no_data_race_for_transaction_pool() {
         blockchain.create_patch(ValidatorId(0), Height(1), &[tx_hash], &tx_cache);
 
     let snapshot = blockchain.snapshot();
-    let is_known = PersistentCache::new(&snapshot, &tx_cache).contains_transaction(tx_hash);
+    let is_known = PersistentPool::new(&snapshot, &tx_cache).contains_transaction(tx_hash);
     assert!(is_known);
     let schema = Schema::new(&snapshot);
     let is_in_pool =
