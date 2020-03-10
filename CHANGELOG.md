@@ -80,6 +80,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   similar to real Exonum nodes. (#1785)
 
 - Added method to get reference to the underlying API client for the `TestKitApi`.
+  (#1811)
 
 ## 1.0.0-rc.1 - 2020-02-07
 
