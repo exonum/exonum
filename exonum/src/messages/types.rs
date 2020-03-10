@@ -14,7 +14,7 @@
 
 pub use crate::{proto::schema, runtime::AnyTx};
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;

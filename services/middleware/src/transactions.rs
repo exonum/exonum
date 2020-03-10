@@ -14,7 +14,7 @@
 
 //! Transaction logic for `MiddlewareService`.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum::runtime::{AnyTx, CoreError, ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;

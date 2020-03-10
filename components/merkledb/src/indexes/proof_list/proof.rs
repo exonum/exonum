@@ -14,7 +14,7 @@
 
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum_crypto::Hash;
 use serde_derive::*;
 use thiserror::Error;

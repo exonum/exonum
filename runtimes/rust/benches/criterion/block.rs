@@ -191,7 +191,7 @@ mod timestamping {
 }
 
 mod cryptocurrency {
-    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4314)
+    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
     use exonum::{
         crypto::PublicKey,
         merkledb::access::AccessExt,
