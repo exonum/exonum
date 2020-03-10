@@ -15,13 +15,14 @@
 //! Module responsible for actix web API management after new service is deployed.
 
 use actix_cors::{Cors, CorsFactory};
+use actix_rt::time::delay_for;
 use actix_web::{dev::Server, web, App, HttpServer};
 use futures::{
     future::{join_all, try_join_all},
-    Stream, StreamExt,
+    Stream, StreamExt, TryFutureExt,
 };
 
-use std::{collections::HashMap, io, net::SocketAddr};
+use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
 
 use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
@@ -74,6 +75,29 @@ pub struct UpdateEndpoints {
     pub endpoints: Vec<(String, ApiBuilder)>,
 }
 
+async fn with_retries<T>(
+    mut action: impl FnMut() -> io::Result<T>,
+    attempts: u16,
+    timeout: u64,
+) -> io::Result<T> {
+    let timeout = Duration::from_millis(timeout);
+
+    for _ in 1..=attempts {
+        match action() {
+            Ok(value) => return Ok(value),
+            Err(e) => {
+                log::warn!("Action failed: {}", e);
+                delay_for(timeout).await;
+            }
+        }
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        "Cannot complete action",
+    ))
+}
+
 /// Actor responsible for API management. The actor encapsulates endpoint handlers and
 /// is capable of updating them via `UpdateEndpoints`.
 #[derive(Debug)]
@@ -96,17 +120,26 @@ impl ApiManager {
     async fn start_servers(&mut self) -> io::Result<()> {
         log::trace!("Servers start requested.");
 
-        let servers = self
-            .config
-            .servers
-            .iter()
-            .map(|(&access, server_config)| {
-                self.start_server(access, server_config.to_owned())
-                    .expect("Failed to start API server")
-            })
-            .collect::<Vec<_>>();
+        let start_servers = self.config.servers.iter().map(|(&access, server_config)| {
+            let mut aggregator = self.config.api_aggregator.clone();
+            aggregator.extend(self.endpoints.clone());
+            let server_config = server_config.to_owned();
 
-        try_join_all(servers.clone()).await?;
+            with_retries(
+                move || Self::start_server(aggregator.clone(), access, server_config.clone()),
+                self.config.server_restart_max_retries,
+                self.config.server_restart_retry_timeout,
+            )
+        });
+        let servers = try_join_all(start_servers).await?;
+
+        for (server, (&access, server_config)) in servers.iter().zip(&self.config.servers) {
+            let listen_addr = server_config.listen_address;
+            actix_rt::spawn(server.clone().unwrap_or_else(move |e| {
+                log::error!("{} server on {} failed: {}", access, listen_addr, e);
+                // TODO: should the server be restarted on error?
+            }));
+        }
 
         self.servers = servers;
         Ok(())
@@ -115,7 +148,7 @@ impl ApiManager {
     async fn stop_servers(&mut self) {
         log::trace!("Servers stop requested.");
 
-        join_all(self.servers.drain(..).map(|server| server.stop(true))).await;
+        join_all(self.servers.drain(..).map(|server| server.stop(false))).await;
     }
 
     /// Starts API manager actor with the specified endpoints update stream.
@@ -134,15 +167,13 @@ impl ApiManager {
     }
 
     fn start_server(
-        &self,
+        aggregator: ApiAggregator,
         access: ApiAccess,
         server_config: WebServerConfig,
     ) -> io::Result<Server> {
         let listen_address = server_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
 
-        let mut aggregator = self.config.api_aggregator.clone();
-        aggregator.extend(self.endpoints.clone());
         let server = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())
