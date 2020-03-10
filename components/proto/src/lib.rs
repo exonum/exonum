@@ -68,8 +68,6 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use crate::proto::bit_vec::BitVec;
 
-#[macro_use]
-mod macros;
 #[cfg(test)]
 mod tests;
 
