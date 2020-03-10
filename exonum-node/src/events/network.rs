@@ -269,7 +269,9 @@ impl ConnectionPool {
     ///
     /// # Return value
     ///
-    /// Returns `true` if the connection with the peer was dropped.
+    /// Returns `true` if the connection with the peer was dropped. If the connection with the
+    /// peer was not dropped (either because it did not exist, or because
+    /// the provided `connection_id` is outdated), returns `false`.
     fn remove(&mut self, address: &PublicKey, connection_id: Option<u64>) -> bool {
         if let Some(entry) = self.peers.get(address) {
             if connection_id.map_or(true, |id| id == entry.id) {
