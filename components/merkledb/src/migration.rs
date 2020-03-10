@@ -587,7 +587,7 @@ impl MigrationHelper {
 #[derive(Debug, Error)]
 pub enum MigrationError {
     /// Failed to merge migration changes to database.
-    #[error("Failed to merge migration changes to database: {}", _0)]
+    #[error("Failed to merge migration changes to the database: {}", _0)]
     Merge(#[source] crate::Error),
 
     /// Migration has been aborted.

@@ -106,11 +106,11 @@ impl<'de> serde::Deserialize<'de> for ProofPath {
 #[non_exhaustive]
 pub enum MapProofError {
     /// Non-terminal node for a map consisting of a single node.
-    #[error("non-terminal node as a single key in proof")]
+    #[error("non-terminal node as a single key in the proof")]
     NonTerminalNode(ProofPath),
 
     /// One path in the proof is a prefix of another path.
-    #[error("embedded paths in proof")]
+    #[error("embedded paths in the proof")]
     EmbeddedPaths {
         /// Prefix key.
         prefix: ProofPath,
@@ -119,7 +119,7 @@ pub enum MapProofError {
     },
 
     /// One path is mentioned several times in the proof.
-    #[error("duplicate path in proof")]
+    #[error("duplicate path in the proof")]
     DuplicatePath(ProofPath),
 
     /// Entries in the proof are not ordered by increasing path.
