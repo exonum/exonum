@@ -97,15 +97,14 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
-    ///
-    /// Note that the schema is fully private; it is exposed to the clients via service HTTP API.
     #[derive(Debug, FromAccess)]
-    pub(crate) struct CurrencySchema<T: Access> {
+    pub struct CurrencySchema<T: Access> {
         /// Correspondence of public keys of users to the account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 
     impl<T: Access> CurrencySchema<T> {
+        /// Creates a new schema.
         pub fn new(access: T) -> Self {
             Self::from_root(access).unwrap()
         }
