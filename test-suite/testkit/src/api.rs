@@ -177,7 +177,7 @@ impl TestKitApi {
 }
 
 /// An asynchronous API client to make Requests with.
-/// 
+///
 /// This client is wrapper around the `reqwest::Client` to provide more convenient
 /// way to test API.
 #[derive(Debug, Clone)]
@@ -189,12 +189,12 @@ pub struct TestKitApiClient {
 impl TestKitApiClient {
     /// Returns the resolved URL for the public API.
     pub fn public_url(&self, url: &str) -> String {
-        format!("{}/public/{}", self.test_server_url, url)
+        [&self.test_server_url, "public/", url].concat()
     }
 
     /// Returns the resolved URL for the private API.
     pub fn private_url(&self, url: &str) -> String {
-        format!("{}/private/{}", self.test_server_url, url)
+        [&self.test_server_url, "private/", url].concat()
     }
 
     /// Creates a requests builder for the public API scope.
