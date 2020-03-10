@@ -27,7 +27,6 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{ExecutionError, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -189,9 +188,7 @@ fn testkit_with_failing_runtime(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .with_additional_runtime(FailingRuntime::default())
         .build()
 }
@@ -202,21 +199,16 @@ fn build_result_transaction(
     request: &DeployRequest,
     result: Result<(), ExecutionError>,
 ) -> Verified<AnyTx> {
-    testkit
-        .network()
-        .validators()
+    let validators = testkit.network().validators();
+    let validator = validators
         .iter()
         .find(|validator| validator.validator_id() == Some(VALIDATOR_OTHER))
-        .map(|validator| {
-            validator.service_keypair().report_deploy_result(
-                SUPERVISOR_INSTANCE_ID,
-                DeployResult {
-                    request: request.clone(),
-                    result: result.into(),
-                },
-            )
-        })
-        .unwrap()
+        .unwrap();
+
+    validator.service_keypair().report_deploy_result(
+        SUPERVISOR_INSTANCE_ID,
+        DeployResult::new(request.clone(), result),
+    )
 }
 
 /// Creates `AsyncEventState::Failed` for planned error of `FailingRuntime`.
@@ -293,12 +285,8 @@ fn deploy_success() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -327,12 +315,8 @@ fn deploy_failure_because_not_confirmed() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -357,12 +341,7 @@ fn deploy_failure_because_cannot_deploy() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_fail(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request = DeployRequest::new(FailingRuntime::artifact_should_fail(), DEPLOY_HEIGHT);
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -401,12 +380,8 @@ fn deploy_failure_check_no_extra_actions() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_fail(),
-        spec: Vec::new(),
-        deadline_height: BIGGER_DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_fail(), BIGGER_DEPLOY_HEIGHT);
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -451,12 +426,8 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -496,12 +467,8 @@ fn deploy_successfully_after_failure() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -538,12 +505,10 @@ fn deploy_successfully_after_failure() {
 
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: NEW_DEPLOY_HEIGHT,
-    };
-
+    let deploy_request = DeployRequest::new(
+        FailingRuntime::artifact_should_be_deployed(),
+        NEW_DEPLOY_HEIGHT,
+    );
     let tx_hash = send_deploy_request(&api, &deploy_request);
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
@@ -571,12 +536,8 @@ fn not_requested_deploy_status() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
     let query = DeployInfoQuery::from(deploy_request);
     let error = api
         .private(ApiKind::Service("supervisor"))

@@ -39,15 +39,15 @@
 //! ```
 //! use exonum_explorer::api::BlocksRange;
 //! use exonum_explorer_service::ExplorerFactory;
-//! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //!
 //! let mut testkit: TestKit = TestKitBuilder::validator()
-//!     .with_default_rust_service(ExplorerFactory)
+//!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     // Add other services here
 //!     .build();
 //! // The explorer endpoints can be accessed via `api()`:
 //! let api = testkit.api();
-//! let BlocksRange { blocks, range } = api
+//! let BlocksRange { blocks, range, .. } = api
 //!     .public(ApiKind::Explorer)
 //!     .get("v1/blocks?count=10")
 //!     .unwrap();
@@ -89,6 +89,7 @@ use crate::api::{websocket::SharedState, ExplorerApi};
 
 /// Errors that can occur during explorer service operation.
 #[derive(Debug, Clone, Copy, ExecutionFail)]
+#[non_exhaustive]
 pub enum Error {
     /// An explorer service is already instantiated on the blockchain.
     DuplicateExplorer = 0,

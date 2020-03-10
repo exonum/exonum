@@ -23,9 +23,9 @@ use exonum::{
     runtime::{CoreError, ExecutionError, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID},
 };
 use exonum_explorer::api::websocket::Notification;
-use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
+use exonum_rust_runtime::DefaultInstance;
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
-use exonum_testkit::{TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{Spec, TestKit, TestKitApi, TestKitBuilder};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use websocket::{
@@ -87,8 +87,8 @@ fn assert_closure(mut client: Client<TcpStream>) {
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(CounterService)
-        .with_default_rust_service(ExplorerFactory)
+        .with(Spec::new(CounterService).with_default_instance())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)
@@ -357,10 +357,8 @@ fn test_blocks_and_tx_subscriptions() {
 #[test]
 fn connections_shut_down_on_service_stop() {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(Supervisor::simple())
         .build();
 
     let api = testkit.api();

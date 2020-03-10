@@ -20,7 +20,7 @@ use exonum::{
 };
 use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
 use exonum_supervisor::{ConfigPropose, MigrationRequest, Supervisor, SupervisorInterface};
-use exonum_testkit::{migrations::MigrationTest, TestKit, TestKitBuilder};
+use exonum_testkit::{migrations::MigrationTest, Spec, TestKit, TestKitBuilder};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use std::{collections::HashMap, iter, thread, time::Duration};
@@ -124,14 +124,11 @@ fn isolated_test_with_random_data() {
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         // Add old version of the service.
-        .with_default_rust_service(OldService)
+        .with(Spec::new(OldService).with_default_instance())
         // Add the artifact for the new version.
-        .with_migrating_rust_service(CryptocurrencyService)
-        .with_artifact(CryptocurrencyService.artifact_id())
+        .with(Spec::migrating(CryptocurrencyService))
         // Add the supervisor service.
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build()
 }
 

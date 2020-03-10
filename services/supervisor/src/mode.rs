@@ -27,13 +27,14 @@ use exonum_proto::ProtobufConvert;
 use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use super::{multisig::MultisigIndex, proto, DeployRequest, MigrationRequest};
 
 /// Supervisor operating mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -122,6 +123,15 @@ impl Mode {
                 confirmations >= byzantine_quorum(validators)
             }
         }
+    }
+}
+
+impl fmt::Display for Mode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Simple => "simple",
+            Self::Decentralized => "decentralized",
+        })
     }
 }
 

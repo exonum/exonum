@@ -107,9 +107,8 @@ pub fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) ->
     let (received, _) = endpoints_rx.by_ref().into_future().wait().unwrap();
     received
         .unwrap()
-        .endpoints
-        .into_iter()
-        .map(|(path, _)| path)
+        .updated_paths()
+        .map(ToOwned::to_owned)
         .collect()
 }
 
@@ -122,11 +121,7 @@ pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoin
     if let Some(update) = maybe_update {
         panic!(
             "Unexpected endpoints update: {:?}",
-            update
-                .endpoints
-                .into_iter()
-                .map(|(path, _)| path)
-                .collect::<Vec<_>>()
+            update.updated_paths().collect::<Vec<_>>()
         );
     }
 }

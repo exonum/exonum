@@ -22,7 +22,7 @@ use exonum::{
 };
 use exonum_api as api;
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::{json, Value};
 
 use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
@@ -32,8 +32,8 @@ mod counter;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(CounterService)
-        .with_default_rust_service(ExplorerFactory)
+        .with(Spec::new(CounterService).with_default_instance())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)
@@ -43,7 +43,7 @@ fn init_testkit() -> (TestKit, TestKitApi) {
 fn test_explorer_blocks_basic() {
     let (mut testkit, api) = init_testkit();
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
         .unwrap();
@@ -77,7 +77,7 @@ fn test_explorer_blocks_basic() {
     // Check empty block creation
     testkit.create_block();
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
         .unwrap();
@@ -185,7 +185,7 @@ fn test_explorer_blocks_skip_empty_small() {
     let (mut testkit, api) = init_testkit();
     create_sample_block(&mut testkit);
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
@@ -195,7 +195,7 @@ fn test_explorer_blocks_skip_empty_small() {
 
     create_sample_block(&mut testkit);
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
         .unwrap();
@@ -206,7 +206,7 @@ fn test_explorer_blocks_skip_empty_small() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
@@ -218,7 +218,7 @@ fn test_explorer_blocks_skip_empty_small() {
     create_sample_block(&mut testkit);
     create_sample_block(&mut testkit);
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
         .unwrap();
@@ -235,7 +235,7 @@ fn test_explorer_blocks_skip_empty() {
         create_sample_block(&mut testkit);
     }
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=1&skip_empty_blocks=true")
         .unwrap();
@@ -244,7 +244,7 @@ fn test_explorer_blocks_skip_empty() {
     assert_eq!(range.start, Height(5));
     assert_eq!(range.end, Height(6));
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=3&skip_empty_blocks=true")
         .unwrap();
@@ -263,7 +263,7 @@ fn test_explorer_blocks_bounds() {
     }
 
     // Check `latest` param
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
         .unwrap();
@@ -273,7 +273,7 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(5));
 
     // Check `earliest` param
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=3")
         .unwrap();
@@ -283,7 +283,7 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(6));
 
     // Check `earliest` & `latest`
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&latest=4&earliest=3")
         .unwrap();
@@ -293,7 +293,7 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(5));
 
     // Check that `count` takes precedence over `earliest`.
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=4&earliest=1")
         .unwrap();
@@ -303,7 +303,7 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(5));
 
     // Check `latest` param isn't exceed the height.
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=5")
         .unwrap();
@@ -547,11 +547,7 @@ fn test_explorer_api_with_before_transactions_error() {
     testkit.create_block_with_transaction(tx);
     let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-            with_proof: false,
-        })
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID))
         .get("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.0.is_ok());
@@ -562,11 +558,7 @@ fn test_explorer_api_with_before_transactions_error() {
 
     let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(2),
-            service_id: SERVICE_ID,
-            with_proof: true,
-        })
+        .query(&CallStatusQuery::new(Height(2), SERVICE_ID).with_proof())
         .get("v1/call_status/before_transactions")
         .expect("Explorer Api unexpectedly failed");
     let proof = match response {
@@ -581,10 +573,7 @@ fn test_explorer_api_with_before_transactions_error() {
 
     let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&TransactionStatusQuery {
-            hash: tx.object_hash(),
-            with_proof: true,
-        })
+        .query(&TransactionStatusQuery::new(tx.object_hash()).with_proof())
         .get("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
 
@@ -597,11 +586,7 @@ fn test_explorer_api_with_before_transactions_error() {
 
     let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-            with_proof: false,
-        })
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID))
         .get("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
     assert!(response.0.is_ok());
@@ -616,10 +601,7 @@ fn test_explorer_api_with_transaction_error() {
 
     let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&TransactionStatusQuery {
-            hash: tx.object_hash(),
-            with_proof: true,
-        })
+        .query(&TransactionStatusQuery::new(tx.object_hash()).with_proof())
         .get("v1/call_status/transaction")
         .expect("Explorer Api unexpectedly failed");
 
@@ -645,11 +627,7 @@ fn test_explorer_api_with_after_transactions_error() {
 
     let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-            with_proof: false,
-        })
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID))
         .get("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
     let execution_error = response.0.unwrap_err();
@@ -659,11 +637,7 @@ fn test_explorer_api_with_after_transactions_error() {
 
     let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-            with_proof: true,
-        })
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID).with_proof())
         .get("v1/call_status/after_transactions")
         .expect("Explorer Api unexpectedly failed");
 

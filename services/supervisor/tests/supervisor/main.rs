@@ -22,7 +22,11 @@ use exonum::{
         SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_rust_runtime::{api, RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{
+    api,
+    spec::{JustFactory, Spec},
+    RustRuntimeBuilder, ServiceFactory,
+};
 use exonum_supervisor::{
     ArtifactError, CommonError as SupervisorCommonError, ConfigPropose, DeployRequest,
     DeployResult, ServiceError, Supervisor, SupervisorInterface,
@@ -161,11 +165,7 @@ fn deploy_confirmation_hash_default(testkit: &TestKit, request: &DeployRequest) 
 }
 
 fn deploy_request(artifact: ArtifactId, deadline_height: Height) -> DeployRequest {
-    DeployRequest {
-        artifact,
-        spec: Vec::default(),
-        deadline_height,
-    }
+    DeployRequest::new(artifact, deadline_height)
 }
 
 fn start_service_request(
@@ -215,20 +215,16 @@ fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> Instanc
 fn testkit_with_inc_service() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_rust_service(IncService)
+        .with(Supervisor::decentralized())
+        .with(JustFactory::new(IncService))
         .build()
 }
 
 fn testkit_with_inc_service_and_n_validators(n: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_rust_service(IncService)
+        .with(Supervisor::decentralized())
+        .with(JustFactory::new(IncService))
         .with_validators(n)
         .build()
 }
@@ -240,10 +236,8 @@ fn testkit_with_inc_service_and_two_validators() -> TestKit {
 fn testkit_with_inc_service_auditor_validator() -> TestKit {
     TestKitBuilder::auditor()
         .with_logger()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_rust_service(IncService)
+        .with(Supervisor::decentralized())
+        .with(JustFactory::new(IncService))
         .with_validators(1)
         .build()
 }
@@ -251,10 +245,8 @@ fn testkit_with_inc_service_auditor_validator() -> TestKit {
 fn testkit_with_inc_service_and_static_instance() -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_default_rust_service(IncService)
+        .with(Supervisor::decentralized())
+        .with(Spec::new(IncService).with_default_instance())
         .build()
 }
 
@@ -521,10 +513,8 @@ fn test_start_two_services_in_one_request() {
 fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_rust_service(IncService)
+        .with(Supervisor::decentralized())
+        .with(JustFactory::new(IncService))
         .build();
     deploy_default(&mut testkit);
 
@@ -944,18 +934,13 @@ fn test_id_assignment() {
 #[test]
 fn test_id_assignment_sparse() {
     let max_builtin_id = 100;
-    let inc_service = IncService;
-    let inc_service_artifact = inc_service.artifact_id();
+    let inc_service = Spec::new(IncService).with_instance(max_builtin_id, "inc", ());
 
     // Create testkit with builtin instance with ID 100.
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_artifact(inc_service_artifact.clone())
-        .with_instance(inc_service_artifact.into_default_instance(max_builtin_id, "inc"))
-        .with_rust_service(inc_service)
+        .with(Supervisor::decentralized())
+        .with(inc_service)
         .build();
 
     let artifact = default_artifact();

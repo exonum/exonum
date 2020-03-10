@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_cli::NodeBuilder;
+use exonum_cli::{NodeBuilder, Spec};
+use exonum_time::TimeServiceFactory;
+
+use exonum_timestamping::TimestampingService;
 
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
-        .with_rust_service(exonum_time::TimeServiceFactory::default())
-        .with_rust_service(exonum_timestamping::TimestampingService)
+        .with(Spec::new(TimeServiceFactory::default()))
+        .with(Spec::new(TimestampingService))
         .run()
 }

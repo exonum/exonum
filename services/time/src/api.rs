@@ -34,21 +34,16 @@
 //! # use chrono::{DateTime, Utc};
 //! # use exonum::{helpers::Height, runtime::InstanceId};
 //! # use exonum_rust_runtime::ServiceFactory;
-//! # use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! # use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //! # use exonum_time::TimeServiceFactory;
-//! # const TIME_SERVICE_ID: InstanceId = 100;
+//! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let time_service_factory = TimeServiceFactory::default();
-//! let time_service_artifact = time_service_factory.artifact_id();
-//! let mut testkit: TestKit = TestKitBuilder::validator()
-//!     .with_artifact(time_service_artifact.clone())
-//!     .with_instance(
-//!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-//!     )
-//!     .with_rust_service(time_service_factory)
-//!     .build();
+//! let time_service = TimeServiceFactory::default();
+//! let time_service = Spec::new(time_service)
+//!     .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
+//! let mut testkit: TestKit = TestKitBuilder::validator().with(time_service).build();
 //! let api = testkit.api();
 //!
 //! // Make request to the `current_time` endpoint.
@@ -89,21 +84,16 @@
 //! # use chrono::{DateTime, Utc};
 //! # use exonum::{helpers::Height, runtime::InstanceId};
 //! # use exonum_rust_runtime::ServiceFactory;
-//! # use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+//! # use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //! # use exonum_time::{TimeServiceFactory, ValidatorTime};
-//! # const TIME_SERVICE_ID: InstanceId = 100;
+//! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
 //! # fn main() -> Result<(), failure::Error> {
-//! let time_service_factory = TimeServiceFactory::default();
-//! let time_service_artifact = time_service_factory.artifact_id();
-//! let mut testkit: TestKit = TestKitBuilder::validator()
-//!     .with_artifact(time_service_artifact.clone())
-//!     .with_instance(
-//!         time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-//!     )
-//!     .with_rust_service(time_service_factory)
-//!     .build();
+//! let time_service = TimeServiceFactory::default();
+//! let time_service = Spec::new(time_service)
+//!     .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
+//! let mut testkit: TestKit = TestKitBuilder::validator().with(time_service).build();
 //! let api = testkit.api();
 //! testkit.create_blocks_until(Height(5));
 //!

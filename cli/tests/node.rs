@@ -20,7 +20,9 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_explorer_service::api::BlocksRange;
-use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service, ServiceFactory};
+use exonum_rust_runtime::{
+    api::ServiceApiBuilder, spec::Spec, DefaultInstance, Service, ServiceFactory,
+};
 use exonum_supervisor::api::DispatcherInfo;
 use futures::Future;
 use lazy_static::lazy_static;
@@ -71,30 +73,28 @@ impl DefaultInstance for SimpleService {
 #[test]
 fn node_basic_workflow() -> Result<(), failure::Error> {
     let public_addr = PUBLIC_ADDRS[0];
-    let private_addr = PRIVATE_ADDRS[0];
     let public_api_root = format!("http://{}/api", public_addr);
+    let public_addr = public_addr.to_string();
+    let private_addr = PRIVATE_ADDRS[0].to_string();
 
     let dir = TempDir::new()?;
-    let dir_path = dir
-        .path()
-        .to_str()
-        .expect("Path to temporary directory cannot be encoded in UTF-8 string");
+    let dir_path = dir.path().as_os_str();
     let args = vec![
-        "run-dev".to_owned(),
-        "-a".to_owned(),
-        dir_path.to_owned(),
-        "--public-api-address".to_owned(),
-        public_addr.to_string(),
-        "--private-api-address".to_owned(),
-        private_addr.to_string(),
+        "run-dev".as_ref(),
+        "-a".as_ref(),
+        dir_path,
+        "--public-api-address".as_ref(),
+        public_addr.as_ref(),
+        "--private-api-address".as_ref(),
+        private_addr.as_ref(),
     ];
 
-    let other_instance = SimpleService
-        .artifact_id()
-        .into_default_instance(200, "other");
     let node = NodeBuilder::with_args(args)
-        .with_default_rust_service(SimpleService)
-        .with_instance(other_instance)
+        .with(
+            Spec::new(SimpleService)
+                .with_default_instance()
+                .with_instance(200, "other", ()),
+        )
         .execute_command()?
         .unwrap();
     let shutdown_handle = node.shutdown_handle();

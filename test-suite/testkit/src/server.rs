@@ -90,7 +90,7 @@ use serde::{Deserialize, Serialize};
 
 use std::thread::{self, JoinHandle};
 
-use super::TestKit;
+use crate::{TestKit, TestNode};
 
 #[derive(Debug)]
 pub(crate) struct TestKitActor(TestKit);
@@ -153,11 +153,14 @@ impl Message for GetStatus {
 
 /// Testkit status, returned by the corresponding API endpoint.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TestKitStatus {
     /// Current blockchain height.
     pub height: Height,
     /// Currently active network configuration.
     pub configuration: ConsensusConfig,
+    /// Nodes in the emulated blockchain network.
+    pub nodes: Vec<TestNode>,
 }
 
 impl Handler<GetStatus> for TestKitActor {
@@ -167,12 +170,14 @@ impl Handler<GetStatus> for TestKitActor {
         Ok(TestKitStatus {
             height: self.0.height(),
             configuration: self.0.consensus_config(),
+            nodes: self.0.network.nodes().to_vec(),
         })
     }
 }
 
 /// Block creation parameters for the testkit server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CreateBlock {
     /// List of transaction hashes to include in the block. Transactions should be
     /// present in the memory pool of the testkit.
@@ -181,6 +186,20 @@ pub struct CreateBlock {
     /// the server will create a block with all transactions from the memory pool.
     #[serde(default)]
     pub tx_hashes: Option<Vec<Hash>>,
+}
+
+impl CreateBlock {
+    /// Creates a block with the specified transaction hashes.
+    pub fn with_tx_hashes(tx_hashes: Vec<Hash>) -> Self {
+        Self {
+            tx_hashes: Some(tx_hashes),
+        }
+    }
+
+    /// Creates a block with all transactions from the memory pool.
+    pub fn with_all_transactions() -> Self {
+        Self { tx_hashes: None }
+    }
 }
 
 impl Message for CreateBlock {
@@ -245,14 +264,14 @@ impl Handler<RollBack> for TestKitActor {
 mod tests {
     use exonum::{
         crypto::{gen_keypair, Hash},
-        helpers::Height,
+        helpers::{Height, ValidatorId},
         messages::{AnyTx, Verified},
         runtime::{ExecutionContext, ExecutionError},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{api, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, spec::Spec, Service};
     use pretty_assertions::assert_eq;
 
     use std::time::Duration;
@@ -291,14 +310,12 @@ mod tests {
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
     fn init_handler(height: Height) -> TestKitApi {
-        let service = SampleService;
-        let artifact = service.artifact_id();
         let mut testkit = TestKitBuilder::validator()
-            .with_artifact(artifact.clone())
-            .with_instance(
-                artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
-            )
-            .with_rust_service(service)
+            .with(Spec::new(SampleService).with_instance(
+                TIMESTAMP_SERVICE_ID,
+                TIMESTAMP_SERVICE_NAME,
+                (),
+            ))
             .build();
         testkit.create_blocks_until(height);
         // Process incoming events in background.
@@ -312,6 +329,21 @@ mod tests {
 
     fn sleep() {
         thread::sleep(Duration::from_millis(20));
+    }
+
+    #[test]
+    fn test_status() {
+        let api = init_handler(Height(0));
+        let status: TestKitStatus = api.private("api/testkit").get("v1/status").unwrap();
+        assert_eq!(status.height, Height(0));
+        assert_eq!(status.nodes.len(), 1);
+
+        let our_node = &status.nodes[0];
+        assert_eq!(our_node.validator_id(), Some(ValidatorId(0)));
+        assert_eq!(
+            status.configuration.validator_keys,
+            [our_node.public_keys()]
+        );
     }
 
     #[test]

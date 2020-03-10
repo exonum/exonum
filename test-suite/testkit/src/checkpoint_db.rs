@@ -14,7 +14,10 @@
 
 use exonum_merkledb::{Database, DatabaseExt, Patch, Result as StorageResult, Snapshot};
 
-use std::sync::{Arc, RwLock};
+use std::{
+    fmt,
+    sync::{Arc, RwLock},
+};
 
 /// Implementation of a `Database`, which allows to rollback its state
 /// to the last made checkpoint.
@@ -50,9 +53,10 @@ impl<T> Clone for CheckpointDb<T> {
     }
 }
 
-impl<T> std::fmt::Debug for CheckpointDb<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("CheckpointDb")
+impl<T> fmt::Debug for CheckpointDb<T> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CheckpointDb")
             .field("refs", &Arc::strong_count(&self.inner))
             .finish()
     }

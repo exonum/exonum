@@ -31,7 +31,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_node::{NodeApiConfig, NodeBuilder, NodeConfig};
-use exonum_rust_runtime::{RustRuntime, ServiceFactory};
+use exonum_rust_runtime::{spec::Deploy, RustRuntime};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};
 use futures::Future;
 
@@ -274,20 +274,16 @@ fn main() {
     let (node_cfg, node_keys) = node_config();
     let consensus_config = node_cfg.consensus.clone();
     let service_keypair = node_keys.service.clone();
-    let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
-        .build();
+
+    let mut genesis_config = GenesisConfigBuilder::with_consensus_config(consensus_config);
+    let mut rt = RustRuntime::builder();
+    Supervisor::simple().deploy(&mut genesis_config, &mut rt);
 
     println!("Creating blockchain with additional runtime...");
     let node = NodeBuilder::new(db, node_cfg, node_keys)
-        .with_genesis_config(genesis_config)
+        .with_genesis_config(genesis_config.build())
         .with_runtime(SampleRuntime::default())
-        .with_runtime_fn(|channel| {
-            RustRuntime::builder()
-                .with_factory(Supervisor)
-                .build(channel.endpoints_sender())
-        })
+        .with_runtime_fn(|channel| rt.build(channel.endpoints_sender()))
         .build();
 
     let blockchain_ref = node.blockchain().to_owned();
@@ -296,13 +292,10 @@ fn main() {
     println!("Blockchain is ready for transactions!");
 
     let handle = thread::spawn(move || {
-        let deploy_height = Height(50);
         // Send an artifact `DeployRequest` to the sample runtime.
-        let request = DeployRequest {
-            artifact: "255:sample_artifact:0.1.0".parse().unwrap(),
-            deadline_height: deploy_height,
-            spec: Vec::default(),
-        };
+        let deploy_height = Height(50);
+        let artifact = "255:sample_artifact:0.1.0".parse().unwrap();
+        let request = DeployRequest::new(artifact, deploy_height);
         let tx = service_keypair.request_artifact_deploy(SUPERVISOR_INSTANCE_ID, request);
         blockchain_ref
             .sender()

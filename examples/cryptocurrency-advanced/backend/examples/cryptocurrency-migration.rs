@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_cli::NodeBuilder;
+use exonum_cli::{NodeBuilder, Spec};
 
 use exonum_cryptocurrency_advanced::CryptocurrencyService;
 use old_cryptocurrency::contracts::CryptocurrencyService as OldService;
@@ -20,8 +20,7 @@ use old_cryptocurrency::contracts::CryptocurrencyService as OldService;
 fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
-        .with_default_rust_service(OldService)
-        // TODO: replace with "migrating service" once ECR-4298 is resolved.
-        .with_rust_service(CryptocurrencyService)
+        .with(Spec::new(OldService).with_default_instance())
+        .with(Spec::migrating(CryptocurrencyService))
         .run()
 }

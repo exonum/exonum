@@ -19,9 +19,8 @@ use exonum::{
     merkledb::{access::Access, Snapshot},
     runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::ServiceFactory;
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use pretty_assertions::assert_eq;
 
 use std::{collections::HashMap, iter::FromIterator};
@@ -258,11 +257,8 @@ fn test_exonum_time_service_with_7_validators() {
 fn test_mock_provider() {
     let mock_provider = MockTimeProvider::default();
     let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
-    let artifact = time_service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
-        .with_rust_service(time_service)
+        .with(Spec::new(time_service).with_instance(INSTANCE_ID, INSTANCE_NAME, ()))
         .build();
 
     let validators = testkit.network().validators().to_vec();
@@ -304,15 +300,10 @@ fn test_mock_provider() {
 #[test]
 fn test_selected_time_less_than_time_in_storage() {
     let time_service = TimeServiceFactory::default();
-    let artifact = time_service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
-        .with_rust_service(time_service)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Spec::new(time_service).with_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with(Supervisor::simple())
         .build();
 
     let validators = testkit.network().validators().to_vec();
@@ -428,13 +419,11 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
 }
 
 fn create_testkit_with_validators(validators_count: u16) -> TestKit {
-    let time_service = TimeServiceFactory::default();
-    let artifact = time_service.artifact_id();
+    let time_service =
+        Spec::new(TimeServiceFactory::default()).with_instance(INSTANCE_ID, INSTANCE_NAME, ());
     TestKitBuilder::validator()
         .with_validators(validators_count)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
-        .with_rust_service(time_service)
+        .with(time_service)
         .build()
 }
 
@@ -489,25 +478,20 @@ fn assert_all_validators_times_eq(
 
 #[test]
 fn test_endpoint_api() {
-    let time_service = TimeServiceFactory::default();
-    let artifact = time_service.artifact_id();
+    let time_service =
+        Spec::new(TimeServiceFactory::default()).with_instance(INSTANCE_ID, INSTANCE_NAME, ());
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(INSTANCE_ID, INSTANCE_NAME))
-        .with_rust_service(time_service)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(time_service)
+        .with(Supervisor::simple())
         .build();
 
     let mut api = testkit.api();
-    let validators = testkit.network().validators().to_vec();
-    let mut current_validators_times: HashMap<_, _> = HashMap::from_iter(
-        validators
-            .iter()
-            .map(|validator| (validator.service_keypair().public_key(), None)),
-    );
+    let validators = testkit.network().validators();
+    let mut current_validators_times: HashMap<_, _> = validators
+        .iter()
+        .map(|validator| (validator.service_keypair().public_key(), None))
+        .collect();
     let mut all_validators_times = HashMap::new();
 
     assert_current_time_eq(&mut api, None);

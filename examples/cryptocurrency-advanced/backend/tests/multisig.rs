@@ -24,10 +24,8 @@ use exonum::{
     runtime::{AnyTx, Caller, CallerAddress, CommonError, ExecutionError, SnapshotExt},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{
-    ExecutionContext, GenericCallMut, MethodDescriptor, Service, ServiceFactory, TxStub,
-};
-use exonum_testkit::{TestKit, TestKitBuilder};
+use exonum_rust_runtime::{ExecutionContext, GenericCallMut, MethodDescriptor, Service, TxStub};
+use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum_cryptocurrency_advanced::{
@@ -182,20 +180,13 @@ impl MultisigInterface<ExecutionContext<'_>> for MultisigService {
 }
 
 fn create_testkit_with_multisig(keys: Vec<PublicKey>, threshold: usize) -> TestKit {
-    let artifact = CryptocurrencyService.artifact_id();
-    let ms_artifact = MultisigService.artifact_id();
-    let ms_instance = ms_artifact
-        .clone()
-        .into_default_instance(MULTISIG_ID, "multisig")
-        .with_constructor(Config::new(keys, threshold));
+    let cryptocurrency = Spec::new(CryptocurrencyService).with_instance(SERVICE_ID, "token", ());
+    let config = Config::new(keys, threshold);
+    let multisig = Spec::new(MultisigService).with_instance(MULTISIG_ID, "multisig", config);
 
     TestKitBuilder::validator()
-        .with_rust_service(CryptocurrencyService)
-        .with_rust_service(MultisigService)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(SERVICE_ID, "token"))
-        .with_artifact(ms_artifact)
-        .with_instance(ms_instance)
+        .with(cryptocurrency)
+        .with(multisig)
         .build()
 }
 
