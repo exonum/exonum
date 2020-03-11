@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::format_err;
 use exonum::{crypto::KeyPair, helpers::Height, merkledb::ObjectHash, runtime::SnapshotExt};
 use exonum_node::FlushPoolStrategy;
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,
 };
-use failure::format_err;
 use futures::Future;
 use structopt::StructOpt;
 
@@ -57,7 +57,7 @@ struct Args {
     tps: usize,
 }
 
-fn parse_strategy(s: &str) -> Result<FlushPoolStrategy, failure::Error> {
+fn parse_strategy(s: &str) -> anyhow::Result<FlushPoolStrategy> {
     match s.trim() {
         "never" => Ok(FlushPoolStrategy::Never),
         "immediate" => Ok(FlushPoolStrategy::Immediate),
