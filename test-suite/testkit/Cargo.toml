@@ -46,7 +46,7 @@ tokio-core = "0.1.17"
 [dev-dependencies]
 assert_matches = "1.2.0"
 bincode = "1.2.1"
-hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
+hex = "0.4.0"
 lazy_static = "1.0.0"
 pretty_assertions = "0.6.1"
 rand = "0.7"

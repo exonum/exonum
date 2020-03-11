@@ -39,7 +39,7 @@ mod user_agent;
 /// [`env_logger`]: https://docs.rs/env_logger/
 pub fn init_logger() -> Result<(), SetLoggerError> {
     Builder::from_default_env()
-        .default_format_timestamp_nanos(true)
+        .format_timestamp_nanos()
         .try_init()
 }
 
