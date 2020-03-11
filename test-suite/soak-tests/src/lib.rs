@@ -17,7 +17,7 @@ use exonum::{
     crypto::KeyPair,
     merkledb::{Database, TemporaryDB},
 };
-use exonum_node::{generate_testnet_config, Node, NodeBuilder, ShutdownHandle};
+use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
 use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
 use futures::Future;
 
@@ -62,12 +62,14 @@ impl RunHandle {
 pub fn run_nodes(
     count: u16,
     start_port: u16,
+    mut modify_cfg: impl FnMut(&mut NodeConfig),
     mut init_node: impl FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder),
 ) -> Vec<RunHandle> {
     let mut node_threads = Vec::with_capacity(count as usize);
 
     let configs = generate_testnet_config(count, start_port);
-    for (node_cfg, node_keys) in configs {
+    for (mut node_cfg, node_keys) in configs {
+        modify_cfg(&mut node_cfg);
         let mut genesis_cfg =
             GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone());
         let mut rt = RustRuntime::builder();

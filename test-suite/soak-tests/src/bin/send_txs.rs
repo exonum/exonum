@@ -13,10 +13,12 @@
 // limitations under the License.
 
 use exonum::{crypto::KeyPair, helpers::Height, merkledb::ObjectHash, runtime::SnapshotExt};
+use exonum_node::FlushPoolStrategy;
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,
 };
+use failure::format_err;
 use futures::Future;
 use structopt::StructOpt;
 
@@ -44,10 +46,28 @@ struct Args {
     #[structopt(name = "tx-count", long, short = "T")]
     tx_count: Option<u64>,
 
+    /// Pool flushing strategy serialized in a TOML-like format (e.g., `never`, `immediate`
+    /// or `timeout=20`).
+    #[structopt(name = "flush", long, short = "f", parse(try_from_str = parse_strategy))]
+    flush_strategy: Option<FlushPoolStrategy>,
+
     /// Intensity of the test, in transactions per second. Sensible values are up to several
     /// hundred tps.
     #[structopt(name = "tps", long, short = "t", default_value = "10")]
     tps: usize,
+}
+
+fn parse_strategy(s: &str) -> Result<FlushPoolStrategy, failure::Error> {
+    match s.trim() {
+        "never" => Ok(FlushPoolStrategy::Never),
+        "immediate" => Ok(FlushPoolStrategy::Immediate),
+        s if s.starts_with("timeout=") => {
+            // 8 is the length of "timeout=".
+            let timeout: u64 = s[8..].parse()?;
+            Ok(FlushPoolStrategy::Timeout(timeout))
+        }
+        _ => Err(format_err!("Invalid pool flushing strategy")),
+    }
 }
 
 #[derive(Default)]
@@ -99,9 +119,16 @@ fn main() {
         MainService::INSTANCE_NAME,
         config,
     );
-    let nodes = run_nodes(args.node_count, 2_000, |genesis, rt| {
-        main_service.clone().deploy(genesis, rt);
-    });
+
+    let flush_strategy = args.flush_strategy.unwrap_or_default();
+    let nodes = run_nodes(
+        args.node_count,
+        2_000,
+        |node_cfg| {
+            node_cfg.mempool.flush_pool_strategy = flush_strategy.clone();
+        },
+        |genesis, rt| main_service.clone().deploy(genesis, rt),
+    );
 
     let keys = KeyPair::random();
     let delay = Duration::from_secs(1).mul_f64(1.0 / args.tps as f64);

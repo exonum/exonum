@@ -60,10 +60,16 @@ fn main() {
         config,
     );
     let supervisor = Spec::new(TogglingSupervisor).with_default_instance();
-    let nodes = run_nodes(args.node_count, 2_000, |genesis, rt| {
-        main_service.clone().deploy(genesis, rt);
-        supervisor.clone().deploy(genesis, rt);
-    });
+
+    let nodes = run_nodes(
+        args.node_count,
+        2_000,
+        |_| {},
+        |genesis, rt| {
+            main_service.clone().deploy(genesis, rt);
+            supervisor.clone().deploy(genesis, rt);
+        },
+    );
 
     loop {
         let height = nodes[0].blockchain().last_block().height;
