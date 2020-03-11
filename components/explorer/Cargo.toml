@@ -19,7 +19,7 @@ travis-ci = { repository = "exonum/exonum" }
 exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
 
 chrono = { version = "0.4.6", features = ["serde"] }
-hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
+hex = "0.4.0"
 serde = "1.0"
 serde_derive = "1.0"
 

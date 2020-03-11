@@ -20,11 +20,11 @@ travis-ci = { repository = "exonum/exonum" }
 [dependencies]
 anyhow = "1.0.26"
 log = "0.4.6"
-hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
+hex = "0.4.0"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 serde_str = "0.1.0"
-env_logger = "0.6.0"
+env_logger = "0.7.1"
 futures = "0.1.25"
 os_info = "2.0"
 chrono = { version = "0.4.6", features = ["serde"] }
