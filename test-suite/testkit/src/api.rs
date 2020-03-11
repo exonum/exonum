@@ -102,8 +102,8 @@ impl fmt::Display for ApiKind {
 /// }
 /// ```
 pub struct TestKitApi {
-    test_server: TestServer,
-    test_client: Client,
+    _test_server_handle: TestServer,
+    test_client: TestKitApiClient,
     api_sender: ApiSender,
 }
 
@@ -122,20 +122,22 @@ impl TestKitApi {
     pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
         // Testkit is intended for manual testing, so we don't want `reqwest` to handle redirects
         // automatically.
-        let test_client = ClientBuilder::new()
+        let inner = ClientBuilder::new()
             .redirect(RedirectPolicy::none())
             .build()
             .unwrap();
+
+        let test_server = create_test_server(aggregator);
+        let test_client = TestKitApiClient {
+            test_server_url: test_server.url(""),
+            inner,
+        };
+
         Self {
-            test_server: create_test_server(aggregator),
+            _test_server_handle: test_server,
             test_client,
             api_sender,
         }
-    }
-
-    /// Returns the resolved URL for the public API.
-    pub fn public_url(&self, url: &str) -> String {
-        self.test_server.url(&format!("public/{}", url))
     }
 
     /// Sends a transaction to the node.
@@ -149,11 +151,58 @@ impl TestKitApi {
             .expect("Cannot broadcast transaction");
     }
 
+    /// Returns the resolved URL for the public API.
+    pub fn public_url(&self, url: &str) -> String {
+        self.test_client.public_url(url)
+    }
+
+    /// Returns the resolved URL for the private API.
+    pub fn private_url(&self, url: &str) -> String {
+        self.test_client.private_url(url)
+    }
+
     /// Creates a requests builder for the public API scope.
     pub fn public(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
+        self.test_client.public(kind)
+    }
+
+    /// Creates a requests builder for the private API scope.
+    pub fn private(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
+        self.test_client.private(kind)
+    }
+
+    /// Return reference to the underlying API client.
+    pub fn client(&self) -> &TestKitApiClient {
+        &self.test_client
+    }
+}
+
+/// An asynchronous API client to make Requests with.
+///
+/// This client is a wrapper around the `reqwest::Client` to provide more convenient
+/// way to test API.
+#[derive(Debug, Clone)]
+pub struct TestKitApiClient {
+    test_server_url: String,
+    inner: Client,
+}
+
+impl TestKitApiClient {
+    /// Returns the resolved URL for the public API.
+    pub fn public_url(&self, url: &str) -> String {
+        [&self.test_server_url, "public/", url].concat()
+    }
+
+    /// Returns the resolved URL for the private API.
+    pub fn private_url(&self, url: &str) -> String {
+        [&self.test_server_url, "private/", url].concat()
+    }
+
+    /// Creates a request builder for the public API scope.
+    pub fn public(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
-            self.test_server.url(""),
-            &self.test_client,
+            &self.test_server_url,
+            &self.inner,
             ApiAccess::Public,
             kind.to_string(),
         )
@@ -162,11 +211,16 @@ impl TestKitApi {
     /// Creates a requests builder for the private API scope.
     pub fn private(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
-            self.test_server.url(""),
-            &self.test_client,
+            &self.test_server_url,
+            &self.inner,
             ApiAccess::Private,
             kind.to_string(),
         )
+    }
+
+    /// Return reference to the inner Reqwest client.
+    pub fn inner(&self) -> &Client {
+        &self.inner
     }
 }
 
@@ -175,7 +229,7 @@ type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + Se
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
 pub struct RequestBuilder<'a, 'b, Q = ()> {
-    test_server_url: String,
+    test_server_url: &'a str,
     test_client: &'a Client,
     access: ApiAccess,
     prefix: String,
@@ -202,7 +256,7 @@ where
     Q: 'b + Serialize,
 {
     fn new(
-        test_server_url: String,
+        test_server_url: &'a str,
         test_client: &'a Client,
         access: ApiAccess,
         prefix: String,
@@ -388,5 +442,12 @@ mod tests {
         let api = testkit.api();
         assert_send(&api.public(ApiKind::Explorer).get::<()>("v1/transactions"));
         assert_send(&api.public(ApiKind::Explorer).post::<()>("v1/transactions"));
+    }
+
+    #[test]
+    fn assert_send_for_testkit_client() {
+        let api = TestKitBuilder::validator().build().api();
+        let client = api.client().clone();
+        assert_send(&client.public(ApiKind::Explorer).get::<()>("ping"));
     }
 }

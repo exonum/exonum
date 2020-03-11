@@ -114,7 +114,7 @@
 )]
 
 pub use crate::{
-    api::{ApiKind, RequestBuilder, TestKitApi},
+    api::{ApiKind, RequestBuilder, TestKitApi, TestKitApiClient},
     builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
 };
