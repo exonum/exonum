@@ -24,6 +24,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Schema::call_errors` was removed in favor of more comprehensive
   `call_records` method. (#1792)
 
+- `Blockchain::create_patch` and `Blockchain::commit` signatures were changed
+  due to unsoundness of the previous implementation; see "Bug Fixes" section
+  for more details. (#1809)
 - Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
   error. (#1806)
 
@@ -124,6 +127,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Bug Fixes
 
+#### exonum
+
+- Fixed bug related to nodes forgetting transactions after executing
+  a block with them. Previously, nodes forgot all transactions
+  in the executed blocks; such transactions were removed from
+  the ephemeral transaction cache, but were not flushed to the DB
+  or anywhere else. This could lead to consensus hang-up. (#1809)
+
 #### exonum-node
 
 - Fixed potential node hang-up if the node received a proposal and
@@ -134,6 +145,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   incorrect. (#1781)
 
 - Fixed incorrect invalidation of block proposals. (#1782)
+
+- Provided clear coherence period for the transaction pool
+  by introducing the `mempool.flush_config_timeout` configuration parameter.
+  Previously, transactions were flushed to the persistent pool
+  only on block commit. This led to the unexpected behavior of some APIs,
+  such as the transaction getter endpoint in the explorer service. (#1809)
 
 #### exonum-testkit
 

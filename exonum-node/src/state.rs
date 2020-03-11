@@ -17,11 +17,11 @@
 use anyhow::bail;
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{contains_transaction, Block, ConsensusConfig, ValidatorKeys},
+    blockchain::{Block, ConsensusConfig, PersistentPool, TransactionCache, ValidatorKeys},
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
-    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch},
+    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch, Snapshot},
     messages::{AnyTx, Precommit, Verified},
 };
 use log::{error, trace};
@@ -37,7 +37,7 @@ use crate::{
     consensus::RoundAction,
     events::network::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose},
-    ConnectInfo,
+    Configuration, ConnectInfo, FlushPoolStrategy,
 };
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -93,6 +93,7 @@ pub(crate) struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
+    flush_pool_strategy: FlushPoolStrategy,
 
     // An in-memory set of transaction hashes, rejected by a node
     // within block.
@@ -360,8 +361,8 @@ impl BlockState {
         self.patch.take().expect("Patch is already committed")
     }
 
-    /// Returns block's transactions.
-    pub fn txs(&self) -> &Vec<Hash> {
+    /// Returns hashes of the transactions in the block.
+    pub fn txs(&self) -> &[Hash] {
         &self.txs
     }
 
@@ -447,29 +448,36 @@ impl SharedConnectList {
 
 impl State {
     /// Creates state with the given parameters.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
-        validator_id: Option<ValidatorId>,
-        connect_list: ConnectList,
-        config: ConsensusConfig,
-        connect: Verified<Connect>,
+        config: Configuration,
+        consensus_config: ConsensusConfig,
+        connect: Connect,
         peers: HashMap<PublicKey, Verified<Connect>>,
-        last_hash: Hash,
-        last_height: Height,
+        last_block: &Block,
         height_start_time: SystemTime,
-        keys: Keys,
     ) -> Self {
+        let validator_id = consensus_config
+            .validator_keys
+            .iter()
+            .position(|pk| pk.consensus_key == config.keys.consensus_pk());
+
+        let our_connect_message = Verified::from_value(
+            connect,
+            config.keys.consensus_pk(),
+            config.keys.consensus_sk(),
+        );
+
         Self {
-            validator_state: validator_id.map(ValidatorState::new),
-            connect_list: SharedConnectList::from_connect_list(connect_list),
+            validator_state: validator_id.map(|id| ValidatorState::new(ValidatorId(id as u16))),
+            connect_list: SharedConnectList::from_connect_list(config.connect_list),
             peers,
             connections: HashMap::new(),
-            height: last_height,
+            height: last_block.height.next(),
             height_start_time,
             round: Round::zero(),
             locked_round: Round::zero(),
             locked_propose: None,
-            last_hash,
+            last_hash: last_block.object_hash(),
 
             proposes: HashMap::new(),
             blocks: HashMap::new(),
@@ -484,19 +492,17 @@ impl State {
             nodes_max_height: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
 
-            our_connect_message: connect,
+            our_connect_message,
 
             requests: HashMap::new(),
-
-            config,
+            config: consensus_config,
 
             incomplete_block: None,
-
             tx_cache: BTreeMap::new(),
-
+            flush_pool_strategy: config.mempool.flush_pool_strategy,
             invalid_txs: HashSet::default(),
 
-            keys,
+            keys: config.keys,
         }
     }
 
@@ -773,9 +779,10 @@ impl State {
         self.blocks.get(hash)
     }
 
-    /// Returns a mutable block with the specified hash.
-    pub(super) fn block_mut(&mut self, hash: &Hash) -> Option<&mut BlockState> {
-        self.blocks.get_mut(hash)
+    pub(super) fn take_block_for_commit(&mut self, hash: &Hash) -> BlockState {
+        self.blocks
+            .remove(hash)
+            .expect("Cannot retrieve block for commit")
     }
 
     /// Updates mode's round.
@@ -1068,16 +1075,17 @@ impl State {
     /// - Already there is an incomplete block.
     /// - Received block has already committed transaction.
     /// - Block contains a transaction that is incorrect.
-    pub(super) fn create_incomplete_block<S: RawAccess>(
+    pub(super) fn create_incomplete_block(
         &mut self,
         mut incomplete_block: IncompleteBlock,
-        txs_map: &MapIndex<S, Hash, Verified<AnyTx>>,
-        txs_pool: &KeySetIndex<S, Hash>,
+        snapshot: &dyn Snapshot,
+        txs_pool: &KeySetIndex<&dyn Snapshot, Hash>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
+        let tx_cache = PersistentPool::new(snapshot, &self.tx_cache);
 
         for hash in &incomplete_block.transactions {
-            if contains_transaction(hash, txs_map, &self.tx_cache) {
+            if tx_cache.contains_transaction(*hash) {
                 if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
                     panic!("Received block with already committed transaction");
                 }
@@ -1290,6 +1298,23 @@ impl State {
     /// Returns mutable reference to the transactions cache.
     pub(super) fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
         &mut self.tx_cache
+    }
+
+    /// Returns interval between flushing transaction pool to the database, if any.
+    pub(super) fn flush_pool_timeout(&self) -> Option<Duration> {
+        match self.flush_pool_strategy {
+            FlushPoolStrategy::Timeout { timeout } => Some(Duration::from_millis(timeout)),
+            _ => None,
+        }
+    }
+
+    /// Checks if the pool flushing strategy prescribes to flush transactions immediately
+    /// on initial processing.
+    pub(super) fn persist_txs_immediately(&self) -> bool {
+        match self.flush_pool_strategy {
+            FlushPoolStrategy::Immediate => true,
+            _ => false,
+        }
     }
 
     /// Returns mutable reference to the invalid transactions cache.

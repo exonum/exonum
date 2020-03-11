@@ -15,17 +15,24 @@
 use exonum::runtime::SUPERVISOR_INSTANCE_ID;
 use exonum::{
     helpers::Height,
-    merkledb::access::AccessExt,
-    runtime::{ExecutionContext, ExecutionError, InstanceId},
+    merkledb::{access::AccessExt, BinaryValue},
+    runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
+use serde_derive::{Deserialize, Serialize};
 
 #[exonum_interface(auto_ids)]
 pub trait MainServiceInterface<Ctx> {
     type Output;
 
     fn timestamp(&self, context: Ctx, height: Height) -> Self::Output;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct MainConfig {
+    pub generate_tx_in_after_commit: bool,
 }
 
 #[derive(Debug, Clone, Copy, ServiceDispatcher, ServiceFactory)]
@@ -42,6 +49,17 @@ impl MainServiceInterface<ExecutionContext<'_>> for MainService {
 }
 
 impl Service for MainService {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let config =
+            MainConfig::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
+        context.service_data().get_entry("config").set(config);
+        Ok(())
+    }
+
     fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         let height = context.data().for_core().next_height();
         let height_str = height.0.to_string();
@@ -58,6 +76,11 @@ impl Service for MainService {
     }
 
     fn after_commit(&self, context: AfterCommitContext<'_>) {
+        let config: MainConfig = context.service_data().get_entry("config").get().unwrap();
+        if !config.generate_tx_in_after_commit {
+            return;
+        }
+
         if let Some(broadcaster) = context.broadcaster() {
             if let Err(e) = broadcaster.timestamp((), context.height()) {
                 log::error!(

@@ -136,6 +136,17 @@ impl<T: ServiceFactory> Spec<T, Migrating> {
     }
 }
 
+impl<T: Clone, Kind> Clone for Spec<T, Kind> {
+    fn clone(&self) -> Self {
+        Self {
+            service: self.service.clone(),
+            instances: self.instances.clone(),
+            default_instance: self.default_instance.clone(),
+            _kind: PhantomData,
+        }
+    }
+}
+
 impl<T: ServiceFactory> Sealed for Spec<T, Simple> {}
 
 impl<T: ServiceFactory> Deploy for Spec<T, Simple> {
@@ -238,7 +249,7 @@ impl<T: ServiceFactory + MigrateData> Deploy for JustFactory<T, Migrating> {
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ForeignSpec {
     artifact: ArtifactId,
     deploy_spec: Option<Vec<u8>>,

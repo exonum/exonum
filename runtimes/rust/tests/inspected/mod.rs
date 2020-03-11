@@ -38,7 +38,7 @@ use futures::{future, sync::mpsc, Async, Future, Stream};
 use serde_derive::*;
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     sync::{Arc, Mutex},
 };
 
@@ -51,9 +51,7 @@ pub fn execute_transaction(
     let tx_hash = tx.object_hash();
 
     let (block_hash, patch) = create_block_with_transactions(blockchain, vec![tx]);
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = CoreSchema::new(&snapshot);
@@ -72,12 +70,7 @@ pub fn create_block_with_transactions(
         CoreSchema::new(&snapshot).next_height()
     };
 
-    blockchain.create_patch(
-        ValidatorId::zero(),
-        height,
-        &tx_hashes,
-        &mut BTreeMap::new(),
-    )
+    blockchain.create_patch(ValidatorId::zero(), height, &tx_hashes, &())
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {

@@ -169,7 +169,7 @@ fn tx_pool_size_overflow() {
     ));
     sandbox.assert_lock(Round(1), Some(propose.object_hash()));
     sandbox.recv(&tx2);
-    sandbox.assert_tx_cache_len(1);
+    sandbox.assert_tx_cache_len(2);
     sandbox.assert_pool_len(0);
 
     sandbox.recv(&sandbox.create_precommit(
@@ -191,9 +191,9 @@ fn tx_pool_size_overflow() {
         sandbox.secret_key(ValidatorId(2)),
     ));
 
-    // The first tx should be committed and removed from cache and added to pool.
-    sandbox.assert_tx_cache_len(0);
-    sandbox.assert_pool_len(1);
+    // The first tx should be committed; the second tx should remain in cache.
+    sandbox.assert_tx_cache_len(1);
+    sandbox.assert_pool_len(0);
     sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(2),
@@ -644,4 +644,72 @@ fn incorrect_txs_are_not_broadcast() {
         .unwrap();
     sandbox.process_events();
     // If the transaction is broadcast, the sandbox will panic on drop.
+}
+
+#[test]
+fn executing_block_does_not_lead_to_amnesia() {
+    let sandbox = timestamping_sandbox();
+    let tx = gen_timestamping_tx();
+    let tx_hash = tx.object_hash();
+    sandbox.recv(&tx);
+
+    let propose = ProposeBuilder::new(&sandbox)
+        .with_tx_hashes(&[tx_hash])
+        .build();
+    let block = sandbox.create_block(&[tx.clone()]);
+
+    let prevotes = (1_u16..3).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_prevote(
+            validator,
+            Height(1),
+            Round(1),
+            propose.object_hash(),
+            NOT_LOCKED,
+            sandbox.secret_key(validator),
+        )
+    });
+    for prevote in prevotes {
+        sandbox.recv(&prevote);
+    }
+    sandbox.recv(&propose);
+
+    sandbox.broadcast(&sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+
+    // Node should execute the block by this point.
+    assert!(sandbox.node_state().block(&block.object_hash()).is_some());
+    sandbox.broadcast(&sandbox.create_precommit(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        block.object_hash(),
+        sandbox.time().into(),
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+
+    // Node should not forget about the transaction.
+    assert!(sandbox.node_state().tx_cache().contains_key(&tx_hash));
+    sandbox.recv(&Sandbox::create_transactions_request(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        vec![tx_hash],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &Sandbox::create_transactions_response(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            vec![tx],
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
 }

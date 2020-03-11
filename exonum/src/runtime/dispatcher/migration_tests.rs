@@ -286,16 +286,10 @@ impl Rig {
 
     fn create_block(&mut self, fork: Fork) -> Block {
         let height = CoreSchema::new(&fork).next_height();
-        let (block_hash, patch) = self.blockchain.create_patch_inner(
-            fork,
-            ValidatorId(0),
-            height,
-            &[],
-            &mut BTreeMap::new(),
-        );
-        self.blockchain
-            .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-            .unwrap();
+        let (block_hash, patch) =
+            self.blockchain
+                .create_patch_inner(fork, ValidatorId(0), height, &[], &());
+        self.blockchain.commit(patch, block_hash, vec![]).unwrap();
         self.blockchain.as_ref().last_block()
     }
 

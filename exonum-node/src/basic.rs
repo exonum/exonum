@@ -250,6 +250,7 @@ impl NodeHandler {
         }
         self.add_peer_exchange_timeout();
     }
+
     /// Handles `NodeTimeout::UpdateApiState`.
     /// Node update internal `ApiState` and `NodeRole`.
     pub(crate) fn handle_update_api_state_timeout(&mut self) {

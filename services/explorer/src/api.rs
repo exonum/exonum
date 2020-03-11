@@ -28,6 +28,40 @@
 //!
 //! - [Submit transaction](#submit-transaction)
 //!
+//! # Transaction Processing
+//!
+//! This section describes how transactions are processed by the nodes and what the clients
+//! can expect when [submitting transactions](#submit-transaction) and
+//! [getting transactions](#transaction-by-hash) from the node.
+//!
+//! As per consensus finality, once a transaction appears in a block, it can never change its
+//! status. The "in-block" status is (eventually) shared among all nodes in the network;
+//! if an honest Exonum node considers a certain transaction committed, eventually all honest
+//! nodes will do the same.
+//!
+//! At the same time, nodes exhibit *eventual* consistency regarding non-committed transactions
+//! (that is, transactions not present in one of the blocks; they are also called *in-pool* transactions).
+//! This is true both for the network in general (one node may not know an in-pool transaction
+//! known to another node) and, less intuitively, for a single node. The latter means that
+//! getting a transaction may return an "not found" error for a small period after the transaction
+//! was submitted to the node (aka a *stale read*).
+//!
+//! The period during which stale reads may exhibit depends on
+//! the `mempool.flush_pool_strategy` parameter of the node configuration.
+//! This parameter can be adjusted by the nodes independently. With the default value,
+//! the coherence period is order of 20 ms.
+//!
+//! As a consequence of eventual consistency, clients using explorer endpoints **MUST NOT**
+//! expect immediate consistency after submitting a transaction. Clients should
+//! be prepared that the getter endpoint may return "not found" status after transaction submission.
+//! It is recommended that clients poll the getter endpoint with a delay comparable to the coherence
+//! period as described above, and poll the endpoint several times if necessary.
+//!
+//! Note that there may be reasons for such eventual consistency unrelated to node implementation.
+//! For example, several Exonum nodes may be placed behind a balancing reverse proxy;
+//! in this case, the getter endpoint may be processed by a different node than the one
+//! that received a transaction.
+//!
 //! # List Blocks
 //!
 //! | Property    | Value |
@@ -117,6 +151,10 @@
 //!
 //! Searches for a transaction, either committed or uncommitted, by the hash.
 //!
+//! **Important.** See [*Transaction Processing*] section for details about how transactions
+//! are processed and which invariants are (not) held during processing.
+//!
+//! [*Transaction Processing*]: #transaction-processing
 //! [`TransactionQuery`]: struct.TransactionQuery.html
 //! [`TransactionInfo`]: enum.TransactionInfo.html
 //!
@@ -320,6 +358,9 @@
 //!
 //! Adds transaction into the pool of unconfirmed transactions if it is valid
 //! and returns an error otherwise.
+//!
+//! **Important.** See [*Transaction Processing*] section for details about how transactions
+//! are processed and which invariants are (not) held during processing.
 //!
 //! [`TransactionHex`]: struct.TransactionHex.html
 //! [`TransactionResponse`]: struct.TransactionResponse.html

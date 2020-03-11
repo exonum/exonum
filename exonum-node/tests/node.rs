@@ -15,10 +15,13 @@
 //! High-level tests for the Exonum node.
 
 use exonum::{
-    blockchain::config::GenesisConfigBuilder,
-    merkledb::{Database, TemporaryDB},
+    blockchain::{config::GenesisConfigBuilder, Blockchain},
+    crypto::KeyPair,
+    helpers::Height,
+    merkledb::{Database, ObjectHash, TemporaryDB},
+    runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
-use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_derive::*;
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
 use futures::{sync::mpsc, Future, Stream};
 use tokio::util::FutureExt;
@@ -34,14 +37,17 @@ use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, Shutdo
 
 #[derive(Debug)]
 struct RunHandle {
+    blockchain: Blockchain,
     node_thread: thread::JoinHandle<()>,
     shutdown_handle: ShutdownHandle,
 }
 
 impl RunHandle {
     fn new(node: Node) -> Self {
+        let blockchain = node.blockchain().to_owned();
         let shutdown_handle = node.shutdown_handle();
         Self {
+            blockchain,
             shutdown_handle,
             node_thread: thread::spawn(|| node.run().unwrap()),
         }
@@ -53,7 +59,14 @@ impl RunHandle {
     }
 }
 
+#[exonum_interface(auto_ids)]
+trait DummyInterface<Ctx> {
+    type Output;
+    fn timestamp(&self, context: Ctx, _value: u64) -> Self::Output;
+}
+
 #[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("DummyInterface"))]
 #[service_factory(
     artifact_name = "after-commit",
     artifact_version = "1.0.0",
@@ -63,6 +76,8 @@ impl RunHandle {
 struct CommitWatcherService(mpsc::UnboundedSender<()>);
 
 impl CommitWatcherService {
+    const ID: InstanceId = 2;
+
     fn new_instance(&self) -> Box<dyn Service> {
         Box::new(self.clone())
     }
@@ -71,6 +86,14 @@ impl CommitWatcherService {
 impl Service for CommitWatcherService {
     fn after_commit(&self, _context: AfterCommitContext<'_>) {
         self.0.unbounded_send(()).ok();
+    }
+}
+
+impl DummyInterface<ExecutionContext<'_>> for CommitWatcherService {
+    type Output = Result<(), ExecutionError>;
+
+    fn timestamp(&self, _context: ExecutionContext<'_>, _value: u64) -> Self::Output {
+        Ok(())
     }
 }
 
@@ -95,17 +118,29 @@ impl StartCheckerServiceFactory {
     }
 }
 
-fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
-    let mut node_threads = Vec::new();
+fn run_nodes(
+    count: u16,
+    start_port: u16,
+    slow_blocks: bool,
+) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
+    let mut node_handles = Vec::new();
     let mut commit_rxs = Vec::new();
-    for (node_cfg, node_keys) in generate_testnet_config(count, start_port) {
+    for (mut node_cfg, node_keys) in generate_testnet_config(count, start_port) {
         let (commit_tx, commit_rx) = mpsc::unbounded();
+        if slow_blocks {
+            node_cfg.consensus.first_round_timeout = 20_000;
+            node_cfg.consensus.min_propose_timeout = 10_000;
+            node_cfg.consensus.max_propose_timeout = 10_000;
+        }
 
         let service = CommitWatcherService(commit_tx);
         let artifact = service.artifact_id();
+        let instance = artifact
+            .clone()
+            .into_default_instance(CommitWatcherService::ID, "commit-watcher");
         let genesis_cfg = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-            .with_artifact(artifact.clone())
-            .with_instance(artifact.into_default_instance(2, "commit-watcher"))
+            .with_artifact(artifact)
+            .with_instance(instance)
             .build();
 
         let db = TemporaryDB::new();
@@ -118,15 +153,16 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
             })
             .build();
 
-        node_threads.push(RunHandle::new(node));
+        node_handles.push(RunHandle::new(node));
         commit_rxs.push(commit_rx);
     }
-    (node_threads, commit_rxs)
+
+    (node_handles, commit_rxs)
 }
 
 #[test]
-fn test_node_run() {
-    let (nodes, commit_rxs) = run_nodes(4, 16_300);
+fn nodes_commit_blocks() {
+    let (nodes, commit_rxs) = run_nodes(4, 16_300, false);
 
     let mut core = Core::new().unwrap();
     let duration = Duration::from_secs(60);
@@ -141,7 +177,48 @@ fn test_node_run() {
 }
 
 #[test]
-fn test_node_restart_regression() {
+fn nodes_flush_transactions_to_storage_before_commit() {
+    // `slow_blocks: true` argument makes it so that nodes should not create a single block
+    // during the test.
+    let (nodes, _) = run_nodes(4, 16_400, true);
+    let mut core = Core::new().unwrap();
+    thread::sleep(Duration::from_secs(5));
+
+    // Send some transactions over `blockchain`s.
+    let keys = KeyPair::random();
+    let tx_hashes: Vec<_> = (0_u64..10)
+        .map(|i| {
+            let tx = keys.timestamp(CommitWatcherService::ID, i);
+            let tx_hash = tx.object_hash();
+            let node_i = i as usize % nodes.len();
+            let broadcast = nodes[node_i].blockchain.sender().broadcast_transaction(tx);
+            core.run(broadcast).unwrap();
+            tx_hash
+        })
+        .collect();
+
+    // Nodes need order of 100ms to create a column family for the tx pool in the debug mode,
+    // so we sleep here to make it happen for all nodes.
+    thread::sleep(Duration::from_millis(300));
+
+    // All transactions should be persisted on all nodes now.
+    for node in &nodes {
+        let snapshot = node.blockchain.snapshot();
+        let snapshot = snapshot.for_core();
+        assert_eq!(snapshot.height(), Height(0));
+        let tx_pool = snapshot.transactions_pool();
+        for tx_hash in &tx_hashes {
+            assert!(tx_pool.contains(tx_hash));
+        }
+    }
+
+    for handle in nodes {
+        handle.join();
+    }
+}
+
+#[test]
+fn node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, node_keys, db, start_times| {
         let service = StartCheckerServiceFactory(start_times);
         let artifact = service.artifact_id();

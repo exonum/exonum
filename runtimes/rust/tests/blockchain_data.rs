@@ -32,8 +32,6 @@ use exonum::{
 use exonum_derive::{FromAccess, ServiceDispatcher, ServiceFactory};
 use futures::sync::mpsc;
 
-use std::collections::BTreeMap;
-
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
 #[derive(Debug, FromAccess)]
@@ -119,11 +117,8 @@ fn setup_blockchain_for_index_proofs() -> Box<dyn Snapshot> {
     fork.get_value_set("test.set").insert(2_u64);
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let (block_hash, patch) =
-        blockchain.create_patch(ValidatorId(0), Height(1), &[], &mut BTreeMap::new());
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), Height(1), &[], &());
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
     blockchain.snapshot()
 }
 
