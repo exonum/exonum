@@ -72,7 +72,7 @@
 //!     }
 //! }
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
@@ -148,7 +148,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -319,7 +319,7 @@ struct Broadcast {
 }
 
 #[derive(Debug, Message)]
-#[rtype("Result<TransactionResponse, failure::Error>")]
+#[rtype("anyhow::Result<TransactionResponse>")]
 struct Transaction(TransactionHex);
 
 pub(crate) struct Server {
@@ -384,7 +384,7 @@ impl Server {
         }
     }
 
-    fn check_transaction(&self, message: &Transaction) -> Result<Verified<AnyTx>, failure::Error> {
+    fn check_transaction(&self, message: &Transaction) -> anyhow::Result<Verified<AnyTx>> {
         let signed = SignedMessage::from_hex(message.0.tx_body.as_bytes())?;
         let verified = signed.into_verified()?;
         Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
@@ -394,7 +394,7 @@ impl Server {
     fn handle_transaction(
         &self,
         message: &Transaction,
-    ) -> impl Future<Item = TransactionResponse, Error = failure::Error> {
+    ) -> impl Future<Item = TransactionResponse, Error = anyhow::Error> {
         let sender = self.blockchain.sender().to_owned();
         self.check_transaction(message)
             .into_future()
@@ -518,7 +518,7 @@ impl Handler<Broadcast> for Server {
 }
 
 impl Handler<Transaction> for Server {
-    type Result = Box<dyn Future<Item = TransactionResponse, Error = failure::Error>>;
+    type Result = Box<dyn Future<Item = TransactionResponse, Error = anyhow::Error>>;
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {

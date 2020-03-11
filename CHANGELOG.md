@@ -7,6 +7,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### General
+
+- Error handling is now performed with the `anyhow` crate instead of `failure`.
+  (#1805)
+
 #### exonum
 
 - Testkit now does not include incorrect transactions into blocks or memory pool,
@@ -22,6 +27,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Blockchain::create_patch` and `Blockchain::commit` signatures were changed
   due to unsoundness of the previous implementation; see "Bug Fixes" section
   for more details. (#1809)
+- Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
+  error. (#1806)
 
 ### exonum-api
 
@@ -38,6 +45,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-explorer
 
 - Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-proto
+
+- `impl_binary_value_for_pb_message` macro was removed. Use the `BinaryValue`
+  derive macro from the `exonum-derive` crate instead. (#1805)
 
 #### exonum-rust-runtime
 
@@ -102,6 +114,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Testkit server now returns info on emulated nodes. (#1799)
 
 ### Internal Improvements
+
+#### exonum
+
+- Core now provides more thorough / context-dependent error descriptions
+  related to service lifecycle. (#1806)
 
 #### exonum-merkledb
 

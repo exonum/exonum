@@ -35,7 +35,6 @@ use exonum_merkledb::{
     Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot, SystemSchema,
     TemporaryDB,
 };
-use failure::Error;
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -483,7 +482,7 @@ impl BlockchainMut {
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and `Precommit` messages. Runtimes are then notified about the committed block.
-    pub fn commit<I>(&mut self, patch: Patch, block_hash: Hash, precommits: I) -> Result<(), Error>
+    pub fn commit<I>(&mut self, patch: Patch, block_hash: Hash, precommits: I) -> anyhow::Result<()>
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {

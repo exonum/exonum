@@ -119,7 +119,7 @@ impl BinaryValue for Height {
         self.0.into_bytes()
     }
 
-    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let value = <u64 as BinaryValue>::from_bytes(value)?;
         Ok(Self(value))
     }
@@ -294,7 +294,7 @@ impl BinaryValue for Round {
         self.0.into_bytes()
     }
 
-    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let value = <u32 as BinaryValue>::from_bytes(value)?;
         Ok(Self(value))
     }
@@ -344,7 +344,7 @@ impl BinaryValue for ValidatorId {
         self.0.to_bytes()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         u16::from_bytes(bytes).map(Self)
     }
 }

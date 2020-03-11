@@ -59,6 +59,7 @@ pub use crate::{
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
+use anyhow::{ensure, format_err, Error};
 use exonum::{
     blockchain::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
@@ -75,7 +76,6 @@ use exonum_api::{
     backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiAggregator, ApiManager,
     ApiManagerConfig, UpdateEndpoints, WebServerConfig,
 };
-use failure::{ensure, format_err, Error};
 use futures::{sync::mpsc, Future, Sink};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
@@ -400,7 +400,7 @@ pub struct NodeConfig {
 }
 
 impl ValidateInput for NodeConfig {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         let capacity = &self.mempool.events_pool_capacity;
@@ -1198,7 +1198,7 @@ impl Node {
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
     /// depending on the provided `NodeConfig`.
-    pub fn run(self) -> Result<(), failure::Error> {
+    pub fn run(self) -> anyhow::Result<()> {
         trace!("Running node.");
 
         // Runs NodeHandler.

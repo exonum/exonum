@@ -60,16 +60,14 @@ pub use protobuf_convert::*;
 
 pub mod proto;
 
+use anyhow::{ensure, format_err, Error};
 use chrono::{DateTime, TimeZone, Utc};
-use failure::{ensure, format_err, Error};
 use protobuf::well_known_types;
 
 use std::{collections::HashMap, convert::TryFrom};
 
-use proto::bit_vec::BitVec;
+use crate::proto::bit_vec::BitVec;
 
-#[macro_use]
-mod macros;
 #[cfg(test)]
 mod tests;
 
@@ -189,7 +187,7 @@ where
     fn to_pb(&self) -> Self::ProtoStruct {
         self.iter().map(|(k, v)| (k.clone(), v.to_pb())).collect()
     }
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
         pb.drain()
             .map(|(k, v)| ProtobufConvert::from_pb(v).map(|v| (k, v)))
             .collect::<Result<HashMap<_, _, _>, _>>()

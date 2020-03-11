@@ -394,7 +394,11 @@ impl Dispatcher {
                     err
                 })
         } else {
-            Err(CoreError::IncorrectRuntime.into())
+            let msg = format!(
+                "Cannot deploy an artifact `{}` depending on the unknown runtime with ID {}",
+                artifact, artifact.runtime_id
+            );
+            Err(CoreError::IncorrectRuntime.with_description(msg))
         }
     }
 
@@ -501,13 +505,19 @@ impl Dispatcher {
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
         let mut schema = Schema::new(fork);
-        let instance_state = schema
-            .get_instance(instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        let instance_state = schema.get_instance(instance_id).ok_or_else(|| {
+            let msg = format!("Cannot freeze unknown service {}", instance_id);
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
+
         let runtime_id = instance_state.spec.artifact.runtime_id;
-        let runtime = self
-            .runtime_by_id(runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
+        let runtime = self.runtime_by_id(runtime_id).unwrap_or_else(|| {
+            panic!(
+                "BUG: runtime absent for an artifact `{}` associated with service `{}`",
+                instance_state.spec.artifact,
+                instance_state.spec.as_descriptor()
+            );
+        });
 
         if !runtime.is_supported(&RuntimeFeature::FreezingServices) {
             let runtime_description = RuntimeIdentifier::transform(runtime_id).ok().map_or_else(
@@ -547,11 +557,25 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let instance = Schema::new(snapshot)
             .get_instance(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Cannot dispatch transaction to unknown service with ID {}",
+                    call_info.instance_id
+                );
+                CoreError::IncorrectInstanceId.with_description(msg)
+            })?;
 
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
-            _ => Err(CoreError::ServiceNotActive.into()),
+            status => {
+                let status_str = status.map_or_else(|| "none".to_owned(), |st| st.to_string());
+                let msg = format!(
+                    "Cannot dispatch transaction to non-active service `{}` (status: {})",
+                    instance.spec.as_descriptor(),
+                    status_str
+                );
+                Err(CoreError::ServiceNotActive.with_description(msg))
+            }
         }
     }
 
@@ -578,13 +602,23 @@ impl Dispatcher {
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let call_info = &tx.as_ref().call_info;
-        let (runtime_id, runtime) = self
-            .runtime_for_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        let (runtime_id, runtime) =
+            self.runtime_for_service(call_info.instance_id)
+                .ok_or_else(|| {
+                    let msg = format!(
+                        "Cannot dispatch transaction to unknown service with ID {}",
+                        call_info.instance_id
+                    );
+                    CoreError::IncorrectInstanceId.with_description(msg)
+                })?;
 
-        let instance = self
-            .get_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        let instance = self.get_service(call_info.instance_id).ok_or_else(|| {
+            let msg = format!(
+                "Cannot dispatch transaction to inactive service with ID {}",
+                call_info.instance_id
+            );
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
 
         let mut should_rollback = false;
         let context = ExecutionContext::for_transaction(
@@ -741,9 +775,14 @@ impl Dispatcher {
         new_artifact: &ArtifactId,
         data_version: &Version,
     ) -> Result<Option<MigrationScript>, ExecutionError> {
-        let runtime = self
-            .runtime_by_id(new_artifact.runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
+        let runtime = self.runtime_by_id(new_artifact.runtime_id).ok_or_else(|| {
+            let msg = format!(
+                "Cannot extract a migration script from artifact `{}` which corresponds to \
+                 unknown runtime with ID {}",
+                new_artifact, new_artifact.runtime_id,
+            );
+            CoreError::IncorrectRuntime.with_description(msg)
+        })?;
         runtime
             .migrate(new_artifact, data_version)
             .map_err(From::from)

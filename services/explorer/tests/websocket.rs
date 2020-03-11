@@ -17,10 +17,8 @@
 use actix_web::ws::CloseCode;
 use assert_matches::assert_matches;
 use exonum::{
-    crypto::KeyPair,
-    helpers::Height,
-    merkledb::ObjectHash,
-    runtime::{CoreError, ExecutionError, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID},
+    crypto::KeyPair, helpers::Height, merkledb::ObjectHash,
+    runtime::SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
 };
 use exonum_explorer::api::websocket::Notification;
 use exonum_rust_runtime::DefaultInstance;
@@ -134,11 +132,13 @@ fn test_send_transaction() {
 
     // Check response on sent message.
     let response: Value = receive_message(&mut client).unwrap();
+    let expected_msg = "Execution error with code `core:7` occurred: \
+        Cannot dispatch transaction to unknown service with ID 101";
     assert_eq!(
         response,
         json!({
             "result": "error",
-            "description": ExecutionError::from(CoreError::IncorrectInstanceId).to_string(),
+            "description": expected_msg,
         })
     );
 }

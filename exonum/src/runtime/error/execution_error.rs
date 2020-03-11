@@ -16,8 +16,8 @@
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
+use anyhow::bail;
 use exonum_proto::ProtobufConvert;
-use failure::bail;
 use protobuf::well_known_types::Empty;
 
 use std::{
@@ -64,7 +64,7 @@ impl ExecutionError {
             s.clone()
         } else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {
             error.description().to_string()
-        } else if let Some(error) = any.downcast_ref::<failure::Error>() {
+        } else if let Some(error) = any.downcast_ref::<anyhow::Error>() {
             error.to_string()
         } else {
             // Unknown error kind; keep its description empty.
@@ -192,7 +192,7 @@ impl ProtobufConvert for ExecutionError {
         inner
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let kind = pb.get_kind();
         let code = u8::try_from(pb.get_code())?;
 

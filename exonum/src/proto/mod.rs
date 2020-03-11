@@ -14,8 +14,8 @@
 
 //! Module that contains Protobuf messages used by Exonum.
 
+use anyhow::{ensure, Error};
 use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
 
 use std::convert::TryFrom;
 

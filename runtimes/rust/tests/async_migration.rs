@@ -274,8 +274,13 @@ fn test_basic_migration(freeze_service: bool) {
     // Check that transactions to the service are not dispatched.
     let tx = keypair.increment(CounterFactory::INSTANCE_ID, 5);
     drop(events.take());
+
     let err = execute_transaction(&mut blockchain, tx).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("unknown service with ID 100")
+    );
     assert_no_endpoint_update(&mut endpoints_rx);
 
     // Check that the migrating service does not receive hooks.

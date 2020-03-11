@@ -13,14 +13,15 @@
 // limitations under the License.
 
 use exonum_cli::{NodeBuilder, Spec};
+use exonum_rust_runtime::spec::JustFactory;
 
 use exonum_cryptocurrency_advanced::CryptocurrencyService;
 use old_cryptocurrency::contracts::CryptocurrencyService as OldService;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
         .with(Spec::new(OldService).with_default_instance())
-        .with(Spec::migrating(CryptocurrencyService))
+        .with(JustFactory::migrating(CryptocurrencyService))
         .run()
 }

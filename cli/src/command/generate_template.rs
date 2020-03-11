@@ -14,9 +14,9 @@
 
 //! Standard Exonum CLI command used to generate common configuration file.
 
+use anyhow::Error;
 use exonum::blockchain::ConsensusConfig;
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 

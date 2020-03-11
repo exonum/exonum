@@ -14,6 +14,7 @@
 
 pub use crate::{proto::schema, runtime::AnyTx};
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
@@ -131,7 +132,7 @@ impl ProtobufConvert for CoreMessage {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let msg = if pb.has_any_tx() {
             let tx = AnyTx::from_pb(pb.take_any_tx())?;
             Self::AnyTx(tx)
@@ -139,7 +140,7 @@ impl ProtobufConvert for CoreMessage {
             let precommit = Precommit::from_pb(pb.take_precommit())?;
             Self::Precommit(precommit)
         } else {
-            failure::bail!("Incorrect protobuf representation of CoreMessage")
+            anyhow::bail!("Incorrect protobuf representation of CoreMessage")
         };
 
         Ok(msg)
@@ -159,31 +160,31 @@ impl From<Precommit> for CoreMessage {
 }
 
 impl TryFrom<CoreMessage> for AnyTx {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
-    fn try_from(msg: CoreMessage) -> Result<Self, failure::Error> {
+    fn try_from(msg: CoreMessage) -> anyhow::Result<Self> {
         if let CoreMessage::AnyTx(tx) = msg {
             Ok(tx)
         } else {
-            failure::bail!("Not an `AnyTx` variant")
+            anyhow::bail!("Not an `AnyTx` variant")
         }
     }
 }
 
 impl TryFrom<CoreMessage> for Precommit {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
-    fn try_from(msg: CoreMessage) -> Result<Self, failure::Error> {
+    fn try_from(msg: CoreMessage) -> anyhow::Result<Self> {
         if let CoreMessage::Precommit(precommit) = msg {
             Ok(precommit)
         } else {
-            failure::bail!("Not a `Precommit` variant")
+            anyhow::bail!("Not a `Precommit` variant")
         }
     }
 }
 
 impl TryFrom<SignedMessage> for CoreMessage {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
         <Self as BinaryValue>::from_bytes(value.payload.into())
@@ -196,7 +197,7 @@ macro_rules! impl_exonum_msg_try_from_signed {
     ( $base:ident => $( $name:ident ),* ) => {
         $(
             impl std::convert::TryFrom<$crate::messages::SignedMessage> for $name {
-                type Error = failure::Error;
+                type Error = anyhow::Error;
 
                 fn try_from(value: $crate::messages::SignedMessage) -> Result<Self, Self::Error> {
                     <$base as $crate::merkledb::BinaryValue>::from_bytes(value.payload.into())
@@ -205,7 +206,7 @@ macro_rules! impl_exonum_msg_try_from_signed {
             }
 
             impl std::convert::TryFrom<&$crate::messages::SignedMessage> for $name {
-                type Error = failure::Error;
+                type Error = anyhow::Error;
 
                 fn try_from(value: &$crate::messages::SignedMessage) -> Result<Self, Self::Error> {
                     let bytes = std::borrow::Cow::Borrowed(value.payload.as_slice());

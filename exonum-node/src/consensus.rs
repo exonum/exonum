@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::bail;
 use exonum::{
     blockchain::{Blockchain, BlockchainMut, PersistentPool, ProposerId, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
@@ -20,7 +21,6 @@ use exonum::{
     messages::{AnyTx, Precommit, SignedMessage, Verified},
     runtime::ExecutionError,
 };
-use failure::bail;
 use log::{error, info, trace, warn};
 
 use std::{collections::HashSet, convert::TryFrom, fmt};
@@ -38,9 +38,7 @@ use crate::{
 };
 
 /// Shortcut to get verified messages from bytes.
-fn into_verified<T: TryFrom<SignedMessage>>(
-    raw: &[Vec<u8>],
-) -> Result<Vec<Verified<T>>, failure::Error> {
+fn into_verified<T: TryFrom<SignedMessage>>(raw: &[Vec<u8>]) -> anyhow::Result<Vec<Verified<T>>> {
     let mut items = Vec::with_capacity(raw.len());
     for bytes in raw {
         let verified = SignedMessage::from_bytes(bytes.into())?.into_verified()?;
@@ -214,7 +212,7 @@ impl NodeHandler {
     fn validate_block_response(
         &self,
         msg: &Verified<BlockResponse>,
-    ) -> Result<Vec<Verified<Precommit>>, failure::Error> {
+    ) -> anyhow::Result<Vec<Verified<Precommit>>> {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
@@ -825,7 +823,7 @@ impl NodeHandler {
     pub(crate) fn handle_txs_batch(
         &mut self,
         msg: &Verified<TransactionsResponse>,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received response intended for another peer, to={}, from={}",
@@ -1215,7 +1213,7 @@ impl NodeHandler {
         precommits: &[Verified<Precommit>],
         block_hash: Hash,
         block_height: Height,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         if precommits.len() < self.state.majority_count() {
             bail!("Received block without consensus");
         } else if precommits.len() > self.state.validators().len() {
@@ -1242,7 +1240,7 @@ impl NodeHandler {
         block_height: Height,
         precommit_round: Round,
         precommit: &Verified<Precommit>,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         let precommit_author = precommit.author();
         let precommit = precommit.payload();
         if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator) {

@@ -436,8 +436,7 @@ impl SupervisorExtensions<'_> {
         }
 
         let spec = state.spec;
-        DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact.clone())?;
+        DispatcherSchema::new(&*self.0.fork).initiate_resuming_service(instance_id)?;
 
         let runtime = self
             .0

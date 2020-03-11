@@ -64,7 +64,7 @@ fn parse_strategy(s: &str) -> Result<FlushPoolStrategy, failure::Error> {
         s if s.starts_with("timeout=") => {
             // 8 is the length of "timeout=".
             let timeout: u64 = s[8..].parse()?;
-            Ok(FlushPoolStrategy::Timeout(timeout))
+            Ok(FlushPoolStrategy::Timeout { timeout })
         }
         _ => Err(format_err!("Invalid pool flushing strategy")),
     }

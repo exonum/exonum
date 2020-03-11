@@ -237,7 +237,7 @@ impl<T: ServiceFactory + MigrateData> Deploy for JustFactory<T, Migrating> {
 /// # #[binary_value(codec = "bincode")]
 /// # struct ArtifactSpec {}
 /// #
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// const MY_RUNTIME_ID: u32 = 42;
 /// let artifact = ArtifactId::new(MY_RUNTIME_ID, "test", Version::new(1, 0, 0))?;
 /// let spec = ForeignSpec::new(artifact)

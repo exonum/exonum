@@ -1604,9 +1604,10 @@ fn restore_after_no_op_initialization() {
 
 #[test]
 fn test_tree_with_hashed_key() {
+    use anyhow::ensure;
     use byteorder::{ByteOrder, LittleEndian};
     use exonum_crypto::Hash;
-    use failure::{self, ensure};
+
     use std::{borrow::Cow, iter::FromIterator};
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -1646,7 +1647,7 @@ fn test_tree_with_hashed_key() {
             buf
         }
 
-        fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
             let bytes = bytes.as_ref();
             ensure!(
                 bytes.len() == 4,

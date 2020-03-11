@@ -195,6 +195,7 @@ testdata
 testkit
 testnet
 testnetctl
+thiserror
 threadpool
 timestamping
 timestamps

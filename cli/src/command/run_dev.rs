@@ -15,8 +15,8 @@
 //! Standard Exonum CLI command used to run the node with default parameters
 //! for developing purposes.
 
+use anyhow::{Context, Error};
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use failure::{Error, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 

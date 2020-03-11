@@ -19,13 +19,14 @@ travis-ci = { repository = "exonum/exonum" }
 actix = "0.7.9"
 actix-net = "0.2.6"
 actix-web = { version = "0.7.18", default-features = false }
+anyhow = "1.0.26"
 chrono = { version = "0.4.6", features = ["serde"] }
-failure = "0.1.5"
 futures = "0.1.25"
 log = "0.4.6"
 serde = { version = "1.0.101", features = ["derive"] }
 serde_json = "1.0.19"
 serde_urlencoded = "0.6.0"
+thiserror = "1.0"
 
 [dev-dependencies]
 pretty_assertions = "0.6.1"

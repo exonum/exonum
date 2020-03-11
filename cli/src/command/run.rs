@@ -15,8 +15,8 @@
 //! Standard Exonum CLI command used to run the node using prepared node
 //! configuration file.
 
+use anyhow::Error;
 use exonum::keys::{read_keys_from_file, Keys};
-use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 

@@ -14,16 +14,16 @@
 
 //! An implementation of `Error` type.
 
-use failure::Fail;
 use std::error::Error as StdError;
+use thiserror::Error;
 
 /// The error type for I/O operations with the `Database`.
 ///
 /// Application code in most cases should consider these errors as fatal. At the same time,
 /// it may be possible to recover from an error after manual intervention (e.g., by restarting
 /// the process or freeing up more disc space).
-#[derive(Fail, Debug, Clone)]
-#[fail(display = "{}", message)]
+#[derive(Debug, Clone, Error)]
+#[error("{}", message)]
 pub struct Error {
     message: String,
 }
