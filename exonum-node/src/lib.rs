@@ -321,10 +321,10 @@ impl Default for EventsPoolCapacity {
 /// overwriting some fields afterwards:
 ///
 /// ```
-/// # use exonum_node::MemoryPoolConfig;
+/// # use exonum_node::{FlushPoolStrategy, MemoryPoolConfig};
 /// let mut pool_config = MemoryPoolConfig::default();
 /// // Increase flush pool interval to 100 milliseconds.
-/// pool_config.flush_pool_timeout = Some(100);
+/// pool_config.flush_pool_strategy = FlushPoolStrategy::Timeout(100);
 /// // Use the config somewhere...
 /// ```
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

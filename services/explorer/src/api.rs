@@ -47,7 +47,7 @@
 //! was submitted to the node (aka a *stale read*).
 //!
 //! The period during which stale reads may exhibit depends on
-//! the `mempool.flush_pool_timeout` parameter of the node configuration.
+//! the `mempool.flush_pool_strategy` parameter of the node configuration.
 //! This parameter can be adjusted by the nodes independently. With the default value,
 //! the coherence period is order of 20 ms.
 //!
@@ -55,7 +55,7 @@
 //! expect immediate consistency after submitting a transaction. Clients should
 //! be prepared that the getter endpoint may return "not found" status after transaction submission.
 //! It is recommended that clients poll the getter endpoint with a delay comparable to the coherence
-//! period as described above, and perform several pollings if necessary.
+//! period as described above, and poll the endpoint several times if necessary.
 //!
 //! Note that there may be reasons for such eventual consistency unrelated to node implementation.
 //! For example, several Exonum nodes may be placed behind a balancing reverse proxy;
