@@ -25,11 +25,16 @@ public_key = "531cd1323febe624a34cda4efa68d9bb78c9e59e0fcb9b5702a8f94dbf7080e1"
 [private_config.database]
 compression_type = "none"
 create_if_missing = true
+
 [private_config.mempool.events_pool_capacity]
 api_requests_capacity = 1024
 internal_events_capacity = 128
 network_events_capacity = 512
 network_requests_capacity = 512
+
+[private_config.mempool.flush_pool_strategy]
+type = "timeout"
+timeout = 20
 
 [private_config.network]
 max_incoming_connections = 128

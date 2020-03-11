@@ -32,6 +32,10 @@ internal_events_capacity = 128
 network_events_capacity = 512
 network_requests_capacity = 512
 
+[private_config.mempool.flush_pool_strategy]
+type = "timeout"
+timeout = 20
+
 [private_config.network]
 max_incoming_connections = 128
 max_outgoing_connections = 128
