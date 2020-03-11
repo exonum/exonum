@@ -37,7 +37,7 @@ use crate::{
     consensus::RoundAction,
     events::network::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose},
-    Configuration, ConnectInfo,
+    Configuration, ConnectInfo, FlushPoolStrategy,
 };
 
 // TODO: Move request timeouts into node configuration. (ECR-171)
@@ -93,7 +93,7 @@ pub(crate) struct State {
 
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
-    flush_pool_timeout: Option<Duration>,
+    flush_pool_strategy: FlushPoolStrategy,
 
     // An in-memory set of transaction hashes, rejected by a node
     // within block.
@@ -499,7 +499,7 @@ impl State {
 
             incomplete_block: None,
             tx_cache: BTreeMap::new(),
-            flush_pool_timeout: config.mempool.flush_pool_timeout.map(Duration::from_millis),
+            flush_pool_strategy: config.mempool.flush_pool_strategy,
             invalid_txs: HashSet::default(),
 
             keys: config.keys,
@@ -1302,7 +1302,19 @@ impl State {
 
     /// Returns interval between flushing transaction pool to the database, if any.
     pub(super) fn flush_pool_timeout(&self) -> Option<Duration> {
-        self.flush_pool_timeout
+        match self.flush_pool_strategy {
+            FlushPoolStrategy::Timeout(timeout) => Some(Duration::from_millis(timeout)),
+            _ => None,
+        }
+    }
+
+    /// Checks if the pool flushing strategy prescribes to flush transactions immediately
+    /// on initial processing.
+    pub(super) fn persist_txs_immediately(&self) -> bool {
+        match self.flush_pool_strategy {
+            FlushPoolStrategy::Immediate => true,
+            _ => false,
+        }
     }
 
     /// Returns mutable reference to the invalid transactions cache.

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::blockchain::Schema;
-use log::{info, warn};
+use log::{info, trace, warn};
 
 use std::mem;
 
@@ -125,7 +125,7 @@ impl NodeHandler {
         if tx_cache_size == 0 {
             return;
         } else {
-            info!(
+            trace!(
                 "Flushing {} transactions from cache to persistent pool",
                 tx_cache_size
             );

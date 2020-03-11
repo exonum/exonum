@@ -327,7 +327,7 @@ impl Default for EventsPoolCapacity {
 /// pool_config.flush_pool_timeout = Some(100);
 /// // Use the config somewhere...
 /// ```
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
@@ -337,21 +337,41 @@ pub struct MemoryPoolConfig {
     /// Interval in milliseconds between flushing the transaction cache to the persistent pool.
     ///
     /// This value influences how fast transactions appear in the persistent pool after they
-    /// have been initially processed by the node. With `None` setting, transactions will not
+    /// have been initially processed by the node. With `Never` setting, transactions will not
     /// be persisted at all before appearing in a block, which may negatively influence
     /// some applications (e.g., the `GET transactions` endpoint of the explorer service).
-    /// On the other hand, setting `flush_pool_timeout` too low may lead to node hiccups
-    /// during high transaction load.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub flush_pool_timeout: Option<Milliseconds>,
+    /// On the other hand of the spectrum, there is `Immediate`, which flushes each transaction
+    /// separately after its initial processing. In the middle, there is `Timeout`, which
+    /// allows to specify the coherence interval for the pool.
+    #[serde(default)]
+    pub flush_pool_strategy: FlushPoolStrategy,
 }
 
-impl Default for MemoryPoolConfig {
+/// Strategy to flush transactions into the pool.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum FlushPoolStrategy {
+    /// Never flush the transactions to the persistent pool.
+    ///
+    /// This setting is best for performance, but may harm the availability of some APIs of the node
+    /// (e.g., the `GET transactions` endpoint of the explorer service).
+    Never,
+
+    /// Flush transactions on the specified timeout in milliseconds.
+    ///
+    /// The recommended values are order of 20ms.
+    Timeout(Milliseconds),
+
+    /// Flush each transaction after receiving it.
+    ///
+    /// Beware that this setting can harm performance of the node under high load.
+    Immediate,
+}
+
+impl Default for FlushPoolStrategy {
     fn default() -> Self {
-        Self {
-            events_pool_capacity: EventsPoolCapacity::default(),
-            flush_pool_timeout: Some(25),
-        }
+        Self::Timeout(20)
     }
 }
 

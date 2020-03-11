@@ -773,8 +773,16 @@ impl NodeHandler {
             // Thus, we don't stop the execution here.
             outcome = Err(HandleTxError::Invalid(e));
         } else {
-            // Transaction is OK, store it to the cache.
-            self.state.tx_cache_mut().insert(hash, msg);
+            // Transaction is OK, store it to the cache or persistent pool.
+            if self.state.persist_txs_immediately() {
+                let fork = self.blockchain.fork();
+                Schema::new(&fork).add_transaction_into_pool(msg);
+                self.blockchain
+                    .merge(fork.into_patch())
+                    .expect("Cannot add transaction to persistent pool");
+            } else {
+                self.state.tx_cache_mut().insert(hash, msg);
+            }
             outcome = Ok(());
         }
 
