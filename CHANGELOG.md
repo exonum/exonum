@@ -24,6 +24,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Schema::call_errors` was removed in favor of more comprehensive
   `call_records` method. (#1792)
 
+- Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
+  error. (#1806)
+
 ### exonum-api
 
 - Data types were made non-exhaustive where appropriate. (#1799)
@@ -108,6 +111,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Testkit server now returns info on emulated nodes. (#1799)
 
 ### Internal Improvements
+
+#### exonum
+
+- Core now provides more thorough / context-dependent error descriptions
+  related to service lifecycle. (#1806)
 
 #### exonum-merkledb
 
