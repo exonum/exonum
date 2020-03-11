@@ -89,6 +89,27 @@ Similarly, nominally public APIs that are hidden from the docs
 via `#[doc(hidden)]` are considered unstable and thus exempt from semantic
 versioning limitations.
 
+## Supported Rust Versions
+
+The Exonum crates are built against a specific stable Rust version (1.41.0).
+Newer stable versions are supported as a result. (Feel free to file an issue
+if any Exonum crate does not build on a newer stable version.)
+Newer beta and nightly versions *should* be supported as well,
+but no specific effort is allocated into supporting them.
+
+Due to at least some external dependencies not factoring the minimum supported
+Rust version into their semantic versioning policy, the Exonum crates effectively
+have no choice but to do the same. Namely, a bump of the minimum supported
+Rust version **will not** be considered a semantically breaking change.
+It is, however, guaranteed that the Exonum crates will build on *some* stable Rust.
+
+Note that due to versioning policies of external dependencies,
+the effective minimum supported Rust version may increase
+as a result of the activities out of control of Exonum developers.
+The decision how to deal with this situation
+(pin the dependency or bump the minimum supported Rust version) will be made
+on the case-by-case basis.
+
 ## Contributing
 
 To contribute to Exonum, please see [CONTRIBUTING](CONTRIBUTING.md).
