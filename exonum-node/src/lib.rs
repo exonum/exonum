@@ -349,7 +349,7 @@ pub struct MemoryPoolConfig {
 
 /// Strategy to flush transactions into the pool.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FlushPoolStrategy {
     /// Never flush the transactions to the persistent pool.
@@ -361,7 +361,10 @@ pub enum FlushPoolStrategy {
     /// Flush transactions on the specified timeout in milliseconds.
     ///
     /// The recommended values are order of 20ms.
-    Timeout(Milliseconds),
+    Timeout {
+        /// Timeout value in milliseconds.
+        timeout: Milliseconds,
+    },
 
     /// Flush each transaction after receiving it.
     ///
@@ -371,7 +374,7 @@ pub enum FlushPoolStrategy {
 
 impl Default for FlushPoolStrategy {
     fn default() -> Self {
-        Self::Timeout(20)
+        Self::Timeout { timeout: 20 }
     }
 }
 
@@ -1361,5 +1364,28 @@ mod tests {
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
         NodeBuilder::new(db, node_cfg, node_keys);
+    }
+
+    #[test]
+    fn flush_pool_strategy_is_serializable() {
+        let mut mempool_config = MemoryPoolConfig::default();
+        let s = toml::to_string(&mempool_config).unwrap();
+        let restored: MemoryPoolConfig = toml::from_str(&s).unwrap();
+        assert_eq!(restored, mempool_config);
+
+        mempool_config.flush_pool_strategy = FlushPoolStrategy::Never;
+        let s = toml::to_string(&mempool_config).unwrap();
+        let restored: MemoryPoolConfig = toml::from_str(&s).unwrap();
+        assert_eq!(restored, mempool_config);
+
+        let config_without_strategy = r#"
+            [events_pool_capacity]
+            network_requests_capacity = 512
+            network_events_capacity = 512
+            internal_events_capacity = 128
+            api_requests_capacity = 1024
+        "#;
+        let restored: MemoryPoolConfig = toml::from_str(config_without_strategy).unwrap();
+        assert_eq!(restored, MemoryPoolConfig::default());
     }
 }

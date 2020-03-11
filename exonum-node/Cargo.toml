@@ -49,6 +49,7 @@ criterion = "0.3.0"
 hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
 pretty_assertions = "0.6.1"
 serde_json = "1.0.44"
+toml = "0.5.6"
 
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../runtimes/rust" }
 

@@ -1303,7 +1303,7 @@ impl State {
     /// Returns interval between flushing transaction pool to the database, if any.
     pub(super) fn flush_pool_timeout(&self) -> Option<Duration> {
         match self.flush_pool_strategy {
-            FlushPoolStrategy::Timeout(timeout) => Some(Duration::from_millis(timeout)),
+            FlushPoolStrategy::Timeout { timeout } => Some(Duration::from_millis(timeout)),
             _ => None,
         }
     }
