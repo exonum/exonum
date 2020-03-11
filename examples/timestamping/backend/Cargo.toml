@@ -21,8 +21,8 @@ exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../../runtimes/rust" 
 exonum-supervisor = { version = "1.0.0-rc.1", path = "../../../services/supervisor" }
 exonum-time = { version = "1.0.0-rc.1", path = "../../../services/time" }
 
+anyhow = "1.0.26"
 chrono = { version = "0.4.6", features = ["serde"] }
-failure = "0.1.5"
 log = "0.4.6"
 protobuf = "2.8.0"
 serde = "1.0.10"

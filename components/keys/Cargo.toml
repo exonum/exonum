@@ -13,8 +13,8 @@ categories = ["cryptography", "hashing"]
 description = "Exonum node keys management."
 
 [dependencies]
+anyhow = "1.0.26"
 rand = "0.7"
-failure = "0.1.5"
 pwbox = "0.2.1"
 secret-tree = "0.2.0"
 serde = "1.0"

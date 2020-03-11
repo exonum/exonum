@@ -46,7 +46,7 @@ pub const TAG_LENGTH: usize = 16;
 pub const HEADER_LENGTH: usize = 4;
 
 type HandshakeData<S> = (Framed<S, MessagesCodec>, Vec<u8>, x25519::PublicKey);
-type HandshakeResult<S> = Box<dyn Future<Item = HandshakeData<S>, Error = failure::Error>>;
+type HandshakeResult<S> = Box<dyn Future<Item = HandshakeData<S>, Error = anyhow::Error>>;
 
 pub trait Handshake {
     fn listen<S: AsyncRead + AsyncWrite + 'static>(self, stream: S) -> HandshakeResult<S>;
@@ -58,7 +58,7 @@ pub struct HandshakeRawMessage(pub Vec<u8>);
 impl HandshakeRawMessage {
     pub fn read<S: AsyncRead + 'static>(
         sock: S,
-    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Self), Error = anyhow::Error> {
         let buf = vec![0_u8; HANDSHAKE_HEADER_LENGTH];
         // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message is the payload length
         // in little-endian, remaining bytes is the handshake payload. Therefore, we need to read
@@ -76,7 +76,7 @@ impl HandshakeRawMessage {
     pub fn write<S: AsyncWrite + 'static>(
         self,
         sock: S,
-    ) -> impl Future<Item = (S, Vec<u8>), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Vec<u8>), Error = anyhow::Error> {
         let len = self.0.len();
         debug_assert!(len < MAX_HANDSHAKE_MESSAGE_LENGTH);
 

@@ -14,7 +14,7 @@
 
 //! Persistent iterators.
 
-use failure::{bail, ensure};
+use anyhow::{bail, ensure};
 
 use std::{
     borrow::{Borrow, Cow},
@@ -69,7 +69,7 @@ where
         }
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         ensure!(
             !bytes.is_empty(),
             "`IteratorPosition` serialization cannot be empty"

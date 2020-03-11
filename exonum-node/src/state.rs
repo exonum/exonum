@@ -14,6 +14,7 @@
 
 //! State of the `NodeHandler`.
 
+use anyhow::bail;
 use bit_vec::BitVec;
 use exonum::{
     blockchain::{contains_transaction, Block, ConsensusConfig, ValidatorKeys},
@@ -23,7 +24,6 @@ use exonum::{
     merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch},
     messages::{AnyTx, Precommit, Verified},
 };
-use failure::bail;
 use log::{error, trace};
 
 use std::{
@@ -991,7 +991,7 @@ impl State {
         msg: Verified<Propose>,
         transactions: &MapIndex<T, Hash, Verified<AnyTx>>,
         transaction_pool: &KeySetIndex<T, Hash>,
-    ) -> Result<&ProposeState, failure::Error> {
+    ) -> anyhow::Result<&ProposeState> {
         let propose_hash = msg.object_hash();
         match self.proposes.entry(propose_hash) {
             Entry::Occupied(..) => bail!("Propose already found"),

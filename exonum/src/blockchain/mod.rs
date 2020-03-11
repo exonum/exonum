@@ -34,7 +34,6 @@ use exonum_merkledb::{
     access::RawAccess, Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemSchema, TemporaryDB,
 };
-use failure::Error;
 
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -397,7 +396,7 @@ impl BlockchainMut {
         block_hash: Hash,
         precommits: I,
         tx_cache: &mut BTreeMap<Hash, Verified<AnyTx>>,
-    ) -> Result<(), Error>
+    ) -> anyhow::Result<()>
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {

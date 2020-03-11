@@ -18,11 +18,11 @@ description = "Persistent storage implementation based on RocksDB which provides
 exonum-crypto = { path = "../crypto", version = "1.0.0-rc.1", features = ["with-serde"]}
 exonum-proto = { path = "../proto", version = "1.0.0-rc.1", optional = true }
 
+anyhow = "1.0.26"
 byteorder = "1.3"
 chrono = "0.4.6"
 crossbeam = "0.7.3"
 enum-primitive-derive = "0.1"
-failure = "0.1"
 leb128 = "0.2"
 num-traits = "0.2"
 protobuf = { version = "2.8.1", features = ["with-serde"], optional = true }
@@ -32,6 +32,7 @@ serde = "1.0"
 serde_derive = "1.0"
 smallvec = "1.0"
 tempfile = "3.0"
+thiserror = "1.0"
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]

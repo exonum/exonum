@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use exonum_cli::{NodeBuilder, Spec};
-use failure::Error;
 
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
-fn main() -> Result<(), Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
     NodeBuilder::development_node()?
         // Starts cryptocurrency instance with given id and name

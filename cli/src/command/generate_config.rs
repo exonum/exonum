@@ -15,13 +15,13 @@
 //! Standard Exonum CLI command used to generate public and secret config files
 //! of the node using provided common configuration file.
 
+use anyhow::{bail, Error};
 use exonum::{
     blockchain::ValidatorKeys,
     keys::{generate_keys, Keys},
     merkledb::DbOptions,
 };
 use exonum_node::{ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig};
-use failure::{bail, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -190,7 +190,7 @@ fn get_master_key_path(path: Option<PathBuf>) -> Result<PathBuf, Error> {
 fn create_keys_and_files(
     secret_key_path: impl AsRef<Path>,
     passphrase: impl AsRef<[u8]>,
-) -> Result<Keys, failure::Error> {
+) -> anyhow::Result<Keys> {
     let secret_key_path = secret_key_path.as_ref();
     if secret_key_path.exists() {
         bail!(

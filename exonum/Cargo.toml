@@ -18,18 +18,19 @@ links = "exonum_protobuf"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
+anyhow = "1.0.26"
 log = "0.4.6"
 hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
 serde = "1.0.101"
 serde_derive = "1.0.101"
 serde_str = "0.1.0"
 env_logger = "0.6.0"
-failure = "0.1.5"
 futures = "0.1.25"
 os_info = "2.0"
 chrono = { version = "0.4.6", features = ["serde"] }
 protobuf = { version = "2.8.1", features = ["with-serde"] }
 semver = { version = "0.9.0", features = ["serde"] }
+thiserror = "1.0"
 
 exonum-crypto = { version = "1.0.0-rc.1", path = "../components/crypto" }
 exonum-derive = { version = "1.0.0-rc.1", path = "../components/derive" }

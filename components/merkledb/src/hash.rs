@@ -14,7 +14,9 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{hash, Hash, HashStream, HASH_SIZE};
-use failure::Fail;
+use thiserror::Error;
+
+use std::error::Error as StdError;
 
 use crate::{proof_map::ProofPath, BinaryValue};
 
@@ -258,16 +260,16 @@ impl ObjectHash for [u8] {
 
 /// Errors that can occur while validating a `ListProof` or `MapProof` against
 /// a trusted collection hash.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum ValidationError<E: Fail> {
+pub enum ValidationError<E: StdError + 'static> {
     /// The hash of the proof is not equal to the trusted root hash.
-    #[fail(display = "hash of the proof is not equal to the trusted hash of the index")]
+    #[error("hash of the proof is not equal to the trusted hash of the index")]
     UnmatchedRootHash,
 
     /// The proof is malformed.
-    #[fail(display = "Malformed proof: {}", _0)]
-    Malformed(#[fail(cause)] E),
+    #[error("Malformed proof: {}", _0)]
+    Malformed(#[source] E),
 }
 
 #[cfg(test)]

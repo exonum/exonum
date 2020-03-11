@@ -17,7 +17,7 @@ use exonum_cli::{NodeBuilder, Spec};
 use exonum_cryptocurrency_advanced::CryptocurrencyService;
 use old_cryptocurrency::contracts::CryptocurrencyService as OldService;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
         .with(Spec::new(OldService).with_default_instance())

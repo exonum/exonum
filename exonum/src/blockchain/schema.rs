@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
+use anyhow::format_err;
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
@@ -20,7 +22,6 @@ use exonum_merkledb::{
     Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
-use failure::format_err;
 
 use std::fmt;
 
@@ -476,7 +477,7 @@ impl ProtobufConvert for CallInBlock {
         pb
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         if pb.has_before_transactions() {
             Ok(Self::BeforeTransactions {
                 id: pb.get_before_transactions(),

@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::format_err;
 use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, Database, ObjectHash, TemporaryDB};
-use failure::format_err;
 use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
 use serde_json::json;

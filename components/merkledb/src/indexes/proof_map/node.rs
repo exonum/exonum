@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(unsafe_code)]
+use anyhow::ensure;
+use smallvec::{smallvec, SmallVec};
 
 use std::borrow::Cow;
-
-use failure::{self, ensure};
-use smallvec::{smallvec, SmallVec};
 
 use exonum_crypto::{self, Hash, HASH_SIZE};
 
@@ -96,7 +94,7 @@ impl BinaryValue for BranchNode {
         self.raw
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let raw = bytes.into_owned();
         ensure!(raw.len() == BRANCH_NODE_SIZE, "Wrong buffer size");
         Ok(Self { raw })

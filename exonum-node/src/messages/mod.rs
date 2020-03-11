@@ -156,12 +156,12 @@ pub enum Message {
 
 impl Message {
     /// Deserialize message from signed message.
-    pub fn from_signed(signed: SignedMessage) -> Result<Self, failure::Error> {
+    pub fn from_signed(signed: SignedMessage) -> anyhow::Result<Self> {
         signed.into_verified::<ExonumMessage>().map(From::from)
     }
 
     /// Checks buffer and returns instance of `Message`.
-    pub fn from_raw_buffer(buffer: Vec<u8>) -> Result<Self, failure::Error> {
+    pub fn from_raw_buffer(buffer: Vec<u8>) -> anyhow::Result<Self> {
         SignedMessage::from_bytes(buffer.into()).and_then(Self::from_signed)
     }
 
@@ -192,13 +192,13 @@ macro_rules! impl_message_from_verified {
             }
 
             impl std::convert::TryFrom<Message> for Verified<$concrete> {
-                type Error = failure::Error;
+                type Error = anyhow::Error;
 
                 fn try_from(msg: Message) -> Result<Self, Self::Error> {
                     if let Message::$category($category::$concrete(msg)) = msg {
                         Ok(msg)
                     } else {
-                        Err(failure::format_err!(
+                        Err(anyhow::format_err!(
                             "Given message is not a {}::{}",
                             stringify!($category),
                             stringify!($concrete)
@@ -312,7 +312,7 @@ impl BinaryValue for Message {
         self.as_raw().to_bytes()
     }
 
-    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let message = SignedMessage::from_bytes(value)?;
         Self::from_signed(message)
     }

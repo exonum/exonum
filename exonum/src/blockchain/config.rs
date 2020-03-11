@@ -18,9 +18,10 @@
 //! The configuration includes the public keys of validators, consensus related parameters,
 //! and built-in services (services deployed at the blockchain start).
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
+use anyhow::{bail, ensure};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use failure::{bail, ensure};
 use log::warn;
 
 use std::collections::{HashMap, HashSet};
@@ -66,7 +67,7 @@ impl ValidatorKeys {
 }
 
 impl ValidateInput for ValidatorKeys {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         if self.consensus_key == self.service_key {
@@ -193,7 +194,7 @@ impl ConsensusConfig {
 
     /// Check that validator keys is correct. Configuration should have at least
     /// a single validator key. And each key should meet only once.
-    fn validate_keys(&self) -> Result<(), failure::Error> {
+    fn validate_keys(&self) -> anyhow::Result<()> {
         ensure!(
             !self.validator_keys.is_empty(),
             "Consensus configuration must have at least one validator."
@@ -417,7 +418,7 @@ impl ConsensusConfigBuilder {
 }
 
 impl ValidateInput for ConsensusConfig {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         const MINIMAL_BODY_SIZE: usize = 256;

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::bail;
 use exonum::{
     crypto::{
         x25519::{self, into_x25519_keypair, into_x25519_public_key},
@@ -20,7 +21,6 @@ use exonum::{
     merkledb::BinaryValue,
     messages::Verified,
 };
-use failure::bail;
 use futures::future::{done, Future};
 use tokio_codec::Decoder;
 use tokio_io::{AsyncRead, AsyncWrite};
@@ -106,7 +106,7 @@ impl NoiseHandshake {
     pub fn read_handshake_msg<S: AsyncRead + 'static>(
         mut self,
         stream: S,
-    ) -> impl Future<Item = (S, Self, Vec<u8>), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Self, Vec<u8>), Error = anyhow::Error> {
         HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
             let message = self.noise.read_handshake_msg(&msg.0)?;
             Ok((stream, self, message))
@@ -117,7 +117,7 @@ impl NoiseHandshake {
         mut self,
         stream: S,
         msg: &[u8],
-    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
+    ) -> impl Future<Item = (S, Self), Error = anyhow::Error> {
         done(self.noise.write_handshake_msg(msg))
             .map_err(Into::into)
             .and_then(|buf| HandshakeRawMessage(buf).write(stream))
@@ -128,7 +128,7 @@ impl NoiseHandshake {
         self,
         stream: S,
         message: Vec<u8>,
-    ) -> Result<HandshakeData<S>, failure::Error> {
+    ) -> Result<HandshakeData<S>, anyhow::Error> {
         let remote_static_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -172,10 +172,7 @@ impl Handshake for NoiseHandshake {
             })
             .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
             .and_then(|(stream, handshake, message)| handshake.finalize(stream, message))
-            .map_err(move |e| {
-                e.context(format!("peer {} disconnected", peer_address))
-                    .into()
-            });
+            .map_err(move |e| e.context(format!("peer {} disconnected", peer_address)));
         Box::new(framed)
     }
 
@@ -195,10 +192,7 @@ impl Handshake for NoiseHandshake {
                 )
             })
             .and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
-            .map_err(move |e| {
-                e.context(format!("peer {} disconnected", peer_address))
-                    .into()
-            });
+            .map_err(move |e| e.context(format!("peer {} disconnected", peer_address)));
         Box::new(framed)
     }
 }

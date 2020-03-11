@@ -176,7 +176,7 @@ impl ArgsBuilder {
         self
     }
 
-    fn run(self) -> Result<StandardResult, failure::Error> {
+    fn run(self) -> anyhow::Result<StandardResult> {
         let command = <Command as StructOpt>::from_iter_safe(self.args).unwrap();
         command.execute()
     }
@@ -198,7 +198,7 @@ fn touch(path: impl AsRef<Path>) {
         .unwrap();
 }
 
-fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<(), failure::Error> {
+fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> anyhow::Result<()> {
     let mut source_file = fs::File::open(&from)?;
 
     let mut destination_file = {
@@ -523,7 +523,7 @@ fn run_node_with_decentralized_supervisor() {
 }
 
 #[test]
-fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> {
+fn different_supervisor_modes_in_public_configs() -> anyhow::Result<()> {
     let pub_config_1 = public_config(SupervisorMode::Simple);
     let pub_config_2 = public_config(SupervisorMode::Decentralized);
     let private_config = NodePrivateConfig {
@@ -579,7 +579,7 @@ fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
     }
 }
 
-fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), failure::Error> {
+fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> anyhow::Result<()> {
     let testnet_dir = tempfile::tempdir()?;
     let common_config_path = testnet_dir.path().join("common.toml");
 

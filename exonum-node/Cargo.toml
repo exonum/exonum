@@ -16,11 +16,11 @@ description = "Node of the Exonum blockchain framework."
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
+anyhow = "1.0.26"
 bit-vec = "0.6.0"
 byteorder = { version = "1.2.7", features = [ "i128" ] }
 bytes = "0.4.11"
 chrono = "0.4.6"
-failure = "0.1.5"
 futures = "0.1.25"
 log = "0.4.6"
 protobuf = { version = "2.8.1", features = ["with-serde"] }
@@ -28,6 +28,7 @@ rand = "0.7"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 snow = { version = "0.6.0", default-features = false }
+thiserror = "1.0"
 tokio = "0.1.14"
 tokio-codec = "0.1.1"
 tokio-core = "0.1.17"

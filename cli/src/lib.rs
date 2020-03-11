@@ -80,7 +80,7 @@
 //!     "--secret", "42",
 //! ]);
 //! assert_eq!(command.secret_number, 42);
-//! # drop(|| -> Result<(), failure::Error> {
+//! # drop(|| -> anyhow::Result<()> {
 //! command.inner.execute()?;
 //! # Ok(())
 //! # });
@@ -213,7 +213,7 @@ impl NodeBuilder {
     /// # Return value
     ///
     /// Returns an error if the temporary directory cannot be created.
-    pub fn development_node() -> Result<Self, failure::Error> {
+    pub fn development_node() -> anyhow::Result<Self> {
         let temp_dir = TempDir::new()?;
         let mut this = Self::with_args(vec![
             OsString::from("run-dev"),
@@ -249,7 +249,7 @@ impl NodeBuilder {
     /// - `Ok(None)` if the command executed successfully and did not lead to node creation
     /// - `Err(_)` if an error occurred during command execution
     #[doc(hidden)] // unstable
-    pub fn execute_command(mut self) -> Result<Option<Node>, failure::Error> {
+    pub fn execute_command(mut self) -> anyhow::Result<Option<Node>> {
         let command = if let Some(args) = self.args {
             Command::from_iter(args)
         } else {
@@ -290,7 +290,7 @@ impl NodeBuilder {
     }
 
     /// Configures the node using parameters provided by user from stdin and then runs it.
-    pub fn run(mut self) -> Result<(), failure::Error> {
+    pub fn run(mut self) -> anyhow::Result<()> {
         // Store temporary directory until the node is done.
         let _temp_dir = self.temp_dir.take();
         if let Some(node) = self.execute_command()? {

@@ -93,23 +93,21 @@ macro_rules! impl_serde_hex_for_binary_value {
     ($name:ident) => {
         impl hex::ToHex for $name {
             fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
-                use exonum_merkledb::BinaryValue;
-
+                use $crate::BinaryValue;
                 BinaryValue::to_bytes(self).encode_hex()
             }
 
             fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
-                use exonum_merkledb::BinaryValue;
-
+                use $crate::BinaryValue;
                 BinaryValue::to_bytes(self).encode_hex_upper()
             }
         }
 
         impl hex::FromHex for $name {
-            type Error = failure::Error;
+            type Error = $crate::_reexports::Error;
 
             fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Self::Error> {
-                use exonum_merkledb::BinaryValue;
+                use $crate::BinaryValue;
 
                 let bytes = Vec::<u8>::from_hex(v)?;
                 <Self as BinaryValue>::from_bytes(bytes.into()).map_err(From::from)
@@ -119,17 +117,15 @@ macro_rules! impl_serde_hex_for_binary_value {
         impl std::fmt::Display for $name {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 use hex::ToHex;
-
                 write!(f, "{}", <Self as ToHex>::encode_hex::<String>(self))
             }
         }
 
         impl std::str::FromStr for $name {
-            type Err = failure::Error;
+            type Err = $crate::_reexports::Error;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 use hex::FromHex;
-
                 <Self as FromHex>::from_hex(s)
             }
         }

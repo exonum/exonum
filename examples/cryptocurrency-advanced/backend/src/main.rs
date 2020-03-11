@@ -16,7 +16,7 @@ use exonum_cli::{NodeBuilder, Spec};
 
 use exonum_cryptocurrency_advanced::CryptocurrencyService;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
     NodeBuilder::new()
         // Starts cryptocurrency instance with the default identifiers

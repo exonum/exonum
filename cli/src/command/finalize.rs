@@ -15,9 +15,9 @@
 //! Standard Exonum CLI command used to combine a private and all the public parts of the
 //! node configuration in a single file.
 
+use anyhow::{bail, ensure, format_err, Error};
 use exonum::crypto::PublicKey;
 use exonum_node::{ConnectInfo, ConnectListConfig, NodeApiConfig};
-use failure::{bail, ensure, format_err, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -108,7 +108,7 @@ impl Finalize {
         })
     }
 
-    fn get_consensus_key(config: &NodePublicConfig) -> Result<PublicKey, failure::Error> {
+    fn get_consensus_key(config: &NodePublicConfig) -> anyhow::Result<PublicKey> {
         Ok(config
             .validator_keys
             .ok_or_else(|| format_err!("Expected validator keys in public config: {:#?}", config))?
