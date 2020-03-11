@@ -290,7 +290,7 @@ fn assert_deploy_state(actual: AsyncEventState, expected: AsyncEventState) {
 /// Test for self-checking the `FailingRuntime` concept and `deploy-status` endpoint.
 /// This test checks the normal conditions: deploy for our node succeed, was confirmed
 /// by the other node and should be deployed within network.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_success() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
@@ -324,7 +324,7 @@ async fn deploy_success() {
 
 /// Checks that deployment fails if there was no enough confirmations
 /// when the deadline height was achieved.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_failure_because_not_confirmed() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
@@ -354,7 +354,7 @@ async fn deploy_failure_because_not_confirmed() {
 
 /// Checks that if deployment attempt fails for our node, the deploy
 /// is failed despite the confirmation from other node.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_failure_because_cannot_deploy() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
@@ -394,7 +394,7 @@ async fn deploy_failure_because_cannot_deploy() {
 ///
 /// Motivation: there was a bug which caused `Supervisor` to attempt deployments
 /// every block until the deadline height.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_failure_check_no_extra_actions() {
     // Choose some bigger height to verify that no extra actions are performed
     // after deployment activities and before deadline height.
@@ -448,7 +448,7 @@ async fn deploy_failure_check_no_extra_actions() {
 }
 
 /// Checks that if other node sends a failure report, deployment fails as well.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_failure_because_other_node_cannot_deploy() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
@@ -488,7 +488,7 @@ async fn deploy_failure_because_other_node_cannot_deploy() {
 
 /// Checks that after unsuccessful deploy attempt we can perform another try and it can
 /// result in a success.
-#[actix_rt::test]
+#[tokio::test]
 async fn deploy_successfully_after_failure() {
     // 1. Perform the same routine as in `deploy_failure_because_other_node_cannot_deploy`:
     // - attempt to deploy an artifact that can be deployed;
@@ -568,7 +568,7 @@ async fn deploy_successfully_after_failure() {
 }
 
 /// Checks that `deploy-status` returns `NotFound` for unknown requests.
-#[actix_rt::test]
+#[tokio::test]
 async fn not_requested_deploy_status() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();

@@ -29,7 +29,7 @@ fn create_testkit() -> TestKit {
         .build()
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn info() {
     // This test checks whether the endpoint returns expected result and correctness of
     // serialize. Expected results:
@@ -50,7 +50,7 @@ async fn info() {
     assert_eq!(info, expected);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn stats() {
     let mut testkit = create_testkit();
     let api = testkit.api();
@@ -65,7 +65,7 @@ async fn stats() {
     assert_eq!(info, expected);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn shutdown() {
     let mut testkit = create_testkit();
     let api = testkit.api();

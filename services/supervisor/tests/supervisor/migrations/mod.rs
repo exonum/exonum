@@ -252,7 +252,7 @@ const DEADLINE_HEIGHT: Height = Height(10);
 ///
 /// Expected behavior is that migration is completed successfully and schema
 /// is updated to the next version of data.
-#[actix_rt::test]
+#[tokio::test]
 async fn migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
@@ -304,7 +304,7 @@ async fn migration() {
 }
 
 /// This test applies two migrations to one service, one after another.
-#[actix_rt::test]
+#[tokio::test]
 async fn migration_two_scripts_sequential() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
@@ -364,7 +364,7 @@ async fn migration_two_scripts_sequential() {
 ///
 /// Expected behavior is that migration is failed and no changes are applied to
 /// data.
-#[actix_rt::test]
+#[tokio::test]
 async fn migration_fail() {
     let mut testkit = {
         // Initialize builder;
@@ -417,7 +417,7 @@ async fn migration_fail() {
 
 /// This test checks that migration that contains two migration scripts completes
 /// successfully in two steps.
-#[actix_rt::test]
+#[tokio::test]
 async fn complex_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
@@ -472,7 +472,7 @@ async fn complex_migration() {
 
 /// This test checks that attempt to request a migration for service that doesn't support
 /// migrations results in a migration failure.
-#[actix_rt::test]
+#[tokio::test]
 async fn no_migration_support() {
     let mut testkit = testkit_with_supervisor_and_service_no_migrations(1);
 
@@ -509,7 +509,7 @@ async fn no_migration_support() {
 ///
 /// Expected behavior is that migration is completed successfully and schema
 /// is updated to the next version of data.
-#[actix_rt::test]
+#[tokio::test]
 async fn migration_consensus() {
     let validators_amount = 5;
     let mut testkit = testkit_with_supervisor_and_service(validators_amount);
@@ -572,7 +572,7 @@ async fn migration_consensus() {
 /// send their confirmation.
 ///
 /// Expected behavior is that migration is failed due to timeout.
-#[actix_rt::test]
+#[tokio::test]
 async fn migration_no_consensus() {
     let validators_amount = 5;
     let mut testkit = testkit_with_supervisor_and_service(validators_amount);
@@ -657,7 +657,7 @@ async fn migration_no_consensus() {
 /// migration fails and no changes are performed to schema.
 ///
 /// Expected behavior is that migration is failed.
-#[actix_rt::test]
+#[tokio::test]
 async fn migration_hash_divergence() {
     let validators_amount = 5;
     let mut testkit = testkit_with_supervisor_and_service(validators_amount);
@@ -732,7 +732,7 @@ async fn migration_hash_divergence() {
 }
 
 /// Test for a fast-forward migration (0.1.0 - 0.1.1)
-#[actix_rt::test]
+#[tokio::test]
 async fn fast_forward_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 
@@ -759,7 +759,7 @@ async fn fast_forward_migration() {
 }
 
 /// This test checks mixed migration scenario: two data migrations and one fast-forward.
-#[actix_rt::test]
+#[tokio::test]
 async fn mixed_migration() {
     let mut testkit = testkit_with_supervisor_and_service(1);
 

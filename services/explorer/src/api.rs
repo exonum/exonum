@@ -47,7 +47,8 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
-//! # #[actix_rt::main]
+//! #
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)
@@ -87,7 +88,7 @@
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
 //! # use exonum_testkit::TestKitBuilder;
 //! #
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with_default_rust_service(ExplorerFactory)
@@ -151,7 +152,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)
@@ -220,7 +221,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
@@ -283,7 +284,7 @@
 //! #     }
 //! # }
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(MyService)
@@ -366,7 +367,7 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with_default_rust_service(ExplorerFactory)

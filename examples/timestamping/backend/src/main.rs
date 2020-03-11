@@ -14,10 +14,13 @@
 
 use exonum_cli::NodeBuilder;
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger()?;
+
     NodeBuilder::new()
         .with_rust_service(exonum_time::TimeServiceFactory::default())
         .with_rust_service(exonum_timestamping::TimestampingService)
         .run()
+        .await
 }

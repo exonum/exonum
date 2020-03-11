@@ -78,7 +78,7 @@ fn incorrect_configuration() {
 }
 
 /// Checks that configuration of the supervisor can be changed via `Configure` interface.
-#[actix_rt::test]
+#[tokio::test]
 async fn configure_call() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)
@@ -108,7 +108,7 @@ async fn configure_call() {
 }
 
 /// Checks that `supervisor-config` works as expected.
-#[actix_rt::test]
+#[tokio::test]
 async fn supervisor_config_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_rust_service(Supervisor)

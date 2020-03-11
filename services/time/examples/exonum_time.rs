@@ -24,9 +24,12 @@
 use exonum_cli::NodeBuilder;
 use exonum_time::TimeServiceFactory;
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger().unwrap();
+
     NodeBuilder::new()
         .with_rust_service(TimeServiceFactory::default())
         .run()
+        .await
 }

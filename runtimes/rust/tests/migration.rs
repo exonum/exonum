@@ -23,18 +23,18 @@ use exonum::{
         migrations::{InitMigrationError, MigrateData, MigrationScript},
         versioning::Version,
         CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail,
-        InstanceStatus, SnapshotExt,
+        InstanceSpec, InstanceStatus, SnapshotExt,
     },
 };
 use exonum_api::UpdateEndpoints;
 use exonum_derive::*;
-use futures_01::sync::mpsc;
+use futures::channel::mpsc;
 use pretty_assertions::assert_eq;
 
 use self::inspected::{
     assert_no_endpoint_update, create_genesis_config_builder, execute_transaction,
     get_endpoint_paths, EventsHandle, Inspected, MigrateService, ResumeService, RuntimeEvent,
-    ToySupervisor, ToySupervisorService,
+    StartService, ToySupervisor, ToySupervisorService,
 };
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
@@ -199,6 +199,31 @@ fn create_runtime() -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoi
         .with_runtime(inspected)
         .build();
     (blockchain, events_handle, endpoints_rx)
+}
+
+#[test]
+fn endpoints_are_updated_on_service_start() {
+    let (mut blockchain, _, mut endpoints_rx) = create_runtime();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+    let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+    assert!(endpoint_paths.contains("services/supervisor"));
+    assert!(endpoint_paths.contains("services/withdrawal"));
+
+    let start_service = StartService {
+        spec: InstanceSpec::from_raw_parts(
+            WithdrawalServiceV1::INSTANCE_ID + 1,
+            "other-withdrawal".to_owned(),
+            WithdrawalServiceV1.artifact_id(),
+        ),
+        constructor: 1_000_u64.to_bytes(),
+    };
+    let start_service = keypair.start_service(ToySupervisorService::INSTANCE_ID, start_service);
+    execute_transaction(&mut blockchain, start_service).unwrap();
+
+    let endpoint_paths = get_endpoint_paths(&mut endpoints_rx);
+    assert!(endpoint_paths.contains("services/supervisor"));
+    assert!(endpoint_paths.contains("services/withdrawal"));
+    assert!(endpoint_paths.contains("services/other-withdrawal"));
 }
 
 fn test_resume_without_migration(freeze_service: bool) {

@@ -20,13 +20,11 @@ use exonum::{
 };
 use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
-use futures_01::{sync::mpsc, Future, Stream};
-use tokio::util::FutureExt;
-use tokio_compat::runtime::current_thread::Runtime as CompatRuntime;
+use futures::{channel::mpsc, prelude::*};
+use tokio::{task::JoinHandle, time::timeout};
 
 use std::{
     sync::{Arc, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -34,22 +32,23 @@ use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, Shutdo
 
 #[derive(Debug)]
 struct RunHandle {
-    node_thread: thread::JoinHandle<()>,
+    node_task: JoinHandle<()>,
     shutdown_handle: ShutdownHandle,
 }
 
 impl RunHandle {
     fn new(node: Node) -> Self {
         let shutdown_handle = node.shutdown_handle();
+        let node_task = node.run().unwrap_or_else(|err| panic!("{}", err));
         Self {
             shutdown_handle,
-            node_thread: thread::spawn(|| node.run().unwrap()),
+            node_task: tokio::spawn(node_task),
         }
     }
 
-    fn join(self) {
-        futures::executor::block_on(self.shutdown_handle.shutdown()).unwrap();
-        self.node_thread.join().unwrap();
+    async fn join(self) {
+        self.shutdown_handle.shutdown().await.unwrap();
+        self.node_task.await.unwrap();
     }
 }
 
@@ -124,24 +123,22 @@ fn run_nodes(count: u16, start_port: u16) -> (Vec<RunHandle>, Vec<mpsc::Unbounde
     (node_threads, commit_rxs)
 }
 
-#[test]
-fn test_node_run() {
+#[tokio::test]
+async fn test_node_run() {
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
     let (nodes, commit_rxs) = run_nodes(4, 16_300);
-
-    let mut core = CompatRuntime::new().unwrap();
-    let duration = Duration::from_secs(60);
-    for rx in commit_rxs {
-        let future = rx.into_future().timeout(duration).map_err(drop);
-        core.block_on(future).expect("failed commit");
-    }
-
-    for handle in nodes {
-        handle.join();
-    }
+    let commit_notifications = commit_rxs.into_iter().map(|mut rx| async move {
+        if timeout(TIMEOUT, rx.next()).await.is_err() {
+            panic!("Timed out");
+        }
+    });
+    future::join_all(commit_notifications).await;
+    future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 }
 
-#[test]
-fn test_node_restart_regression() {
+#[tokio::test]
+async fn test_node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, node_keys, db, start_times| {
         let service = StartCheckerServiceFactory(start_times);
         let artifact = service.artifact_id();
@@ -159,7 +156,7 @@ fn test_node_restart_regression() {
                     .build(channel.endpoints_sender())
             })
             .build();
-        RunHandle::new(node).join();
+        RunHandle::new(node).join()
     };
 
     let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
@@ -172,9 +169,10 @@ fn test_node_restart_regression() {
         node_keys.clone(),
         Arc::clone(&db),
         Arc::clone(&start_times),
-    );
+    )
+    .await;
     // Second launch
-    start_node(node_cfg, node_keys, db, Arc::clone(&start_times));
+    start_node(node_cfg, node_keys, db, Arc::clone(&start_times)).await;
 
     // The service is created two times on instantiation (for `start_adding_service`
     // and `commit_service` methods), and then once on each new node startup.

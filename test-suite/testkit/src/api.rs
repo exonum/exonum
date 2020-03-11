@@ -77,14 +77,15 @@ impl fmt::Display for ApiKind {
 /// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
 /// instantiated.
 ///
-/// The HTTP server uses `actix_rt` under the hood, so in order to execute asynchronous methods,
-/// the user must use this API inside the `actix_rt` runtime.
-/// The easiest way to do that is to use `#[actix_rt::test]` instead of `#[test]`.
+/// The HTTP server uses `actix` under the hood, so in order to execute asynchronous methods,
+/// the user should use this API inside the `actix_rt` or `tokio` runtime.
+/// The easiest way to do that is to use `#[tokio::test]` or `#[actix_rt::test]` instead of
+/// `#[test]`.
 ///
 /// # Example
 ///
 /// ```
-/// #[actix_rt::test]
+/// #[tokio::test]
 /// async fn test_api() {
 ///     let testkit = TestKitBuilder::validator().build();
 ///     let api = testkit.api();
@@ -223,7 +224,7 @@ impl TestKitApiClient {
     }
 }
 
-type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b + Send>;
+type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b>;
 
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
@@ -290,7 +291,7 @@ where
     /// Allows to modify a request before sending it by executing a provided closure.
     pub fn with<F>(self, f: F) -> Self
     where
-        F: Fn(ReqwestBuilder) -> ReqwestBuilder + 'b + Send,
+        F: FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b,
     {
         Self {
             modifier: Some(Box::new(f)),
@@ -428,18 +429,25 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
     server
 }
 
-mod compile_tests {
+#[cfg(test)]
+mod tests {
     use super::*;
     use crate::TestKitBuilder;
 
-    fn _assert_send<T: Send>(v: T) {
-        drop(v)
+    fn assert_send<T: Send>(_object: &T) {}
+
+    #[test]
+    fn assert_send_for_testkit_api() {
+        let mut testkit = TestKitBuilder::validator().build();
+        let api = testkit.api();
+        assert_send(&api.public(ApiKind::Explorer).get::<()>("v1/transactions"));
+        assert_send(&api.public(ApiKind::Explorer).post::<()>("v1/transactions"));
     }
 
-    fn _assert_send_for_testkit_client() {
+    #[test]
+    fn assert_send_for_testkit_client() {
         let api = TestKitBuilder::validator().build().api();
         let client = api.client().clone();
-
-        _assert_send(client.public(ApiKind::Explorer).get::<()>("ping"));
+        assert_send(&client.public(ApiKind::Explorer).get::<()>("ping"));
     }
 }

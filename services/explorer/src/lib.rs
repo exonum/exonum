@@ -41,7 +41,7 @@
 //! use exonum_explorer_service::ExplorerFactory;
 //! use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with_default_rust_service(ExplorerFactory)

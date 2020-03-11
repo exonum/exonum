@@ -23,4 +23,6 @@ exonum-cryptocurrency = { version = "0.0.0", path = "../../../examples/cryptocur
 exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../../services/explorer" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../../runtimes/rust" }
 
-actix-rt = "1.0.0"
+[dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

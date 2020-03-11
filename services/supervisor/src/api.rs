@@ -56,7 +56,7 @@
 //! use exonum_supervisor::Supervisor;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_rust_service(Supervisor)
@@ -93,7 +93,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -132,7 +132,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -197,7 +197,7 @@
 //! #     Vec::new()
 //! # }
 //! #
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -263,7 +263,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_rust_service(Supervisor)
@@ -338,7 +338,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -404,7 +404,7 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
@@ -469,7 +469,7 @@
 //! use exonum_supervisor::Supervisor;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -508,7 +508,7 @@
 //! use exonum_supervisor::{mode::Mode, Supervisor, SupervisorConfig};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -559,7 +559,7 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
@@ -617,7 +617,7 @@
 //! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()

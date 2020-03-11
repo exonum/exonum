@@ -169,7 +169,7 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
         .unwrap()
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn start_stop_inc_service() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
@@ -201,7 +201,7 @@ async fn start_stop_inc_service() {
     assert_eq!(err, expected_err);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn start_freeze_and_stop_inc_service() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
@@ -400,7 +400,7 @@ fn stop_already_stopped_service() {
     )
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn resume_stopped_service() {
     let mut testkit = create_testkit();
 

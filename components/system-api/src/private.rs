@@ -42,7 +42,7 @@
 //! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -70,7 +70,7 @@
 //! use exonum_system_api::{private::NodeStats, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -100,7 +100,7 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! # let address = "127.0.0.1:8080".to_owned();
 //! # let public_key = Default::default();
@@ -139,7 +139,7 @@
 //! use exonum_system_api::{private::ConsensusEnabledQuery, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -170,7 +170,7 @@
 //! use exonum_system_api::SystemApiPlugin;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # #[actix_rt::main]
+//! # #[tokio::main]
 //! # async fn main() -> Result<(), failure::Error> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
@@ -367,9 +367,13 @@ impl SystemApi {
     fn handle_peers(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(name, move |connect_info: ConnectInfo| {
-            sender
-                .send_message(ExternalMessage::PeerAdd(connect_info))
-                .map_err(|e| api::Error::internal(e).title("Failed to add peer"))
+            let mut sender = sender.clone();
+            async move {
+                sender
+                    .send_message(ExternalMessage::PeerAdd(connect_info))
+                    .await
+                    .map_err(|e| api::Error::internal(e).title("Failed to add peer"))
+            }
         });
         self
     }
@@ -377,9 +381,13 @@ impl SystemApi {
     fn handle_consensus_status(self, name: &'static str, api_scope: &mut ApiScope) -> Self {
         let sender = self.sender.clone();
         api_scope.endpoint_mut(name, move |query: ConsensusEnabledQuery| {
-            sender
-                .send_message(ExternalMessage::Enable(query.enabled))
-                .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"))
+            let mut sender = sender.clone();
+            async move {
+                sender
+                    .send_message(ExternalMessage::Enable(query.enabled))
+                    .await
+                    .map_err(|e| api::Error::internal(e).title("Failed to set consensus enabled"))
+            }
         });
         self
     }
@@ -393,15 +401,19 @@ impl SystemApi {
 
         let sender = self.sender.clone();
         let index = move |_, _| {
-            sender
-                .send_message(ExternalMessage::Shutdown)
-                .map_ok(|_| HttpResponse::Ok().json(()))
-                .map_err(|e| {
-                    api::Error::internal(e)
-                        .title("Failed to handle shutdown")
-                        .into()
-                })
-                .boxed_local()
+            let mut sender = sender.clone();
+            async move {
+                sender
+                    .send_message(ExternalMessage::Shutdown)
+                    .await
+                    .map(|_| HttpResponse::Ok().json(()))
+                    .map_err(|e| {
+                        api::Error::internal(e)
+                            .title("Failed to handle shutdown")
+                            .into()
+                    })
+            }
+            .boxed_local()
         };
 
         let handler = RequestHandler {

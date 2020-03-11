@@ -492,7 +492,7 @@ async fn assert_all_validators_times_eq(
     assert_eq!(*expected_validators_times, validators_times);
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_endpoint_api() {
     let time_service = TimeServiceFactory::default();
     let artifact = time_service.artifact_id();

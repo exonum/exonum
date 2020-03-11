@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use async_trait::async_trait;
 use exonum::{
     crypto::{
         x25519::{self, into_x25519_keypair, into_x25519_public_key},
@@ -21,17 +22,13 @@ use exonum::{
     messages::Verified,
 };
 use failure::bail;
-use futures_01::future::{done, Future};
-use tokio_codec::Decoder;
-use tokio_io::{AsyncRead, AsyncWrite};
-
-use std::net::SocketAddr;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::wrapper::NoiseWrapper;
 use crate::{
     events::{
         codec::MessagesCodec,
-        noise::{Handshake, HandshakeData, HandshakeRawMessage, HandshakeResult},
+        noise::{Handshake, HandshakeData, HandshakeRawMessage},
     },
     messages::Connect,
     state::SharedConnectList,
@@ -74,79 +71,76 @@ impl HandshakeParams {
 #[derive(Debug)]
 pub struct NoiseHandshake {
     noise: NoiseWrapper,
-    peer_address: SocketAddr,
     max_message_len: u32,
     connect_list: SharedConnectList,
     connect: Verified<Connect>,
 }
 
 impl NoiseHandshake {
-    pub fn initiator(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
+    pub fn initiator(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::initiator(params);
         Self {
             noise,
-            peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
             connect: params.connect.clone(),
         }
     }
 
-    pub fn responder(params: &HandshakeParams, peer_address: &SocketAddr) -> Self {
+    pub fn responder(params: &HandshakeParams) -> Self {
         let noise = NoiseWrapper::responder(params);
         Self {
             noise,
-            peer_address: *peer_address,
             max_message_len: params.max_message_len,
             connect_list: params.connect_list.clone(),
             connect: params.connect.clone(),
         }
     }
 
-    pub fn read_handshake_msg<S: AsyncRead + 'static>(
-        mut self,
-        stream: S,
-    ) -> impl Future<Item = (S, Self, Vec<u8>), Error = failure::Error> {
-        HandshakeRawMessage::read(stream).and_then(move |(stream, msg)| {
-            let message = self.noise.read_handshake_msg(&msg.0)?;
-            Ok((stream, self, message))
-        })
+    pub async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> Result<Vec<u8>, failure::Error>
+    where
+        S: AsyncRead + Unpin,
+    {
+        let handshake = HandshakeRawMessage::read(stream).await?;
+        let message = self.noise.read_handshake_msg(&handshake.0)?;
+        Ok(message)
     }
 
-    pub fn write_handshake_msg<S: AsyncWrite + 'static>(
-        mut self,
-        stream: S,
+    pub async fn write_handshake_msg<S>(
+        &mut self,
+        stream: &mut S,
         msg: &[u8],
-    ) -> impl Future<Item = (S, Self), Error = failure::Error> {
-        done(self.noise.write_handshake_msg(msg))
-            .map_err(Into::into)
-            .and_then(|buf| HandshakeRawMessage(buf).write(stream))
-            .map(move |(stream, _)| (stream, self))
+    ) -> Result<(), failure::Error>
+    where
+        S: AsyncWrite + Unpin,
+    {
+        let buf = self.noise.write_handshake_msg(msg)?;
+        HandshakeRawMessage(buf).write(stream).await
     }
 
-    pub fn finalize<S: AsyncRead + AsyncWrite + 'static>(
-        self,
-        stream: S,
-        message: Vec<u8>,
-    ) -> Result<HandshakeData<S>, failure::Error> {
-        let remote_static_key = {
+    pub fn finalize(self, raw_message: Vec<u8>) -> Result<HandshakeData, failure::Error> {
+        let peer_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
             let rs = self
                 .noise
                 .state
                 .get_remote_static()
-                .expect("Remote static key is not present!");
-            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key!")
+                .expect("Remote static key is not present");
+            x25519::PublicKey::from_slice(rs).expect("Remote static key is not valid x25519 key")
         };
 
-        if !self.is_peer_allowed(&remote_static_key) {
-            bail!("peer is not in ConnectList")
+        if !self.is_peer_allowed(&peer_key) {
+            bail!("peer is not in ConnectList");
         }
 
         let noise = self.noise.into_transport_wrapper()?;
-        let framed = MessagesCodec::new(self.max_message_len, noise).framed(stream);
-        Ok((framed, message, remote_static_key))
+        let codec = MessagesCodec::new(self.max_message_len, noise);
+        Ok(HandshakeData {
+            codec,
+            raw_message,
+            peer_key,
+        })
     }
 
     fn is_peer_allowed(&self, remote_static_key: &x25519::PublicKey) -> bool {
@@ -158,47 +152,24 @@ impl NoiseHandshake {
     }
 }
 
-impl Handshake for NoiseHandshake {
-    fn listen<S>(self, stream: S) -> HandshakeResult<S>
-    where
-        S: AsyncRead + AsyncWrite + 'static + Send,
-    {
-        let peer_address = self.peer_address;
-        let connect = self.connect.clone();
-        let framed = self
-            .read_handshake_msg(stream)
-            .and_then(|(stream, handshake, _)| {
-                handshake.write_handshake_msg(stream, &connect.into_bytes())
-            })
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake, message)| handshake.finalize(stream, message))
-            .map_err(move |e| {
-                e.context(format!("peer {} disconnected", peer_address))
-                    .into()
-            });
-        Box::new(framed)
+#[async_trait]
+impl<S> Handshake<S> for NoiseHandshake
+where
+    S: AsyncRead + AsyncWrite + Send + Unpin,
+{
+    async fn listen(mut self, stream: &mut S) -> Result<HandshakeData, failure::Error> {
+        self.read_handshake_msg(stream).await?;
+        self.write_handshake_msg(stream, &self.connect.to_bytes())
+            .await?;
+        let raw_message = self.read_handshake_msg(stream).await?;
+        self.finalize(raw_message)
     }
 
-    fn send<S>(self, stream: S) -> HandshakeResult<S>
-    where
-        S: AsyncRead + AsyncWrite + 'static + Send,
-    {
-        let peer_address = self.peer_address;
-        let connect = self.connect.clone();
-        let framed = self
-            .write_handshake_msg(stream, &[])
-            .and_then(|(stream, handshake)| handshake.read_handshake_msg(stream))
-            .and_then(|(stream, handshake, message)| {
-                (
-                    handshake.write_handshake_msg(stream, &connect.into_bytes()),
-                    Ok(message),
-                )
-            })
-            .and_then(|((stream, handshake), message)| handshake.finalize(stream, message))
-            .map_err(move |e| {
-                e.context(format!("peer {} disconnected", peer_address))
-                    .into()
-            });
-        Box::new(framed)
+    async fn send(mut self, stream: &mut S) -> Result<HandshakeData, failure::Error> {
+        self.write_handshake_msg(stream, &[]).await?;
+        let message = self.read_handshake_msg(stream).await?;
+        self.write_handshake_msg(stream, &self.connect.to_bytes())
+            .await?;
+        self.finalize(message)
     }
 }

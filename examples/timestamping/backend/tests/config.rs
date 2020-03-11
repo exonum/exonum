@@ -97,7 +97,7 @@ async fn propose_configuration(
     Ok(())
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_propose_configuration() {
     let (mut testkit, _) = init_testkit(true);
     let config = Config {
@@ -110,7 +110,7 @@ async fn test_propose_configuration() {
         .expect("Configuration proposal failed.");
 }
 
-#[actix_rt::test]
+#[tokio::test]
 async fn test_propose_invalid_configuration() {
     let (mut testkit, _) = init_testkit(false);
     let incorrect_names = vec!["", " ", "illegal.illegal", "not_service", SERVICE_NAME];

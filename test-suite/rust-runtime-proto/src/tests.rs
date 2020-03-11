@@ -14,13 +14,19 @@
 
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
-use exonum::crypto::{self, Hash, PublicKey};
+use exonum::{
+    crypto::{self, Hash, PublicKey},
+    merkledb::BinaryValue,
+};
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_merkledb::BinaryValue;
 use exonum_proto::ProtobufConvert;
+use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
+use exonum_testkit::{ApiKind, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use std::{borrow::Cow, collections::HashMap};
+
+use crate::{assert_exonum_core_protos, testkit_with_rust_service};
 
 #[test]
 fn test_date_time_pb_convert() {
@@ -217,4 +223,70 @@ fn test_struct_with_fixed_arrays_roundtrip() {
     let bytes = arr_struct.to_bytes();
     let struct_encode_round_trip = StructWithFixedArrays::from_bytes(Cow::from(&bytes)).unwrap();
     assert_eq!(struct_encode_round_trip, arr_struct);
+}
+
+#[tokio::test]
+async fn core_protos_with_service() {
+    let (_, api) = testkit_with_rust_service();
+    assert_exonum_core_protos(&api).await;
+}
+
+#[tokio::test]
+#[should_panic] // TODO: Remove `should_panic` after fix (ECR-3948)
+async fn core_protos_without_services() {
+    let mut testkit = TestKitBuilder::validator().build();
+    assert_exonum_core_protos(&testkit.api()).await;
+}
+
+/// Rust-runtime api returns correct source files of the specified artifact.
+#[tokio::test]
+async fn service_protos_with_service() {
+    let (_, api) = testkit_with_rust_service();
+
+    let proto_files: Vec<ProtoSourceFile> = api
+        .public(ApiKind::RustRuntime)
+        .query(&ProtoSourcesQuery::Artifact {
+            name: "test-runtime-api".to_owned(),
+            version: "0.0.1".parse().unwrap(),
+        })
+        .get("proto-sources")
+        .await
+        .expect("Rust runtime Api unexpectedly failed");
+
+    const EXPECTED_CONTENT: &str = include_str!("proto/tests.proto");
+
+    assert_eq!(proto_files.len(), 1);
+    assert_eq!(proto_files[0].name, "tests.proto".to_string());
+    assert_eq!(proto_files[0].content, EXPECTED_CONTENT.to_string());
+}
+
+/// Rust-runtime API should return error in case of an incorrect artifact.
+#[tokio::test]
+async fn service_protos_with_incorrect_service() {
+    use exonum::runtime::{ArtifactId, RuntimeIdentifier};
+
+    let (_, api) = testkit_with_rust_service();
+
+    let artifact_id = ArtifactId::new(
+        RuntimeIdentifier::Rust,
+        "invalid-service",
+        "0.0.1".parse().unwrap(),
+    )
+    .unwrap();
+    let artifact_query = ProtoSourcesQuery::Artifact {
+        name: artifact_id.name.clone(),
+        version: artifact_id.version.clone(),
+    };
+    let error = api
+        .public(ApiKind::RustRuntime)
+        .query(&artifact_query)
+        .get::<Vec<ProtoSourceFile>>("proto-sources")
+        .await
+        .expect_err("Rust runtime Api returns a fake source!");
+
+    assert_eq!(&error.body.title, "Artifact sources not found");
+    assert_eq!(
+        error.body.detail,
+        format!("Unable to find sources for artifact {}", artifact_id)
+    );
 }

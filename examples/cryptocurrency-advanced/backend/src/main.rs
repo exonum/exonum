@@ -16,11 +16,14 @@ use exonum_cli::NodeBuilder;
 
 use exonum_cryptocurrency_advanced::CryptocurrencyService;
 
-fn main() -> Result<(), failure::Error> {
+#[tokio::main]
+async fn main() -> Result<(), failure::Error> {
     exonum::helpers::init_logger()?;
+
     NodeBuilder::new()
         // Starts cryptocurrency instance with given id and name
         // immediately after genesis block creation.
         .with_default_rust_service(CryptocurrencyService)
         .run()
+        .await
 }
