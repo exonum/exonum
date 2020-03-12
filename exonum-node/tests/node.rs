@@ -30,6 +30,7 @@ use tokio::{
 };
 
 use std::{
+    net::{Ipv4Addr, SocketAddr, TcpListener},
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -120,19 +121,33 @@ impl StartCheckerServiceFactory {
     }
 }
 
+#[derive(Clone, Copy, Default)]
+struct Options {
+    slow_blocks: bool,
+    http_start_port: Option<u16>,
+}
+
 fn run_nodes(
     count: u16,
     start_port: u16,
-    slow_blocks: bool,
+    options: Options,
 ) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
     let mut node_handles = Vec::new();
     let mut commit_rxs = Vec::new();
-    for (mut node_cfg, node_keys) in generate_testnet_config(count, start_port) {
+
+    let it = generate_testnet_config(count, start_port)
+        .into_iter()
+        .enumerate();
+    for (i, (mut node_cfg, node_keys)) in it {
         let (commit_tx, commit_rx) = mpsc::unbounded();
-        if slow_blocks {
+        if options.slow_blocks {
             node_cfg.consensus.first_round_timeout = 20_000;
             node_cfg.consensus.min_propose_timeout = 10_000;
             node_cfg.consensus.max_propose_timeout = 10_000;
+        }
+        if let Some(start_port) = options.http_start_port {
+            let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), start_port + i as u16);
+            node_cfg.api.public_api_address = Some(addr);
         }
 
         let service = CommitWatcherService(commit_tx);
@@ -166,7 +181,7 @@ fn run_nodes(
 async fn nodes_commit_blocks() {
     const TIMEOUT: Duration = Duration::from_secs(10);
 
-    let (nodes, commit_rxs) = run_nodes(4, 16_300, false);
+    let (nodes, commit_rxs) = run_nodes(4, 16_300, Options::default());
     let commit_notifications = commit_rxs.into_iter().map(|mut rx| async move {
         if timeout(TIMEOUT, rx.next()).await.is_err() {
             panic!("Timed out");
@@ -177,10 +192,33 @@ async fn nodes_commit_blocks() {
 }
 
 #[tokio::test]
+async fn node_frees_sockets_on_shutdown() {
+    let options = Options {
+        http_start_port: Some(16_351),
+        ..Options::default()
+    };
+    let (mut nodes, mut commit_rxs) = run_nodes(1, 16_350, options);
+    let node = nodes.pop().unwrap();
+    let mut commit_rx = commit_rxs.pop().unwrap();
+    commit_rx.next().await;
+    node.join().await;
+
+    delay_for(Duration::from_millis(100)).await;
+
+    // The sockets used by the node should be freed now.
+    TcpListener::bind(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 16_350)).unwrap();
+    TcpListener::bind(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 16_351)).unwrap();
+}
+
+#[tokio::test]
 async fn nodes_flush_transactions_to_storage_before_commit() {
     // `slow_blocks: true` argument makes it so that nodes should not create a single block
     // during the test.
-    let (nodes, _) = run_nodes(4, 16_400, true);
+    let options = Options {
+        slow_blocks: true,
+        ..Options::default()
+    };
+    let (nodes, _) = run_nodes(4, 16_400, options);
     delay_for(Duration::from_secs(5)).await;
 
     // Send some transactions over `blockchain`s.
