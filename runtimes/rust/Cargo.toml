@@ -22,11 +22,12 @@ exonum-derive = { version = "1.0.0-rc.1", path = "../../components/derive" }
 exonum-merkledb = { version = "1.0.0-rc.1", path = "../../components/merkledb" }
 exonum-proto = { version = "1.0.0-rc.1", path = "../../components/proto" }
 
-futures = "0.1.25"
+futures = "0.3.4"
 log = "0.4.8"
 protobuf = "2.10.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"
+tokio = "0.2.11"
 
 [dev-dependencies]
 anyhow = "1.0.26"

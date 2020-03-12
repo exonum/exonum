@@ -43,7 +43,7 @@
 //!     let mut builder = ApiBuilder::new();
 //!     builder
 //!         .public_scope()
-//!         .endpoint("some", |query: SomeQuery| {
+//!         .endpoint("some", |query: SomeQuery| async move {
 //!             Ok(query.first + query.second)
 //!         });
 //!     builder
@@ -65,7 +65,7 @@ pub use self::{
     cors::AllowOrigin,
     error::{Error, HttpStatusCode, MovedPermanentlyError},
     manager::{ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig},
-    with::{Actuality, Deprecated, FutureResult, NamedWith, Result, With},
+    with::{Actuality, Deprecated, NamedWith, Result, With},
 };
 
 pub mod backends;
@@ -76,7 +76,7 @@ mod with;
 
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{collections::BTreeMap, fmt};
+use std::{collections::BTreeMap, fmt, future::Future};
 
 use crate::backends::actix;
 
@@ -159,9 +159,9 @@ impl ApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone + Send + Sync,
         E: Into<With<Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
+        R: Future<Output = crate::Result<I>>,
     {
         self.actix_backend.endpoint(name, endpoint);
         self
@@ -178,9 +178,9 @@ impl ApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(Q) -> R + 'static + Clone,
+        F: Fn(Q) -> R + 'static + Clone + Send + Sync,
         E: Into<With<Q, I, R, F>>,
-        actix::RequestHandler: From<NamedWith<Q, I, R, F>>,
+        R: Future<Output = crate::Result<I>>,
     {
         self.actix_backend.endpoint_mut(name, endpoint);
         self

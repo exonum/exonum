@@ -20,13 +20,18 @@ exonum = { version = "1.0.0-rc.1", path = "../../exonum" }
 exonum-api = { version = "1.0.0-rc.1", path = "../api" }
 exonum-node = { version = "1.0.0-rc.1", path = "../../exonum-node" }
 
-actix-web = { version = "0.7.18", default-features = false }
-futures = "0.1.25"
+actix-web = { version = "2.0.0", default-features = false }
+futures = "0.3.4"
 semver = "0.9.0"
 serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
-anyhow = "1.0.26"
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit", features = ["exonum-node"] }
+
+anyhow = "1.0.26"
 pretty_assertions = "0.6.1"
+
+[dev-dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

@@ -17,10 +17,13 @@ use exonum_time::TimeServiceFactory;
 
 use exonum_timestamping::TimestampingService;
 
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
+
     NodeBuilder::new()
         .with(Spec::new(TimeServiceFactory::default()))
         .with(Spec::new(TimestampingService))
         .run()
+        .await
 }

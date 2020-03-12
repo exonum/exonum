@@ -13,12 +13,8 @@
 // limitations under the License.
 
 use exonum::{merkledb::BinaryValue, messages::SignedMessage};
-use futures::{
-    future::{self, Executor},
-    sync::mpsc,
-    Future, Sink, Stream,
-};
-use tokio_core::reactor::{Handle, Timeout};
+use futures::{channel::mpsc, prelude::*};
+use tokio::{task, time::delay_for};
 
 use std::time::{Duration, SystemTime};
 
@@ -32,54 +28,39 @@ pub struct InternalPart {
 }
 
 impl InternalPart {
-    fn send_event(
-        sender: mpsc::Sender<InternalEvent>,
-        event: InternalEvent,
-    ) -> impl Future<Item = (), Error = ()> {
+    async fn send_event(mut sender: mpsc::Sender<InternalEvent>, event: InternalEvent) {
         // We don't make a fuss if the event receiver hanged up; this happens if the node
         // is being terminated.
-        sender.send(event).then(|_| Ok(()))
+        sender.send(event).await.ok();
     }
 
-    fn verify_message(
-        raw: Vec<u8>,
-        internal_tx: mpsc::Sender<InternalEvent>,
-    ) -> impl Future<Item = (), Error = ()> {
-        future::lazy(|| {
+    async fn verify_message(raw: Vec<u8>, internal_tx: mpsc::Sender<InternalEvent>) {
+        let task = task::spawn_blocking(|| {
             SignedMessage::from_bytes(raw.into())
                 .and_then(SignedMessage::into_verified::<ExonumMessage>)
                 .map(Message::from)
-        })
-        .map_err(drop)
-        .and_then(|msg| {
+        });
+        if let Ok(Ok(msg)) = task.await {
             let event = InternalEvent::message_verified(msg);
-            Self::send_event(internal_tx, event)
-        })
+            Self::send_event(internal_tx, event).await;
+        }
     }
 
     /// Represents a task that processes internal requests and produces internal events.
     /// `handle` is used to schedule additional tasks within this task.
     /// `verify_executor` is where transaction verification tasks are executed.
-    pub fn run<E>(self, handle: Handle, verify_executor: E) -> impl Future<Item = (), Error = ()>
-    where
-        E: Executor<Box<dyn Future<Item = (), Error = ()> + Send>>,
-    {
-        let internal_tx = self.internal_tx;
-
-        let cycle = self.internal_requests_rx.for_each(move |request| {
+    pub async fn run(mut self) {
+        while let Some(request) = self.internal_requests_rx.next().await {
             // Check if the receiver of internal events has hanged up. If so, terminate
             // event processing immediately since the generated events will be dropped anyway.
-            if internal_tx.is_closed() {
-                return Err(());
+            if self.internal_tx.is_closed() {
+                return;
             }
-            let internal_tx = internal_tx.clone();
+            let internal_tx = self.internal_tx.clone();
 
             match request {
-                InternalRequest::VerifyMessage(tx) => {
-                    let fut = Self::verify_message(tx, internal_tx);
-                    verify_executor
-                        .execute(Box::new(fut))
-                        .expect("cannot schedule message verification");
+                InternalRequest::VerifyMessage(raw) => {
+                    tokio::spawn(Self::verify_message(raw, internal_tx));
                 }
 
                 InternalRequest::Timeout(TimeoutRequest(time, timeout)) => {
@@ -87,31 +68,23 @@ impl InternalPart {
                         .duration_since(SystemTime::now())
                         .unwrap_or_else(|_| Duration::from_millis(0));
 
-                    let fut = Timeout::new(duration, &handle)
-                        .expect("Unable to create timeout")
-                        .map_err(drop)
-                        .and_then(|()| {
-                            Self::send_event(internal_tx, InternalEvent::timeout(timeout))
-                        });
-                    handle.spawn(fut);
+                    tokio::spawn(async move {
+                        delay_for(duration).await;
+                        Self::send_event(internal_tx, InternalEvent::timeout(timeout)).await;
+                    });
                 }
 
                 InternalRequest::JumpToRound(height, round) => {
                     let event = InternalEvent::jump_to_round(height, round);
-                    handle.spawn(Self::send_event(internal_tx, event));
+                    tokio::spawn(Self::send_event(internal_tx, event));
                 }
 
                 InternalRequest::Shutdown => {
                     let event = InternalEvent::shutdown();
-                    handle.spawn(Self::send_event(internal_tx, event));
+                    tokio::spawn(Self::send_event(internal_tx, event));
                 }
             }
-            Ok(())
-        });
-
-        // Since we generate an error only when then receiver hanged up, we can safely convert
-        // it here.
-        cycle.or_else(Ok)
+        }
     }
 }
 
@@ -123,38 +96,24 @@ mod tests {
         messages::Verified,
     };
     use pretty_assertions::assert_eq;
-    use tokio_core::reactor::Core;
-
-    use std::thread;
 
     use super::*;
     use crate::messages::Status;
 
-    fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
-        let (internal_tx, internal_rx) = mpsc::channel(16);
-        let (internal_requests_tx, internal_requests_rx) = mpsc::channel(16);
+    async fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
+        let (internal_tx, mut internal_rx) = mpsc::channel(16);
+        let (mut internal_requests_tx, internal_requests_rx) = mpsc::channel(16);
 
         let internal_part = InternalPart {
             internal_tx,
             internal_requests_rx,
         };
-
-        let thread = thread::spawn(|| {
-            let mut core = Core::new().unwrap();
-            let handle = core.handle();
-            let verifier = core.handle();
-
-            let task = internal_part
-                .run(handle, verifier)
-                .map_err(drop)
-                .and_then(|()| internal_rx.into_future().map_err(drop))
-                .map(|(event, _)| event);
-            core.run(task).unwrap()
-        });
+        tokio::spawn(internal_part.run());
 
         let request = InternalRequest::VerifyMessage(msg);
-        internal_requests_tx.wait().send(request).unwrap();
-        thread.join().unwrap()
+        internal_requests_tx.send(request).await.unwrap();
+        drop(internal_requests_tx); // force the `internal_part` to stop
+        internal_rx.next().await
     }
 
     fn get_signed_message() -> SignedMessage {
@@ -167,22 +126,20 @@ mod tests {
         .into_raw()
     }
 
-    #[test]
-    fn verify_msg() {
+    #[tokio::test]
+    async fn verify_msg() {
         let tx = get_signed_message();
-
         let expected_event =
             InternalEvent::message_verified(Message::from_signed(tx.clone()).unwrap());
-        let event = verify_message(tx.into_bytes());
+        let event = verify_message(tx.into_bytes()).await;
         assert_eq!(event, Some(expected_event));
     }
 
-    #[test]
-    fn verify_incorrect_msg() {
+    #[tokio::test]
+    async fn verify_incorrect_msg() {
         let mut tx = get_signed_message();
         tx.signature = Signature::zero();
-
-        let event = verify_message(tx.into_bytes());
+        let event = verify_message(tx.into_bytes()).await;
         assert_eq!(event, None);
     }
 }

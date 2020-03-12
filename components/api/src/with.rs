@@ -13,16 +13,13 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use futures::Future;
 
-use std::marker::PhantomData;
+use std::{future::Future, marker::PhantomData};
 
 use super::{error, EndpointMutability};
 
 /// Type alias for the usual synchronous result.
 pub type Result<I> = std::result::Result<I, error::Error>;
-/// Type alias for the asynchronous result that will be ready in the future.
-pub type FutureResult<I> = Box<dyn Future<Item = I, Error = error::Error>>;
 
 /// API endpoint handler extractor which can extract a handler from various entities.
 ///
@@ -108,7 +105,11 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 
     /// Replaces the used handler with a new one.
-    pub fn with_different_handler<F1>(self, handler: F1) -> Deprecated<Q, I, R, F1> {
+    pub fn with_different_handler<F1, R1>(self, handler: F1) -> Deprecated<Q, I, R1, F1>
+    where
+        F1: Fn(Q) -> R1,
+        R1: Future<Output = Result<I>>,
+    {
         Deprecated {
             handler,
             discontinued_on: self.discontinued_on,
@@ -121,25 +122,17 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 }
 
-impl<Q, I, F> From<F> for Deprecated<Q, I, Result<I>, F>
+impl<Q, I, R, F> From<F> for Deprecated<Q, I, R, F>
 where
-    F: Fn(Q) -> Result<I>,
+    F: Fn(Q) -> R,
+    R: Future<Output = Result<I>>,
 {
     fn from(handler: F) -> Self {
         Self::new(handler)
     }
 }
 
-impl<Q, I, F> From<F> for Deprecated<Q, I, FutureResult<I>, F>
-where
-    F: Fn(Q) -> FutureResult<I>,
-{
-    fn from(handler: F) -> Self {
-        Self::new(handler)
-    }
-}
-
-impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, FutureResult<I>, F> {
+impl<'a, Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, R, F> {
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,
@@ -206,28 +199,10 @@ impl<Q, I, R, F> NamedWith<Q, I, R, F> {
     }
 }
 
-// Implementations for `ApiResult` and `query` parameters.
-
-impl<Q, I, F> From<F> for With<Q, I, Result<I>, F>
+impl<Q, I, R, F> From<F> for With<Q, I, R, F>
 where
-    F: Fn(Q) -> Result<I>,
-{
-    fn from(handler: F) -> Self {
-        Self {
-            handler,
-            actuality: Actuality::Actual,
-            _query_type: PhantomData,
-            _item_type: PhantomData,
-            _result_type: PhantomData,
-        }
-    }
-}
-
-// Implementations for `ApiFutureResult` and `query` parameters.
-
-impl<Q, I, F> From<F> for With<Q, I, FutureResult<I>, F>
-where
-    F: Fn(Q) -> FutureResult<I>,
+    F: Fn(Q) -> R,
+    R: Future<Output = Result<I>>,
 {
     fn from(handler: F) -> Self {
         Self {

@@ -48,11 +48,12 @@ fn get_validator_keys(testkit: &TestKit) -> Vec<PublicKey> {
         .collect()
 }
 
-fn inc_count(api: &TestKitApi, by: u64) -> Hash {
+async fn inc_count(api: &TestKitApi, by: u64) -> Hash {
     let tx_info: TransactionResponse = api
         .public(ApiKind::Service("counter"))
         .query(&by)
         .post("count")
+        .await
         .unwrap();
     tx_info.tx_hash
 }
@@ -85,8 +86,8 @@ fn test_inc_add_tx_incorrect_transaction() {
     testkit.add_tx(incorrect_tx);
 }
 
-#[test]
-fn test_inc_count_create_block() {
+#[tokio::test]
+async fn test_inc_count_create_block() {
     let (mut testkit, api) = init_testkit();
     let keypair = KeyPair::random();
 
@@ -97,12 +98,14 @@ fn test_inc_count_create_block() {
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 5);
 
     let counter_with_proof: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     let validator_keys = get_validator_keys(&testkit);
     assert_eq!(counter_with_proof.verify(&validator_keys), Some(5));
@@ -115,18 +118,20 @@ fn test_inc_count_create_block() {
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 10);
     let counter_with_proof: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     assert_eq!(counter_with_proof.verify(&validator_keys), Some(10));
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Transaction is already committed")]
-fn test_inc_count_create_block_with_committed_transaction() {
+async fn test_inc_count_create_block_with_committed_transaction() {
     let (mut testkit, _) = init_testkit();
     let keypair = KeyPair::random();
     // Create a pre-signed transaction
@@ -135,43 +140,45 @@ fn test_inc_count_create_block_with_committed_transaction() {
     testkit.create_block_with_transaction(keypair.increment(SERVICE_ID, 5));
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Cannot create block with incorrect transaction")]
-fn test_inc_count_create_block_with_transaction_incorrect_transaction() {
+async fn test_inc_count_create_block_with_transaction_incorrect_transaction() {
     let (mut testkit, _) = init_testkit();
     let incorrect_tx = gen_inc_incorrect_tx(5);
     testkit.create_block_with_transaction(incorrect_tx);
 }
 
-#[test]
-fn test_inc_count_api() {
+#[tokio::test]
+async fn test_inc_count_api() {
     let (mut testkit, api) = init_testkit();
-    inc_count(&api, 5);
+    inc_count(&api, 5).await;
     testkit.create_block();
 
     // Check that the user indeed is persisted by the service
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 5);
 }
 
-#[test]
-fn test_inc_count_with_multiple_transactions() {
+#[tokio::test]
+async fn test_inc_count_with_multiple_transactions() {
     let (mut testkit, api) = init_testkit();
     let validator_keys = get_validator_keys(&testkit);
 
     for _ in 0..100 {
-        inc_count(&api, 1);
-        inc_count(&api, 2);
-        inc_count(&api, 3);
-        inc_count(&api, 4);
+        inc_count(&api, 1).await;
+        inc_count(&api, 2).await;
+        inc_count(&api, 3).await;
+        inc_count(&api, 4).await;
 
         testkit.create_block();
         let counter_with_proof: CounterWithProof = api
             .public(ApiKind::Service("counter"))
             .get("count-with-proof")
+            .await
             .unwrap();
         counter_with_proof.verify(&validator_keys);
     }
@@ -180,21 +187,23 @@ fn test_inc_count_with_multiple_transactions() {
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 10);
 }
 
-#[test]
-fn test_inc_count_with_manual_tx_control() {
+#[tokio::test]
+async fn test_inc_count_with_manual_tx_control() {
     let (mut testkit, api) = init_testkit();
-    let tx_a = inc_count(&api, 5);
-    let tx_b = inc_count(&api, 3);
+    let tx_a = inc_count(&api, 5).await;
+    let tx_b = inc_count(&api, 3).await;
 
     // Empty block
     testkit.create_block_with_tx_hashes(&[]);
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 0);
 
@@ -202,6 +211,7 @@ fn test_inc_count_with_manual_tx_control() {
     let counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     assert_eq!(counter.verify(&get_validator_keys(&testkit)), None);
 
@@ -209,6 +219,7 @@ fn test_inc_count_with_manual_tx_control() {
     let counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(3));
 
@@ -216,20 +227,22 @@ fn test_inc_count_with_manual_tx_control() {
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 8);
 }
 
-#[test]
-fn test_private_api() {
+#[tokio::test]
+async fn test_private_api() {
     let (mut testkit, api) = init_testkit();
-    inc_count(&api, 5);
-    inc_count(&api, 3);
+    inc_count(&api, 5).await;
+    inc_count(&api, 3).await;
 
     testkit.create_block();
     let counter: u64 = api
         .private(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 8);
 
@@ -238,6 +251,7 @@ fn test_private_api() {
         .private(ApiKind::Service("counter"))
         .query(&())
         .post("reset")
+        .await
         .unwrap();
     assert_eq!(tx_info.tx_hash, tx.object_hash());
 
@@ -245,58 +259,62 @@ fn test_private_api() {
     let counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     assert_eq!(counter.verify(&get_validator_keys(&testkit)), Some(0));
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Insufficient number of precommits")]
-fn counter_proof_without_precommits() {
+async fn counter_proof_without_precommits() {
     let (mut testkit, api) = init_testkit();
-    inc_count(&api, 5);
+    inc_count(&api, 5).await;
     testkit.create_block();
 
     let mut counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     counter.remove_precommits();
     counter.verify(&get_validator_keys(&testkit));
 }
 
-#[test]
+#[tokio::test]
 #[should_panic(expected = "Invalid counter value in proof")]
-fn counter_proof_with_mauled_value() {
+async fn counter_proof_with_mauled_value() {
     let (mut testkit, api) = init_testkit();
-    inc_count(&api, 5);
+    inc_count(&api, 5).await;
     testkit.create_block();
 
     let mut counter: CounterWithProof = api
         .public(ApiKind::Service("counter"))
         .get("count-with-proof")
+        .await
         .unwrap();
     counter.maul_value();
     counter.verify(&get_validator_keys(&testkit));
 }
 
-#[test]
-fn test_duplicate_tx() {
+#[tokio::test]
+async fn test_duplicate_tx() {
     let (mut testkit, api) = init_testkit();
 
-    inc_count(&api, 5);
+    inc_count(&api, 5).await;
     testkit.create_block();
-    inc_count(&api, 5);
-    inc_count(&api, 5);
+    inc_count(&api, 5).await;
+    inc_count(&api, 5).await;
     testkit.create_block();
     let counter: u64 = api
         .public(ApiKind::Service("counter"))
         .get("count")
+        .await
         .unwrap();
     assert_eq!(counter, 5);
 }
 
-#[test]
-fn test_explorer_with_after_transactions_error() {
+#[tokio::test]
+async fn test_explorer_with_after_transactions_error() {
     let (mut testkit, _) = init_testkit();
     let tx1 = KeyPair::random().increment(SERVICE_ID, 21);
     let keypair = KeyPair::random();
@@ -337,8 +355,8 @@ fn test_explorer_with_before_transactions_error() {
     // ^-- The changes in `before_transactions` should be reverted.
 }
 
-#[test]
-fn test_explorer_single_block() {
+#[tokio::test]
+async fn test_explorer_single_block() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
         .with(Spec::new(CounterService).with_default_instance())
@@ -354,7 +372,7 @@ fn test_explorer_single_block() {
     assert_eq!(&*block.transaction_hashes(), &[]);
 
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
-    testkit.api().send(tx.clone());
+    testkit.api().send(tx.clone()).await;
     testkit.create_block(); // height == 1
 
     let snapshot = testkit.snapshot();
@@ -383,8 +401,8 @@ fn test_explorer_single_block() {
     assert!(validators.len() >= testkit.majority_count());
 }
 
-#[test]
-fn submitting_incorrect_tx_via_sender() {
+#[tokio::test]
+async fn submitting_incorrect_tx_via_sender() {
     exonum::helpers::init_logger().ok();
 
     let (mut testkit, api) = init_testkit();
@@ -392,6 +410,7 @@ fn submitting_incorrect_tx_via_sender() {
         .public(ApiKind::Service("counter"))
         .query(&11_u64)
         .post("incorrect-tx")
+        .await
         .unwrap();
     // The transaction should not appear in the pool.
     let incorrect_tx = testkit.us().service_keypair().increment(SERVICE_ID + 1, 11);

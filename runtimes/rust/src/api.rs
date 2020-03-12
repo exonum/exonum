@@ -14,7 +14,7 @@
 
 //! Building blocks for creating HTTP API of Rust services.
 
-pub use exonum_api::{Deprecated, EndpointMutability, Error, FutureResult, HttpStatusCode, Result};
+pub use exonum_api::{Deprecated, EndpointMutability, Error, HttpStatusCode, Result};
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
@@ -25,7 +25,7 @@ use exonum::{
     },
 };
 use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
-use futures::{future, Future, IntoFuture};
+use futures::prelude::*;
 use serde::{de::DeserializeOwned, Serialize};
 
 use super::Broadcaster;
@@ -35,9 +35,9 @@ use super::Broadcaster;
 /// This structure allows a service API handler to interact with the service instance
 /// and other parts of the blockchain.
 #[derive(Debug)]
-pub struct ServiceApiState<'a> {
+pub struct ServiceApiState {
     /// Transaction broadcaster.
-    broadcaster: Broadcaster<'a>,
+    broadcaster: Broadcaster,
     // TODO Think about avoiding of unnecessary snapshots creation. [ECR-3222]
     snapshot: Box<dyn Snapshot>,
     /// Endpoint path relative to the service root.
@@ -46,10 +46,10 @@ pub struct ServiceApiState<'a> {
     status: InstanceStatus,
 }
 
-impl<'a> ServiceApiState<'a> {
+impl ServiceApiState {
     /// Creates service API context from the given blockchain and instance descriptor.
     fn new<S: Into<String>>(
-        blockchain: &'a Blockchain,
+        blockchain: &Blockchain,
         instance: InstanceDescriptor,
         expected_artifact: &ArtifactId,
         endpoint: S,
@@ -67,8 +67,8 @@ impl<'a> ServiceApiState<'a> {
         Ok(Self {
             broadcaster: Broadcaster::new(
                 instance,
-                blockchain.service_keypair(),
-                blockchain.sender(),
+                blockchain.service_keypair().clone(),
+                blockchain.sender().clone(),
             ),
             snapshot,
             endpoint: endpoint.into(),
@@ -88,12 +88,12 @@ impl<'a> ServiceApiState<'a> {
     }
 
     /// Returns readonly access to blockchain data.
-    pub fn data(&'a self) -> BlockchainData<&dyn Snapshot> {
+    pub fn data(&self) -> BlockchainData<&dyn Snapshot> {
         BlockchainData::new(&self.snapshot, &self.instance().name)
     }
 
     /// Returns readonly access to the data of the executing service.
-    pub fn service_data(&'a self) -> Prefixed<&dyn Snapshot> {
+    pub fn service_data(&self) -> Prefixed<&dyn Snapshot> {
         self.data().for_executing_service()
     }
 
@@ -120,7 +120,7 @@ impl<'a> ServiceApiState<'a> {
 
     /// Returns a transaction broadcaster if the current node is a validator and the service
     /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
+    pub fn broadcaster(&self) -> Option<Broadcaster> {
         if self.status.is_active() {
             CoreSchema::new(&self.snapshot).validator_id(self.service_key())?;
             Some(self.broadcaster.clone())
@@ -136,7 +136,7 @@ impl<'a> ServiceApiState<'a> {
     ///
     /// Transactions for non-active services will not be broadcast successfully; they will be
     /// filtered on the receiving nodes as ones that cannot (currently) be processed.
-    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
+    pub fn generic_broadcaster(&self) -> Broadcaster {
         self.broadcaster.clone()
     }
 
@@ -211,29 +211,27 @@ impl ServiceApiScope {
     /// In HTTP backends this type of endpoint corresponds to `GET` requests.
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
-        Q: DeserializeOwned + 'static,
+        Q: DeserializeOwned + 'static + Send,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = Error> + 'static,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        R: Future<Output = exonum_api::Result<I>>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
-        self.inner
-            .endpoint(name, move |query: Q| -> FutureResult<I> {
-                let maybe_state =
-                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-                let state = match maybe_state {
-                    Ok(state) => state,
-                    Err(err) => return Box::new(future::err(err)),
-                };
+        self.inner.endpoint(name, move |query: Q| {
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return future::err(err).left_future(),
+            };
 
-                let descriptor = descriptor.clone();
-                let future = handler(&state, query)
-                    .into_future()
-                    .map_err(move |err| err.source(descriptor.to_string()));
-                Box::new(future)
-            });
+            let descriptor = descriptor.clone();
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
+        });
         self
     }
 
@@ -244,27 +242,25 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = Error> + 'static,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        R: Future<Output = exonum_api::Result<I>>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
-        self.inner
-            .endpoint_mut(name, move |query: Q| -> FutureResult<I> {
-                let maybe_state =
-                    ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-                let state = match maybe_state {
-                    Ok(state) => state,
-                    Err(err) => return Box::new(future::err(err)),
-                };
+        self.inner.endpoint_mut(name, move |query: Q| {
+            let maybe_state =
+                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
+            let state = match maybe_state {
+                Ok(state) => state,
+                Err(err) => return future::err(err).left_future(),
+            };
 
-                let descriptor = descriptor.clone();
-                let future = handler(&state, query)
-                    .into_future()
-                    .map_err(move |err| err.source(descriptor.to_string()));
-                Box::new(future)
-            });
+            let descriptor = descriptor.clone();
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
+        });
         self
     }
 
@@ -279,30 +275,29 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = Error> + 'static,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        R: Future<Output = exonum_api::Result<I>>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
-        let inner = deprecated.handler.clone();
+        let handler = deprecated.handler.clone();
 
-        let handler = move |query: Q| -> FutureResult<I> {
+        let full_handler = move |query: Q| {
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
             let state = match maybe_state {
                 Ok(state) => state,
-                Err(err) => return Box::new(future::err(err)),
+                Err(err) => return future::err(err).left_future(),
             };
 
             let descriptor = descriptor.clone();
-            let future = inner(&state, query)
-                .into_future()
-                .map_err(move |err| err.source(descriptor.to_string()));
-            Box::new(future)
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
         };
         // Mark endpoint as deprecated.
-        let handler = deprecated.with_different_handler(handler);
+        let handler = deprecated.with_different_handler(full_handler);
         self.inner.endpoint(name, handler);
         self
     }
@@ -318,30 +313,29 @@ impl ServiceApiScope {
     where
         Q: DeserializeOwned + 'static,
         I: Serialize + 'static,
-        F: Fn(&ServiceApiState<'_>, Q) -> R + 'static + Clone + Send + Sync,
-        R: IntoFuture<Item = I, Error = Error> + 'static,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        R: Future<Output = exonum_api::Result<I>>,
     {
         let blockchain = self.blockchain.clone();
         let descriptor = self.descriptor.clone();
         let artifact = self.artifact.clone();
-        let inner = deprecated.handler.clone();
+        let handler = deprecated.handler.clone();
 
-        let handler = move |query: Q| -> FutureResult<I> {
+        let full_handler = move |query: Q| {
             let maybe_state =
                 ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
             let state = match maybe_state {
                 Ok(state) => state,
-                Err(err) => return Box::new(future::err(err)),
+                Err(err) => return future::err(err).left_future(),
             };
 
             let descriptor = descriptor.clone();
-            let future = inner(&state, query)
-                .into_future()
-                .map_err(move |err| err.source(descriptor.to_string()));
-            Box::new(future)
+            handler(state, query)
+                .map_err(move |err| err.source(descriptor.to_string()))
+                .right_future()
         };
         // Mark endpoint as deprecated.
-        let handler = deprecated.with_different_handler(handler);
+        let handler = deprecated.with_different_handler(full_handler);
         self.inner.endpoint_mut(name, handler);
         self
     }
@@ -383,8 +377,8 @@ impl ServiceApiScope {
 /// // Create API handlers.
 /// impl MyApi {
 ///     /// Immutable handler which returns a hash of the block at the given height.
-///     pub fn block_hash(
-///         state: &ServiceApiState,
+///     pub async fn block_hash(
+///         state: ServiceApiState,
 ///         query: MyQuery,
 ///     ) -> api::Result<Option<BlockInfo>> {
 ///         let schema = state.data().for_core();
@@ -395,18 +389,19 @@ impl ServiceApiScope {
 ///     }
 ///
 ///     /// Simple handler without any parameters.
-///     pub fn ping(_state: &ServiceApiState, _query: ()) -> api::Result<()> {
+///     pub async fn ping(_state: ServiceApiState, _query: ()) -> api::Result<()> {
 ///         Ok(())
 ///     }
 ///
-///     /// You may also create asynchronous handlers for long requests.
-///     pub fn async_operation(
-///         _state: &ServiceApiState,
+///     /// You may also use asynchronous tasks.
+///     pub async fn async_operation(
+///         _state: ServiceApiState,
 ///         query: MyQuery,
-///     ) -> api::FutureResult<Option<Hash>> {
-///         Box::new(futures::lazy(move || {
-///             Ok(Some(query.block_height.object_hash()))
-///         }))
+///     ) -> api::Result<Option<Hash>> {
+///         # async fn long_async_task(query: MyQuery) -> Option<Hash> {
+///         #     Some(Hash::zero())
+///         # }
+///         Ok(long_async_task(query).await)
 ///     }
 /// }
 ///

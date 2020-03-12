@@ -16,13 +16,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 use anyhow::Error;
-use log::error;
 
 use std::{error::Error as StdError, fmt::Display};
-
-pub fn log_error<E: Display>(error: E) {
-    error!("An error occurred: {}", error)
-}
 
 pub trait LogError {
     fn log_error(self);
@@ -38,7 +33,7 @@ where
 {
     fn log_error(self) {
         if let Err(error) = self {
-            error!("An error occurred: {}", error);
+            log::error!("An error occurred: {}", error);
         }
     }
 }

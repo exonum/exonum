@@ -35,6 +35,16 @@ pub struct Error {
     pub headers: HeaderMap,
 }
 
+impl Default for Error {
+    fn default() -> Self {
+        Self {
+            http_code: HttpStatusCode::default(),
+            body: ErrorBody::default(),
+            headers: HeaderMap::new(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub struct ErrorBody {

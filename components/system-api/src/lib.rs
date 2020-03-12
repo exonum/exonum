@@ -33,6 +33,7 @@
 //! use exonum_node::{NodeBuilder, NodeConfig};
 //! use exonum_system_api::SystemApiPlugin;
 //!
+//! # async fn run_node() -> anyhow::Result<()> {
 //! let node_config: NodeConfig = // ...
 //! #    unimplemented!();
 //! let node_keys = Keys::random();
@@ -44,7 +45,9 @@
 //!     .with_plugin(SystemApiPlugin)
 //!     // Add runtimes etc...
 //!     .build();
-//! node.run().unwrap();
+//! node.run().await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Use with the testkit:
@@ -53,12 +56,18 @@
 //! use exonum_system_api::{private::{ConsensusStatus, NodeInfo}, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! let info: NodeInfo = api.private(ApiKind::System).get("v1/info").unwrap();
+//! let info: NodeInfo = api.private(ApiKind::System)
+//!     .get("v1/info")
+//!     .await?;
 //! assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
+//! Ok(())
+//! # }
 //! ```
 //!
 //! Note that the testkit does not emulate the functionality of the node completely; it does

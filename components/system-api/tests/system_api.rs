@@ -28,8 +28,8 @@ fn create_testkit() -> TestKit {
         .build()
 }
 
-#[test]
-fn info() {
+#[tokio::test]
+async fn info() {
     // This test checks whether the endpoint returns expected result and correctness of
     // serialize. Expected results:
     //
@@ -38,27 +38,28 @@ fn info() {
     let mut testkit = create_testkit();
     let api = testkit.api();
 
-    let info: NodeInfo = api.private(ApiKind::System).get("v1/info").unwrap();
+    let info: NodeInfo = api.private(ApiKind::System).get("v1/info").await.unwrap();
     assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
     assert!(info.connected_peers.is_empty());
     assert_eq!(info.rust_version.major, 1);
 }
 
-#[test]
-fn stats() {
+#[tokio::test]
+async fn stats() {
     let mut testkit = create_testkit();
     let api = testkit.api();
-    let info: NodeStats = api.private(ApiKind::System).get("v1/stats").unwrap();
+    let info: NodeStats = api.private(ApiKind::System).get("v1/stats").await.unwrap();
     assert_eq!(info.height, 0);
     assert_eq!(info.tx_cache_size, 0);
 }
 
-#[test]
-fn shutdown() {
+#[tokio::test]
+async fn shutdown() {
     let mut testkit = create_testkit();
     let api = testkit.api();
     api.private(ApiKind::System)
         .post::<()>("v1/shutdown")
+        .await
         .unwrap();
     let control_messages = testkit.poll_control_messages();
     match control_messages.as_slice() {

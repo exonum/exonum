@@ -78,14 +78,16 @@ impl Service for AfterCommitService {
         let counter = self.counter.fetch_add(1, Ordering::SeqCst);
 
         // Test both validator-specific and generic sending.
+        let height = context.height().0;
         if counter < 10_000 {
             if let Some(broadcast) = context.broadcaster() {
-                broadcast.after_commit((), context.height().0).ok();
+                broadcast.blocking().after_commit((), height).ok();
             }
         } else {
             context
                 .generic_broadcaster()
-                .after_commit((), context.height().0)
+                .blocking()
+                .after_commit((), height)
                 .ok();
         }
     }
@@ -112,7 +114,8 @@ impl AfterCommitInterface<ExecutionContext<'_>> for AfterCommitServiceV2 {
 impl Service for AfterCommitServiceV2 {
     fn after_commit(&self, context: AfterCommitContext<'_>) {
         if let Some(broadcast) = context.broadcaster() {
-            broadcast.after_commit((), context.height().0).ok();
+            let height = context.height().0;
+            broadcast.blocking().after_commit((), height).ok();
         }
     }
 }

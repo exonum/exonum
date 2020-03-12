@@ -17,7 +17,8 @@ use exonum_explorer_service::ExplorerFactory;
 use exonum_rust_runtime::spec::Spec;
 use exonum_testkit::TestKitBuilder;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     exonum::helpers::init_logger().unwrap();
 
     TestKitBuilder::validator()
@@ -26,5 +27,6 @@ fn main() {
         .serve(
             "0.0.0.0:8000".parse().unwrap(),
             "0.0.0.0:9000".parse().unwrap(),
-        );
+        )
+        .await;
 }

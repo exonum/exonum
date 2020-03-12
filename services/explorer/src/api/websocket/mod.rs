@@ -195,8 +195,8 @@ pub use exonum_explorer::api::websocket::{
     TransactionFilter,
 };
 
-use actix::*;
-use actix_web::ws;
+use actix::prelude::*;
+use actix_web_actors::ws;
 use exonum::{
     blockchain::{Blockchain, Schema},
     crypto::Hash,
@@ -204,7 +204,7 @@ use exonum::{
     messages::{AnyTx, SignedMessage, Verified},
 };
 use exonum_explorer::api::{TransactionHex, TransactionResponse};
-use futures::{Future, IntoFuture};
+use futures::future::{FutureExt, LocalBoxFuture};
 use hex::FromHex;
 
 use std::{
@@ -267,7 +267,7 @@ impl SharedStateRef {
         let mut inner = arc.lock().expect("Cannot lock `SharedState`");
         let addr = inner.server_addr.get_or_insert_with(|| {
             let blockchain = blockchain.to_owned();
-            Arbiter::start(|_| Server::new(blockchain))
+            Server::new(blockchain).start()
         });
         Some(addr.clone())
     }
@@ -275,6 +275,7 @@ impl SharedStateRef {
 
 /// WebSocket message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]
+#[rtype(result = "()")]
 enum Message {
     /// This message will send data to a client.
     Data(String),
@@ -284,6 +285,7 @@ enum Message {
 
 /// This message will terminate server.
 #[derive(Debug, Message)]
+#[rtype(result = "()")]
 struct Terminate;
 
 #[derive(Message)]
@@ -303,17 +305,20 @@ impl fmt::Debug for Subscribe {
 }
 
 #[derive(Debug, Message)]
+#[rtype(result = "()")]
 struct Unsubscribe {
     id: u64,
 }
 
 #[derive(Debug, Message)]
+#[rtype(result = "()")]
 struct UpdateSubscriptions {
     id: u64,
     subscriptions: Vec<SubscriptionType>,
 }
 
 #[derive(Debug, Message)]
+#[rtype(result = "()")]
 struct Broadcast {
     block_hash: Hash,
 }
@@ -374,11 +379,13 @@ impl Server {
         let subscribers = mem::replace(&mut self.subscribers, BTreeMap::new());
         for (_, subscriber_group) in subscribers {
             for (_, recipient) in subscriber_group {
-                if let Err(err) = recipient.do_send(Message::Close) {
-                    log::warn!(
-                        "Can't send `Close` message to a websocket client: {:?}",
-                        err
-                    );
+                if recipient.connected() {
+                    if let Err(err) = recipient.do_send(Message::Close) {
+                        log::warn!(
+                            "Can't send `Close` message to a websocket client: {:?}",
+                            err
+                        );
+                    }
                 }
             }
         }
@@ -394,17 +401,19 @@ impl Server {
     fn handle_transaction(
         &self,
         message: &Transaction,
-    ) -> impl Future<Item = TransactionResponse, Error = anyhow::Error> {
+    ) -> impl Future<Output = anyhow::Result<TransactionResponse>> {
         let sender = self.blockchain.sender().to_owned();
-        self.check_transaction(message)
-            .into_future()
-            .and_then(move |verified| {
-                let tx_hash = verified.object_hash();
-                sender
-                    .broadcast_transaction(verified)
-                    .map(move |()| TransactionResponse::new(tx_hash))
-                    .from_err()
-            })
+        let verified = self.check_transaction(message);
+
+        async move {
+            let verified = verified?;
+            let tx_hash = verified.object_hash();
+            sender
+                .broadcast_transaction(verified)
+                .await
+                .map(move |()| TransactionResponse::new(tx_hash))
+                .map_err(From::from)
+        }
     }
 }
 
@@ -518,11 +527,11 @@ impl Handler<Broadcast> for Server {
 }
 
 impl Handler<Transaction> for Server {
-    type Result = Box<dyn Future<Item = TransactionResponse, Error = anyhow::Error>>;
+    type Result = LocalBoxFuture<'static, anyhow::Result<TransactionResponse>>;
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {
-        Box::new(self.handle_transaction(&message))
+        self.handle_transaction(&message).boxed_local()
     }
 }
 
@@ -566,13 +575,6 @@ impl Session {
         }
     }
 
-    fn process_incoming_message(&mut self, msg: IncomingMessage) -> String {
-        match msg {
-            IncomingMessage::SetSubscriptions(subs) => self.set_subscriptions(subs),
-            IncomingMessage::Transaction(tx) => self.send_transaction(tx),
-        }
-    }
-
     fn set_subscriptions(&mut self, subscriptions: Vec<SubscriptionType>) -> String {
         self.subscriptions = subscriptions.clone();
         let response = self
@@ -585,21 +587,21 @@ impl Session {
         serde_json::to_string(&response).unwrap()
     }
 
-    fn send_transaction(&mut self, tx: TransactionHex) -> String {
-        let response = self
-            .server_address
-            .send(Transaction(tx))
-            .wait()
-            .map_or_else(Response::error, |res| {
-                let res = res.map_err(|e| e.to_string());
-                Response::from(res)
-            });
+    async fn send_transaction(server_address: Addr<Server>, tx: TransactionHex) -> String {
+        let response =
+            server_address
+                .send(Transaction(tx))
+                .await
+                .map_or_else(Response::error, |res| {
+                    let res = res.map_err(|e| e.to_string());
+                    Response::from(res)
+                });
         serde_json::to_string(&response).unwrap()
     }
 }
 
 impl Actor for Session {
-    type Context = ws::WebsocketContext<Self, ()>;
+    type Context = ws::WebsocketContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         let address: Recipient<_> = ctx.address().recipient();
@@ -616,7 +618,7 @@ impl Actor for Session {
                     }
                     _ => context.stop(),
                 }
-                fut::ok(())
+                actix::fut::ready(())
             })
             .wait(ctx);
     }
@@ -639,27 +641,42 @@ impl Handler<Message> for Session {
                     description: Some("Explorer service shut down".into()),
                 }));
                 ctx.stop();
-                ctx.terminate();
             }
         }
     }
 }
 
-impl StreamHandler<ws::Message, ws::ProtocolError> for Session {
-    fn handle(&mut self, msg: ws::Message, ctx: &mut Self::Context) {
+impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for Session {
+    fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
+        let msg = if let Ok(msg) = msg {
+            msg
+        } else {
+            ctx.stop();
+            return;
+        };
+
         match msg {
             ws::Message::Ping(msg) => ctx.pong(&msg),
             ws::Message::Close(_) => ctx.stop(),
-            ws::Message::Text(ref text) => {
-                let response = serde_json::from_str(text).map_or_else(
-                    |err| {
-                        let err = Response::<()>::error(err);
-                        serde_json::to_string(&err).unwrap()
-                    },
-                    |msg| self.process_incoming_message(msg),
-                );
-                ctx.text(response);
-            }
+            ws::Message::Text(ref text) => match serde_json::from_str(text) {
+                Ok(IncomingMessage::SetSubscriptions(subs)) => {
+                    let response = self.set_subscriptions(subs);
+                    ctx.text(response);
+                }
+                Ok(IncomingMessage::Transaction(transaction)) => {
+                    Self::send_transaction(self.server_address.clone(), transaction)
+                        .into_actor(self)
+                        .then(move |response: String, _actor, context| {
+                            context.text(response);
+                            actix::fut::ready(())
+                        })
+                        .wait(ctx);
+                }
+                Err(err) => {
+                    let err = Response::<()>::error(err);
+                    ctx.text(serde_json::to_string(&err).unwrap());
+                }
+            },
             _ => {}
         }
     }

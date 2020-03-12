@@ -55,7 +55,10 @@ fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
 
 /// Creates block with `ConfigPropose` tx and returns `Result` with new
 /// configuration or corresponding `ExecutionError`.
-fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), ExecutionError> {
+async fn propose_configuration(
+    testkit: &mut TestKit,
+    config: Config,
+) -> Result<(), ExecutionError> {
     let tx = ConfigPropose::immediate(0).service_config(SERVICE_ID, config.clone());
     let keypair = testkit.network().us().service_keypair();
     let tx = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, tx);
@@ -69,25 +72,28 @@ fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), Ex
         .api()
         .public(ApiKind::Service(SERVICE_NAME))
         .get("v1/timestamps/config")
+        .await
         .expect("Failed to get service configuration");
 
     assert_eq!(config.time_service_name, new_config.time_service_name);
     Ok(())
 }
 
-#[test]
-fn test_propose_configuration() {
+#[tokio::test]
+async fn test_propose_configuration() {
     let (mut testkit, _) = init_testkit(true);
     let config = Config {
         time_service_name: SECOND_TIME_SERVICE_NAME.to_string(),
     };
 
     // Propose valid configuration.
-    propose_configuration(&mut testkit, config).expect("Configuration proposal failed.");
+    propose_configuration(&mut testkit, config)
+        .await
+        .expect("Configuration proposal failed.");
 }
 
-#[test]
-fn test_propose_invalid_configuration() {
+#[tokio::test]
+async fn test_propose_invalid_configuration() {
     let (mut testkit, _) = init_testkit(false);
     let incorrect_names = vec!["", " ", "illegal.illegal", "not_service", SERVICE_NAME];
 
@@ -98,6 +104,7 @@ fn test_propose_invalid_configuration() {
 
         // Propose configuration with invalid time service name.
         let err = propose_configuration(&mut testkit, config)
+            .await
             .expect_err("Configuration proposal should fail.");
 
         let expected_err =

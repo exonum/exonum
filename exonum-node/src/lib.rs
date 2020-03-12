@@ -59,7 +59,8 @@ pub use crate::{
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
-use anyhow::{ensure, format_err, Error};
+use actix_rt::System;
+use anyhow::{ensure, format_err};
 use exonum::{
     blockchain::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
@@ -73,14 +74,12 @@ use exonum::{
     runtime::RuntimeInstance,
 };
 use exonum_api::{
-    backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiAggregator, ApiManager,
-    ApiManagerConfig, UpdateEndpoints, WebServerConfig,
+    AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
+    WebServerConfig,
 };
-use futures::{sync::mpsc, Future, Sink};
+use futures::{channel::mpsc, TryFutureExt};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio_core::reactor::Core;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -95,10 +94,8 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        error::{into_failure, LogError},
-        noise::HandshakeParams,
-        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
-        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+        noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart, InternalRequest,
+        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
     schema::NodeSchema,
@@ -687,7 +684,7 @@ impl NodeHandler {
     fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
         let message = message.into();
         let request = NetworkRequest::SendMessage(public_key, message);
-        self.channel.network_requests.send(request).log_error();
+        self.channel.network_requests.send(request);
     }
 
     /// Broadcasts given message to all peers.
@@ -719,10 +716,7 @@ impl NodeHandler {
     /// Adds a timeout request.
     fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
-        self.channel
-            .internal_requests
-            .send(request.into())
-            .log_error();
+        self.channel.internal_requests.send(request.into());
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -864,8 +858,8 @@ impl ShutdownHandle {
     /// # Return value
     ///
     /// The failure means that the node is already being shut down.
-    pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
-        self.inner.send_message(ExternalMessage::Shutdown)
+    pub async fn shutdown(mut self) -> Result<(), SendError> {
+        self.inner.send_message(ExternalMessage::Shutdown).await
     }
 }
 
@@ -980,10 +974,10 @@ impl NodeChannel {
     /// Returns the channel for sending timeouts, networks and API requests.
     fn node_sender(&self) -> NodeSender {
         NodeSender {
-            internal_requests: self.internal_requests.0.clone().wait(),
-            network_requests: self.network_requests.0.clone().wait(),
-            transactions: self.transactions.0.clone().wait(),
-            api_requests: self.api_requests.0.clone().wait(),
+            internal_requests: SyncSender::new(self.internal_requests.0.clone()),
+            network_requests: SyncSender::new(self.network_requests.0.clone()),
+            transactions: SyncSender::new(self.transactions.0.clone()),
+            api_requests: SyncSender::new(self.api_requests.0.clone()),
         }
     }
 }
@@ -1166,41 +1160,14 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    fn run_handler(mut self, handshake_params: HandshakeParams) -> Result<(), Error> {
+    async fn run_handler(mut self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
         self.handler.initialize();
-
-        let pool_size = self.thread_pool_size;
-        let (handler_part, network_part, internal_part) = self.into_reactor();
-
-        let network_thread = thread::spawn(move || {
-            let mut core = Core::new().map_err(into_failure)?;
-            let handle = core.handle();
-
-            let mut pool_builder = ThreadPoolBuilder::new();
-            if let Some(pool_size) = pool_size {
-                pool_builder.pool_size(pool_size as usize);
-            }
-            let thread_pool = pool_builder.build();
-            let executor = thread_pool.sender().clone();
-
-            core.handle().spawn(internal_part.run(handle, executor));
-
-            let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler)
-                .map(drop)
-                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
-        });
-
-        let mut core = Core::new().map_err(into_failure)?;
-        core.run(handler_part.run())
-            .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
-
-        network_thread.join().unwrap()
+        Reactor::new(self).run(handshake_params).await
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
     /// depending on the provided `NodeConfig`.
-    pub fn run(self) -> anyhow::Result<()> {
+    pub async fn run(self) -> anyhow::Result<()> {
         trace!("Running node.");
 
         // Runs NodeHandler.
@@ -1210,40 +1177,7 @@ impl Node {
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
-        self.run_handler(handshake_params)
-    }
-
-    fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
-        let connect_message = self.state().our_connect_message().clone();
-        let connect_list = self.state().connect_list();
-        let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
-        SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
-        let (network_tx, network_rx) = self.channel.network_events;
-        let internal_requests_rx = self.channel.internal_requests.1;
-        let network_part = NetworkPart {
-            our_connect_message: connect_message,
-            listen_address: self.handler.system_state.listen_address(),
-            network_requests: self.channel.network_requests,
-            network_tx,
-            network_config: self.network_config,
-            max_message_len: self.max_message_len,
-            connect_list,
-        };
-
-        let (internal_tx, internal_rx) = self.channel.internal_events;
-        let handler_part = HandlerPart {
-            handler: self.handler,
-            internal_rx,
-            network_rx,
-            transactions_rx: self.channel.transactions.1,
-            api_rx: self.channel.api_requests.1,
-        };
-
-        let internal_part = InternalPart {
-            internal_tx,
-            internal_requests_rx,
-        };
-        (handler_part, network_part, internal_part)
+        self.run_handler(handshake_params).await
     }
 
     /// Returns `State` of the node.
@@ -1264,6 +1198,73 @@ impl Node {
         ShutdownHandle {
             inner: ApiSender::new(self.channel.api_requests.0.clone()),
         }
+    }
+}
+
+struct Reactor {
+    handler_part: HandlerPart<NodeHandler>,
+    network_part: NetworkPart,
+    internal_part: InternalPart,
+}
+
+impl Reactor {
+    fn new(node: Node) -> Self {
+        let connect_message = node.state().our_connect_message().clone();
+        let connect_list = node.state().connect_list();
+
+        let api_manager = ApiManager::new(node.api_manager_config);
+        let endpoints = node.channel.endpoints.1;
+        let api_task = api_manager
+            .run(endpoints)
+            .unwrap_or_else(|e| log::error!("Error in actix thread: {}", e));
+        // Creating a separate thread here seems easier than making `Node::run()` return
+        // a non-`Send` future (which, e.g., precludes running nodes with `tokio::spawn`).
+        thread::spawn(|| {
+            System::new("exonum-node").block_on(api_task);
+        });
+
+        let (network_tx, network_rx) = node.channel.network_events;
+        let internal_requests_rx = node.channel.internal_requests.1;
+        let network_part = NetworkPart {
+            our_connect_message: connect_message,
+            listen_address: node.handler.system_state.listen_address(),
+            network_requests: node.channel.network_requests.1,
+            network_tx,
+            network_config: node.network_config,
+            max_message_len: node.max_message_len,
+            connect_list,
+        };
+
+        let (internal_tx, internal_rx) = node.channel.internal_events;
+        let handler_part = HandlerPart {
+            handler: node.handler,
+            internal_rx,
+            network_rx,
+            transactions_rx: node.channel.transactions.1,
+            api_rx: node.channel.api_requests.1,
+        };
+
+        let internal_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
+        };
+
+        Self {
+            handler_part,
+            network_part,
+            internal_part,
+        }
+    }
+
+    // FIXME: is joining appropriate here (vs select)? How about joining actix?
+    async fn run(self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
+        tokio::spawn(self.internal_part.run());
+        let network_task = tokio::spawn(self.network_part.run(handshake_params));
+
+        self.handler_part.run().await;
+        network_task
+            .await
+            .map_err(|e| format_err!("Error in the network thread: {}", e))
     }
 }
 

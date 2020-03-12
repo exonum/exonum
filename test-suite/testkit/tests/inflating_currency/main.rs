@@ -21,6 +21,10 @@ use exonum::{
     helpers::Height,
 };
 use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
+use futures::{
+    stream::{self, StreamExt},
+    FutureExt,
+};
 use pretty_assertions::assert_eq;
 use rand::Rng;
 
@@ -46,25 +50,26 @@ fn create_wallet(testkit: &mut TestKit, name: &str) -> KeyPair {
     keypair
 }
 
-fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
+async fn get_balance(api: &TestKitApi, pubkey: &PublicKey) -> u64 {
     api.public(ApiKind::Service("cryptocurrency"))
         .get(&format!("v1/balance?pub_key={}", pubkey.to_hex()))
+        .await
         .unwrap()
 }
 
-#[test]
-fn test_inflation() {
+#[tokio::test]
+async fn test_inflation() {
     let mut testkit = init_testkit();
     let alice = create_wallet(&mut testkit, "Alice");
 
     let api = testkit.api();
-    assert_eq!(get_balance(&api, &alice.public_key()), 1);
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 1);
     testkit.create_blocks_until(Height(10));
-    assert_eq!(get_balance(&api, &alice.public_key()), 10);
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 10);
 }
 
-#[test]
-fn test_transfer_scenarios() {
+#[tokio::test]
+async fn test_transfer_scenarios() {
     let mut testkit = init_testkit();
     let api = testkit.api();
 
@@ -77,8 +82,8 @@ fn test_transfer_scenarios() {
     testkit.create_blocks_until(Height(9));
 
     // Check that the initial Alice's and Bob's balances are persisted by the service
-    assert_eq!(get_balance(&api, &alice.public_key()), 9);
-    assert_eq!(get_balance(&api, &bob.public_key()), 9);
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 9);
+    assert_eq!(get_balance(&api, &bob.public_key()).await, 9);
 
     // Transfer funds
     let tx_a_to_b = alice.transfer(
@@ -104,8 +109,8 @@ fn test_transfer_scenarios() {
     testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(vec![]); // A: 4 + 2, B: 14 + 2
     testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // A: 0 + 1, B: 20 + 3
-    assert_eq!(get_balance(&api, &alice.public_key()), 1); // 0 + 1
-    assert_eq!(get_balance(&api, &bob.public_key()), 23); // 20 + 3
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 1); // 0 + 1
+    assert_eq!(get_balance(&api, &bob.public_key()).await, 23); // 20 + 3
     testkit.rollback();
 
     // If there is no block separating transactions, Alice's balance is insufficient
@@ -113,35 +118,35 @@ fn test_transfer_scenarios() {
     testkit.checkpoint();
     testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // A: 4 + 1, B: 14 + 1
     testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // fails
-    assert_eq!(get_balance(&api, &alice.public_key()), 6); // 4 + 2
-    assert_eq!(get_balance(&api, &bob.public_key()), 16); // 14 + 2
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 6); // 4 + 2
+    assert_eq!(get_balance(&api, &bob.public_key()).await, 16); // 14 + 2
     testkit.rollback();
 
     testkit.checkpoint();
     testkit.create_block_with_transactions(vec![next_tx_a_to_b.clone()]); // A: 3 + 1, B: 15 + 1
     testkit.create_block_with_transactions(vec![tx_a_to_b.clone()]); // fails
-    assert_eq!(get_balance(&api, &alice.public_key()), 5); // 3 + 2
-    assert_eq!(get_balance(&api, &bob.public_key()), 17); // 15 + 2
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 5); // 3 + 2
+    assert_eq!(get_balance(&api, &bob.public_key()).await, 17); // 15 + 2
     testkit.rollback();
 
     // If the transactions are put in the same block, only the first transaction should succeed
     testkit.checkpoint();
     testkit.create_block_with_transactions(vec![tx_a_to_b.clone(), next_tx_a_to_b.clone()]);
-    assert_eq!(get_balance(&api, &alice.public_key()), 5); // 4 + 1
-    assert_eq!(get_balance(&api, &bob.public_key()), 15); // 14 + 1
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 5); // 4 + 1
+    assert_eq!(get_balance(&api, &bob.public_key()).await, 15); // 14 + 1
     testkit.rollback();
 
     // Same here
     testkit.checkpoint();
     testkit.create_block_with_transactions(vec![next_tx_a_to_b, tx_a_to_b]);
-    assert_eq!(get_balance(&api, &alice.public_key()), 4); // 3 + 1
-    assert_eq!(get_balance(&api, &bob.public_key()), 16); // 15 + 1
+    assert_eq!(get_balance(&api, &alice.public_key()).await, 4); // 3 + 1
+    assert_eq!(get_balance(&api, &bob.public_key()).await, 16); // 15 + 1
     testkit.rollback();
 }
 
 /// Test randomly generated transfers among users without blockchain rollbacks.
-#[test]
-fn test_fuzz_transfers() {
+#[tokio::test]
+async fn test_fuzz_transfers() {
     const USERS: usize = 10;
 
     let mut rng = rand::thread_rng();
@@ -161,7 +166,9 @@ fn test_fuzz_transfers() {
     testkit.create_block_with_transactions(keys_and_txs.iter().map(|(_, tx)| tx.clone()));
 
     for _ in 0..64 {
-        let total_balance: u64 = pubkeys.iter().map(|key| get_balance(&api, &key)).sum();
+        let total_balance: u64 = stream::iter(&pubkeys)
+            .fold(0, |acc, key| get_balance(&api, &key).map(move |x| x + acc))
+            .await;
         assert_eq!(total_balance, (USERS as u64) * testkit.height().0);
 
         let tx_count = rng.gen::<u32>() & 15;

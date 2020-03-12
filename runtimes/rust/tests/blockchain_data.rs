@@ -30,7 +30,7 @@ use exonum::{
     },
 };
 use exonum_derive::{FromAccess, ServiceDispatcher, ServiceFactory};
-use futures::sync::mpsc;
+use futures::channel::mpsc;
 
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 

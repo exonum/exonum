@@ -13,24 +13,33 @@
 // limitations under the License.
 
 use anyhow::format_err;
-use exonum::{crypto::KeyPair, helpers::Height, merkledb::ObjectHash, runtime::SnapshotExt};
+use exonum::{
+    blockchain::{ApiSender, Blockchain},
+    crypto::KeyPair,
+    helpers::Height,
+    merkledb::ObjectHash,
+    messages::{AnyTx, Verified},
+    runtime::SnapshotExt,
+};
 use exonum_node::FlushPoolStrategy;
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,
 };
-use futures::Future;
+use futures::future;
 use structopt::StructOpt;
+use tokio::time::delay_for;
 
 use std::{
-    collections::HashMap,
-    fmt, thread,
+    fmt,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 use exonum_soak_tests::{
     run_nodes,
     services::{MainConfig, MainService, MainServiceInterface},
+    RunHandle,
 };
 
 /// Runs a network with a service and sends transactions to it, measuring how fast
@@ -103,8 +112,50 @@ impl TimingStats {
     }
 }
 
-// FIXME: refactor using the `tokio` runtime once #1804 is merged. (ECR-4320)
-fn main() {
+async fn transaction_task(
+    transaction: Verified<AnyTx>,
+    sender: ApiSender,
+    blockchain: Blockchain,
+    times_to_pool: Arc<Mutex<TimingStats>>,
+    times_to_commit: Arc<Mutex<TimingStats>>,
+) {
+    /// Poll delay foreach transaction.
+    const POLL_DELAY: Duration = Duration::from_millis(5);
+
+    let tx_hash = transaction.object_hash();
+    sender.broadcast_transaction(transaction).await.unwrap();
+    let start = Instant::now();
+    let mut in_pool = false;
+
+    loop {
+        // The additional block scope is needed to not spill vars across the `await` boundary.
+        {
+            let snapshot = blockchain.snapshot();
+            let snapshot = snapshot.for_core();
+            let tx_pool = snapshot.transactions_pool();
+            let tx_locations = snapshot.transactions_locations();
+            let now = Instant::now();
+
+            if tx_locations.contains(&tx_hash) {
+                log::trace!("Transaction {} is committed", tx_hash);
+                if !in_pool {
+                    times_to_pool.lock().unwrap().push(now - start);
+                }
+                times_to_commit.lock().unwrap().push(now - start);
+                break;
+            } else if !in_pool && tx_pool.contains(&tx_hash) {
+                log::trace!("Transaction {} appeared in pool", tx_hash);
+                times_to_pool.lock().unwrap().push(now - start);
+                in_pool = true;
+            }
+        }
+
+        delay_for(POLL_DELAY).await;
+    }
+}
+
+#[tokio::main]
+async fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().ok();
 
@@ -133,85 +184,49 @@ fn main() {
     let keys = KeyPair::random();
     let delay = Duration::from_secs(1).mul_f64(1.0 / args.tps as f64);
 
-    let mut txs_not_in_pool = HashMap::new();
-    let mut times_to_pool = TimingStats::default();
-    let mut txs_in_pool = HashMap::new();
-    let mut times_to_commit = TimingStats::default();
-    let mut prev_report_time = Instant::now();
-
     loop {
         let height = nodes[0].blockchain().last_block().height;
         if height > Height(0) {
             break;
         }
-        thread::sleep(Duration::from_millis(200));
+        delay_for(Duration::from_millis(200)).await;
     }
     log::info!("Started sending transactions");
 
+    let times_to_pool = Arc::new(Mutex::new(TimingStats::default()));
+    let times_to_commit = Arc::new(Mutex::new(TimingStats::default()));
+    let mut prev_report_time = Instant::now();
+
     for i in 0..args.tx_count.unwrap_or_else(u64::max_value) {
         let tx = keys.timestamp(MainService::INSTANCE_ID, Height(i));
-        let tx_hash = tx.object_hash();
+        let sender = nodes[0].blockchain().sender().to_owned();
+        let blockchain = nodes.last().unwrap().blockchain().to_owned();
+        let tx_task = transaction_task(
+            tx,
+            sender,
+            blockchain,
+            Arc::clone(&times_to_pool),
+            Arc::clone(&times_to_commit),
+        );
+        tokio::spawn(tx_task);
+        delay_for(delay).await;
+
         let now = Instant::now();
-        txs_not_in_pool.insert(tx_hash, now);
-
-        nodes[0]
-            .blockchain()
-            .sender()
-            .broadcast_transaction(tx)
-            .wait()
-            .unwrap();
-
-        let snapshot = nodes.last().unwrap().blockchain().snapshot();
-        let snapshot = snapshot.for_core();
-        let tx_pool = snapshot.transactions_pool();
-        let tx_locations = snapshot.transactions_locations();
-
-        txs_not_in_pool.retain(|tx_hash, start| {
-            if tx_locations.contains(tx_hash) {
-                log::trace!("Transaction {} is immediately committed", tx_hash);
-                times_to_pool.push(now - *start);
-                times_to_commit.push(now - *start);
-                false
-            } else if tx_pool.contains(tx_hash) {
-                log::trace!("Transaction {} appeared in pool", tx_hash);
-                txs_in_pool.insert(*tx_hash, *start);
-                times_to_pool.push(now - *start);
-                false
-            } else {
-                true
-            }
-        });
-
-        txs_in_pool.retain(|tx_hash, start| {
-            if tx_locations.contains(tx_hash) {
-                log::trace!("Transaction {} is committed", tx_hash);
-                times_to_commit.push(now - *start);
-                false
-            } else {
-                true
-            }
-        });
-
         if now - prev_report_time >= Duration::from_secs(1) {
             prev_report_time = now;
             println!(
-                "Transactions: {} total, {} in pool, {} committed",
+                "Transactions: {} total, {} committed",
                 i + 1,
-                txs_in_pool.len(),
-                times_to_commit.samples
+                times_to_commit.lock().unwrap().samples
             );
-            println!("Time to pool: {}", times_to_pool);
-            println!("Time to commit: {}", times_to_commit);
+            println!("Time to pool: {}", times_to_pool.lock().unwrap());
+            println!("Time to commit: {}", times_to_commit.lock().unwrap());
         }
-
-        thread::sleep(delay);
     }
 
-    for node in nodes {
-        node.join();
-    }
+    future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 
     println!("\nOverall results:");
-    println!("Time to pool: {}", times_to_pool);
-    println!("Time to commit: {}", times_to_commit);
+    println!("Time to pool: {}", times_to_pool.lock().unwrap());
+    println!("Time to commit: {}", times_to_commit.lock().unwrap());
 }

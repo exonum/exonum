@@ -20,15 +20,86 @@ use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,
 };
+use futures::{
+    channel::oneshot,
+    future::{self, Either},
+    FutureExt,
+};
+use reqwest::Client;
 use structopt::StructOpt;
+use tokio::time::delay_for;
 
-use std::{thread, time::Duration};
+use std::{fmt, time::Duration};
 
 use exonum_soak_tests::{
     run_nodes,
     services::{MainConfig, MainService, MainServiceInterface, TogglingSupervisor},
     RunHandle,
 };
+
+struct ApiStats {
+    ok_answers: usize,
+    erroneous_answers: usize,
+}
+
+impl fmt::Debug for ApiStats {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut debug_struct = formatter.debug_struct("ApiStats");
+        debug_struct
+            .field("ok_answers", &self.ok_answers)
+            .field("erroneous_answers", &self.erroneous_answers);
+
+        let all_answers = self.ok_answers + self.erroneous_answers;
+        if all_answers > 0 {
+            let ok_fraction = self.ok_answers as f64 / all_answers as f64;
+            debug_struct.field("ok_fraction", &ok_fraction);
+        }
+        debug_struct.finish()
+    }
+}
+
+/// Periodically probes the node HTTP API, recording the number of times the response was
+/// successful and erroneous. `cancel_rx` is used to signal probe termination.
+async fn probe_api(url: &str, mut cancel_rx: oneshot::Receiver<()>) -> ApiStats {
+    const API_TIMEOUT: Duration = Duration::from_millis(50);
+
+    async fn send_request(client: &Client, url: &str) -> anyhow::Result<()> {
+        let response: String = client
+            .get(url)
+            .timeout(API_TIMEOUT)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        assert_eq!(response, "pong");
+        Ok(())
+    }
+
+    let mut stats = ApiStats {
+        ok_answers: 0,
+        erroneous_answers: 0,
+    };
+
+    loop {
+        let selected = future::select(&mut cancel_rx, delay_for(API_TIMEOUT)).await;
+        if let Either::Left(_) = selected {
+            // We've received the cancellation signal; we're done.
+            break;
+        }
+
+        // NB: reusing `Client` among requests makes it cache responses, which is the last thing
+        // we want in this test.
+        if let Err(e) = send_request(&Client::new(), url).await {
+            log::info!("Call to node API resulted in an error: {}", e);
+            stats.erroneous_answers += 1;
+        } else {
+            log::trace!("Successfully called node API");
+            stats.ok_answers += 1;
+        }
+    }
+    stats
+}
 
 /// Runs a network with a service that is frequently switched on / off and that generates
 /// transactions in `after_commit` hook.
@@ -44,7 +115,8 @@ struct Args {
     max_height: Option<u64>,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     exonum::crypto::init();
     exonum::helpers::init_logger().ok();
 
@@ -61,15 +133,40 @@ fn main() {
     );
     let supervisor = Spec::new(TogglingSupervisor).with_default_instance();
 
+    let mut set_api = false;
     let nodes = run_nodes(
         args.node_count,
         2_000,
-        |_| {},
+        |node_cfg| {
+            // Enable public HTTP server for a single node.
+            if !set_api {
+                node_cfg.api.public_api_address = Some("127.0.0.1:8080".parse().unwrap());
+                set_api = true;
+            }
+
+            // Slightly enlarge intervals between blocks.
+            node_cfg.consensus.first_round_timeout *= 2;
+            node_cfg.consensus.min_propose_timeout *= 2;
+            node_cfg.consensus.max_propose_timeout *= 2;
+        },
         |genesis, rt| {
-            main_service.clone().deploy(genesis, rt);
             supervisor.clone().deploy(genesis, rt);
+            main_service.clone().deploy(genesis, rt);
         },
     );
+
+    let (supervisor_api_tx, supervisor_api_rx) = oneshot::channel();
+    let supervisor_stats_task = probe_api(
+        "http://127.0.0.1:8080/api/services/supervisor/ping",
+        supervisor_api_rx,
+    );
+    let (supervisor_stats_task, supervisor_stats) = supervisor_stats_task.remote_handle();
+    tokio::spawn(supervisor_stats_task);
+
+    let (main_api_tx, main_api_rx) = oneshot::channel();
+    let main_stats_task = probe_api("http://127.0.0.1:8080/api/services/main/ping", main_api_rx);
+    let (main_stats_task, main_stats) = main_stats_task.remote_handle();
+    tokio::spawn(main_stats_task);
 
     loop {
         let height = nodes[0].blockchain().last_block().height;
@@ -77,15 +174,16 @@ fn main() {
         if args.max_height.map_or(false, |max| height >= Height(max)) {
             break;
         }
-        thread::sleep(Duration::from_secs(1));
+        delay_for(Duration::from_secs(1)).await;
     }
 
     let snapshot = nodes[0].blockchain().snapshot();
     let core_schema = snapshot.for_core();
     let transactions = core_schema.transactions();
+    let transactions_pool = core_schema.transactions_pool();
     let height = core_schema.height();
 
-    let keys: Vec<_> = nodes.into_iter().map(RunHandle::join).collect();
+    let keys = future::join_all(nodes.into_iter().map(RunHandle::join)).await;
     let mut committed_timestamps = 0;
     for (node_i, keys) in keys.into_iter().enumerate() {
         let timestamps = (1..=height.0)
@@ -96,7 +194,8 @@ fn main() {
             .map(|i| (i, keys.timestamp(MainService::INSTANCE_ID, i)));
 
         for (i, timestamp) in timestamps {
-            if transactions.contains(&timestamp.object_hash()) {
+            let tx_hash = timestamp.object_hash();
+            if transactions.contains(&tx_hash) && !transactions_pool.contains(&tx_hash) {
                 committed_timestamps += 1;
             } else {
                 println!(
@@ -113,4 +212,9 @@ fn main() {
         committed_timestamps, committed_txs,
         "There are unknown transactions on the blockchain"
     );
+
+    drop(supervisor_api_tx);
+    drop(main_api_tx);
+    println!("Supervisor availability: {:#?}", supervisor_stats.await);
+    println!("Main service availability: {:#?}", main_stats.await);
 }

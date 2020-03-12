@@ -121,7 +121,8 @@ impl TransportWrapper {
         let data = &data[HEADER_LENGTH..];
 
         let len = decrypted_msg_len(data.len());
-        let mut decrypted_message = vec![0; len];
+        let mut decrypted_message = BytesMut::with_capacity(len);
+        decrypted_message.resize(len, 0);
 
         let mut read = vec![0_u8; MAX_MESSAGE_LENGTH];
         for (i, msg) in data.chunks(MAX_MESSAGE_LENGTH).enumerate() {
@@ -132,7 +133,7 @@ impl TransportWrapper {
             decrypted_message[start..end].copy_from_slice(&read[..len]);
         }
 
-        Ok(BytesMut::from(decrypted_message))
+        Ok(decrypted_message)
     }
 
     /// Encrypts `msg` using Noise session

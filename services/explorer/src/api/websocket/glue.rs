@@ -15,9 +15,11 @@
 //! Glue between WebSocket server and `actix-web` HTTP server.
 
 use actix_web::{
-    dev::QueryConfig, http, ws, AsyncResponder, Error as ActixError, FromRequest, HttpResponse,
-    Query,
+    http,
+    web::{Payload, Query},
+    FromRequest,
 };
+use actix_web_actors::ws;
 use exonum::blockchain::Blockchain;
 use exonum_api::{
     self as api,
@@ -25,7 +27,7 @@ use exonum_api::{
     ApiBackend,
 };
 use exonum_rust_runtime::api::ServiceApiScope;
-use futures::IntoFuture;
+use futures::{future, FutureExt};
 
 use std::sync::Arc;
 
@@ -41,22 +43,23 @@ impl ExplorerApi {
         shared_state: SharedStateRef,
         extract_query: Q,
     ) where
-        Q: Fn(&HttpRequest) -> Result<SubscriptionType, ActixError> + Send + Sync + 'static,
+        Q: Fn(&HttpRequest) -> SubscriptionType + 'static + Clone + Send + Sync,
     {
-        let index = move |request: HttpRequest| -> Result<HttpResponse, ActixError> {
-            let address = shared_state.ensure_server(&blockchain).ok_or_else(|| {
-                let msg = "Server shut down".to_owned();
-                api::Error::not_found().title(msg)
-            })?;
-            let query = extract_query(&request)?;
-            ws::start(&request, Session::new(address, vec![query]))
+        let handler = move |request: HttpRequest, stream: Payload| {
+            let maybe_address = shared_state.ensure_server(&blockchain);
+            let address =
+                maybe_address.ok_or_else(|| api::Error::not_found().title("Server shut down"))?;
+
+            let query = extract_query(&request);
+            ws::start(Session::new(address, vec![query]), &request, stream)
         };
-        let handler = move |req| index(req).into_future().responder();
+        let raw_handler =
+            move |request, stream| future::ready(handler(request, stream)).boxed_local();
 
         backend.raw_handler(RequestHandler {
             name: name.to_owned(),
             method: http::Method::GET,
-            inner: Arc::from(handler) as Arc<RawHandler>,
+            inner: Arc::from(raw_handler) as Arc<RawHandler>,
         });
     }
 
@@ -67,7 +70,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             self.blockchain.clone(),
             shared_state.clone(),
-            |_| Ok(SubscriptionType::Blocks),
+            |_| SubscriptionType::Blocks,
         );
         // Default subscription for transactions.
         Self::handle_ws(
@@ -76,17 +79,20 @@ impl ExplorerApi {
             self.blockchain.clone(),
             shared_state.clone(),
             |request| {
-                if request.query().is_empty() {
-                    return Ok(SubscriptionType::Transactions { filter: None });
+                if request.query_string().is_empty() {
+                    return SubscriptionType::Transactions { filter: None };
                 }
 
-                Query::from_request(request, &QueryConfig::default())
-                    .map(|query: Query<TransactionFilter>| {
-                        Ok(SubscriptionType::Transactions {
-                            filter: Some(query.into_inner()),
-                        })
+                // `future::Ready<_>` type annotation is redundant; it's here to check that
+                // `now_or_never` will not fail due to changes in `actix`.
+                let extract: future::Ready<_> = Query::<TransactionFilter>::extract(request);
+                extract
+                    .now_or_never()
+                    .expect("`Ready` futures always have their output immediately available")
+                    .map(|query| SubscriptionType::Transactions {
+                        filter: Some(query.into_inner()),
                     })
-                    .unwrap_or(Ok(SubscriptionType::None))
+                    .unwrap_or(SubscriptionType::None)
             },
         );
         // Default websocket connection.
@@ -95,7 +101,7 @@ impl ExplorerApi {
             api_scope.web_backend(),
             self.blockchain.clone(),
             shared_state,
-            |_| Ok(SubscriptionType::None),
+            |_| SubscriptionType::None,
         );
         self
     }

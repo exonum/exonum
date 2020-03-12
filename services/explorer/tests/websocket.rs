@@ -14,7 +14,7 @@
 
 //! WebSocket API tests.
 
-use actix_web::ws::CloseCode;
+use actix_web_actors::ws::CloseCode;
 use assert_matches::assert_matches;
 use exonum::{
     crypto::KeyPair, helpers::Height, merkledb::ObjectHash,

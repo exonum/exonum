@@ -35,8 +35,8 @@ mod supervisor;
 
 const SUPERVISOR_ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 
-#[test]
-fn test_after_commit() {
+#[tokio::test]
+async fn test_after_commit() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(service.clone()).with_default_instance())
@@ -67,8 +67,8 @@ fn test_after_commit() {
 }
 
 /// An auditor should not broadcast transactions.
-#[test]
-fn test_after_commit_with_auditor() {
+#[tokio::test]
+async fn test_after_commit_with_auditor() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
@@ -94,8 +94,8 @@ fn test_after_commit_with_auditor() {
     }
 }
 
-#[test]
-fn after_commit_not_called_after_service_stop() {
+#[tokio::test]
+async fn after_commit_not_called_after_service_stop() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(Supervisor).with_default_instance())
@@ -124,8 +124,8 @@ fn after_commit_not_called_after_service_stop() {
     }
 }
 
-#[test]
-fn after_commit_during_service_freeze() {
+#[tokio::test]
+async fn after_commit_during_service_freeze() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(Supervisor).with_default_instance())
@@ -152,8 +152,8 @@ fn after_commit_during_service_freeze() {
     }
 }
 
-#[test]
-fn after_commit_during_migration() {
+#[tokio::test]
+async fn after_commit_during_migration() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(Supervisor).with_default_instance())
@@ -204,8 +204,8 @@ fn after_commit_during_migration() {
     assert_matches!(service_state.status, Some(InstanceStatus::Stopped));
 }
 
-#[test]
-fn incorrect_txs_are_not_included_into_blocks() {
+#[tokio::test]
+async fn incorrect_txs_are_not_included_into_blocks() {
     let service = AfterCommitService::new();
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(Supervisor).with_default_instance())
@@ -239,8 +239,8 @@ fn incorrect_txs_are_not_included_into_blocks() {
     assert_eq!(block.len(), 6); // 5 old transactions + 1 generated after resume
 }
 
-#[test]
-fn restart_testkit() {
+#[tokio::test]
+async fn restart_testkit() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
         .with(Spec::new(AfterCommitService::new()).with_default_instance())

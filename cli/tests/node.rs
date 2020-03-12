@@ -24,13 +24,14 @@ use exonum_rust_runtime::{
     api::ServiceApiBuilder, spec::Spec, DefaultInstance, Service, ServiceFactory,
 };
 use exonum_supervisor::api::DispatcherInfo;
-use futures::Future;
 use lazy_static::lazy_static;
+use reqwest::RequestBuilder;
+use serde::de::DeserializeOwned;
 use tempfile::TempDir;
+use tokio::time::delay_for;
 
 use std::{
     net::{Ipv4Addr, SocketAddr, TcpListener},
-    thread,
     time::Duration,
 };
 
@@ -61,7 +62,7 @@ impl Service for SimpleService {
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("answer", |_state, _query: ()| Ok(42));
+            .endpoint("answer", |_state, _query: ()| async { Ok(42) });
     }
 }
 
@@ -70,8 +71,21 @@ impl DefaultInstance for SimpleService {
     const INSTANCE_NAME: &'static str = "simple";
 }
 
-#[test]
-fn node_basic_workflow() -> anyhow::Result<()> {
+async fn send_request<T>(request: RequestBuilder) -> anyhow::Result<T>
+where
+    T: DeserializeOwned,
+{
+    request
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await
+        .map_err(From::from)
+}
+
+#[tokio::test]
+async fn node_basic_workflow() -> anyhow::Result<()> {
     let public_addr = PUBLIC_ADDRS[0];
     let public_api_root = format!("http://{}/api", public_addr);
     let public_addr = public_addr.to_string();
@@ -98,18 +112,13 @@ fn node_basic_workflow() -> anyhow::Result<()> {
         .execute_command()?
         .unwrap();
     let shutdown_handle = node.shutdown_handle();
-    let node_thread = thread::spawn(|| {
-        node.run().ok();
-    });
-    thread::sleep(Duration::from_secs(2));
+    let node_task = tokio::spawn(node.run());
+    delay_for(Duration::from_secs(2)).await;
 
     let client = reqwest::Client::new();
     // Check info about deployed artifacts returned via supervisor API.
-    let info: DispatcherInfo = client
-        .get(&format!("{}/services/supervisor/services", public_api_root))
-        .send()?
-        .error_for_status()?
-        .json()?;
+    let url = format!("{}/services/supervisor/services", public_api_root);
+    let info: DispatcherInfo = send_request(client.get(&url)).await?;
 
     let simple_service_artifact = SimpleService.artifact_id();
     assert!(info.artifacts.contains(&simple_service_artifact));
@@ -130,38 +139,29 @@ fn node_basic_workflow() -> anyhow::Result<()> {
     assert!(has_supervisor);
 
     // Check explorer API.
+    let url = format!(
+        "{}/explorer/v1/blocks?count=1&add_precommits=true",
+        public_api_root
+    );
     loop {
-        let BlocksRange { blocks, .. } = client
-            .get(&format!(
-                "{}/explorer/v1/blocks?count=1&add_precommits=true",
-                public_api_root
-            ))
-            .send()?
-            .error_for_status()?
-            .json()?;
+        let BlocksRange { blocks, .. } = send_request(client.get(&url)).await?;
         assert_eq!(blocks.len(), 1);
         if blocks[0].block.height > Height(0) {
             assert_eq!(blocks[0].precommits.as_ref().unwrap().len(), 1);
             break;
         }
-        thread::sleep(Duration::from_millis(200));
+        delay_for(Duration::from_millis(200)).await;
     }
 
     // Check API of two started service instances.
-    let answer: u64 = client
-        .get(&format!("{}/services/simple/answer", public_api_root))
-        .send()?
-        .error_for_status()?
-        .json()?;
+    let url = format!("{}/services/simple/answer", public_api_root);
+    let answer: u64 = send_request(client.get(&url)).await?;
     assert_eq!(answer, 42);
-    let answer: u64 = client
-        .get(&format!("{}/services/other/answer", public_api_root))
-        .send()?
-        .error_for_status()?
-        .json()?;
+    let url = format!("{}/services/other/answer", public_api_root);
+    let answer: u64 = send_request(client.get(&url)).await?;
     assert_eq!(answer, 42);
 
-    shutdown_handle.shutdown().wait()?;
-    node_thread.join().ok();
+    shutdown_handle.shutdown().await?;
+    node_task.await??;
     Ok(())
 }

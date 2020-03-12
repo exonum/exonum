@@ -81,18 +81,19 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
 //! # use exonum_testkit::{Spec, TestKitBuilder};
-//! # fn main() -> anyhow::Result<()> {
+//! #
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlocksRange = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/blocks?count=2"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/blocks?count=2");
+//! let response: BlocksRange = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.range, Height(4)..Height(6));
 //! // Blocks are returned in reverse order, from the latest
 //! // to the earliest.
@@ -120,18 +121,19 @@
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
 //! # use exonum_testkit::{Spec, TestKitBuilder};
-//! # fn main() -> anyhow::Result<()> {
+//! #
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with(Spec::new(ExplorerFactory).with_default_instance())
 //! #    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlockInfo = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/block?height=3"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/block?height=3");
+//! let response: BlockInfo = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.block.height, Height(3));
 //! // Precommits and median precommit time are always returned.
 //! assert!(response.precommits.is_some());
@@ -188,7 +190,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -200,9 +203,9 @@
 //! let response: TransactionInfo = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/transactions"))
 //!     .query(&TransactionQuery::new(tx.object_hash()))
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let response = response.as_committed().unwrap();
 //! assert_eq!(response.location().block_height(), Height(1));
 //! # Ok(())
@@ -256,7 +259,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -268,9 +272,9 @@
 //! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/transaction"))
 //!     .query(&TransactionStatusQuery::new(tx.object_hash()))
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Error!");
 //! # Ok(())
@@ -315,7 +319,8 @@
 //! #     }
 //! # }
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -326,9 +331,9 @@
 //! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/before_transactions"))
 //!     .query(&CallStatusQuery::new(Height(2), MyService::INSTANCE_ID))
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Not a good start");
 //! # Ok(())
@@ -396,7 +401,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -407,9 +413,9 @@
 //! let response: TransactionResponse = reqwest::Client::new()
 //!     .post(&api.public_url("api/explorer/v1/transactions"))
 //!     .json(&TransactionHex::new(&tx))
-//!     .send()?
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.tx_hash, tx.object_hash());
 //! # Ok(())
 //! # }
@@ -436,7 +442,7 @@ use exonum::{
 };
 use exonum_explorer::BlockchainExplorer;
 use exonum_rust_runtime::api::{self, ServiceApiScope};
-use futures::{Future, IntoFuture};
+use futures::{future, Future, FutureExt, TryFutureExt};
 use hex::FromHex;
 use serde_json::json;
 
@@ -596,7 +602,8 @@ impl ExplorerApi {
         snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
-    ) -> api::FutureResult<TransactionResponse> {
+    ) -> impl Future<Output = api::Result<TransactionResponse>> {
+        // Synchronous part of message verification.
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> anyhow::Result<_> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
@@ -605,46 +612,49 @@ impl ExplorerApi {
             Ok((verified, tx_hash))
         };
 
-        let sender = sender.clone();
-        let send_transaction = move |(verified, tx_hash)| {
-            sender
-                .broadcast_transaction(verified)
-                .map(move |_| TransactionResponse::new(tx_hash))
-                .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))
+        let (verified, tx_hash) = match verify_message(snapshot, query.tx_body) {
+            Ok((verified, tx_hash)) => (verified, tx_hash),
+            Err(err) => {
+                let err = api::Error::bad_request()
+                    .title("Failed to add transaction to memory pool")
+                    .detail(err.to_string());
+                return future::err(err).left_future();
+            }
         };
 
-        Box::new(
-            verify_message(snapshot, query.tx_body)
-                .into_future()
-                .map_err(|e| {
-                    api::Error::bad_request()
-                        .title("Failed to add transaction to memory pool")
-                        .detail(e.to_string())
-                })
-                .and_then(send_transaction),
-        )
+        sender
+            .broadcast_transaction(verified)
+            .map_ok(move |_| TransactionResponse::new(tx_hash))
+            .map_err(|err| api::Error::internal(err).title("Failed to add transaction"))
+            .right_future()
     }
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
             .endpoint("v1/blocks", |state, query| {
-                Self::blocks(state.data().for_core(), &query)
+                future::ready(Self::blocks(state.data().for_core(), &query))
             })
             .endpoint("v1/block", |state, query| {
-                Self::block(state.data().for_core(), &query)
+                future::ready(Self::block(state.data().for_core(), &query))
             })
             .endpoint("v1/call_status/transaction", |state, query| {
-                Self::transaction_status(&state.data().for_core(), &query)
+                future::ready(Self::transaction_status(&state.data().for_core(), &query))
             })
             .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(&state.data().for_core(), &query)
+                future::ready(Self::after_transactions_status(
+                    &state.data().for_core(),
+                    &query,
+                ))
             })
             .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(&state.data().for_core(), &query)
+                future::ready(Self::before_transactions_status(
+                    &state.data().for_core(),
+                    &query,
+                ))
             })
             .endpoint("v1/transactions", |state, query| {
-                Self::transaction_info(state.data().for_core(), &query)
+                future::ready(Self::transaction_info(state.data().for_core(), &query))
             });
 
         let tx_sender = self.blockchain.sender().to_owned();

@@ -19,15 +19,16 @@ use exonum::{
 };
 use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
 use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
-use futures::Future;
+use futures::TryFutureExt;
+use tokio::task::JoinHandle;
 
-use std::{sync::Arc, thread};
+use std::sync::Arc;
 
 pub mod services;
 
 #[derive(Debug)]
 pub struct RunHandle {
-    node_thread: thread::JoinHandle<()>,
+    node_task: JoinHandle<()>,
     blockchain: Blockchain,
     shutdown_handle: ShutdownHandle,
 }
@@ -36,8 +37,9 @@ impl RunHandle {
     pub fn new(node: Node) -> Self {
         let blockchain = node.blockchain().to_owned();
         let shutdown_handle = node.shutdown_handle();
+        let node_task = node.run().unwrap_or_else(|e| panic!("{}", e));
         Self {
-            node_thread: thread::spawn(|| node.run().unwrap()),
+            node_task: tokio::spawn(node_task),
             blockchain,
             shutdown_handle,
         }
@@ -47,14 +49,12 @@ impl RunHandle {
         &self.blockchain
     }
 
-    pub fn join(self) -> KeyPair {
+    pub async fn join(self) -> KeyPair {
         self.shutdown_handle
             .shutdown()
-            .wait()
+            .await
             .expect("Cannot shut down node");
-        self.node_thread
-            .join()
-            .expect("Node panicked during shutdown");
+        self.node_task.await.expect("Node panicked during shutdown");
         self.blockchain.service_keypair().to_owned()
     }
 }

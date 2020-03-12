@@ -55,17 +55,21 @@ fn default_artifact() -> ArtifactId {
     IncService.artifact_id()
 }
 
-fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u64) {
+async fn assert_count(api: &TestKitApi, service_name: &'static str, expected_count: u64) {
     let real_count: u64 = api
         .public(ApiKind::Service(service_name))
         .get("v1/counter")
+        .await
         .unwrap();
     assert_eq!(real_count, expected_count);
 }
 
 /// Check that the service's counter isn't started yet (no Inc txs were received).
-fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
-    let response: api::Result<u64> = api.public(ApiKind::Service(service_name)).get("v1/counter");
+async fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
+    let response: api::Result<u64> = api
+        .public(ApiKind::Service(service_name))
+        .get("v1/counter")
+        .await;
     assert!(response.is_err());
 }
 
@@ -92,11 +96,12 @@ fn find_instance_id(testkit: &TestKit, instance_name: &str) -> InstanceId {
         .id
 }
 
-fn deploy_artifact(api: &TestKitApi, request: DeployRequest) -> crypto::Hash {
+async fn deploy_artifact(api: &TestKitApi, request: DeployRequest) -> crypto::Hash {
     let hash: crypto::Hash = api
         .private(ApiKind::Service("supervisor"))
         .query(&request)
         .post("deploy-artifact")
+        .await
         .unwrap();
     hash
 }
@@ -114,7 +119,7 @@ fn deploy_artifact_manually(
     request_hash
 }
 
-fn start_service(api: &TestKitApi, request: ConfigPropose) -> crypto::Hash {
+async fn start_service(api: &TestKitApi, request: ConfigPropose) -> crypto::Hash {
     // Even though this method sends a config proposal, it's *intended* to start
     // services (so the callee-side code will be more readable).
     // However, this convention is up to test writers.
@@ -123,6 +128,7 @@ fn start_service(api: &TestKitApi, request: ConfigPropose) -> crypto::Hash {
         .private(ApiKind::Service("supervisor"))
         .query(&request)
         .post("propose-config")
+        .await
         .unwrap();
     hash
 }
@@ -176,7 +182,7 @@ fn start_service_request(
     ConfigPropose::new(0, deadline_height).start_service(artifact, name, Vec::default())
 }
 
-fn deploy_default(testkit: &mut TestKit) {
+async fn deploy_default(testkit: &mut TestKit) {
     let artifact = default_artifact();
     let api = testkit.api();
 
@@ -184,7 +190,7 @@ fn deploy_default(testkit: &mut TestKit) {
 
     let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(testkit, &request);
-    let hash = deploy_artifact(&api, request);
+    let hash = deploy_artifact(&api, request).await;
     let block = testkit.create_block();
     block[hash].status().unwrap();
 
@@ -198,12 +204,12 @@ fn deploy_default(testkit: &mut TestKit) {
     assert!(artifact_exists(&testkit, &artifact.name));
 }
 
-fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
+async fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {
     assert!(!service_instance_exists(testkit, instance_name));
 
     let api = testkit.api();
     let request = start_service_request(default_artifact(), instance_name, START_HEIGHT);
-    let hash = start_service(&api, request);
+    let hash = start_service(&api, request).await;
     let block = testkit.create_block();
     block[hash].status().unwrap();
     testkit.create_blocks_until(START_HEIGHT);
@@ -257,45 +263,45 @@ fn available_services() -> RustRuntimeBuilder {
 }
 
 /// Just test that the Inc service works as intended.
-#[test]
-fn test_static_service() {
+#[tokio::test]
+async fn test_static_service() {
     let mut testkit = testkit_with_inc_service_and_static_instance();
     let api = testkit.api();
 
-    assert_count_is_not_set(&api, SERVICE_NAME);
+    assert_count_is_not_set(&api, SERVICE_NAME).await;
 
     let keypair = crypto::KeyPair::random();
-    api.send(keypair.inc(SERVICE_ID, 0));
+    api.send(keypair.inc(SERVICE_ID, 0)).await;
     testkit.create_block();
-    assert_count(&api, SERVICE_NAME, 1);
-    api.send(keypair.inc(SERVICE_ID, 1));
+    assert_count(&api, SERVICE_NAME, 1).await;
+    api.send(keypair.inc(SERVICE_ID, 1)).await;
     testkit.create_block();
-    assert_count(&api, SERVICE_NAME, 2);
+    assert_count(&api, SERVICE_NAME, 2).await;
 }
 
 /// Test a normal dynamic service workflow with one validator.
-#[test]
-fn test_dynamic_service_normal_workflow() {
+#[tokio::test]
+async fn test_dynamic_service_normal_workflow() {
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
     let instance_name = "test_basics";
-    let instance_id = start_service_instance(&mut testkit, instance_name);
+    let instance_id = start_service_instance(&mut testkit, instance_name).await;
     let api = testkit.api();
 
-    assert_count_is_not_set(&api, instance_name);
+    assert_count_is_not_set(&api, instance_name).await;
 
     let keypair = crypto::KeyPair::random();
-    api.send(keypair.inc(instance_id, 0));
+    api.send(keypair.inc(instance_id, 0)).await;
     testkit.create_block();
-    assert_count(&api, instance_name, 1);
+    assert_count(&api, instance_name, 1).await;
 
-    api.send(keypair.inc(instance_id, 1));
+    api.send(keypair.inc(instance_id, 1)).await;
     testkit.create_block();
-    assert_count(&api, instance_name, 2);
+    assert_count(&api, instance_name, 2).await;
 }
 
-#[test]
-fn test_artifact_deploy_with_already_passed_deadline_height() {
+#[tokio::test]
+async fn test_artifact_deploy_with_already_passed_deadline_height() {
     let mut testkit = testkit_with_inc_service();
 
     // We skip to Height(1) ...
@@ -309,7 +315,7 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
 
     let request = deploy_request(artifact.clone(), bad_deadline_height);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
-    let hash = deploy_artifact(&api, request);
+    let hash = deploy_artifact(&api, request).await;
     let block = testkit.create_block();
 
     assert!(!artifact_exists(&testkit, &artifact.name));
@@ -321,17 +327,17 @@ fn test_artifact_deploy_with_already_passed_deadline_height() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[test]
-fn test_start_service_instance_with_already_passed_deadline_height() {
+#[tokio::test]
+async fn test_start_service_instance_with_already_passed_deadline_height() {
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     let api = testkit.api();
     let artifact = default_artifact();
     let instance_name = "inc_test";
     let bad_deadline_height = testkit.height().previous();
     let request = start_service_request(artifact, instance_name, bad_deadline_height);
-    let hash = start_service(&api, request);
+    let hash = start_service(&api, request).await;
     let block = testkit.create_block();
 
     let expected_err = ErrorMatch::from_fail(&SupervisorCommonError::ActualFromIsPast)
@@ -340,8 +346,8 @@ fn test_start_service_instance_with_already_passed_deadline_height() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[test]
-fn test_try_run_unregistered_service_instance() {
+#[tokio::test]
+async fn test_try_run_unregistered_service_instance() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
 
@@ -349,7 +355,7 @@ fn test_try_run_unregistered_service_instance() {
 
     let instance_name = "wont_run";
     let request = start_service_request(default_artifact(), instance_name.to_owned(), Height(1000));
-    let hash = start_service(&api, request);
+    let hash = start_service(&api, request).await;
     let block = testkit.create_block();
 
     let expected_err = ErrorMatch::from_fail(&ArtifactError::UnknownArtifact)
@@ -358,8 +364,8 @@ fn test_try_run_unregistered_service_instance() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[test]
-fn test_bad_artifact_name() {
+#[tokio::test]
+async fn test_bad_artifact_name() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
 
@@ -370,7 +376,7 @@ fn test_bad_artifact_name() {
     );
     let request = deploy_request(bad_artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
-    let hash = deploy_artifact(&api, request);
+    let hash = deploy_artifact(&api, request).await;
 
     let block = testkit.create_block();
     // The deploy request transaction was executed...
@@ -383,8 +389,8 @@ fn test_bad_artifact_name() {
     assert!(!artifact_exists(&testkit, &bad_artifact.name));
 }
 
-#[test]
-fn test_bad_runtime_id() {
+#[tokio::test]
+async fn test_bad_runtime_id() {
     let mut testkit = testkit_with_inc_service();
     let api = testkit.api();
     let bad_runtime_id = 10_000;
@@ -393,7 +399,7 @@ fn test_bad_runtime_id() {
     artifact.runtime_id = bad_runtime_id;
     let request = deploy_request(artifact.clone(), DEPLOY_HEIGHT);
     let deploy_confirmation_hash = deploy_confirmation_hash_default(&testkit, &request);
-    let hash = deploy_artifact(&api, request);
+    let hash = deploy_artifact(&api, request).await;
     let block = testkit.create_block();
 
     // The deploy request transaction was executed...
@@ -406,17 +412,17 @@ fn test_bad_runtime_id() {
     assert!(!artifact_exists(&testkit, &artifact.name));
 }
 
-#[test]
-fn test_empty_service_instance_name() {
+#[tokio::test]
+async fn test_empty_service_instance_name() {
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     let api = testkit.api();
     let artifact = default_artifact();
     let empty_instance_name = "";
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, empty_instance_name, deadline_height);
-    let hash = start_service(&api, request);
+    let hash = start_service(&api, request).await;
     let block = testkit.create_block();
 
     let expected_err = ErrorMatch::from_fail(&ServiceError::InvalidInstanceName)
@@ -425,10 +431,10 @@ fn test_empty_service_instance_name() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[test]
-fn test_bad_service_instance_name() {
+#[tokio::test]
+async fn test_bad_service_instance_name() {
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     let api = testkit.api();
     let artifact = default_artifact();
@@ -436,7 +442,7 @@ fn test_bad_service_instance_name() {
 
     let deadline_height = testkit.height().next();
     let request = start_service_request(artifact, bad_instance_name, deadline_height);
-    let hash = start_service(&api, request);
+    let hash = start_service(&api, request).await;
     let block = testkit.create_block();
 
     let expected_msg = "Service name `\u{2764}` is invalid";
@@ -446,11 +452,11 @@ fn test_bad_service_instance_name() {
     assert_eq!(*block[hash].status().unwrap_err(), expected_err);
 }
 
-#[test]
-fn test_start_service_instance_twice() {
+#[tokio::test]
+async fn test_start_service_instance_twice() {
     let instance_name = "inc";
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     // Start the first instance
     {
@@ -459,7 +465,7 @@ fn test_start_service_instance_twice() {
         let api = testkit.api();
         let deadline = testkit.height().next();
         let request = start_service_request(default_artifact(), instance_name, deadline);
-        let hash = start_service(&api, request);
+        let hash = start_service(&api, request).await;
         let block = testkit.create_block();
         block[hash].status().unwrap();
 
@@ -472,7 +478,7 @@ fn test_start_service_instance_twice() {
 
         let deadline = testkit.height().next();
         let request = start_service_request(default_artifact(), instance_name, deadline);
-        let hash = start_service(&api, request);
+        let hash = start_service(&api, request).await;
         let block = testkit.create_block();
 
         let expected_err = ErrorMatch::from_fail(&ServiceError::InstanceExists)
@@ -483,12 +489,12 @@ fn test_start_service_instance_twice() {
 }
 
 /// Checks that we can start several service instances in one request.
-#[test]
-fn test_start_two_services_in_one_request() {
+#[tokio::test]
+async fn test_start_two_services_in_one_request() {
     let instance_name_1 = "inc";
     let instance_name_2 = "inc2";
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     assert!(!service_instance_exists(&testkit, instance_name_1));
     assert!(!service_instance_exists(&testkit, instance_name_2));
@@ -501,7 +507,7 @@ fn test_start_two_services_in_one_request() {
         .start_service(artifact, instance_name_2, Vec::default());
 
     let api = testkit.api();
-    let hash = start_service(&api, request);
+    let hash = start_service(&api, request).await;
     let block = testkit.create_block();
     block[hash].status().unwrap();
 
@@ -509,14 +515,14 @@ fn test_start_two_services_in_one_request() {
     assert!(service_instance_exists(&testkit, instance_name_2));
 }
 
-#[test]
-fn test_restart_node_and_start_service_instance() {
+#[tokio::test]
+async fn test_restart_node_and_start_service_instance() {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with(Supervisor::decentralized())
         .with(JustFactory::new(IncService))
         .build();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     // Stop the node.
     let stopped_testkit = testkit.stop();
@@ -530,20 +536,20 @@ fn test_restart_node_and_start_service_instance() {
     let keypair = crypto::KeyPair::random();
 
     // Start IncService's instance now.
-    let instance_id = start_service_instance(&mut testkit, instance_name);
+    let instance_id = start_service_instance(&mut testkit, instance_name).await;
     let api = testkit.api(); // update the API
 
     // Check that the service instance actually works.
     {
-        assert_count_is_not_set(&api, instance_name);
+        assert_count_is_not_set(&api, instance_name).await;
 
-        api.send(keypair.inc(instance_id, 0));
+        api.send(keypair.inc(instance_id, 0)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 1);
+        assert_count(&api, instance_name, 1).await;
 
-        api.send(keypair.inc(instance_id, 1));
+        api.send(keypair.inc(instance_id, 1)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 2);
+        assert_count(&api, instance_name, 2).await;
     }
 
     // Restart the node again.
@@ -556,15 +562,15 @@ fn test_restart_node_and_start_service_instance() {
 
     // Check that the service instance still works.
     {
-        assert_count(&api, instance_name, 2);
-        api.send(keypair.inc(instance_id, 2));
+        assert_count(&api, instance_name, 2).await;
+        api.send(keypair.inc(instance_id, 2)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 3);
+        assert_count(&api, instance_name, 3).await;
     }
 }
 
-#[test]
-fn test_restart_node_during_artifact_deployment_with_two_validators() {
+#[tokio::test]
+async fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = default_artifact();
     let api = testkit.api();
@@ -575,7 +581,7 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
     // Send an artifact deploy request from this validator.
-    deploy_artifact(&api, request_deploy.clone());
+    deploy_artifact(&api, request_deploy.clone()).await;
     // Emulate an artifact deploy request from the second validator.
     deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
 
@@ -602,8 +608,8 @@ fn test_restart_node_during_artifact_deployment_with_two_validators() {
 }
 
 /// This test emulates a normal workflow with two validators.
-#[test]
-fn test_two_validators() {
+#[tokio::test]
+async fn test_two_validators() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
     let artifact = default_artifact();
     let api = testkit.api();
@@ -614,7 +620,7 @@ fn test_two_validators() {
     let deploy_confirmation_1 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(1));
 
     // Send an artifact deploy request from this validator.
-    deploy_artifact(&api, request_deploy.clone());
+    deploy_artifact(&api, request_deploy.clone()).await;
     // Emulate an artifact deploy request from the second validator.
     deploy_artifact_manually(&mut testkit, &request_deploy, ValidatorId(1));
     let block = testkit.create_block();
@@ -645,7 +651,7 @@ fn test_two_validators() {
         let propose_hash = request_start.object_hash();
 
         // Send a start instance request from this node.
-        start_service(&api, request_start);
+        start_service(&api, request_start).await;
         testkit.create_block();
 
         // Confirm changes.
@@ -663,21 +669,21 @@ fn test_two_validators() {
     let instance_id = find_instance_id(&testkit, instance_name);
     // Basic check that service works.
     {
-        assert_count_is_not_set(&api, instance_name);
+        assert_count_is_not_set(&api, instance_name).await;
         let keypair = crypto::KeyPair::random();
-        api.send(keypair.inc(instance_id, 0));
+        api.send(keypair.inc(instance_id, 0)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 1);
+        assert_count(&api, instance_name, 1).await;
 
-        api.send(keypair.inc(instance_id, 1));
+        api.send(keypair.inc(instance_id, 1)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 2);
+        assert_count(&api, instance_name, 2).await;
     }
 }
 
 /// This test emulates the case when the second validator doesn't send DeployRequest.
-#[test]
-fn test_multiple_validators_no_confirmation() {
+#[tokio::test]
+async fn test_multiple_validators_no_confirmation() {
     let mut testkit = testkit_with_inc_service_and_two_validators();
 
     let artifact = default_artifact();
@@ -688,7 +694,7 @@ fn test_multiple_validators_no_confirmation() {
     let deploy_confirmation_0 = deploy_confirmation(&testkit, &request_deploy, ValidatorId(0));
 
     // Send an artifact deploy request from this validator.
-    deploy_artifact(&api, request_deploy);
+    deploy_artifact(&api, request_deploy).await;
     // Deliberately not sending an artifact deploy request from the second validator.
     let block = testkit.create_block();
     block.iter().for_each(|tx| tx.status().unwrap());
@@ -703,8 +709,8 @@ fn test_multiple_validators_no_confirmation() {
 }
 
 // Test that auditor can't send any requests.
-#[test]
-fn test_auditor_cant_send_requests() {
+#[tokio::test]
+async fn test_auditor_cant_send_requests() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
 
     let artifact = default_artifact();
@@ -744,8 +750,8 @@ fn test_auditor_cant_send_requests() {
 }
 
 /// This test emulates a normal workflow with a validator and an auditor.
-#[test]
-fn test_auditor_normal_workflow() {
+#[tokio::test]
+async fn test_auditor_normal_workflow() {
     let mut testkit = testkit_with_inc_service_auditor_validator();
     let artifact = default_artifact();
     assert!(!artifact_exists(&testkit, &artifact.name));
@@ -788,21 +794,21 @@ fn test_auditor_normal_workflow() {
 
     // Check that service still works.
     {
-        assert_count_is_not_set(&api, instance_name);
+        assert_count_is_not_set(&api, instance_name).await;
         let keypair = crypto::KeyPair::random();
-        api.send(keypair.inc(instance_id, 0));
+        api.send(keypair.inc(instance_id, 0)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 1);
-        api.send(keypair.inc(instance_id, 1));
+        assert_count(&api, instance_name, 1).await;
+        api.send(keypair.inc(instance_id, 1)).await;
         testkit.create_block();
-        assert_count(&api, instance_name, 2);
+        assert_count(&api, instance_name, 2).await;
     }
 }
 
 /// This test emulates a deploy confirmation with 12 validators.
 /// Here we send confirmations by every validator and expect deploy to start.
-#[test]
-fn test_multiple_validators_deploy_confirm() {
+#[tokio::test]
+async fn test_multiple_validators_deploy_confirm() {
     let validators_count = 12;
     let mut testkit = testkit_with_inc_service_and_n_validators(validators_count);
     let artifact = default_artifact();
@@ -896,15 +902,15 @@ fn test_multiple_validators_deploy_confirm_byzantine_minority() {
 
 /// Checks that service IDs are assigned sequentially starting from the
 /// ID next to max builtin ID.
-#[test]
-fn test_id_assignment() {
+#[tokio::test]
+async fn test_id_assignment() {
     let max_builtin_id = SUPERVISOR_INSTANCE_ID;
 
     // Deploy inc service & start two instances.
     let instance_name_1 = "inc";
     let instance_name_2 = "inc2";
     let mut testkit = testkit_with_inc_service();
-    deploy_default(&mut testkit);
+    deploy_default(&mut testkit).await;
 
     let artifact = default_artifact();
     let deadline = testkit.height().next();
@@ -914,7 +920,7 @@ fn test_id_assignment() {
         .start_service(artifact, instance_name_2, Vec::default());
 
     let api = testkit.api();
-    start_service(&api, request);
+    start_service(&api, request).await;
     testkit.create_block();
 
     // Check that new instances have IDs 1 and 2.
@@ -931,8 +937,8 @@ fn test_id_assignment() {
 /// Checks that if builtin IDs space is sparse (here we have `Supervisor` with ID 0 and
 /// `IncService` with ID 100), the ID for the new service will be next to the max
 /// builtin ID (101 in our case).
-#[test]
-fn test_id_assignment_sparse() {
+#[tokio::test]
+async fn test_id_assignment_sparse() {
     let max_builtin_id = 100;
     let inc_service = Spec::new(IncService).with_instance(max_builtin_id, "inc", ());
 
@@ -951,7 +957,7 @@ fn test_id_assignment_sparse() {
         ConfigPropose::new(0, deadline).start_service(artifact, instance_name, Vec::default());
 
     let api = testkit.api();
-    start_service(&api, request);
+    start_service(&api, request).await;
     testkit.create_block();
 
     // Check that new instance has ID 101.

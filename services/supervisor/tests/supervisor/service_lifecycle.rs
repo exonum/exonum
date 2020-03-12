@@ -121,11 +121,12 @@ pub fn execute_transaction(
 }
 
 /// Checks that the `inc` service API is available.
-fn is_inc_service_api_available(testkit: &mut TestKit) -> bool {
+async fn is_inc_service_api_available(testkit: &mut TestKit) -> bool {
     testkit
         .api()
         .public(ApiKind::Service(IncService::INSTANCE_NAME))
         .get::<()>("v1/ping")
+        .await
         .is_ok()
 }
 
@@ -165,13 +166,13 @@ fn start_inc_service(testkit: &mut TestKit) -> InstanceState {
         .unwrap()
 }
 
-#[test]
-fn start_stop_inc_service() {
+#[tokio::test]
+async fn start_stop_inc_service() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
     let instance_id = start_inc_service(&mut testkit).spec.id;
     assert!(
-        is_inc_service_api_available(&mut testkit),
+        is_inc_service_api_available(&mut testkit).await,
         "Inc service API should be available after starting."
     );
 
@@ -181,7 +182,7 @@ fn start_stop_inc_service() {
     execute_transaction(&mut testkit, change)
         .expect("Stop service transaction should be processed");
     assert!(
-        !is_inc_service_api_available(&mut testkit),
+        !is_inc_service_api_available(&mut testkit).await,
         "Inc service API should not be available after stopping."
     );
 
@@ -197,8 +198,8 @@ fn start_stop_inc_service() {
     assert_eq!(err, expected_err);
 }
 
-#[test]
-fn start_freeze_and_stop_inc_service() {
+#[tokio::test]
+async fn start_freeze_and_stop_inc_service() {
     let mut testkit = create_testkit();
     let keypair = testkit.us().service_keypair();
     let instance_id = start_inc_service(&mut testkit).spec.id;
@@ -209,7 +210,7 @@ fn start_freeze_and_stop_inc_service() {
     execute_transaction(&mut testkit, change)
         .expect("Freeze service transaction should be processed");
     assert!(
-        is_inc_service_api_available(&mut testkit),
+        is_inc_service_api_available(&mut testkit).await,
         "Inc service API should be available after freezing."
     );
 
@@ -219,7 +220,7 @@ fn start_freeze_and_stop_inc_service() {
     execute_transaction(&mut testkit, change)
         .expect("Stop service transaction should be processed");
     assert!(
-        !is_inc_service_api_available(&mut testkit),
+        !is_inc_service_api_available(&mut testkit).await,
         "Inc service API should not be available after stopping."
     );
 }
@@ -396,8 +397,8 @@ fn stop_already_stopped_service() {
     )
 }
 
-#[test]
-fn resume_stopped_service() {
+#[tokio::test]
+async fn resume_stopped_service() {
     let mut testkit = create_testkit();
 
     // Stop service instance.
@@ -413,7 +414,7 @@ fn resume_stopped_service() {
     execute_transaction(&mut testkit, change).expect("Transaction should be processed");
 
     // Check resumed service API.
-    assert!(is_inc_service_api_available(&mut testkit));
+    assert!(is_inc_service_api_available(&mut testkit).await);
 }
 
 #[test]

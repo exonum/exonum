@@ -56,7 +56,8 @@
 //! use exonum_supervisor::Supervisor;
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Supervisor::simple())
 //!     .build();
@@ -64,7 +65,8 @@
 //! let consensus_config: ConsensusConfig = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("consensus-config")?;
+//!     .get("consensus-config")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -88,14 +90,16 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("config-proposal")?;
+//!     .get("config-proposal")
+//!     .await?;
 //!
 //! // Will be none, since we did not send a proposal.
 //! assert!(pending_proposal.is_none());
@@ -121,14 +125,16 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let services_info: DispatcherInfo = testkit
 //!     .api()
 //!     .public(ApiKind::Service("supervisor"))
-//!     .get("services")?;
+//!     .get("services")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -178,7 +184,8 @@
 //! #
 //! # fn config_for_artifact() -> Vec<u8> { Vec::new() }
 //! #
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -191,7 +198,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&deploy_request)
-//!     .post("deploy-artifact")?;
+//!     .post("deploy-artifact")
+//!     .await?;
 //!
 //! let block = testkit.create_block();
 //! let result = block[tx_hash].status();
@@ -235,7 +243,8 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Supervisor::simple())
 //!     // Add some service that supports migrations...
@@ -255,7 +264,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&migration_request)
-//!     .post("migrate")?;
+//!     .post("migrate")
+//!     .await?;
 //!
 //! let block = testkit.create_block();
 //! let result = block[tx_hash].status();
@@ -306,7 +316,8 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -318,7 +329,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&proposal)
-//!     .post("propose-config")?;
+//!     .post("propose-config")
+//!     .await?;
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
@@ -366,7 +378,8 @@
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
@@ -390,7 +403,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&config_vote)
-//!     .post("confirm-config")?;
+//!     .post("confirm-config")
+//!     .await?;
 //!
 //! // Create a block, so the proposal transaction will appear in the blockchain.
 //! let block = testkit.create_block();
@@ -427,14 +441,16 @@
 //! use exonum_supervisor::Supervisor;
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let configuration_number: u64 = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
-//!     .get("configuration-number")?;
+//!     .get("configuration-number")
+//!     .await?;
 //!
 //! // There was no configuration proposals, so configuration number is 0.
 //! assert_eq!(configuration_number, 0);
@@ -460,14 +476,16 @@
 //! use exonum_supervisor::{mode::Mode, Supervisor, SupervisorConfig};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let config: SupervisorConfig = testkit
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
-//!     .get("supervisor-config")?;
+//!     .get("supervisor-config")
+//!     .await?;
 //!
 //! assert_eq!(config.mode, Mode::Simple);
 //! # Ok(())
@@ -505,7 +523,8 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with(Supervisor::simple())
@@ -519,7 +538,8 @@
 //! #     .api()
 //! #     .private(ApiKind::Service("supervisor"))
 //! #     .query(&deploy_request)
-//! #     .post("deploy-artifact")?;
+//! #     .post("deploy-artifact")
+//! #     .await?;
 //! # testkit.create_block();
 //! let query = DeployInfoQuery::from(deploy_request);
 //!
@@ -527,7 +547,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("deploy-status")?;
+//!     .get("deploy-status")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -554,7 +575,8 @@
 //! };
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
@@ -568,7 +590,8 @@
 //! #     .api()
 //! #     .private(ApiKind::Service("supervisor"))
 //! #     .query(&migration_request)
-//! #     .post("migrate")?;
+//! #     .post("migrate")
+//! #     .await?;
 //! # testkit.create_block();
 //! let query = MigrationInfoQuery::from(migration_request);
 //!
@@ -576,7 +599,8 @@
 //!     .api()
 //!     .private(ApiKind::Service("supervisor"))
 //!     .query(&query)
-//!     .get("migration-status")?;
+//!     .get("migration-status")
+//!     .await?;
 //! # Ok(())
 //! # }
 //! ```
@@ -594,7 +618,7 @@ use exonum_rust_runtime::{
 };
 use serde_derive::{Deserialize, Serialize};
 
-use std::{convert::TryFrom, error::Error};
+use std::convert::TryFrom;
 
 use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, AsyncEventState, ConfigProposalWithHash,
@@ -723,115 +747,128 @@ impl DispatcherInfo {
     }
 }
 
-/// Private API specification of the supervisor service.
-trait PrivateApi {
-    /// Error type for the current API implementation.
-    type Error: Error;
+/// Public API specification of the supervisor service.
+struct PublicApi;
 
-    /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `MigrationRequest` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error>;
-
-    /// Creates and broadcasts the `ConfigVote` transaction, which is signed
-    /// by the current node, and returns its hash.
-    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error>;
-
-    /// Returns the number of processed configurations.
-    fn configuration_number(&self) -> Result<u64, Self::Error>;
-
-    /// Returns an actual supervisor config.
-    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error>;
-
-    /// Returns the state of deployment for the given deploy request.
-    fn deploy_status(&self, request: DeployInfoQuery) -> Result<AsyncEventState, Self::Error>;
-
-    /// Returns the state of migration for the given migration request.
-    fn migration_status(&self, request: MigrationInfoQuery) -> Result<MigrationState, Self::Error>;
-}
-
-trait PublicApi {
-    /// Error type for the current API implementation.
-    type Error: Error;
-
+impl PublicApi {
     /// Returns an actual consensus configuration of the blockchain.
-    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error>;
+    async fn consensus_config(
+        state: ServiceApiState,
+        _query: (),
+    ) -> Result<ConsensusConfig, api::Error> {
+        Ok(state.data().for_core().consensus_config())
+    }
+
     /// Returns a pending propose config change.
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error>;
+    async fn config_proposal(
+        state: ServiceApiState,
+        _query: (),
+    ) -> Result<Option<ConfigProposalWithHash>, api::Error> {
+        Ok(SchemaImpl::new(state.service_data())
+            .public
+            .pending_proposal
+            .get())
+    }
+
     /// Returns a list of deployed artifacts and initialized services.
-    fn services(&self) -> Result<DispatcherInfo, Self::Error>;
+    async fn services(state: ServiceApiState, _query: ()) -> Result<DispatcherInfo, api::Error> {
+        Ok(DispatcherInfo::load(&state.data().for_dispatcher()))
+    }
 }
 
-struct ApiImpl<'a>(&'a ServiceApiState<'a>);
+/// Private API specification of the supervisor service.
+struct PrivateApi;
 
-impl ApiImpl<'_> {
-    fn broadcaster(&self) -> Result<Broadcaster<'_>, api::Error> {
-        self.0.broadcaster().ok_or_else(|| {
+impl PrivateApi {
+    fn broadcaster(state: &ServiceApiState) -> Result<Broadcaster, api::Error> {
+        state.broadcaster().ok_or_else(|| {
             api::Error::bad_request()
                 .title("Invalid broadcast request")
                 .detail("Nod is not a validator")
         })
     }
-}
 
-impl PrivateApi for ApiImpl<'_> {
-    type Error = api::Error;
-
-    fn deploy_artifact(&self, artifact: DeployRequest) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `DeployArtifact` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn deploy_artifact(
+        state: ServiceApiState,
+        artifact: DeployRequest,
+    ) -> Result<Hash, api::Error> {
+        Self::broadcaster(&state)?
             .request_artifact_deploy((), artifact)
+            .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
 
-    fn migrate(&self, request: MigrationRequest) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `MigrationRequest` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn migrate(
+        state: ServiceApiState,
+        request: MigrationRequest,
+    ) -> Result<Hash, api::Error> {
+        Self::broadcaster(&state)?
             .request_migration((), request)
+            .await
             .map_err(|err| api::Error::internal(err).title("Migration start request failed"))
     }
 
-    fn propose_config(&self, proposal: ConfigPropose) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `ConfigPropose` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn propose_config(
+        state: ServiceApiState,
+        proposal: ConfigPropose,
+    ) -> Result<Hash, api::Error> {
+        Self::broadcaster(&state)?
             .propose_config_change((), proposal)
+            .await
             .map_err(|err| api::Error::internal(err).title("Config propose failed"))
     }
 
-    fn confirm_config(&self, vote: ConfigVote) -> Result<Hash, Self::Error> {
-        self.broadcaster()?
+    /// Creates and broadcasts the `ConfigVote` transaction, which is signed
+    /// by the current node, and returns its hash.
+    async fn confirm_config(state: ServiceApiState, vote: ConfigVote) -> Result<Hash, api::Error> {
+        Self::broadcaster(&state)?
             .confirm_config_change((), vote)
+            .await
             .map_err(|err| api::Error::internal(err).title("Config vote failed"))
     }
 
-    fn configuration_number(&self) -> Result<u64, Self::Error> {
-        let configuration_number =
-            SchemaImpl::new(self.0.service_data()).get_configuration_number();
+    /// Returns the number of processed configurations.
+    async fn configuration_number(state: ServiceApiState, _query: ()) -> Result<u64, api::Error> {
+        let configuration_number = SchemaImpl::new(state.service_data()).get_configuration_number();
         Ok(configuration_number)
     }
 
-    fn supervisor_config(&self) -> Result<SupervisorConfig, Self::Error> {
-        let config = SchemaImpl::new(self.0.service_data()).supervisor_config();
+    /// Returns an actual supervisor config.
+    async fn supervisor_config(
+        state: ServiceApiState,
+        _query: (),
+    ) -> Result<SupervisorConfig, api::Error> {
+        let config = SchemaImpl::new(state.service_data()).supervisor_config();
         Ok(config)
     }
 
-    fn deploy_status(&self, query: DeployInfoQuery) -> Result<AsyncEventState, Self::Error> {
+    /// Returns the state of deployment for the given deploy request.
+    async fn deploy_status(
+        state: ServiceApiState,
+        query: DeployInfoQuery,
+    ) -> Result<AsyncEventState, api::Error> {
         let request = DeployRequest::try_from(query)?;
-        let schema = SchemaImpl::new(self.0.service_data());
+        let schema = SchemaImpl::new(state.service_data());
         let status = schema.deploy_states.get(&request).ok_or_else(|| {
-            Self::Error::not_found().title("No corresponding deploy request found")
+            api::Error::not_found().title("No corresponding deploy request found")
         })?;
 
         Ok(status)
     }
 
-    fn migration_status(&self, query: MigrationInfoQuery) -> Result<MigrationState, Self::Error> {
+    /// Returns the state of migration for the given migration request.
+    async fn migration_status(
+        state: ServiceApiState,
+        query: MigrationInfoQuery,
+    ) -> Result<MigrationState, api::Error> {
         let request = MigrationRequest::try_from(query)?;
-        let schema = SchemaImpl::new(self.0.service_data());
+        let schema = SchemaImpl::new(state.service_data());
         let status = schema.migration_states.get(&request).ok_or_else(|| {
             api::Error::not_found().title("No corresponding migration request found")
         })?;
@@ -840,58 +877,21 @@ impl PrivateApi for ApiImpl<'_> {
     }
 }
 
-impl PublicApi for ApiImpl<'_> {
-    type Error = api::Error;
-
-    fn consensus_config(&self) -> Result<ConsensusConfig, Self::Error> {
-        Ok(self.0.data().for_core().consensus_config())
-    }
-
-    fn config_proposal(&self) -> Result<Option<ConfigProposalWithHash>, Self::Error> {
-        Ok(SchemaImpl::new(self.0.service_data())
-            .public
-            .pending_proposal
-            .get())
-    }
-
-    fn services(&self) -> Result<DispatcherInfo, Self::Error> {
-        Ok(DispatcherInfo::load(&self.0.data().for_dispatcher()))
-    }
-}
-
 /// Wires Supervisor API endpoints.
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", |state, query| {
-            ApiImpl(state).deploy_artifact(query)
-        })
-        .endpoint_mut("migrate", |state, query| ApiImpl(state).migrate(query))
-        .endpoint_mut("propose-config", |state, query| {
-            ApiImpl(state).propose_config(query)
-        })
-        .endpoint_mut("confirm-config", |state, query| {
-            ApiImpl(state).confirm_config(query)
-        })
-        .endpoint("configuration-number", |state, _query: ()| {
-            ApiImpl(state).configuration_number()
-        })
-        .endpoint("supervisor-config", |state, _query: ()| {
-            ApiImpl(state).supervisor_config()
-        })
-        .endpoint("deploy-status", |state, query| {
-            ApiImpl(state).deploy_status(query)
-        })
-        .endpoint("migration-status", |state, query| {
-            ApiImpl(state).migration_status(query)
-        });
+        .endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
+        .endpoint_mut("migrate", PrivateApi::migrate)
+        .endpoint_mut("propose-config", PrivateApi::propose_config)
+        .endpoint_mut("confirm-config", PrivateApi::confirm_config)
+        .endpoint("configuration-number", PrivateApi::configuration_number)
+        .endpoint("supervisor-config", PrivateApi::supervisor_config)
+        .endpoint("deploy-status", PrivateApi::deploy_status)
+        .endpoint("migration-status", PrivateApi::migration_status);
     builder
         .public_scope()
-        .endpoint("consensus-config", |state, _query: ()| {
-            ApiImpl(state).consensus_config()
-        })
-        .endpoint("config-proposal", |state, _query: ()| {
-            ApiImpl(state).config_proposal()
-        })
-        .endpoint("services", |state, _query: ()| ApiImpl(state).services());
+        .endpoint("consensus-config", PublicApi::consensus_config)
+        .endpoint("config-proposal", PublicApi::config_proposal)
+        .endpoint("services", PublicApi::services);
 }

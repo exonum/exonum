@@ -65,8 +65,8 @@ fn incorrect_configuration() {
 }
 
 /// Checks that configuration of the supervisor can be changed via `Configure` interface.
-#[test]
-fn configure_call() {
+#[tokio::test]
+async fn configure_call() {
     let mut testkit = TestKitBuilder::validator()
         .with(Supervisor::simple())
         .build();
@@ -76,7 +76,7 @@ fn configure_call() {
         .service_config(SUPERVISOR_INSTANCE_ID, Supervisor::decentralized_config());
 
     // Apply it (in simple mode no confirmations required).
-    create_proposal(&testkit.api(), config_proposal);
+    create_proposal(&testkit.api(), config_proposal).await;
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
 
     // Check that supervisor now in the decentralized mode.
@@ -84,8 +84,8 @@ fn configure_call() {
 }
 
 /// Checks that `supervisor-config` works as expected.
-#[test]
-fn supervisor_config_api() {
+#[tokio::test]
+async fn supervisor_config_api() {
     let mut testkit = TestKitBuilder::validator()
         .with(Supervisor::simple())
         .build();
@@ -94,6 +94,7 @@ fn supervisor_config_api() {
             .api()
             .private(ApiKind::Service("supervisor"))
             .get::<SupervisorConfig>("supervisor-config")
+            .await
             .unwrap(),
         Supervisor::simple_config(),
     );
@@ -107,6 +108,7 @@ fn supervisor_config_api() {
             .api()
             .private(ApiKind::Service("supervisor"))
             .get::<SupervisorConfig>("supervisor-config")
+            .await
             .unwrap(),
         Supervisor::decentralized_config(),
     );

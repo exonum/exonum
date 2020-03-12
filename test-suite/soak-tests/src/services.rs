@@ -19,7 +19,7 @@ use exonum::{
     runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
+use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
 use serde_derive::{Deserialize, Serialize};
 
 #[exonum_interface(auto_ids)]
@@ -82,15 +82,23 @@ impl Service for MainService {
         }
 
         if let Some(broadcaster) = context.broadcaster() {
-            if let Err(e) = broadcaster.timestamp((), context.height()) {
+            let height = context.height();
+            let service_key = context.service_key();
+            if let Err(e) = broadcaster.blocking().timestamp((), height) {
                 log::error!(
                     "[{}] Failed to broadcast transaction at height {}: {}",
-                    context.service_key(),
-                    context.height(),
+                    service_key,
+                    height,
                     e
                 );
             }
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("ping", |_state, _query: ()| async { Ok("pong".to_owned()) });
     }
 }
 
@@ -113,6 +121,12 @@ impl Service for TogglingSupervisor {
             4 => extensions.initiate_resuming_service(MainService::INSTANCE_ID, ()),
             _ => Ok(()),
         }
+    }
+
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .endpoint("ping", |_state, _query: ()| async { Ok("pong".to_owned()) });
     }
 }
 

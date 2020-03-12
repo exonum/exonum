@@ -27,20 +27,54 @@ use exonum::{
     helpers::{Height, Round},
     messages::{AnyTx, Verified},
 };
-use futures::{
-    sink::Wait,
-    sync::mpsc::{self, Sender},
-    Async, Future, Poll, Stream,
+use futures::{channel::mpsc, prelude::*};
+
+use std::{
+    cmp::Ordering,
+    pin::Pin,
+    task::{Context, Poll},
+    time::SystemTime,
 };
 
-use std::{cmp::Ordering, time::SystemTime};
-
-use crate::{messages::Message, ExternalMessage, NodeTimeout};
+use crate::{events::error::LogError, messages::Message, ExternalMessage, NodeTimeout};
 
 #[cfg(test)]
 mod tests;
 
-pub type SyncSender<T> = Wait<Sender<T>>;
+#[derive(Debug)]
+pub struct SyncSender<T>(mpsc::Sender<T>);
+
+impl<T: Send + 'static> SyncSender<T> {
+    pub fn new(inner: mpsc::Sender<T>) -> Self {
+        Self(inner)
+    }
+
+    // Since sandbox tests execute outside the `tokio` context, we detect this and block
+    // the future if necessary.
+    #[cfg(test)]
+    pub fn send(&mut self, message: T) {
+        use futures::executor::block_on;
+        use tokio::runtime::Handle;
+
+        if let Ok(handle) = Handle::try_current() {
+            let mut sender = self.0.clone();
+            handle.spawn(async move {
+                sender.send(message).await.log_error();
+            });
+        } else {
+            block_on(self.0.send(message)).log_error();
+        }
+    }
+
+    // Outside tests, `send()` is always called from an async context.
+    #[cfg(not(test))]
+    pub fn send(&mut self, message: T) {
+        let mut sender = self.0.clone();
+        tokio::spawn(async move {
+            sender.send(message).await.log_error();
+        });
+    }
+}
 
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
@@ -131,21 +165,19 @@ pub struct HandlerPart<H: EventHandler> {
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
 
-impl<H: EventHandler + 'static> HandlerPart<H> {
-    pub fn run(self) -> Box<dyn Future<Item = (), Error = ()>> {
+impl<H: EventHandler + 'static + Send> HandlerPart<H> {
+    pub async fn run(self) {
         let mut handler = self.handler;
-        let aggregator = EventsAggregator::new(
+        let mut aggregator = EventsAggregator::new(
             self.internal_rx,
             self.network_rx,
             self.transactions_rx,
             self.api_rx,
         );
-        let fut = aggregator.for_each(move |event| {
-            handler.handle_event(event);
-            Ok(())
-        });
 
-        to_box(fut)
+        while let Some(event) = aggregator.next().await {
+            handler.handle_event(event);
+        }
     }
 }
 
@@ -210,10 +242,10 @@ pub struct EventsAggregator<S1, S2, S3, S4> {
 
 impl<S1, S2, S3, S4> EventsAggregator<S1, S2, S3, S4>
 where
-    S1: Stream,
-    S2: Stream,
-    S3: Stream,
-    S4: Stream,
+    S1: Stream + Unpin,
+    S2: Stream + Unpin,
+    S3: Stream + Unpin,
+    S4: Stream + Unpin,
 {
     pub fn new(internal: S1, network: S2, transactions: S3, api: S4) -> Self {
         Self {
@@ -228,68 +260,62 @@ where
 
 impl<S1, S2, S3, S4> Stream for EventsAggregator<S1, S2, S3, S4>
 where
-    S1: Stream<Item = InternalEvent>,
-    S2: Stream<Item = NetworkEvent, Error = S1::Error>,
-    S3: Stream<Item = Verified<AnyTx>, Error = S1::Error>,
-    S4: Stream<Item = ExternalMessage, Error = S1::Error>,
+    S1: Stream<Item = InternalEvent> + Unpin,
+    S2: Stream<Item = NetworkEvent> + Unpin,
+    S3: Stream<Item = Verified<AnyTx>> + Unpin,
+    S4: Stream<Item = ExternalMessage> + Unpin,
 {
     type Item = Event;
-    type Error = S1::Error;
 
-    fn poll(&mut self) -> Poll<Option<Event>, Self::Error> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.done {
-            Ok(Async::Ready(None))
-        } else {
-            match self.internal.poll()? {
-                Async::Ready(None)
-                | Async::Ready(Some(InternalEvent(InternalEventInner::Shutdown))) => {
-                    self.done = true;
-                    return Ok(Async::Ready(None));
-                }
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Internal(item))));
-                }
-                Async::NotReady => {}
-            };
-
-            match self.network.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Network(item))));
-                }
-                Async::Ready(None) => {
-                    self.done = true;
-                    return Ok(Async::Ready(None));
-                }
-                Async::NotReady => {}
-            };
-
-            match self.transactions.poll()? {
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Transaction(item))));
-                }
-                Async::Ready(None) => {
-                    self.done = true;
-                    return Ok(Async::Ready(None));
-                }
-                Async::NotReady => {}
-            };
-
-            match self.api.poll()? {
-                Async::Ready(None) => {
-                    self.done = true;
-                    return Ok(Async::Ready(None));
-                }
-                Async::Ready(Some(item)) => {
-                    return Ok(Async::Ready(Some(Event::Api(item))));
-                }
-                Async::NotReady => {}
-            };
-
-            Ok(Async::NotReady)
+            return Poll::Ready(None);
         }
-    }
-}
 
-fn to_box<F: Future + 'static>(f: F) -> Box<dyn Future<Item = (), Error = F::Error>> {
-    Box::new(f.map(drop))
+        match self.internal.poll_next_unpin(cx) {
+            Poll::Ready(None) | Poll::Ready(Some(InternalEvent(InternalEventInner::Shutdown))) => {
+                self.done = true;
+                return Poll::Ready(None);
+            }
+            Poll::Ready(Some(item)) => {
+                return Poll::Ready(Some(Event::Internal(item)));
+            }
+            Poll::Pending => {}
+        }
+
+        match self.network.poll_next_unpin(cx) {
+            Poll::Ready(Some(item)) => {
+                return Poll::Ready(Some(Event::Network(item)));
+            }
+            Poll::Ready(None) => {
+                self.done = true;
+                return Poll::Ready(None);
+            }
+            Poll::Pending => {}
+        }
+
+        match self.transactions.poll_next_unpin(cx) {
+            Poll::Ready(Some(item)) => {
+                return Poll::Ready(Some(Event::Transaction(item)));
+            }
+            Poll::Ready(None) => {
+                self.done = true;
+                return Poll::Ready(None);
+            }
+            Poll::Pending => {}
+        }
+
+        match self.api.poll_next_unpin(cx) {
+            Poll::Ready(None) => {
+                self.done = true;
+                return Poll::Ready(None);
+            }
+            Poll::Ready(Some(item)) => {
+                return Poll::Ready(Some(Event::Api(item)));
+            }
+            Poll::Pending => {}
+        }
+
+        Poll::Pending
+    }
 }

@@ -306,7 +306,7 @@ pub mod api {
 
     impl CryptocurrencyApi {
         /// Endpoint for getting a single wallet.
-        pub fn get_wallet(state: &ServiceApiState<'_>, query: WalletQuery) -> api::Result<Wallet> {
+        pub async fn get_wallet(state: ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
             schema
                 .wallets
@@ -315,7 +315,7 @@ pub mod api {
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(state: &ServiceApiState<'_>, _query: ()) -> api::Result<Vec<Wallet>> {
+        pub async fn get_wallets(state: ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
             let schema = CurrencySchema::new(state.service_data());
             Ok(schema.wallets.values().collect())
         }

@@ -33,7 +33,11 @@ zeroize = "1.1.0"
 [dev-dependencies]
 exonum-derive = { version = "1.0.0-rc.1", path = "../components/derive" }
 
-futures = "0.1.29"
+futures = "0.3.4"
 lazy_static = "1.4.0"
 pretty_assertions = "0.6"
-reqwest = "0.9"
+reqwest = { version = "0.10.2", features = ["json"] }
+
+[dev-dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

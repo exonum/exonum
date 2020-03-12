@@ -23,13 +23,14 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
-use futures::{sync::mpsc, Future, Stream};
-use tokio::util::FutureExt;
-use tokio_core::reactor::Core;
+use futures::{channel::mpsc, prelude::*};
+use tokio::{
+    task::JoinHandle,
+    time::{delay_for, timeout},
+};
 
 use std::{
     sync::{Arc, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -38,7 +39,7 @@ use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, Shutdo
 #[derive(Debug)]
 struct RunHandle {
     blockchain: Blockchain,
-    node_thread: thread::JoinHandle<()>,
+    node_task: JoinHandle<()>,
     shutdown_handle: ShutdownHandle,
 }
 
@@ -46,16 +47,17 @@ impl RunHandle {
     fn new(node: Node) -> Self {
         let blockchain = node.blockchain().to_owned();
         let shutdown_handle = node.shutdown_handle();
+        let node_task = node.run().unwrap_or_else(|err| panic!("{}", err));
         Self {
             blockchain,
             shutdown_handle,
-            node_thread: thread::spawn(|| node.run().unwrap()),
+            node_task: tokio::spawn(node_task),
         }
     }
 
-    fn join(self) {
-        self.shutdown_handle.shutdown().wait().unwrap();
-        self.node_thread.join().unwrap();
+    async fn join(self) {
+        self.shutdown_handle.shutdown().await.unwrap();
+        self.node_task.await.unwrap();
     }
 }
 
@@ -160,46 +162,43 @@ fn run_nodes(
     (node_handles, commit_rxs)
 }
 
-#[test]
-fn nodes_commit_blocks() {
+#[tokio::test]
+async fn nodes_commit_blocks() {
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
     let (nodes, commit_rxs) = run_nodes(4, 16_300, false);
-
-    let mut core = Core::new().unwrap();
-    let duration = Duration::from_secs(60);
-    for rx in commit_rxs {
-        let future = rx.into_future().timeout(duration).map_err(drop);
-        core.run(future).expect("failed commit");
-    }
-
-    for handle in nodes {
-        handle.join();
-    }
+    let commit_notifications = commit_rxs.into_iter().map(|mut rx| async move {
+        if timeout(TIMEOUT, rx.next()).await.is_err() {
+            panic!("Timed out");
+        }
+    });
+    future::join_all(commit_notifications).await;
+    future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 }
 
-#[test]
-fn nodes_flush_transactions_to_storage_before_commit() {
+#[tokio::test]
+async fn nodes_flush_transactions_to_storage_before_commit() {
     // `slow_blocks: true` argument makes it so that nodes should not create a single block
     // during the test.
     let (nodes, _) = run_nodes(4, 16_400, true);
-    let mut core = Core::new().unwrap();
-    thread::sleep(Duration::from_secs(5));
+    delay_for(Duration::from_secs(5)).await;
 
     // Send some transactions over `blockchain`s.
     let keys = KeyPair::random();
-    let tx_hashes: Vec<_> = (0_u64..10)
+    let (tx_hashes, broadcasts): (Vec<_>, Vec<_>) = (0_u64..10)
         .map(|i| {
             let tx = keys.timestamp(CommitWatcherService::ID, i);
             let tx_hash = tx.object_hash();
             let node_i = i as usize % nodes.len();
             let broadcast = nodes[node_i].blockchain.sender().broadcast_transaction(tx);
-            core.run(broadcast).unwrap();
-            tx_hash
+            (tx_hash, broadcast)
         })
-        .collect();
+        .unzip();
+    future::try_join_all(broadcasts).await.unwrap();
 
     // Nodes need order of 100ms to create a column family for the tx pool in the debug mode,
     // so we sleep here to make it happen for all nodes.
-    thread::sleep(Duration::from_millis(300));
+    delay_for(Duration::from_millis(500)).await;
 
     // All transactions should be persisted on all nodes now.
     for node in &nodes {
@@ -212,13 +211,11 @@ fn nodes_flush_transactions_to_storage_before_commit() {
         }
     }
 
-    for handle in nodes {
-        handle.join();
-    }
+    future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 }
 
-#[test]
-fn node_restart_regression() {
+#[tokio::test]
+async fn node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, node_keys, db, start_times| {
         let service = StartCheckerServiceFactory(start_times);
         let artifact = service.artifact_id();
@@ -236,7 +233,7 @@ fn node_restart_regression() {
                     .build(channel.endpoints_sender())
             })
             .build();
-        RunHandle::new(node).join();
+        RunHandle::new(node).join()
     };
 
     let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
@@ -249,9 +246,10 @@ fn node_restart_regression() {
         node_keys.clone(),
         Arc::clone(&db),
         Arc::clone(&start_times),
-    );
+    )
+    .await;
     // Second launch
-    start_node(node_cfg, node_keys, db, Arc::clone(&start_times));
+    start_node(node_cfg, node_keys, db, Arc::clone(&start_times)).await;
 
     // The service is created two times on instantiation (for `start_adding_service`
     // and `commit_service` methods), and then once on each new node startup.

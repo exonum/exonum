@@ -14,14 +14,17 @@
 
 //! Module responsible for actix web API management after new service is deployed.
 
-use actix::prelude::*;
-use actix_net::server::Server;
-use actix_web::server::{HttpServer, StopServer};
-use futures::{sync::mpsc, Future};
+use actix_cors::{Cors, CorsFactory};
+use actix_rt::time::delay_for;
+use actix_web::{dev::Server, web, App, HttpServer};
+use futures::{
+    future::{join_all, try_join_all},
+    Stream, StreamExt, TryFutureExt,
+};
 
-use std::{collections::HashMap, fmt, io, net::SocketAddr, time::Duration};
+use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
 
-use crate::{backends::actix::create_app, AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
+use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
 /// Configuration parameters for a single web server.
 #[derive(Debug, Clone)]
@@ -41,6 +44,12 @@ impl WebServerConfig {
             allow_origin: None,
         }
     }
+
+    fn cors_factory(&self) -> CorsFactory {
+        self.allow_origin
+            .clone()
+            .map_or_else(Cors::default, CorsFactory::from)
+    }
 }
 
 /// Configuration parameters for `ApiManager`.
@@ -58,139 +67,12 @@ pub struct ApiManagerConfig {
     pub server_restart_max_retries: u16,
 }
 
-/// Actor responsible for API management. The actor encapsulates endpoint handlers and
-/// is capable of updating them via `UpdateEndpoints`.
-pub struct ApiManager {
-    config: ApiManagerConfig,
-    server_addresses: HashMap<ApiAccess, Addr<Server>>,
-    variable_endpoints: Vec<(String, ApiBuilder)>,
-    endpoints_rx: Option<mpsc::Receiver<UpdateEndpoints>>,
-}
-
-impl fmt::Debug for ApiManager {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("ApiManager")
-            .field("config", &self.config)
-            .finish()
-    }
-}
-
-impl ApiManager {
-    /// Creates a new API manager instance with the specified runtime configuration and
-    /// the receiver of the `UpdateEndpoints` events.
-    pub fn new(config: ApiManagerConfig, endpoints_rx: mpsc::Receiver<UpdateEndpoints>) -> Self {
-        Self {
-            config,
-            server_addresses: HashMap::new(),
-            variable_endpoints: vec![],
-            endpoints_rx: Some(endpoints_rx),
-        }
-    }
-
-    fn start_api_servers(&mut self) {
-        self.server_addresses = self
-            .config
-            .servers
-            .iter()
-            .map(|(&access, server_config)| {
-                let server_address = self
-                    .start_server(access, server_config.to_owned())
-                    .expect("Failed to start API server");
-                (access, server_address)
-            })
-            .collect();
-    }
-
-    fn start_server(
-        &self,
-        access: ApiAccess,
-        server_config: WebServerConfig,
-    ) -> io::Result<Addr<Server>> {
-        let listen_address = server_config.listen_address;
-        log::info!("Starting {} web api on {}", access, listen_address);
-
-        let mut aggregator = self.config.api_aggregator.clone();
-        aggregator.extend(self.variable_endpoints.clone());
-        HttpServer::new(move || create_app(&aggregator, access, &server_config))
-            .disable_signals()
-            .bind(listen_address)
-            .map(HttpServer::start)
-    }
-
-    fn initiate_restart(&mut self, manager: Addr<Self>) {
-        log::info!("Restarting servers.");
-        for (access, addr) in self.server_addresses.drain() {
-            let manager = manager.clone();
-            Arbiter::spawn(
-                addr.send(StopServer { graceful: true })
-                    .then(move |_| manager.send(StartServer { access, attempt: 0 }))
-                    .map_err(|e| log::error!("Error while restarting API server: {}", e)),
-            );
-        }
-    }
-}
-
-impl Actor for ApiManager {
-    type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        self.start_api_servers();
-        let endpoints_rx = self
-            .endpoints_rx
-            .take()
-            .expect("`Actor::started()` called twice for `ApiManager`");
-        Self::add_stream(endpoints_rx, ctx);
-    }
-}
-
-#[derive(Debug)]
-struct StartServer {
-    access: ApiAccess,
-    attempt: u16,
-}
-
-impl Message for StartServer {
-    type Result = ();
-}
-
-impl Handler<StartServer> for ApiManager {
-    type Result = ();
-
-    fn handle(&mut self, mut msg: StartServer, ctx: &mut Context<Self>) -> Self::Result {
-        log::info!(
-            "Handling server start: {:?} (attempt #{})",
-            msg.access,
-            msg.attempt + 1
-        );
-
-        let server_config = self.config.servers[&msg.access].clone();
-        let addr = match self.start_server(msg.access, server_config) {
-            Ok(addr) => addr,
-            Err(e) => {
-                log::warn!("Error handling {} server start: {}", msg.access, e);
-                if msg.attempt == self.config.server_restart_max_retries {
-                    log::error!("Cannot spawn {} server", msg.access);
-                    ctx.terminate();
-                } else {
-                    msg.attempt += 1;
-                    ctx.notify_later(
-                        msg,
-                        Duration::from_millis(self.config.server_restart_retry_timeout),
-                    );
-                }
-                return;
-            }
-        };
-        self.server_addresses.insert(msg.access, addr);
-    }
-}
-
 /// Updates variable endpoints of the service, restarting all HTTP servers managed by the addressed
 /// `ApiManager`. The endpoints initially supplied to the `ApiManager` during its construction
 /// are not affected.
 #[derive(Debug, Clone)]
 pub struct UpdateEndpoints {
+    /// Complete list of endpoints.
     endpoints: Vec<(String, ApiBuilder)>,
 }
 
@@ -213,14 +95,113 @@ impl UpdateEndpoints {
     }
 }
 
-impl Message for UpdateEndpoints {
-    type Result = ();
+async fn with_retries<T>(
+    mut action: impl FnMut() -> io::Result<T>,
+    attempts: u16,
+    timeout: u64,
+) -> io::Result<T> {
+    let timeout = Duration::from_millis(timeout);
+
+    for _ in 1..=attempts {
+        match action() {
+            Ok(value) => return Ok(value),
+            Err(e) => {
+                log::warn!("Action failed: {}", e);
+                delay_for(timeout).await;
+            }
+        }
+    }
+
+    Err(io::Error::new(
+        io::ErrorKind::Other,
+        "Cannot complete action",
+    ))
 }
 
-impl StreamHandler<UpdateEndpoints, ()> for ApiManager {
-    fn handle(&mut self, msg: UpdateEndpoints, ctx: &mut Context<Self>) {
-        log::info!("Server restart requested");
-        self.variable_endpoints = msg.endpoints;
-        self.initiate_restart(ctx.address());
+/// Actor responsible for API management. The actor encapsulates endpoint handlers and
+/// is capable of updating them via `UpdateEndpoints`.
+#[derive(Debug)]
+pub struct ApiManager {
+    config: ApiManagerConfig,
+    servers: Vec<Server>,
+    endpoints: Vec<(String, ApiBuilder)>,
+}
+
+impl ApiManager {
+    /// Creates a new API manager instance with the specified runtime configuration.
+    pub fn new(config: ApiManagerConfig) -> Self {
+        Self {
+            config,
+            servers: Vec::new(),
+            endpoints: Vec::new(),
+        }
+    }
+
+    async fn start_servers(&mut self) -> io::Result<()> {
+        log::trace!("Servers start requested.");
+
+        let start_servers = self.config.servers.iter().map(|(&access, server_config)| {
+            let mut aggregator = self.config.api_aggregator.clone();
+            aggregator.extend(self.endpoints.clone());
+            let server_config = server_config.to_owned();
+
+            with_retries(
+                move || Self::start_server(aggregator.clone(), access, server_config.clone()),
+                self.config.server_restart_max_retries,
+                self.config.server_restart_retry_timeout,
+            )
+        });
+        let servers = try_join_all(start_servers).await?;
+
+        for (server, (&access, server_config)) in servers.iter().zip(&self.config.servers) {
+            let listen_addr = server_config.listen_address;
+            actix_rt::spawn(server.clone().unwrap_or_else(move |e| {
+                log::error!("{} server on {} failed: {}", access, listen_addr, e);
+                // TODO: should the server be restarted on error?
+            }));
+        }
+
+        self.servers = servers;
+        Ok(())
+    }
+
+    async fn stop_servers(&mut self) {
+        log::trace!("Servers stop requested.");
+
+        join_all(self.servers.drain(..).map(|server| server.stop(false))).await;
+    }
+
+    /// Starts API manager actor with the specified endpoints update stream.
+    pub async fn run<S>(mut self, mut endpoints_rx: S) -> io::Result<()>
+    where
+        S: Stream<Item = UpdateEndpoints> + Unpin,
+    {
+        while let Some(request) = endpoints_rx.next().await {
+            log::info!("Server restart requested");
+            self.stop_servers().await;
+            self.endpoints = request.endpoints;
+            self.start_servers().await?;
+        }
+
+        Ok(())
+    }
+
+    fn start_server(
+        aggregator: ApiAggregator,
+        access: ApiAccess,
+        server_config: WebServerConfig,
+    ) -> io::Result<Server> {
+        let listen_address = server_config.listen_address;
+        log::info!("Starting {} web api on {}", access, listen_address);
+
+        let server = HttpServer::new(move || {
+            App::new()
+                .wrap(server_config.cors_factory())
+                .service(aggregator.extend_backend(access, web::scope("api")))
+        })
+        .disable_signals()
+        .bind(listen_address)?
+        .run();
+        Ok(server)
     }
 }

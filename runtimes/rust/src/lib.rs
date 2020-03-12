@@ -349,7 +349,7 @@ use exonum::{
     },
 };
 use exonum_api::{ApiBuilder, UpdateEndpoints};
-use futures::{sync::mpsc, Future, Sink};
+use futures::{channel::mpsc, executor, SinkExt};
 use log::trace;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -652,11 +652,8 @@ impl RustRuntime {
             let user_endpoints = self.api_endpoints();
             // FIXME: this should either be made async, or an unbounded channel should be used.
             if !self.api_notifier.is_closed() {
-                self.api_notifier
-                    .clone()
-                    .send(UpdateEndpoints::new(user_endpoints))
-                    .wait()
-                    .ok();
+                let send_task = self.api_notifier.send(UpdateEndpoints::new(user_endpoints));
+                executor::block_on(send_task).ok();
             }
         }
         self.changed_services_since_last_block = false;

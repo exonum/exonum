@@ -34,7 +34,7 @@ use exonum::{
 };
 use exonum_api::UpdateEndpoints;
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
-use futures::{future, sync::mpsc, Async, Future, Stream};
+use futures::{channel::mpsc, FutureExt, StreamExt};
 use serde_derive::*;
 
 use std::{
@@ -97,20 +97,16 @@ fn add_transactions_into_pool(
 }
 
 pub fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) -> HashSet<String> {
-    let (received, _) = endpoints_rx.by_ref().into_future().wait().unwrap();
-    received
-        .unwrap()
-        .updated_paths()
-        .map(ToOwned::to_owned)
-        .collect()
+    let received = endpoints_rx
+        .next()
+        .now_or_never()
+        .expect("No endpoint update")
+        .expect("Node sender was dropped");
+    received.updated_paths().map(ToOwned::to_owned).collect()
 }
 
 pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) {
-    let task = future::poll_fn(|| match endpoints_rx.poll() {
-        Ok(Async::NotReady) => Ok(Async::Ready(None)),
-        other => other,
-    });
-    let maybe_update = task.wait().unwrap();
+    let maybe_update = endpoints_rx.next().now_or_never().flatten();
     if let Some(update) = maybe_update {
         panic!(
             "Unexpected endpoints update: {:?}",

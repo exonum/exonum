@@ -253,7 +253,7 @@ class RegularDeployTest(unittest.TestCase):
                 # in case of stopped service its tx will not be processed
                 self.assertEqual(tx_response.status_code, 400)
                 self.assertIn(
-                    "Specified service is not active", str(tx_response.content)
+                    "Cannot dispatch transaction to non-active service", str(tx_response.content)
                 )
 
         # resume service
