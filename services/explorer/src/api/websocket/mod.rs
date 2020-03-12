@@ -57,7 +57,7 @@
 //! # use exonum_explorer_service::api::websocket::{
 //! #     IncomingMessage, Response, SubscriptionType, Notification,
 //! # };
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! # use std::time::Duration;
 //! use websocket::OwnedMessage;
 //!
@@ -72,9 +72,9 @@
 //!     }
 //! }
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_default_rust_service(ExplorerFactory)
+//!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
 //! let api = testkit.api();
 //! let url = api.public_url("api/explorer/v1/ws");
@@ -112,7 +112,7 @@
 //! #     websocket::{IncomingMessage, Response, SubscriptionType, Notification},
 //! #     TransactionHex, TransactionResponse,
 //! # };
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! # use std::time::Duration;
 //! # use websocket::OwnedMessage;
 //! // `stringify` and `parse` functions are defined as in the previous example.
@@ -148,10 +148,10 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(ExplorerFactory)
-//!    .with_default_rust_service(MyService)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let api = testkit.api();
 //!
@@ -324,7 +324,7 @@ struct Broadcast {
 }
 
 #[derive(Debug, Message)]
-#[rtype("Result<TransactionResponse, failure::Error>")]
+#[rtype("anyhow::Result<TransactionResponse>")]
 struct Transaction(TransactionHex);
 
 pub(crate) struct Server {
@@ -391,7 +391,7 @@ impl Server {
         }
     }
 
-    fn check_transaction(&self, message: &Transaction) -> Result<Verified<AnyTx>, failure::Error> {
+    fn check_transaction(&self, message: &Transaction) -> anyhow::Result<Verified<AnyTx>> {
         let signed = SignedMessage::from_hex(message.0.tx_body.as_bytes())?;
         let verified = signed.into_verified()?;
         Blockchain::check_tx(&self.blockchain.snapshot(), &verified)?;
@@ -401,7 +401,7 @@ impl Server {
     fn handle_transaction(
         &self,
         message: &Transaction,
-    ) -> impl Future<Output = Result<TransactionResponse, failure::Error>> {
+    ) -> impl Future<Output = anyhow::Result<TransactionResponse>> {
         let sender = self.blockchain.sender().to_owned();
         let verified = self.check_transaction(message);
 
@@ -411,7 +411,7 @@ impl Server {
             sender
                 .broadcast_transaction(verified)
                 .await
-                .map(move |()| TransactionResponse { tx_hash })
+                .map(move |()| TransactionResponse::new(tx_hash))
                 .map_err(From::from)
         }
     }
@@ -527,7 +527,7 @@ impl Handler<Broadcast> for Server {
 }
 
 impl Handler<Transaction> for Server {
-    type Result = LocalBoxFuture<'static, Result<TransactionResponse, failure::Error>>;
+    type Result = LocalBoxFuture<'static, anyhow::Result<TransactionResponse>>;
 
     /// Broadcasts transaction if the check was passed, and returns an error otherwise.
     fn handle(&mut self, message: Transaction, _ctx: &mut Self::Context) -> Self::Result {

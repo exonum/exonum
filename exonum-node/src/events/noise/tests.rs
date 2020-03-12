@@ -363,7 +363,7 @@ async fn wait_for_handshake_result(
     params: HandshakeParams,
     sender_message: Option<BogusMessage>,
     responder_message: Option<BogusMessage>,
-) -> (Result<(), failure::Error>, failure::Error) {
+) -> (anyhow::Result<()>, anyhow::Error) {
     let (err_tx, mut err_rx) = mpsc::channel(1);
     tokio::spawn(run_handshake_listener(
         addr,
@@ -381,9 +381,9 @@ async fn wait_for_handshake_result(
 async fn run_handshake_listener(
     addr: SocketAddr,
     params: HandshakeParams,
-    err_sender: mpsc::Sender<failure::Error>,
+    err_sender: mpsc::Sender<anyhow::Error>,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), failure::Error> {
+) -> anyhow::Result<()> {
     let mut listener = TcpListener::bind(addr).await?;
     let mut incoming_connections = listener.incoming();
 
@@ -409,7 +409,7 @@ async fn send_handshake(
     addr: SocketAddr,
     params: HandshakeParams,
     bogus_message: Option<BogusMessage>,
-) -> Result<(), failure::Error> {
+) -> anyhow::Result<()> {
     let mut stream = TcpStream::connect(addr).await?;
     if let Some(message) = bogus_message {
         NoiseErrorHandshake::initiator(&params, message)
@@ -449,14 +449,14 @@ impl NoiseErrorHandshake {
         }
     }
 
-    async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> Result<(), failure::Error>
+    async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> anyhow::Result<()>
     where
         S: AsyncRead + Unpin,
     {
         self.inner.read_handshake_msg(stream).await.map(drop)
     }
 
-    async fn write_handshake_msg<S>(&mut self, stream: &mut S) -> Result<(), failure::Error>
+    async fn write_handshake_msg<S>(&mut self, stream: &mut S) -> anyhow::Result<()>
     where
         S: AsyncWrite + Unpin,
     {
@@ -480,14 +480,14 @@ impl<S> Handshake<S> for NoiseErrorHandshake
 where
     S: AsyncRead + AsyncWrite + 'static + Send + Unpin,
 {
-    async fn listen(mut self, stream: &mut S) -> Result<HandshakeData, failure::Error> {
+    async fn listen(mut self, stream: &mut S) -> anyhow::Result<HandshakeData> {
         self.read_handshake_msg(stream).await?;
         self.write_handshake_msg(stream).await?;
         self.read_handshake_msg(stream).await?;
         self.inner.finalize(vec![])
     }
 
-    async fn send(mut self, stream: &mut S) -> Result<HandshakeData, failure::Error> {
+    async fn send(mut self, stream: &mut S) -> anyhow::Result<HandshakeData> {
         self.write_handshake_msg(stream).await?;
         self.read_handshake_msg(stream).await?;
         self.write_handshake_msg(stream).await?;

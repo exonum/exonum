@@ -27,7 +27,10 @@ use exonum::{
         SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_rust_runtime::{DefaultInstance, ExecutionContext, ServiceFactory};
+use exonum_rust_runtime::{
+    spec::{ForeignSpec, Spec},
+    DefaultInstance, ExecutionContext, ServiceFactory,
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use crate::inc::IncService;
@@ -129,11 +132,8 @@ async fn is_inc_service_api_available(testkit: &mut TestKit) -> bool {
 
 fn create_testkit() -> TestKit {
     TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_rust_service(IncService)
-        .with_artifact(Supervisor.artifact_id())
-        .with_artifact(IncService.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
+        .with(Spec::new(IncService))
         .build()
 }
 
@@ -141,11 +141,8 @@ fn create_testkit_with_additional_runtime() -> TestKit {
     let artifact = RuntimeWithoutFreeze::artifact();
     TestKitBuilder::validator()
         .with_additional_runtime(RuntimeWithoutFreeze)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_artifact(artifact.clone())
-        .with_instance(Supervisor::simple())
-        .with_instance(artifact.into_default_instance(100, "test"))
+        .with(ForeignSpec::new(artifact).with_instance(100, "test", ()))
+        .with(Supervisor::simple())
         .build()
 }
 

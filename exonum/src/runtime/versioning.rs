@@ -148,7 +148,7 @@
 //! // Then, the `Schema` may be used like this:
 //! use exonum::runtime::SnapshotExt;
 //!
-//! # fn access_schema() -> Result<(), failure::Error> {
+//! # fn access_schema() -> anyhow::Result<()> {
 //! # let db = TemporaryDB::new();
 //! let snapshot: Box<dyn Snapshot> = // ...
 //! #   db.snapshot();
@@ -166,7 +166,8 @@
 
 pub use semver::{Version, VersionReq};
 
-use failure::{format_err, Fail};
+use anyhow::format_err;
+use thiserror::Error;
 
 use std::{fmt, str::FromStr};
 
@@ -178,7 +179,7 @@ use crate::runtime::{ArtifactId, CoreError, ExecutionError, ExecutionFail};
 ///
 /// ```
 /// # use exonum::runtime::{versioning::ArtifactReq, ArtifactId, RuntimeIdentifier};
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// // Requirements can be parsed from a string.
 /// let req: ArtifactReq = "some.Service@^1.3.0".parse()?;
 ///
@@ -242,7 +243,7 @@ impl ArtifactReq {
 }
 
 impl FromStr for ArtifactReq {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<_> = s.splitn(2, '@').collect();
@@ -320,18 +321,15 @@ pub trait RequireArtifact {
 }
 
 /// Artifact requirement error.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum ArtifactReqError {
     /// No service with the specified identifier exists.
-    #[fail(display = "No service with the specified identifier exists")]
+    #[error("No service with the specified identifier exists")]
     NoService,
 
     /// Unexpected artifact name.
-    #[fail(
-        display = "Unexpected artifact name ({}), was expecting `{}`",
-        expected, actual
-    )]
+    #[error("Unexpected artifact name ({}), was expecting `{}`", expected, actual)]
     UnexpectedName {
         /// Expected artifact name.
         expected: String,
@@ -340,7 +338,7 @@ pub enum ArtifactReqError {
     },
 
     /// Incompatible artifact version.
-    #[fail(display = "Incompatible artifact version ({})", actual)]
+    #[error("Incompatible artifact version ({})", actual)]
     IncompatibleVersion {
         /// Actual artifact version.
         actual: Version,

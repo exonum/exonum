@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 
@@ -29,7 +29,7 @@ mod tests;
 pub fn testkit_with_rust_service() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_default_rust_service(TestRuntimeApiService)
+        .with(Spec::new(TestRuntimeApiService).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)

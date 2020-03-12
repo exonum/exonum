@@ -23,7 +23,7 @@ protobuf = "2.10.1"
 pretty_assertions = "0.6.1"
 
 [dev-dependencies]
-failure = "0.1.5"
+anyhow = "1.0.26"
 
 [dev-dependencies.tokio]
 version = "0.2.13"

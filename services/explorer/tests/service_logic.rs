@@ -19,29 +19,24 @@ use exonum::{
 };
 use exonum_rust_runtime::ServiceFactory;
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
-use exonum_testkit::TestKitBuilder;
+use exonum_testkit::{Spec, TestKitBuilder};
 
 use exonum_explorer_service::{Error, ExplorerFactory};
 
 #[test]
 #[should_panic(expected = "explorer service is already instantiated")]
 fn cannot_initialize_blockchain_with_2_explorers() {
-    let other_explorer = ExplorerFactory
-        .artifact_id()
-        .into_default_instance(100, "other-explorer");
-    TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_instance(other_explorer)
-        .build();
+    let bogus_spec = Spec::new(ExplorerFactory)
+        .with_default_instance()
+        .with_instance(100, "other-explorer", ());
+    TestKitBuilder::validator().with(bogus_spec).build();
 }
 
 #[test]
 fn cannot_add_another_explorer() {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(Supervisor::simple())
         .build();
 
     let deadline = Height(5);

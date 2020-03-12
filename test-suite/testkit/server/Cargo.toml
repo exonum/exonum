@@ -19,7 +19,7 @@ travis-ci = { repository = "exonum/exonum" }
 [dependencies]
 exonum = { version = "1.0.0-rc.1", path = "../../../exonum" }
 exonum-testkit = { version = "1.0.0-rc.1", path = ".." }
-exonum-cryptocurrency = { version = "0.0.0", path = "../../../examples/cryptocurrency" }
+exonum-cryptocurrency = { version = "0.1.0", path = "../../../examples/cryptocurrency" }
 exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../../services/explorer" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../../runtimes/rust" }
 

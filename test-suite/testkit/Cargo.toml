@@ -33,7 +33,6 @@ exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../runtimes/rust" }
 actix = { version = "0.9.0", default-features = false }
 actix-web = { version = "2.0.0", default-features = false }
 chrono = "0.4.6"
-failure = "0.1.5"
 futures = "0.3.4"
 log = "0.4.6"
 reqwest = { version = "0.10.2", features = ["json"] }
@@ -49,7 +48,7 @@ features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"
 [dev-dependencies]
 assert_matches = "1.2.0"
 bincode = "1.2.1"
-hex = "=0.4.0" # 0.4.1 is not compatible with Rust 1.36
+hex = "0.4.0"
 lazy_static = "1.0.0"
 pretty_assertions = "0.6.1"
 rand = "0.7"

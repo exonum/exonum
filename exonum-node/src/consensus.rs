@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::bail;
 use exonum::{
-    blockchain::{contains_transaction, Blockchain, BlockchainMut, ProposerId, Schema},
+    blockchain::{Blockchain, BlockchainMut, PersistentPool, ProposerId, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, Fork, ObjectHash, Patch},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
     runtime::ExecutionError,
 };
-use failure::bail;
 use log::{error, info, trace, warn};
 
 use std::{collections::HashSet, convert::TryFrom, fmt};
@@ -38,9 +38,7 @@ use crate::{
 };
 
 /// Shortcut to get verified messages from bytes.
-fn into_verified<T: TryFrom<SignedMessage>>(
-    raw: &[Vec<u8>],
-) -> Result<Vec<Verified<T>>, failure::Error> {
+fn into_verified<T: TryFrom<SignedMessage>>(raw: &[Vec<u8>]) -> anyhow::Result<Vec<Verified<T>>> {
     let mut items = Vec::with_capacity(raw.len());
     for bytes in raw {
         let verified = SignedMessage::from_bytes(bytes.into())?.into_verified()?;
@@ -214,7 +212,7 @@ impl NodeHandler {
     fn validate_block_response(
         &self,
         msg: &Verified<BlockResponse>,
-    ) -> Result<Vec<Verified<Precommit>>, failure::Error> {
+    ) -> anyhow::Result<Vec<Verified<Precommit>>> {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
@@ -294,15 +292,11 @@ impl NodeHandler {
             let block_height = block.height;
             let incomplete_block = IncompleteBlock::new(block, transactions, precommits);
             let snapshot = self.blockchain.snapshot();
-            let schema = Schema::new(&snapshot);
+            let txs_pool = Schema::new(snapshot.as_ref()).transactions_pool();
 
             let has_unknown_txs = self
                 .state
-                .create_incomplete_block(
-                    incomplete_block,
-                    &schema.transactions(),
-                    &schema.transactions_pool(),
-                )
+                .create_incomplete_block(incomplete_block, &snapshot, &txs_pool)
                 .has_unknown_txs();
 
             let known_nodes = self.remove_request(&RequestData::Block(block_height));
@@ -677,40 +671,35 @@ impl NodeHandler {
     ) {
         trace!("COMMIT {:?}", block_hash);
 
-        // Merge changes into storage
-        let (committed_txs, proposer) = {
-            let (committed_txs, proposer) = {
-                let block_state = self.state.block_mut(&block_hash).unwrap();
-                let committed_txs = block_state.txs().len();
-                let proposer = block_state.proposer_id();
+        let mut block_state = self.state.take_block_for_commit(&block_hash);
+        let committed_txs = block_state.txs();
+        let proposer = block_state.proposer_id();
 
-                self.blockchain
-                    .commit(
-                        block_state.patch(),
-                        block_hash,
-                        precommits,
-                        self.state.tx_cache_mut(),
-                    )
-                    .expect("Cannot commit block");
+        // Remove committed transactions from the cache.
+        for tx_hash in committed_txs {
+            self.state.tx_cache_mut().remove(tx_hash);
+        }
+        let committed_txs_len = committed_txs.len();
 
-                // Consensus messages cache is useful only during one height, so it should be
-                // cleared when a new height is achieved.
-                self.blockchain.persist_changes(
-                    |schema| schema.consensus_messages_cache().clear(),
-                    "Cannot clear consensus messages",
-                );
+        // Commit block patch to the storage.
+        self.blockchain
+            .commit(block_state.patch(), block_hash, precommits)
+            .expect("Cannot commit block");
 
-                (committed_txs, proposer)
-            };
-            // Update node state.
-            self.state
-                .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
-            // Update state to new height.
-            let block_hash = self.blockchain.as_ref().last_hash();
-            self.state
-                .new_height(&block_hash, self.system_state.current_time());
-            (committed_txs, proposer)
-        };
+        // Consensus messages cache is useful only during one height, so it should be
+        // cleared when a new height is achieved.
+        self.blockchain.persist_changes(
+            |schema| schema.consensus_messages_cache().clear(),
+            "Cannot clear consensus messages",
+        );
+
+        // Update node state.
+        self.state
+            .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
+        // Update state to new height.
+        let block_hash = self.blockchain.as_ref().last_hash();
+        self.state
+            .new_height(&block_hash, self.system_state.current_time());
 
         let snapshot = self.blockchain.snapshot();
         for plugin in &self.plugins {
@@ -726,7 +715,7 @@ impl NodeHandler {
             height,
             proposer,
             round.map_or_else(|| "?".to_owned(), |x| x.to_string()),
-            committed_txs,
+            committed_txs_len,
             pool_len,
             block_hash.to_hex(),
         );
@@ -763,8 +752,8 @@ impl NodeHandler {
         let hash = msg.object_hash();
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        if contains_transaction(&hash, &schema.transactions(), self.state.tx_cache()) {
+        let tx_pool = PersistentPool::new(&snapshot, self.state.tx_cache());
+        if tx_pool.contains_transaction(hash) {
             return Err(HandleTxError::AlreadyProcessed);
         }
 
@@ -782,8 +771,16 @@ impl NodeHandler {
             // Thus, we don't stop the execution here.
             outcome = Err(HandleTxError::Invalid(e));
         } else {
-            // Transaction is OK, store it to the cache.
-            self.state.tx_cache_mut().insert(hash, msg);
+            // Transaction is OK, store it to the cache or persistent pool.
+            if self.state.persist_txs_immediately() {
+                let fork = self.blockchain.fork();
+                Schema::new(&fork).add_transaction_into_pool(msg);
+                self.blockchain
+                    .merge(fork.into_patch())
+                    .expect("Cannot add transaction to persistent pool");
+            } else {
+                self.state.tx_cache_mut().insert(hash, msg);
+            }
             outcome = Ok(());
         }
 
@@ -826,7 +823,7 @@ impl NodeHandler {
     pub(crate) fn handle_txs_batch(
         &mut self,
         msg: &Verified<TransactionsResponse>,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received response intended for another peer, to={}, from={}",
@@ -1063,12 +1060,8 @@ impl NodeHandler {
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Hash, Patch) {
-        self.blockchain.create_patch(
-            proposer_id,
-            height,
-            tx_hashes,
-            &mut self.state.tx_cache_mut(),
-        )
+        self.blockchain
+            .create_patch(proposer_id, height, tx_hashes, self.state.tx_cache())
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
@@ -1220,7 +1213,7 @@ impl NodeHandler {
         precommits: &[Verified<Precommit>],
         block_hash: Hash,
         block_height: Height,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         if precommits.len() < self.state.majority_count() {
             bail!("Received block without consensus");
         } else if precommits.len() > self.state.validators().len() {
@@ -1247,7 +1240,7 @@ impl NodeHandler {
         block_height: Height,
         precommit_round: Round,
         precommit: &Verified<Precommit>,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         let precommit_author = precommit.author();
         let precommit = precommit.payload();
         if let Some(pub_key) = self.state.consensus_public_key_of(precommit.validator) {

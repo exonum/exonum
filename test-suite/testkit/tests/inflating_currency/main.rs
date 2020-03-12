@@ -20,7 +20,7 @@ use exonum::{
     crypto::{KeyPair, PublicKey},
     helpers::Height,
 };
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use futures::{
     stream::{self, StreamExt},
     FutureExt,
@@ -37,7 +37,7 @@ mod inflating_cryptocurrency;
 fn init_testkit() -> TestKit {
     TestKitBuilder::validator()
         .with_validators(4)
-        .with_default_rust_service(CurrencyService)
+        .with(Spec::new(CurrencyService).with_default_instance())
         .build()
 }
 

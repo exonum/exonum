@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_cli::NodeBuilder;
+use exonum_cli::{NodeBuilder, Spec};
 
 use exonum_cryptocurrency_advanced::CryptocurrencyService;
 
 #[tokio::main]
-async fn main() -> Result<(), failure::Error> {
+async fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
 
     NodeBuilder::new()
-        // Starts cryptocurrency instance with given id and name
+        // Starts cryptocurrency instance with the default identifiers
         // immediately after genesis block creation.
-        .with_default_rust_service(CryptocurrencyService)
+        .with(Spec::new(CryptocurrencyService).with_default_instance())
         .run()
         .await
 }

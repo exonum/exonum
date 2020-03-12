@@ -128,8 +128,8 @@
 pub use super::types::{InstanceMigration, MigrationStatus};
 
 use exonum_merkledb::migration::{self as db_migration, MigrationHelper};
-use failure::Fail;
 use semver::Version;
+use thiserror::Error;
 
 use std::{collections::BTreeMap, fmt};
 
@@ -149,18 +149,18 @@ pub enum MigrationType {
 }
 
 /// Errors that can occur in a migration script.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum MigrationError {
     /// Error has occurred in the helper code, due to either a database-level failure (e.g.,
     /// we've run out of disc space) or the migration script getting aborted.
     ///
     /// Scripts should not instantiate errors of this kind.
-    #[fail(display = "{}", _0)]
-    Helper(#[fail(cause)] db_migration::MigrationError),
+    #[error("{}", _0)]
+    Helper(#[source] db_migration::MigrationError),
 
     /// Custom error signalling that the migration cannot be completed.
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Custom(String),
 }
 
@@ -336,13 +336,12 @@ pub trait MigrateData {
 
 /// Errors that can occur when initiating a data migration. This error indicates that the migration
 /// cannot be started.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum InitMigrationError {
     /// The start version is too far in the past.
-    #[fail(
-        display = "The provided start version is too far in the past; \
-                   the minimum supported version is {}",
+    #[error(
+        "The provided start version is too far in the past; the minimum supported version is {}",
         min_supported_version
     )]
     OldStartVersion {
@@ -351,8 +350,8 @@ pub enum InitMigrationError {
     },
 
     /// The start version is in the future.
-    #[fail(
-        display = "The provided start version is greater than the maximum supported version ({})",
+    #[error(
+        "The provided start version is greater than the maximum supported version ({})",
         max_supported_version
     )]
     FutureStartVersion {
@@ -362,11 +361,11 @@ pub enum InitMigrationError {
 
     /// The start version falls in the supported lower / upper bounds on versions,
     /// but is not supported itself. This can be the case, e.g., for pre-releases.
-    #[fail(display = "Start version is not supported: {}", _0)]
+    #[error("Start version is not supported: {}", _0)]
     UnsupportedStart(String),
 
     /// Data migrations are not supported by the artifact.
-    #[fail(display = "Data migrations are not supported by the artifact")]
+    #[error("Data migrations are not supported by the artifact")]
     NotSupported,
 }
 
@@ -476,7 +475,7 @@ impl From<InitMigrationError> for ExecutionError {
 /// }
 ///
 /// // Check that the migration scripts are selected properly.
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// let scripts = TokenService.migration_scripts(&Version::new(0, 3, 0))?;
 /// assert_eq!(scripts.len(), 2);
 /// assert_eq!(*scripts[0].end_version(), Version::new(0, 4, 0));

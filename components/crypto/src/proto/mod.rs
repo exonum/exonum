@@ -17,8 +17,8 @@
 // Re-export raw Protobuf types so other modules can re-use it for custom serialization.
 pub use crate::proto::schema::*;
 
+use anyhow::{ensure, format_err, Error};
 use exonum_proto::ProtobufConvert;
-use failure::{ensure, format_err, Error};
 
 use crate::{HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
 

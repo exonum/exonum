@@ -20,10 +20,9 @@ use exonum::{
     runtime::{AnyTx, InstanceId},
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{
     explorer::api::{TransactionQuery, TransactionResponse},
-    ApiKind, TestKit, TestKitApi, TestKitBuilder,
+    ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder,
 };
 use exonum_time::{MockTimeProvider, TimeServiceFactory};
 use serde_json::json;
@@ -42,26 +41,19 @@ const SERVICE_NAME: &str = "timestamping";
 fn init_testkit() -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
-    let time_service_artifact = time_service.artifact_id();
-    let timestamping = TimestampingService;
-    let timestamping_artifact = timestamping.artifact_id();
+    let time_service =
+        Spec::new(time_service).with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
+
+    let config = Config {
+        time_service_name: TIME_SERVICE_NAME.to_owned(),
+    };
+    let timestamping =
+        Spec::new(TimestampingService).with_instance(SERVICE_ID, SERVICE_NAME, config);
 
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_rust_service(time_service)
-        .with_rust_service(timestamping)
-        .with_artifact(time_service_artifact.clone())
-        .with_instance(
-            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-        )
-        .with_artifact(timestamping_artifact.clone())
-        .with_instance(
-            timestamping_artifact
-                .into_default_instance(SERVICE_ID, SERVICE_NAME)
-                .with_constructor(Config {
-                    time_service_name: TIME_SERVICE_NAME.to_owned(),
-                }),
-        )
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(time_service)
+        .with(timestamping)
         .build();
     testkit.create_blocks_until(Height(2)); // Ensure that time is set
     (testkit, mock_provider)

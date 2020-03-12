@@ -29,7 +29,7 @@ serde_derive = "1.0"
 [dev-dependencies]
 exonum-testkit = { version = "1.0.0-rc.1", path = "../../test-suite/testkit", features = ["exonum-node"] }
 
-failure = "0.1.5"
+anyhow = "1.0.26"
 pretty_assertions = "0.6.1"
 
 [dev-dependencies.tokio]

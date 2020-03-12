@@ -43,6 +43,7 @@ use self::inspected::{
     RuntimeEvent, ToySupervisor, ToySupervisorService,
 };
 use exonum_rust_runtime::{
+    spec::{Deploy, Spec},
     ArtifactProtobufSpec, DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory,
 };
 
@@ -175,31 +176,33 @@ impl MigrateData for CounterFactory {
 fn create_runtime(
     db: impl Into<Arc<dyn Database>>,
 ) -> (BlockchainMut, EventsHandle, mpsc::Receiver<UpdateEndpoints>) {
-    let factories: Vec<_> = VERSIONS
-        .iter()
-        .map(|&version| CounterFactory::new(version.parse().unwrap()))
-        .collect();
+    let mut counter_services = VERSIONS.iter().map(|&version| {
+        let factory = CounterFactory::new(version.parse().unwrap());
+        Spec::migrating(factory)
+    });
 
-    let blockchain = Blockchain::new(db, KeyPair::random(), ApiSender::closed());
-    let mut builder = create_genesis_config_builder()
-        .with_artifact(ToySupervisorService.artifact_id())
-        .with_instance(ToySupervisorService.default_instance());
-    for factory in &factories {
-        builder = builder.with_artifact(factory.artifact_id());
-    }
-    builder = builder.with_instance(factories[0].default_instance());
-    let genesis_config = builder.build();
+    let mut genesis = create_genesis_config_builder();
+    let mut rust_runtime = RustRuntimeBuilder::new();
+    Spec::new(ToySupervisorService)
+        .with_default_instance()
+        .deploy(&mut genesis, &mut rust_runtime);
 
-    let mut rust_runtime = RustRuntimeBuilder::new().with_factory(ToySupervisorService);
-    for factory in factories {
-        rust_runtime = rust_runtime.with_migrating_factory(factory);
+    // Deploy the instance of the earliest counter service and artifacts for other versions.
+    let service = counter_services.next().unwrap();
+    service
+        .with_default_instance()
+        .deploy(&mut genesis, &mut rust_runtime);
+    for service in counter_services {
+        service.deploy(&mut genesis, &mut rust_runtime);
     }
+
     let (endpoints_tx, endpoints_rx) = mpsc::channel(16);
     let inspected = Inspected::new(rust_runtime.build(endpoints_tx));
     let events_handle = inspected.events.clone();
 
+    let blockchain = Blockchain::new(db, KeyPair::random(), ApiSender::closed());
     let blockchain = BlockchainBuilder::new(blockchain)
-        .with_genesis_config(genesis_config)
+        .with_genesis_config(genesis.build())
         .with_runtime(inspected)
         .build();
     (blockchain, events_handle, endpoints_rx)
@@ -271,8 +274,13 @@ fn test_basic_migration(freeze_service: bool) {
     // Check that transactions to the service are not dispatched.
     let tx = keypair.increment(CounterFactory::INSTANCE_ID, 5);
     drop(events.take());
+
     let err = execute_transaction(&mut blockchain, tx).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("unknown service with ID 100")
+    );
     assert_no_endpoint_update(&mut endpoints_rx);
 
     // Check that the migrating service does not receive hooks.

@@ -14,7 +14,7 @@
 
 //! Internal raw error representation.
 
-use failure::ensure;
+use anyhow::ensure;
 
 use std::fmt::Display;
 
@@ -137,11 +137,9 @@ impl ErrorKind {
         }
     }
 
-    pub(super) fn from_raw(
-        kind: errors_proto::ErrorKind,
-        code: u8,
-    ) -> Result<Self, failure::Error> {
+    pub(super) fn from_raw(kind: errors_proto::ErrorKind, code: u8) -> anyhow::Result<Self> {
         use errors_proto::ErrorKind::*;
+
         let kind = match kind {
             UNEXPECTED => {
                 ensure!(code == 0, "Error code for panic should be zero");

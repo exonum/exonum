@@ -28,6 +28,7 @@ use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
 /// Configuration parameters for a single web server.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct WebServerConfig {
     /// The socket address to bind.
     pub listen_address: SocketAddr,
@@ -72,7 +73,26 @@ pub struct ApiManagerConfig {
 #[derive(Debug, Clone)]
 pub struct UpdateEndpoints {
     /// Complete list of endpoints.
-    pub endpoints: Vec<(String, ApiBuilder)>,
+    endpoints: Vec<(String, ApiBuilder)>,
+}
+
+impl UpdateEndpoints {
+    /// Creates an update with the previous server endpoints completely replaced
+    /// by the provided endpoints.
+    pub fn new(endpoints: Vec<(String, ApiBuilder)>) -> Self {
+        Self { endpoints }
+    }
+
+    /// Iterates over paths updated in this object.
+    pub fn updated_paths(&self) -> impl Iterator<Item = &str> {
+        self.endpoints.iter().map(|(path, _)| path.as_str())
+    }
+
+    /// Converts this update into constituent endpoints.
+    #[doc(hidden)] // used by testkit; not stable yet
+    pub fn into_endpoints(self) -> Vec<(String, ApiBuilder)> {
+        self.endpoints
+    }
 }
 
 async fn with_retries<T>(

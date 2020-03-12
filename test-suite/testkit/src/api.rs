@@ -45,6 +45,7 @@ use crate::TestKit;
 ///
 /// [`TestKitApi`]: struct.TestKitApi.html
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum ApiKind {
     /// `api/system` endpoints of the system API node plugin. To access endpoints, the plugin
     /// must be attached to the testkit.
@@ -108,8 +109,8 @@ pub struct TestKitApi {
 }
 
 impl fmt::Debug for TestKitApi {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("TestKitApi").finish()
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        formatter.debug_struct("TestKitApi").finish()
     }
 }
 

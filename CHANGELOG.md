@@ -7,6 +7,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### General
+
+- Error handling is now performed with the `anyhow` crate instead of `failure`.
+  (#1805)
+
 #### exonum
 
 - Testkit now does not include incorrect transactions into blocks or memory pool,
@@ -19,6 +24,41 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `Schema::call_errors` was removed in favor of more comprehensive
   `call_records` method. (#1792)
 
+- `Blockchain::create_patch` and `Blockchain::commit` signatures were changed
+  due to unsoundness of the previous implementation; see "Bug Fixes" section
+  for more details. (#1809)
+- Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
+  error. (#1806)
+
+### exonum-api
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-cli
+
+- `NodeBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+- Submodules of the `command` module were made private; the relevant data types
+  are now exported from the `command` module directly. Similarly,
+  `io` module was made private. (#1799)
+
+#### exonum-explorer
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-proto
+
+- `impl_binary_value_for_pb_message` macro was removed. Use the `BinaryValue`
+  derive macro from the `exonum-derive` crate instead. (#1805)
+
+#### exonum-rust-runtime
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-supervisor
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
 #### exonum-system-api
 
 - Public api module has been removed. List of endpoints from private api has
@@ -30,6 +70,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - `v1/consensus_status` - enables or disables consensus on the node;
   - `v1/shutdown` - shuts down the node.
 
+- API data types were made non-exhaustive where appropriate. (#1799)
+
+### exonum-testkit
+
+- `TestKitBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
 ### New Features
 
 #### exonum
@@ -40,6 +89,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Core and the explorer service now support retrieving call status with
   a cryptographic proof of authenticity. (#1792)
+  
+- Exonum now supports unloading of unused service artifacts. This operation
+  may be used to free resources associated with artifacts in the runtime
+  hosting them. (#1794)
 
 #### exonum-supervisor
 
@@ -48,13 +101,24 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `supervisor/services` endpoint has been added which obtains information
   about deployed artifacts and available services. (#1790)
 
+- Supervisor service supports artifact unloading. (#1798)
+
 #### exonum-rust-runtime
 
 - Rust services support freezing. (#1780)
 
 - HTTP API of Rust services is now switched on during data migrations. (#1780)
 
+#### exonum-testkit
+
+- Testkit server now returns info on emulated nodes. (#1799)
+
 ### Internal Improvements
+
+#### exonum
+
+- Core now provides more thorough / context-dependent error descriptions
+  related to service lifecycle. (#1806)
 
 #### exonum-merkledb
 
@@ -62,6 +126,14 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   a significant performance boost for this operation. (#1791)
 
 ### Bug Fixes
+
+#### exonum
+
+- Fixed bug related to nodes forgetting transactions after executing
+  a block with them. Previously, nodes forgot all transactions
+  in the executed blocks; such transactions were removed from
+  the ephemeral transaction cache, but were not flushed to the DB
+  or anywhere else. This could lead to consensus hang-up. (#1809)
 
 #### exonum-node
 
@@ -73,6 +145,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   incorrect. (#1781)
 
 - Fixed incorrect invalidation of block proposals. (#1782)
+
+- Provided clear coherence period for the transaction pool
+  by introducing the `mempool.flush_config_timeout` configuration parameter.
+  Previously, transactions were flushed to the persistent pool
+  only on block commit. This led to the unexpected behavior of some APIs,
+  such as the transaction getter endpoint in the explorer service. (#1809)
 
 #### exonum-testkit
 

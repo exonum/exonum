@@ -17,7 +17,7 @@
 use exonum::runtime::SUPERVISOR_INSTANCE_ID;
 use exonum_api as api;
 use exonum_rust_runtime::{RustRuntime, ServiceFactory};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use crate::{
@@ -30,10 +30,9 @@ mod supervisor;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(Supervisor)
-        .with_default_rust_service(ApiService)
-        .with_migrating_rust_service(ApiServiceV2)
-        .with_artifact(ApiServiceV2.artifact_id())
+        .with(Spec::new(Supervisor).with_default_instance())
+        .with(Spec::new(ApiService).with_default_instance())
+        .with(Spec::migrating(ApiServiceV2))
         .build();
     let api = testkit.api();
     (testkit, api)

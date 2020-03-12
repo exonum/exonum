@@ -104,13 +104,8 @@ async fn test_confirm_proposal_with_api() {
     assert_eq!(config_proposal, pending_config.config_propose);
 
     // Confirm proposal
-    let tx_hash = confirm_config(
-        &testkit.api(),
-        ConfigVote {
-            propose_hash: pending_config.propose_hash,
-        },
-    )
-    .await;
+    let tx_hash =
+        confirm_config(&testkit.api(), ConfigVote::new(pending_config.propose_hash)).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
     testkit.create_blocks_until(CFG_CHANGE_HEIGHT.next());
@@ -144,9 +139,7 @@ async fn test_send_proposal_with_api() {
     let keypair = testkit.network().validators()[1].service_keypair();
     let signed_confirm = keypair.confirm_config_change(
         SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: pending_config.propose_hash,
-        },
+        ConfigVote::new(pending_config.propose_hash),
     );
     // Confirm proposal
     testkit
@@ -181,9 +174,7 @@ async fn apply_config(testkit: &mut TestKit) {
     let keypair = testkit.network().validators()[1].service_keypair();
     let signed_confirm = keypair.confirm_config_change(
         SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: pending_config.propose_hash,
-        },
+        ConfigVote::new(pending_config.propose_hash),
     );
 
     // Confirm proposal.

@@ -286,16 +286,10 @@ impl Rig {
 
     fn create_block(&mut self, fork: Fork) -> Block {
         let height = CoreSchema::new(&fork).next_height();
-        let (block_hash, patch) = self.blockchain.create_patch_inner(
-            fork,
-            ValidatorId(0),
-            height,
-            &[],
-            &mut BTreeMap::new(),
-        );
-        self.blockchain
-            .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-            .unwrap();
+        let (block_hash, patch) =
+            self.blockchain
+                .create_patch_inner(fork, ValidatorId(0), height, &[], &());
+        self.blockchain.commit(patch, block_hash, vec![]).unwrap();
         self.blockchain.as_ref().last_block()
     }
 
@@ -357,7 +351,7 @@ fn test_migration_workflow(freeze_service: bool) {
         .unwrap_err();
     assert_eq!(
         err,
-        ErrorMatch::from_fail(&CoreError::ServiceNotStopped)
+        ErrorMatch::from_fail(&CoreError::InvalidServiceTransition)
             .with_description_containing("Data migration cannot be initiated")
     );
 
@@ -575,7 +569,11 @@ fn migration_immediate_errors() {
         .dispatcher()
         .initiate_migration(&fork, new_artifact, "bogus-service")
         .unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("for non-existing service `bogus-service`")
+    );
 
     // Attempt to migrate to unknown artifact.
     let unknown_artifact = ArtifactId::from_raw_parts(
@@ -903,18 +901,24 @@ fn migration_rollback_invariants() {
     // Non-existing service.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::rollback_migration(&fork, "bogus").unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("Cannot rollback migration for unknown service `bogus`")
+    );
 
     // Service is not stopped.
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
+    let no_migration_match = ErrorMatch::from_fail(&CoreError::NoMigration)
+        .with_description_containing("it has no ongoing migration");
+    assert_eq!(err, no_migration_match);
 
     rig.stop_service(&service);
 
     // Service is stopped, but there is no migration happening.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
+    assert_eq!(err, no_migration_match);
 
     // Start migration and commit its result, thus making the rollback impossible.
     rig.dispatcher()
@@ -932,7 +936,7 @@ fn migration_rollback_invariants() {
     // ...In the next block, we'll get another error.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::rollback_migration(&fork, &service.name).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
+    assert_eq!(err, no_migration_match);
 }
 
 /// Tests that migration rollback aborts locally executed migration script.
@@ -1049,18 +1053,24 @@ fn migration_commit_invariants() {
     // Non-existing service.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::commit_migration(&fork, "bogus", Hash::zero()).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("Cannot commit migration for unknown service `bogus`")
+    );
 
     // Service is not stopped.
     let err = Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
+    let no_migration_match = ErrorMatch::from_fail(&CoreError::NoMigration)
+        .with_description_containing("Cannot commit migration for service `100:good`");
+    assert_eq!(err, no_migration_match);
 
     rig.stop_service(&service);
 
     // Service is stopped, but there is no migration happening.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::commit_migration(&fork, &service.name, Hash::zero()).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
+    assert_eq!(err, no_migration_match);
 
     // Start migration and commit its result, making the second commit impossible.
     rig.dispatcher()
@@ -1076,10 +1086,11 @@ fn migration_commit_invariants() {
     let err = Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::ServicePending));
     rig.create_block(fork);
+
     // ...In the next block, we'll get another error.
     let fork = rig.blockchain.fork();
     let err = Dispatcher::commit_migration(&fork, &service.name, migration_hash).unwrap_err();
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::NoMigration));
+    assert_eq!(err, no_migration_match);
 }
 
 /// Tests that a migration commit after the migration script finished locally with an error

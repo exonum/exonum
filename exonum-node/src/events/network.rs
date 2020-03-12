@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::{bail, ensure, format_err};
 use exonum::{
     crypto::{
         x25519::{self, into_x25519_public_key},
@@ -19,7 +20,6 @@ use exonum::{
     },
     messages::{SignedMessage, Verified},
 };
-use failure::{bail, ensure, format_err};
 use futures::{channel::mpsc, future, prelude::*};
 use futures_retry::{ErrorHandler, FutureRetry, RetryPolicy};
 use rand::{thread_rng, Rng};
@@ -320,7 +320,7 @@ impl NetworkHandler {
         }
     }
 
-    async fn listener(self) -> Result<(), failure::Error> {
+    async fn listener(self) -> anyhow::Result<()> {
         let mut listener = TcpListener::bind(&self.listen_address).await?;
         let mut incoming_connections = listener.incoming();
 
@@ -392,7 +392,7 @@ impl NetworkHandler {
         &self,
         key: PublicKey,
         handshake_params: &HandshakeParams,
-    ) -> impl Future<Output = Result<(), failure::Error>> {
+    ) -> impl Future<Output = anyhow::Result<()>> {
         // Resolve peer key to an address.
         let maybe_address = self.connect_list.find_address_by_key(&key);
         let unresolved_address = if let Some(address) = maybe_address {
@@ -498,7 +498,7 @@ impl NetworkHandler {
                     "Connection with peer {} terminated: {} (root cause: {})",
                     key,
                     err,
-                    err.find_root_cause()
+                    err.root_cause()
                 );
             }
         });
@@ -508,7 +508,7 @@ impl NetworkHandler {
     fn configure_socket(
         socket: &mut TcpStream,
         network_config: NetworkConfiguration,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         socket.set_nodelay(network_config.tcp_nodelay)?;
         let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
         socket.set_keepalive(duration)?;
@@ -520,7 +520,7 @@ impl NetworkHandler {
         connect: Verified<Connect>,
         pool: SharedConnectionPool,
         mut network_tx: mpsc::Sender<NetworkEvent>,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         let address = connection.address.clone();
         log::trace!("Established connection with peer {:?}", address);
 
@@ -532,7 +532,7 @@ impl NetworkHandler {
     fn parse_connect_msg(
         raw: Vec<u8>,
         key: &x25519::PublicKey,
-    ) -> Result<Verified<Connect>, failure::Error> {
+    ) -> anyhow::Result<Verified<Connect>> {
         let message = Message::from_raw_buffer(raw)?;
         let connect: Verified<Connect> = match message {
             Message::Service(Service::Connect(connect)) => connect,
@@ -580,7 +580,7 @@ impl NetworkHandler {
         &mut self,
         address: PublicKey,
         message: SignedMessage,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         if self.pool.read().contains(&address) {
             self.pool.send_message(&address, message).await;
             Ok(())
@@ -595,7 +595,7 @@ impl NetworkHandler {
         &self,
         key: PublicKey,
         message: SignedMessage,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         self.connect(key, &self.handshake_params).await?;
         let connect = &self.handshake_params.connect;
         if message != *connect.as_raw() {
@@ -608,7 +608,7 @@ impl NetworkHandler {
         address: ConnectedPeerAddr,
         message: Verified<Connect>,
         network_tx: &mut mpsc::Sender<NetworkEvent>,
-    ) -> Result<(), failure::Error> {
+    ) -> anyhow::Result<()> {
         let peer_connected = NetworkEvent::PeerConnected(address, message);
         network_tx
             .send(peer_connected)
@@ -620,7 +620,7 @@ impl NetworkHandler {
         self.pool.read().count_outgoing() < self.network_config.max_outgoing_connections
     }
 
-    async fn send_unable_connect_event(&mut self, peer: PublicKey) -> Result<(), failure::Error> {
+    async fn send_unable_connect_event(&mut self, peer: PublicKey) -> anyhow::Result<()> {
         let event = NetworkEvent::UnableConnectToPeer(peer);
         self.network_tx
             .send(event)

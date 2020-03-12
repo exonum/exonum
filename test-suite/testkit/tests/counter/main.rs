@@ -21,7 +21,7 @@ use exonum::{
 };
 use exonum_explorer::{api::TransactionResponse, BlockchainExplorer};
 use exonum_merkledb::{access::Access, HashTag, ObjectHash, Snapshot};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 
 use std::collections::HashSet;
@@ -359,7 +359,7 @@ fn test_explorer_with_before_transactions_error() {
 async fn test_explorer_single_block() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_default_rust_service(CounterService)
+        .with(Spec::new(CounterService).with_default_instance())
         .build();
 
     assert_eq!(testkit.majority_count(), 3);

@@ -14,10 +14,10 @@
 
 //! Standard Exonum CLI command used to perform different maintenance actions.
 
+use anyhow::Error;
 use exonum::merkledb::{migration::rollback_migration, Database, RocksDB};
 use exonum::runtime::remove_local_migration_result;
 use exonum_node::helpers::clear_consensus_messages_cache;
-use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -31,24 +31,29 @@ use crate::{
 
 /// Perform different maintenance actions.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Maintenance {
     /// Path to a node configuration file.
     #[structopt(long, short = "c")]
     pub node_config: PathBuf,
+
     /// Path to a database directory.
     #[structopt(long, short = "d")]
     pub db_path: PathBuf,
+
     /// Action to be performed.
     #[structopt(subcommand)]
-    pub action: Action,
+    pub action: MaintenanceAction,
 }
 
 /// Available maintenance actions.
 #[derive(StructOpt, Debug, Clone, Serialize, Deserialize)]
-pub enum Action {
+#[non_exhaustive]
+pub enum MaintenanceAction {
     /// Clear consensus messages cache.
     #[structopt(name = "clear-cache")]
     ClearCache,
+
     /// Restart migration script.
     #[structopt(name = "restart-migration")]
     RestartMigration {
@@ -57,7 +62,7 @@ pub enum Action {
     },
 }
 
-impl Action {
+impl MaintenanceAction {
     fn clear_cache(node_config: &Path, db_path: &Path) -> Result<(), Error> {
         let node_config: NodeConfig = load_config_file(node_config)?;
         let db: Box<dyn Database> = Box::new(RocksDB::open(
@@ -92,11 +97,18 @@ impl Action {
 impl ExonumCommand for Maintenance {
     fn execute(self) -> Result<StandardResult, Error> {
         match self.action {
-            Action::ClearCache => Action::clear_cache(&self.node_config, &self.db_path)?,
-            Action::RestartMigration { ref service_name } => {
-                Action::restart_migration(&self.node_config, &self.db_path, service_name)?
+            MaintenanceAction::ClearCache => {
+                MaintenanceAction::clear_cache(&self.node_config, &self.db_path)?
+            }
+            MaintenanceAction::RestartMigration { ref service_name } => {
+                MaintenanceAction::restart_migration(
+                    &self.node_config,
+                    &self.db_path,
+                    service_name,
+                )?
             }
         }
+
         Ok(StandardResult::Maintenance {
             node_config_path: self.node_config,
             db_path: self.db_path,

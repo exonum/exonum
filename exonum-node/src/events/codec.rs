@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::bail;
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use exonum::{
     merkledb::BinaryValue,
     messages::{SignedMessage, SIGNED_MESSAGE_MIN_SIZE},
 };
-use failure::bail;
 use tokio_util::codec::{Decoder, Encoder};
 
 use std::mem;
@@ -44,7 +44,7 @@ impl MessagesCodec {
 
 impl Decoder for MessagesCodec {
     type Item = Vec<u8>;
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Framing level
@@ -80,7 +80,7 @@ impl Decoder for MessagesCodec {
 
 impl Encoder for MessagesCodec {
     type Item = SignedMessage;
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
         self.session.encrypt_msg(&msg.into_bytes(), buf)?;
@@ -105,7 +105,7 @@ mod test {
         messages::Status,
     };
 
-    fn get_decoded_message(data: &[u8]) -> Result<Option<Vec<u8>>, failure::Error> {
+    fn get_decoded_message(data: &[u8]) -> anyhow::Result<Option<Vec<u8>>> {
         let (mut responder, mut initiator) = create_encrypted_codecs();
         let mut bytes: BytesMut = BytesMut::new();
         initiator.session.encrypt_msg(data, &mut bytes).unwrap();

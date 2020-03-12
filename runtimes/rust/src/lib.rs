@@ -332,6 +332,7 @@ pub use self::{
 };
 
 pub mod api;
+pub mod spec;
 
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
@@ -651,9 +652,7 @@ impl RustRuntime {
             let user_endpoints = self.api_endpoints();
             // FIXME: this should either be made async, or an unbounded channel should be used.
             if !self.api_notifier.is_closed() {
-                let send_task = self.api_notifier.send(UpdateEndpoints {
-                    endpoints: user_endpoints,
-                });
+                let send_task = self.api_notifier.send(UpdateEndpoints::new(user_endpoints));
                 executor::block_on(send_task).ok();
             }
         }

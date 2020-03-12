@@ -42,7 +42,7 @@ fn main() {
     );
 }
 
-fn generate_json(passphrase: &str, seed: &str) -> Result<serde_json::Value, failure::Error> {
+fn generate_json(passphrase: &str, seed: &str) -> anyhow::Result<serde_json::Value> {
     let seed = hex::decode(seed)?;
     let (keys, encrypted_key) = generate_keys_from_seed(passphrase.as_bytes(), &seed)?;
     let file_content = toml::to_string_pretty(&encrypted_key)?;

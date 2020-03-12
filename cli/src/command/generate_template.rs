@@ -14,9 +14,9 @@
 
 //! Standard Exonum CLI command used to generate common configuration file.
 
+use anyhow::Error;
 use exonum::blockchain::ConsensusConfig;
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use failure::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -30,12 +30,15 @@ use crate::{
 
 /// Generate common part of the nodes configuration.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct GenerateTemplate {
     /// Path to a node configuration template file.
     pub common_config: PathBuf,
+
     /// Number of validators in the network.
     #[structopt(long)]
     pub validators_count: u32,
+
     /// Supervisor service mode. Possible options are "simple" and "decentralized".
     #[structopt(long, default_value = "simple")]
     pub supervisor_mode: SupervisorMode,

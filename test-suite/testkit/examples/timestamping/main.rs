@@ -20,7 +20,7 @@ use exonum::{
     runtime::{ExecutionContext, ExecutionError, SnapshotExt},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{Service, ServiceFactory};
+use exonum_rust_runtime::{spec::Spec, Service};
 use exonum_testkit::TestKitBuilder;
 
 #[exonum_interface(auto_ids)]
@@ -48,12 +48,9 @@ fn main() {
     let instance_id = 512;
     // Create a testkit for a network with four validators.
     let service = TimestampingService;
-    let artifact = service.artifact_id();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(4)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(instance_id, "timestamping"))
-        .with_rust_service(service)
+        .with(Spec::new(service).with_instance(instance_id, "timestamping", ()))
         .build();
     // Create few transactions.
     let keypair = KeyPair::random();

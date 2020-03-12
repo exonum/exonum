@@ -158,7 +158,7 @@ impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
         buf.into_inner()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut values = BTreeSet::new();
 
         // Read the sequence of the (byte size, value bytes) pairs and deserialize them.

@@ -57,11 +57,9 @@
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
+//!     .with(Supervisor::simple())
 //!     .build();
 //!
 //! let consensus_config: ConsensusConfig = testkit
@@ -69,7 +67,6 @@
 //!     .public(ApiKind::Service("supervisor"))
 //!     .get("consensus-config")
 //!     .await?;
-//!
 //! # Ok(())
 //! # }
 //! ```
@@ -94,13 +91,9 @@
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let pending_proposal: Option<ConfigProposalWithHash> = testkit
 //!     .api()
@@ -133,13 +126,9 @@
 //! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let services_info: DispatcherInfo = testkit
 //!     .api()
@@ -193,25 +182,16 @@
 //! #
 //! # impl Service for SomeService {}
 //! #
-//! # fn config_for_service() -> Vec<u8> {
-//! #     Vec::new()
-//! # }
+//! # fn config_for_artifact() -> Vec<u8> { Vec::new() }
 //! #
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! // In this example, we will try to deploy `SomeService` artifact.
-//! let deploy_request = DeployRequest {
-//!     artifact: SomeService.artifact_id(),
-//!     spec: config_for_service(),
-//!     deadline_height: Height(10),
-//! };
+//! let deploy_request = DeployRequest::new(SomeService.artifact_id(), Height(10))
+//!     .with_spec(config_for_artifact());
 //!
 //! // `deploy_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
@@ -264,11 +244,9 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_rust_service(Supervisor)
-//!     .with_artifact(Supervisor.artifact_id())
-//!     .with_instance(Supervisor::simple())
+//!     .with(Supervisor::simple())
 //!     // Add some service that supports migrations...
 //!     .build();
 //!
@@ -339,13 +317,9 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(0));
@@ -405,13 +379,11 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
+//! #         .with(Supervisor::simple())
 //! #         .build();
 //! let proposal: ConfigPropose = // Proposal creation skipped...
 //! # ConfigPropose::new(0, Height(10));
@@ -470,13 +442,9 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let configuration_number: u64 = testkit
 //!     .api()
@@ -509,13 +477,9 @@
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
 //! let config: SupervisorConfig = testkit
 //!     .api()
@@ -544,7 +508,7 @@
 //!
 //! ```
 //! # use exonum::{crypto::Hash, helpers::Height, merkledb::BinaryValue};
-//! # use exonum_rust_runtime::ServiceFactory;
+//! # use exonum_rust_runtime::{spec::{JustFactory, Spec}, ServiceFactory};
 //! use exonum_supervisor::{
 //!     api::DeployInfoQuery, DeployRequest, AsyncEventState, Supervisor,
 //! };
@@ -560,21 +524,15 @@
 //! # impl Service for SomeService {}
 //! #
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .with_rust_service(SomeService)
+//! #         .with(Supervisor::simple())
+//! #         .with(JustFactory::new(SomeService))
 //! #         .build();
 //!
 //! let deploy_request: DeployRequest = // Some previously performed deploy request.
-//! #     DeployRequest {
-//! #         artifact: SomeService.artifact_id(),
-//! #         spec: Vec::new(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     DeployRequest::new(SomeService.artifact_id(), Height(10));
 //! # // Request deploy, so we will be able to request its state.
 //! # let _hash: Hash = testkit
 //! #     .api()
@@ -618,13 +576,9 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
-//! #     TestKitBuilder::validator()
-//! #         .with_rust_service(Supervisor)
-//! #         .with_artifact(Supervisor.artifact_id())
-//! #         .with_instance(Supervisor::simple())
-//! #         .build();
+//! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
 //! #     MigrationRequest {
 //! #         new_artifact: Supervisor.artifact_id(),
@@ -775,6 +729,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
 
 /// Services info response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[non_exhaustive]
 pub struct DispatcherInfo {
     /// List of deployed artifacts.
     pub artifacts: Vec<ArtifactId>,

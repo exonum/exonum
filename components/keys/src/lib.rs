@@ -24,7 +24,7 @@
 //! use exonum_keys::{generate_keys, read_keys_from_file};
 //! use tempdir::TempDir;
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let dir = TempDir::new("test_keys")?;
 //! let file_path = dir.path().join("private_key.toml");
 //! let pass_phrase = b"super_secret_passphrase";
@@ -54,8 +54,8 @@
     clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
+use anyhow::format_err;
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
@@ -193,7 +193,7 @@ impl EncryptedMasterKey {
 }
 
 /// Creates a TOML file that contains encrypted master and returns `Keys` derived from it.
-pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys, failure::Error> {
+pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> anyhow::Result<Keys> {
     let tree = SecretTree::new(&mut thread_rng());
     let encrypted_key = EncryptedMasterKey::encrypt(tree.seed(), passphrase)?;
     save_master_key(path, &encrypted_key)?;
@@ -205,7 +205,7 @@ pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys,
 pub fn generate_keys_from_seed(
     passphrase: &[u8],
     seed: &[u8],
-) -> Result<(Keys, EncryptedMasterKey), failure::Error> {
+) -> anyhow::Result<(Keys, EncryptedMasterKey)> {
     let tree = SecretTree::from_seed(seed)
         .ok_or_else(|| format_err!("Error creating SecretTree from seed"))?;
     let encrypted_key = EncryptedMasterKey::encrypt(tree.seed(), passphrase)?;
@@ -232,7 +232,7 @@ fn generate_keys_from_master_password(tree: &SecretTree) -> Keys {
 pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
     pass_phrase: W,
-) -> Result<Keys, failure::Error> {
+) -> anyhow::Result<Keys> {
     let mut key_file = File::open(path)?;
 
     #[cfg(unix)]

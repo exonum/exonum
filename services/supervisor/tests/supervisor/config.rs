@@ -19,8 +19,7 @@ use exonum::{
     merkledb::ObjectHash,
     runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::ServiceFactory;
-use exonum_testkit::TestKitBuilder;
+use exonum_testkit::{Spec, TestKitBuilder};
 
 use crate::{utils::*, IncService as ConfigChangeService};
 use exonum_supervisor::{
@@ -157,12 +156,8 @@ fn test_discard_config_with_not_enough_confirms() {
 
     // Sign confirmation transaction by second validator
     let keypair = testkit.network().validators()[1].service_keypair();
-    let signed_confirm = keypair.confirm_config_change(
-        SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: proposal_hash,
-        },
-    );
+    let signed_confirm =
+        keypair.confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash));
     testkit
         .create_block_with_transaction(signed_confirm)
         .transactions[0]
@@ -196,9 +191,7 @@ fn test_apply_config_by_min_required_majority() {
         .status()
         .expect("Transaction with change propose discarded.");
 
-    let confirm = ConfigVote {
-        propose_hash: proposal_hash,
-    };
+    let confirm = ConfigVote::new(proposal_hash);
     // Sign and send confirmation transaction by second validator
     let keys = testkit.network().validators()[1].service_keypair();
     let tx = keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, confirm.clone());
@@ -240,12 +233,8 @@ fn test_send_confirmation_by_initiator() {
 
     // Try to send confirmation transaction by the initiator
     let keys = testkit.network().us().service_keypair();
-    let signed_confirm = keys.confirm_config_change(
-        SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: proposal_hash,
-        },
-    );
+    let signed_confirm =
+        keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash));
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();
@@ -297,12 +286,8 @@ fn test_confirm_config_by_incorrect_validator() {
         .expect("Transaction with change propose discarded.");
 
     let keys = KeyPair::random();
-    let signed_confirm = keys.confirm_config_change(
-        SUPERVISOR_INSTANCE_ID,
-        ConfigVote {
-            propose_hash: proposal_hash,
-        },
-    );
+    let signed_confirm =
+        keys.confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(proposal_hash));
 
     let block = testkit.create_block_with_transaction(signed_confirm);
     let err = block.transactions[0].status().unwrap_err();
@@ -495,19 +480,15 @@ fn test_another_configuration_change_proposal() {
 fn test_service_config_discard_fake_supervisor() {
     const FAKE_SUPERVISOR_ID: InstanceId = 5;
     let keypair = KeyPair::random();
-    let fake_supervisor_artifact = Supervisor.artifact_id();
-
-    let fake_supervisor_instance = fake_supervisor_artifact
-        .clone()
-        .into_default_instance(FAKE_SUPERVISOR_ID, "fake-supervisor")
-        .with_constructor(Supervisor::decentralized_config());
 
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_rust_service(Supervisor)
-        .with_artifact(fake_supervisor_artifact)
-        .with_instance(fake_supervisor_instance)
-        .with_default_rust_service(ConfigChangeService)
+        .with(Spec::new(Supervisor).with_instance(
+            FAKE_SUPERVISOR_ID,
+            "fake-supervisor",
+            Supervisor::decentralized_config(),
+        ))
+        .with(Spec::new(ConfigChangeService).with_default_instance())
         .build();
 
     let params = "I am a new parameter".to_owned();

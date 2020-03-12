@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::bail;
 use async_trait::async_trait;
 use exonum::{
     crypto::{
@@ -21,7 +22,6 @@ use exonum::{
     merkledb::BinaryValue,
     messages::Verified,
 };
-use failure::bail;
 use tokio::io::{AsyncRead, AsyncWrite};
 
 use super::wrapper::NoiseWrapper;
@@ -97,7 +97,7 @@ impl NoiseHandshake {
         }
     }
 
-    pub async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> Result<Vec<u8>, failure::Error>
+    pub async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> anyhow::Result<Vec<u8>>
     where
         S: AsyncRead + Unpin,
     {
@@ -106,11 +106,7 @@ impl NoiseHandshake {
         Ok(message)
     }
 
-    pub async fn write_handshake_msg<S>(
-        &mut self,
-        stream: &mut S,
-        msg: &[u8],
-    ) -> Result<(), failure::Error>
+    pub async fn write_handshake_msg<S>(&mut self, stream: &mut S, msg: &[u8]) -> anyhow::Result<()>
     where
         S: AsyncWrite + Unpin,
     {
@@ -118,7 +114,7 @@ impl NoiseHandshake {
         HandshakeRawMessage(buf).write(stream).await
     }
 
-    pub fn finalize(self, raw_message: Vec<u8>) -> Result<HandshakeData, failure::Error> {
+    pub fn finalize(self, raw_message: Vec<u8>) -> anyhow::Result<HandshakeData> {
         let peer_key = {
             // Panic because with selected handshake pattern we must have
             // `remote_static_key` on final step of handshake.
@@ -157,7 +153,7 @@ impl<S> Handshake<S> for NoiseHandshake
 where
     S: AsyncRead + AsyncWrite + Send + Unpin,
 {
-    async fn listen(mut self, stream: &mut S) -> Result<HandshakeData, failure::Error> {
+    async fn listen(mut self, stream: &mut S) -> anyhow::Result<HandshakeData> {
         self.read_handshake_msg(stream).await?;
         self.write_handshake_msg(stream, &self.connect.to_bytes())
             .await?;
@@ -165,7 +161,7 @@ where
         self.finalize(raw_message)
     }
 
-    async fn send(mut self, stream: &mut S) -> Result<HandshakeData, failure::Error> {
+    async fn send(mut self, stream: &mut S) -> anyhow::Result<HandshakeData> {
         self.write_handshake_msg(stream, &[]).await?;
         let message = self.read_handshake_msg(stream).await?;
         self.write_handshake_msg(stream, &self.connect.to_bytes())

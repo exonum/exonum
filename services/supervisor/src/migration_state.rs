@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum::{
     crypto::Hash,
     runtime::{versioning::Version, ExecutionError},
@@ -27,6 +28,7 @@ use super::{proto, AsyncEventState, MigrationError};
 #[derive(ProtobufConvert, BinaryValue)]
 #[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::MigrationState")]
+#[non_exhaustive]
 pub struct MigrationState {
     /// Migration process state.
     #[serde(rename = "state")]

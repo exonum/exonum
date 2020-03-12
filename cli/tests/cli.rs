@@ -15,15 +15,6 @@
 // This is a regression test for exonum configuration.
 
 use exonum::{blockchain::ValidatorKeys, crypto::KeyPair};
-use exonum_cli::{
-    command::{
-        finalize::Finalize, generate_config::GenerateConfig, generate_template::GenerateTemplate,
-        run::Run, Command, ExonumCommand, StandardResult,
-    },
-    config::{GeneralConfig, NodePrivateConfig, NodePublicConfig},
-    io::{load_config_file, save_config_file},
-    password::DEFAULT_MASTER_PASS_ENV_VAR,
-};
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use pretty_assertions::assert_eq;
 use structopt::StructOpt;
@@ -37,7 +28,16 @@ use std::{
     fs::{self, OpenOptions},
     panic,
     path::{Path, PathBuf},
-    str::FromStr,
+};
+
+use exonum_cli::{
+    command::{
+        Command, ExonumCommand, Finalize, GenerateConfig, GenerateTemplate, Run, StandardResult,
+    },
+    config::{GeneralConfig, NodePrivateConfig, NodePublicConfig},
+    load_config_file,
+    password::DEFAULT_MASTER_PASS_ENV_VAR,
+    save_config_file,
 };
 
 #[derive(Debug)]
@@ -129,6 +129,7 @@ impl ConfigSpec {
         match mode {
             SupervisorMode::Simple => self.expected_dir().join("template.simple.toml"),
             SupervisorMode::Decentralized => self.expected_dir().join("template.dec.toml"),
+            _ => unreachable!("Not tested"),
         }
     }
 
@@ -175,7 +176,7 @@ impl ArgsBuilder {
         self
     }
 
-    fn run(self) -> Result<StandardResult, failure::Error> {
+    fn run(self) -> anyhow::Result<StandardResult> {
         let command = <Command as StructOpt>::from_iter_safe(self.args).unwrap();
         command.execute()
     }
@@ -197,7 +198,7 @@ fn touch(path: impl AsRef<Path>) {
         .unwrap();
 }
 
-fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> Result<(), failure::Error> {
+fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> anyhow::Result<()> {
     let mut source_file = fs::File::open(&from)?;
 
     let mut destination_file = {
@@ -522,7 +523,7 @@ fn run_node_with_decentralized_supervisor() {
 }
 
 #[test]
-fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> {
+fn different_supervisor_modes_in_public_configs() -> anyhow::Result<()> {
     let pub_config_1 = public_config(SupervisorMode::Simple);
     let pub_config_2 = public_config(SupervisorMode::Decentralized);
     let private_config = NodePrivateConfig {
@@ -547,15 +548,14 @@ fn different_supervisor_modes_in_public_configs() -> Result<(), failure::Error> 
     save_config_file(&pub_config_2, &pub_config_2_path)?;
     save_config_file(&private_config, &private_config_path)?;
 
-    let finalize = Finalize {
-        private_config_path: testnet_dir.path().join("sec.toml"),
-        output_config_path: testnet_dir.path().join("node.toml"),
-        public_configs: vec![pub_config_1_path, pub_config_2_path],
-        public_api_address: None,
-        private_api_address: None,
-        public_allow_origin: None,
-        private_allow_origin: None,
-    };
+    let finalize = Finalize::from_iter_safe(vec![
+        "executable".as_ref(),
+        testnet_dir.path().join("sec.toml").as_os_str(),
+        testnet_dir.path().join("node.toml").as_os_str(),
+        "-p".as_ref(),
+        pub_config_1_path.as_os_str(),
+        pub_config_2_path.as_os_str(),
+    ])?;
     let err = finalize.execute().err().unwrap();
     assert!(err
         .to_string()
@@ -579,27 +579,28 @@ fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
     }
 }
 
-fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), failure::Error> {
+fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> anyhow::Result<()> {
     let testnet_dir = tempfile::tempdir()?;
-
     let common_config_path = testnet_dir.path().join("common.toml");
 
-    let generate_template = GenerateTemplate {
-        common_config: common_config_path.clone(),
-        validators_count: 1,
-        supervisor_mode: supervisor_mode.clone(),
-    };
+    let generate_template = GenerateTemplate::from_iter_safe(vec![
+        "executable".as_ref(),
+        common_config_path.as_os_str(),
+        "--validators-count".as_ref(),
+        "1".as_ref(),
+        "--supervisor-mode".as_ref(),
+        supervisor_mode.to_string().as_ref(),
+    ])?;
     generate_template.execute()?;
 
-    let generate_config = GenerateConfig {
-        common_config: common_config_path,
-        output_dir: testnet_dir.path().to_owned(),
-        peer_address: "127.0.0.1:5400".parse().unwrap(),
-        listen_address: None,
-        no_password: true,
-        master_key_pass: None,
-        master_key_path: None,
-    };
+    let generate_config = GenerateConfig::from_iter_safe(vec![
+        "executable".as_ref(),
+        common_config_path.as_os_str(),
+        testnet_dir.path().as_os_str(),
+        "-a".as_ref(),
+        "127.0.0.1:5400".as_ref(),
+        "--no-password".as_ref(),
+    ])?;
     let (public_config, secret_config) = match generate_config.execute()? {
         StandardResult::GenerateConfig {
             public_config_path,
@@ -611,24 +612,24 @@ fn run_node_with_supervisor(supervisor_mode: &SupervisorMode) -> Result<(), fail
 
     let node_config_path = testnet_dir.path().join("node.toml");
 
-    let finalize = Finalize {
-        private_config_path: secret_config,
-        output_config_path: node_config_path.clone(),
-        public_configs: vec![public_config],
-        public_api_address: None,
-        private_api_address: None,
-        public_allow_origin: None,
-        private_allow_origin: None,
-    };
+    let finalize = Finalize::from_iter_safe(vec![
+        "executable".as_ref(),
+        secret_config.as_os_str(),
+        node_config_path.as_os_str(),
+        "-p".as_ref(),
+        public_config.as_os_str(),
+    ])?;
     finalize.execute()?;
 
-    let run = Run {
-        node_config: node_config_path,
-        db_path: testnet_dir.path().to_owned(),
-        public_api_address: None,
-        private_api_address: None,
-        master_key_pass: Some(FromStr::from_str("pass:")?),
-    };
+    let run = Run::from_iter_safe(vec![
+        "executable".as_ref(),
+        "-c".as_ref(),
+        node_config_path.as_os_str(),
+        "-d".as_ref(),
+        testnet_dir.path().as_os_str(),
+        "--master-key-pass".as_ref(),
+        "pass:".as_ref(),
+    ])?;
 
     if let StandardResult::Run(config) = run.execute()? {
         assert_eq!(

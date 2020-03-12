@@ -38,7 +38,7 @@ use futures::{channel::mpsc, FutureExt, StreamExt};
 use serde_derive::*;
 
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     sync::{Arc, Mutex},
 };
 
@@ -51,9 +51,7 @@ pub fn execute_transaction(
     let tx_hash = tx.object_hash();
 
     let (block_hash, patch) = create_block_with_transactions(blockchain, vec![tx]);
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = CoreSchema::new(&snapshot);
@@ -72,12 +70,7 @@ pub fn create_block_with_transactions(
         CoreSchema::new(&snapshot).next_height()
     };
 
-    blockchain.create_patch(
-        ValidatorId::zero(),
-        height,
-        &tx_hashes,
-        &mut BTreeMap::new(),
-    )
+    blockchain.create_patch(ValidatorId::zero(), height, &tx_hashes, &())
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {
@@ -109,11 +102,7 @@ pub fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) ->
         .now_or_never()
         .expect("No endpoint update")
         .expect("Node sender was dropped");
-    received
-        .endpoints
-        .into_iter()
-        .map(|(path, _)| path)
-        .collect()
+    received.updated_paths().map(ToOwned::to_owned).collect()
 }
 
 pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) {
@@ -121,11 +110,7 @@ pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoin
     if let Some(update) = maybe_update {
         panic!(
             "Unexpected endpoints update: {:?}",
-            update
-                .endpoints
-                .into_iter()
-                .map(|(path, _)| path)
-                .collect::<Vec<_>>()
+            update.updated_paths().collect::<Vec<_>>()
         );
     }
 }

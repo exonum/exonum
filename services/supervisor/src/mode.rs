@@ -21,19 +21,20 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
+use anyhow::format_err;
 use exonum::{crypto::Hash, helpers::byzantine_quorum};
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use super::{multisig::MultisigIndex, proto, DeployRequest, MigrationRequest};
 
 /// Supervisor operating mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -54,7 +55,7 @@ impl ProtobufConvert for Mode {
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let result = match pb {
             proto::SupervisorMode::SIMPLE => Self::Simple,
             proto::SupervisorMode::DECENTRALIZED => Self::Decentralized,
@@ -125,8 +126,17 @@ impl Mode {
     }
 }
 
+impl fmt::Display for Mode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Simple => "simple",
+            Self::Decentralized => "decentralized",
+        })
+    }
+}
+
 impl FromStr for Mode {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {

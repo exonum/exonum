@@ -324,9 +324,9 @@ where
     if n_validators == 1 {
         try_add_round_with_transactions(sandbox, sandbox_state, hashes.as_ref())?;
         let block = sandbox.last_block();
-        assert_eq!(block.tx_hash, compute_txs_merkle_root(&hashes));
         assert_eq!(block.tx_count, hashes.len() as u32);
         assert_eq!(block.height, initial_height);
+        assert_eq!(block.tx_hash, compute_txs_merkle_root(&hashes));
         sandbox.assert_state(new_height, Round(1));
 
         return Ok(hashes);

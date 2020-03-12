@@ -60,6 +60,7 @@ pub use crate::{
 };
 
 use actix_rt::System;
+use anyhow::{ensure, format_err};
 use exonum::{
     blockchain::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
@@ -76,7 +77,6 @@ use exonum_api::{
     AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
     WebServerConfig,
 };
-use failure::{ensure, format_err};
 use futures::{channel::mpsc, TryFutureExt};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
@@ -127,11 +127,6 @@ pub mod _bench_types {
 }
 
 /// External messages sent to the node.
-///
-/// # Stability
-///
-/// This enum is not intended to be exhaustively matched. New variants may be added to it
-/// without breaking semver compatibility.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ExternalMessage {
@@ -158,6 +153,8 @@ pub(crate) enum NodeTimeout {
     UpdateApiState,
     /// Exchange peers timeout.
     PeerExchange,
+    /// Flush uncommitted transactions into the database.
+    FlushPool,
 }
 
 /// A helper trait that provides the node with information about the state of the system such
@@ -315,13 +312,69 @@ impl Default for EventsPoolCapacity {
 
 /// Memory pool configuration parameters.
 ///
-/// The internal structure of this type is an implementation detail. For most applications,
-/// you should use the value returned by `Default::default()`.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+/// # Examples
+///
+/// For most applications, you should use the value returned by `MemoryPoolConfig::default()`, maybe
+/// overwriting some fields afterwards:
+///
+/// ```
+/// # use exonum_node::{FlushPoolStrategy, MemoryPoolConfig};
+/// let mut pool_config = MemoryPoolConfig::default();
+/// // Increase flush pool interval to 100 milliseconds.
+/// pool_config.flush_pool_strategy = FlushPoolStrategy::Timeout {
+///     timeout: 100,
+/// };
+/// // Use the config somewhere...
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    events_pool_capacity: EventsPoolCapacity,
+    pub events_pool_capacity: EventsPoolCapacity,
+
+    /// Interval in milliseconds between flushing the transaction cache to the persistent pool.
+    ///
+    /// This value influences how fast transactions appear in the persistent pool after they
+    /// have been initially processed by the node. With `Never` setting, transactions will not
+    /// be persisted at all before appearing in a block, which may negatively influence
+    /// some applications (e.g., the `GET transactions` endpoint of the explorer service).
+    /// On the other hand of the spectrum, there is `Immediate`, which flushes each transaction
+    /// separately after its initial processing. In the middle, there is `Timeout`, which
+    /// allows to specify the coherence interval for the pool.
+    #[serde(default)]
+    pub flush_pool_strategy: FlushPoolStrategy,
+}
+
+/// Strategy to flush transactions into the pool.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum FlushPoolStrategy {
+    /// Never flush the transactions to the persistent pool.
+    ///
+    /// This setting is best for performance, but may harm the availability of some APIs of the node
+    /// (e.g., the `GET transactions` endpoint of the explorer service).
+    Never,
+
+    /// Flush transactions on the specified timeout in milliseconds.
+    ///
+    /// The recommended values are order of 20ms.
+    Timeout {
+        /// Timeout value in milliseconds.
+        timeout: Milliseconds,
+    },
+
+    /// Flush each transaction after receiving it.
+    ///
+    /// Beware that this setting can harm performance of the node under high load.
+    Immediate,
+}
+
+impl Default for FlushPoolStrategy {
+    fn default() -> Self {
+        Self::Timeout { timeout: 20 }
+    }
 }
 
 /// Configuration for the `Node`.
@@ -346,7 +399,7 @@ pub struct NodeConfig {
 }
 
 impl ValidateInput for NodeConfig {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         let capacity = &self.mempool.events_pool_capacity;
@@ -464,48 +517,32 @@ impl NodeHandler {
         api_state: SharedNodeState,
         config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
-        let (last_hash, last_height) = {
-            let block = blockchain.as_ref().last_block();
-            (block.object_hash(), block.height.next())
-        };
-
+        let last_block = blockchain.as_ref().last_block();
         let snapshot = blockchain.snapshot();
         let consensus_config = Schema::new(&snapshot).consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
-        let validator_id = consensus_config
-            .validator_keys
-            .iter()
-            .position(|pk| pk.consensus_key == config.keys.consensus_pk())
-            .map(|id| ValidatorId(id as u16));
-        info!("Validator id = '{:?}'", validator_id);
-        let connect = Verified::from_value(
-            Connect::new(
-                external_address,
-                system_state.current_time().into(),
-                &user_agent(),
-            ),
-            config.keys.consensus_pk(),
-            config.keys.consensus_sk(),
+        let connect = Connect::new(
+            external_address,
+            system_state.current_time().into(),
+            &user_agent(),
         );
-
-        let connect_list = config.connect_list;
         let peers = NodeSchema::new(&blockchain.snapshot())
             .peers_cache()
             .iter()
             .collect();
+        let peer_discovery = config.peer_discovery.clone();
+
         let state = State::new(
-            validator_id,
-            connect_list,
+            config,
             consensus_config,
             connect,
             peers,
-            last_hash,
-            last_height,
+            &last_block,
             system_state.current_time(),
-            config.keys,
         );
 
+        let validator_id = state.validator_id();
         let node_role = NodeRole::new(validator_id);
         let is_enabled = api_state.is_enabled();
         api_state.set_node_role(node_role);
@@ -517,7 +554,7 @@ impl NodeHandler {
             system_state,
             state,
             channel: sender,
-            peer_discovery: config.peer_discovery,
+            peer_discovery,
             is_enabled,
             node_role,
             config_manager,
@@ -640,6 +677,7 @@ impl NodeHandler {
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
+        self.maybe_add_flush_pool_timeout();
     }
 
     /// Sends the given message to a peer by its public key.
@@ -763,6 +801,13 @@ impl NodeHandler {
         let time = self.system_state.current_time()
             + Duration::from_millis(self.api_state().state_update_timeout());
         self.add_timeout(NodeTimeout::UpdateApiState, time);
+    }
+
+    fn maybe_add_flush_pool_timeout(&mut self) {
+        if let Some(timeout) = self.state().flush_pool_timeout() {
+            let time = self.system_state.current_time() + timeout;
+            self.add_timeout(NodeTimeout::FlushPool, time);
+        }
     }
 
     /// Returns hash of the last block.
@@ -1074,17 +1119,13 @@ impl Node {
 
         let mut servers = HashMap::new();
         if let Some(listen_address) = api_cfg.public_api_address {
-            let server_config = WebServerConfig {
-                listen_address,
-                allow_origin: api_cfg.public_allow_origin.clone(),
-            };
+            let mut server_config = WebServerConfig::new(listen_address);
+            server_config.allow_origin = api_cfg.public_allow_origin.clone();
             servers.insert(ApiAccess::Public, server_config);
         }
         if let Some(listen_address) = api_cfg.private_api_address {
-            let server_config = WebServerConfig {
-                listen_address,
-                allow_origin: api_cfg.private_allow_origin.clone(),
-            };
+            let mut server_config = WebServerConfig::new(listen_address);
+            server_config.allow_origin = api_cfg.private_allow_origin.clone();
             servers.insert(ApiAccess::Private, server_config);
         }
 
@@ -1119,17 +1160,14 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    async fn run_handler(
-        mut self,
-        handshake_params: HandshakeParams,
-    ) -> Result<(), failure::Error> {
+    async fn run_handler(mut self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
         self.handler.initialize();
         Reactor::new(self).run(handshake_params).await
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
     /// depending on the provided `NodeConfig`.
-    pub async fn run(self) -> Result<(), failure::Error> {
+    pub async fn run(self) -> anyhow::Result<()> {
         trace!("Running node.");
 
         // Runs NodeHandler.
@@ -1219,7 +1257,7 @@ impl Reactor {
     }
 
     // FIXME: is joining appropriate here (vs select)? How about joining actix?
-    async fn run(self, handshake_params: HandshakeParams) -> Result<(), failure::Error> {
+    async fn run(self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
         tokio::spawn(self.internal_part.run());
         let network_task = tokio::spawn(self.network_part.run(handshake_params));
 
@@ -1329,5 +1367,28 @@ mod tests {
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
         NodeBuilder::new(db, node_cfg, node_keys);
+    }
+
+    #[test]
+    fn flush_pool_strategy_is_serializable() {
+        let mut mempool_config = MemoryPoolConfig::default();
+        let s = toml::to_string(&mempool_config).unwrap();
+        let restored: MemoryPoolConfig = toml::from_str(&s).unwrap();
+        assert_eq!(restored, mempool_config);
+
+        mempool_config.flush_pool_strategy = FlushPoolStrategy::Never;
+        let s = toml::to_string(&mempool_config).unwrap();
+        let restored: MemoryPoolConfig = toml::from_str(&s).unwrap();
+        assert_eq!(restored, mempool_config);
+
+        let config_without_strategy = r#"
+            [events_pool_capacity]
+            network_requests_capacity = 512
+            network_events_capacity = 512
+            internal_events_capacity = 128
+            api_requests_capacity = 1024
+        "#;
+        let restored: MemoryPoolConfig = toml::from_str(config_without_strategy).unwrap();
+        assert_eq!(restored, MemoryPoolConfig::default());
     }
 }

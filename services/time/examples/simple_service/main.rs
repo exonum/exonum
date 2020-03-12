@@ -31,8 +31,8 @@ use exonum::{
     runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{Service, ServiceFactory};
-use exonum_testkit::TestKitBuilder;
+use exonum_rust_runtime::Service;
+use exonum_testkit::{Spec, TestKitBuilder};
 use serde_derive::{Deserialize, Serialize};
 
 use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
@@ -123,19 +123,13 @@ fn main() {
     // Create testkit for network with one validator.
     let time_service =
         TimeServiceFactory::with_provider(mock_provider.clone() as Arc<dyn TimeProvider>);
-    let time_service_artifact = time_service.artifact_id();
-    let marker_service = MarkerService;
-    let marker_service_artifact = marker_service.artifact_id();
+    let time_service =
+        Spec::new(time_service).with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
+    let marker_service = Spec::new(MarkerService).with_instance(SERVICE_ID, SERVICE_NAME, ());
 
     let mut testkit = TestKitBuilder::validator()
-        .with_artifact(time_service_artifact.clone())
-        .with_instance(
-            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-        )
-        .with_rust_service(time_service)
-        .with_artifact(marker_service_artifact.clone())
-        .with_instance(marker_service_artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
-        .with_rust_service(marker_service)
+        .with(time_service)
+        .with(marker_service)
         .build();
 
     mock_provider.set_time(Utc.timestamp(10, 0));

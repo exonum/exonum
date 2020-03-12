@@ -15,7 +15,6 @@
 //! Updating node configuration on the fly.
 
 use exonum_node::{ConfigManager, ConnectListConfig};
-use failure;
 use log::error;
 
 use std::{path::Path, sync::mpsc, thread};
@@ -58,10 +57,7 @@ impl DefaultConfigManager {
     // Updates ConnectList on file system synchronously.
     // This method is public only for testing and should not be used explicitly.
     #[doc(hidden)]
-    pub fn update_connect_list<P>(
-        connect_list: ConnectListConfig,
-        path: &P,
-    ) -> Result<(), failure::Error>
+    pub fn update_connect_list<P>(connect_list: ConnectListConfig, path: &P) -> anyhow::Result<()>
     where
         P: AsRef<Path>,
     {

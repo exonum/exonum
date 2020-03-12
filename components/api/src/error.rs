@@ -18,13 +18,14 @@ pub use actix_web::http::{
     header::{self, HeaderName},
     HeaderMap, StatusCode as HttpStatusCode,
 };
-use failure::Fail;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use std::fmt;
 
 /// API HTTP error struct.
-#[derive(Fail, Debug)]
+#[derive(Error, Debug)]
+#[non_exhaustive]
 pub struct Error {
     /// HTTP error code.
     pub http_code: HttpStatusCode,
@@ -45,6 +46,7 @@ impl Default for Error {
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
+#[non_exhaustive]
 pub struct ErrorBody {
     /// A URI reference to the documentation or possible solutions for the problem.
     #[serde(rename = "type", default, skip_serializing_if = "String::is_empty")]
@@ -95,7 +97,7 @@ impl Error {
     }
 
     /// Builds Internal Server Error (500).
-    pub fn internal(cause: impl failure::Fail) -> Self {
+    pub fn internal(cause: impl fmt::Display) -> Self {
         Error::new(HttpStatusCode::INTERNAL_SERVER_ERROR).detail(cause.to_string())
     }
 

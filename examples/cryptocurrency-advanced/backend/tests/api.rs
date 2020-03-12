@@ -25,10 +25,9 @@ use exonum::{
     runtime::{Caller, CallerAddress, SnapshotExt},
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{
     explorer::api::{TransactionQuery, TransactionResponse},
-    ApiKind, TestKit, TestKitApi, TestKitBuilder,
+    ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder,
 };
 use serde_json::json;
 
@@ -368,12 +367,9 @@ impl CryptocurrencyApi {
 
 /// Creates a testkit together with the API wrapper defined above.
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
-    let artifact = CryptocurrencyService.artifact_id();
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_rust_service(CryptocurrencyService)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(Spec::new(CryptocurrencyService).with_instance(SERVICE_ID, SERVICE_NAME, ()))
         .build();
 
     let api = CryptocurrencyApi {

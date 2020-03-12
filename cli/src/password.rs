@@ -14,7 +14,7 @@
 
 //! This module contains utilities for passphrase entry.
 
-use failure::{bail, Error, ResultExt};
+use anyhow::{bail, Context, Error};
 use rpassword::read_password_from_tty;
 use serde_derive::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -104,11 +104,8 @@ impl PassInputMethod {
             }
             Self::EnvVariable(name) => {
                 let variable_name = name.unwrap_or_else(|| DEFAULT_MASTER_PASS_ENV_VAR.to_string());
-                let passphrase = env::var(&variable_name).with_context(|e| {
-                    format!(
-                        "Failed to get password from env variable {}: {}",
-                        variable_name, e
-                    )
+                let passphrase = env::var(&variable_name).with_context(|| {
+                    format!("Failed to get password from env variable {}", variable_name)
                 })?;
                 Ok(Passphrase(passphrase))
             }
@@ -118,7 +115,7 @@ impl PassInputMethod {
 }
 
 impl FromStr for PassInputMethod {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s.is_empty() {

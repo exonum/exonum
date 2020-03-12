@@ -28,8 +28,6 @@ use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFac
 use pretty_assertions::assert_eq;
 use serde_derive::*;
 
-use std::collections::BTreeMap;
-
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
 use self::inspected::{
@@ -700,9 +698,7 @@ fn conflicting_service_instances() {
     );
 
     // Commit first fork.
-    blockchain
-        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
 
     assert_eq!(
         events_handle.take(),
@@ -728,7 +724,11 @@ fn conflicting_service_instances() {
     )
     .unwrap_err();
     // Alternative instance was discarded.
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("unknown service with ID 3")
+    );
 }
 
 #[test]
@@ -858,9 +858,7 @@ fn dependent_service_in_same_block() {
             ),
         ],
     );
-    blockchain
-        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
 
     // Start both services in the same block.
     let patch = create_block_with_transactions(
@@ -882,9 +880,7 @@ fn dependent_service_in_same_block() {
             ),
         ],
     );
-    blockchain
-        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = snapshot.for_dispatcher();

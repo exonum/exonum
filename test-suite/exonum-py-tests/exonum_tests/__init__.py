@@ -3,6 +3,4 @@
 from exonum_tests.api import *
 from exonum_tests.crypto_advanced import *
 from exonum_tests.freeze import *
-
-# Skip deploy tests. The cryptocurrency-advanced is included service.
-# from exonum_tests.deploy import *
+from exonum_tests.deploy import *

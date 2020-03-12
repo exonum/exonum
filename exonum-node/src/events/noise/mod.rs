@@ -49,14 +49,14 @@ pub struct HandshakeData {
 
 #[async_trait]
 pub trait Handshake<S> {
-    async fn listen(self, stream: &mut S) -> Result<HandshakeData, failure::Error>;
-    async fn send(self, stream: &mut S) -> Result<HandshakeData, failure::Error>;
+    async fn listen(self, stream: &mut S) -> anyhow::Result<HandshakeData>;
+    async fn send(self, stream: &mut S) -> anyhow::Result<HandshakeData>;
 }
 
 pub struct HandshakeRawMessage(pub Vec<u8>);
 
 impl HandshakeRawMessage {
-    pub async fn read<S>(sock: &mut S) -> Result<Self, failure::Error>
+    pub async fn read<S>(sock: &mut S) -> anyhow::Result<Self>
     where
         S: AsyncRead + Unpin,
     {
@@ -72,7 +72,7 @@ impl HandshakeRawMessage {
         Ok(Self(message))
     }
 
-    pub async fn write<S>(&self, sock: &mut S) -> Result<(), failure::Error>
+    pub async fn write<S>(&self, sock: &mut S) -> anyhow::Result<()>
     where
         S: AsyncWrite + Unpin,
     {

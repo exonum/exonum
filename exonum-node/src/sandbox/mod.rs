@@ -22,8 +22,8 @@ use bit_vec::BitVec;
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        contains_transaction, Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut,
-        ConsensusConfig, Schema, ValidatorKeys,
+        Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        PersistentPool, Schema, TransactionCache, ValidatorKeys,
     },
     crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
     helpers::{user_agent, Height, Round, ValidatorId},
@@ -37,7 +37,7 @@ use futures::{channel::mpsc, prelude::*};
 
 use std::{
     cell::{Ref, RefCell, RefMut},
-    collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, BinaryHeap, HashMap, HashSet, VecDeque},
     convert::TryFrom,
     fmt::Debug,
     iter::FromIterator,
@@ -649,23 +649,17 @@ impl Sandbox {
     {
         let mut unique_set: HashSet<Hash> = HashSet::new();
         let snapshot = self.blockchain().snapshot();
-        let schema = snapshot.for_core();
-        let schema_transactions = schema.transactions();
+        let node_state = self.node_state();
+        let tx_cache = PersistentPool::new(&snapshot, node_state.tx_cache());
+
         txs.into_iter()
-            .filter(|elem| {
-                let hash_elem = elem.object_hash();
-                if unique_set.contains(&hash_elem) {
+            .filter(|transaction| {
+                let tx_hash = transaction.object_hash();
+                if unique_set.contains(&tx_hash) {
                     return false;
                 }
-                unique_set.insert(hash_elem);
-                if contains_transaction(
-                    &hash_elem,
-                    &schema_transactions,
-                    self.node_state().tx_cache(),
-                ) {
-                    return false;
-                }
-                true
+                unique_set.insert(tx_hash);
+                !tx_cache.contains_transaction(tx_hash)
             })
             .cloned()
             .collect()
@@ -693,8 +687,7 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let (_, patch) =
-            blockchain.create_patch(ValidatorId(0), height, &hashes, &mut BTreeMap::new());
+        let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes, &());
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);

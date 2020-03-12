@@ -27,7 +27,7 @@
 //! use serde_derive::*;
 //! use exonum_derive::*;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! use exonum_testkit::{ApiKind, Spec, TestKitBuilder};
 //! use exonum_rust_runtime::{ServiceFactory, ExecutionContext, Service};
 //!
 //! // Simple service implementation.
@@ -61,13 +61,11 @@
 //!
 //! // Create testkit for network with four validators
 //! // and add a builtin timestamping service with ID=1.
-//! let service = TimestampingService;
-//! let artifact = service.artifact_id();
+//! let service = Spec::new(TimestampingService)
+//!     .with_instance(SERVICE_ID, "timestamping", ());
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_validators(4)
-//!     .with_artifact(artifact.clone())
-//!     .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
-//!     .with_rust_service(service)
+//!     .with(service)
 //!     .build();
 //!
 //! // Create a few transactions.
@@ -119,6 +117,7 @@ pub use crate::{
     network::{TestNetwork, TestNode},
 };
 pub use exonum_explorer as explorer;
+pub use exonum_rust_runtime::spec::Spec;
 
 use exonum::{
     blockchain::{
@@ -148,7 +147,7 @@ use futures::{
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt, iter, mem,
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -237,16 +236,8 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let artifact = service_factory.artifact_id();
-        TestKitBuilder::validator()
-            .with_artifact(artifact.clone())
-            .with_instance(
-                artifact
-                    .into_default_instance(id, name)
-                    .with_constructor(constructor),
-            )
-            .with_rust_service(service_factory)
-            .build()
+        let spec = Spec::new(service_factory).with_instance(id, name, constructor);
+        TestKitBuilder::validator().with(spec).build()
     }
 
     fn assemble(
@@ -364,7 +355,7 @@ impl TestKit {
 
         if let Some(update) = maybe_update {
             let mut aggregator = self.create_api_aggregator();
-            aggregator.extend(update.endpoints);
+            aggregator.extend(update.into_endpoints());
             self.api_aggregator = aggregator;
         }
         self.api_aggregator.clone()
@@ -403,7 +394,7 @@ impl TestKit {
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
     /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
-    /// # use exonum_testkit::{TestKit, TestKitBuilder};
+    /// # use exonum_testkit::{Spec, TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{crypto::{Hash, KeyPair, PublicKey, SecretKey}, runtime::ExecutionError};
     /// # use exonum_rust_runtime::{ExecutionContext, Service, ServiceFactory};
@@ -439,13 +430,8 @@ impl TestKit {
     /// // ...with this ID:
     /// const SERVICE_ID: u32 = 1;
     ///
-    /// let service = ExampleService;
-    /// let artifact = service.artifact_id();
-    /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_artifact(artifact.clone())
-    ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
-    ///     .with_rust_service(ExampleService)
-    ///     .build();
+    /// let service = Spec::new(ExampleService).with_instance(SERVICE_ID, "example", ());
+    /// let mut testkit = TestKitBuilder::validator().with(service).build();
     /// expensive_setup(&mut testkit);
     /// let keys = KeyPair::random();
     /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
@@ -473,27 +459,19 @@ impl TestKit {
         let validator_id = self.leader().validator_id().unwrap();
 
         let guard = self.processing_lock.lock().unwrap();
-        let (block_hash, patch) = self.blockchain.create_patch(
-            validator_id,
-            new_block_height,
-            tx_hashes,
-            &mut BTreeMap::new(),
-        );
+        let (block_hash, patch) =
+            self.blockchain
+                .create_patch(validator_id, new_block_height, tx_hashes, &());
 
         let precommits: Vec<_> = self
             .network()
             .validators()
             .iter()
-            .map(|v| v.create_precommit(new_block_height, block_hash))
+            .map(|validator| validator.create_precommit(new_block_height, block_hash))
             .collect();
 
         self.blockchain
-            .commit(
-                patch,
-                block_hash,
-                precommits.into_iter(),
-                &mut BTreeMap::new(),
-            )
+            .commit(patch, block_hash, precommits.into_iter())
             .unwrap();
         drop(guard);
 

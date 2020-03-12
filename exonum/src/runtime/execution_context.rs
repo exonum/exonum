@@ -348,7 +348,7 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
 #[derive(Debug)]
 pub struct SupervisorExtensions<'a>(pub(super) ExecutionContext<'a>);
 
-impl<'a> SupervisorExtensions<'a> {
+impl SupervisorExtensions<'_> {
     /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
     ///
     /// If / when a block with this instruction is accepted, artifact deployment becomes
@@ -361,6 +361,9 @@ impl<'a> SupervisorExtensions<'a> {
 
     /// Unloads the specified artifact, making it unavailable for service deployment and other
     /// operations.
+    ///
+    /// Like other operations concerning services or artifacts, the artifact will be unloaded
+    /// only if / when the block with this instruction is committed.
     ///
     /// # Return value
     ///
@@ -433,8 +436,7 @@ impl<'a> SupervisorExtensions<'a> {
         }
 
         let spec = state.spec;
-        DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact.clone())?;
+        DispatcherSchema::new(&*self.0.fork).initiate_resuming_service(instance_id)?;
 
         let runtime = self
             .0

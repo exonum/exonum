@@ -20,7 +20,7 @@ exonum-supervisor = { version = "1.0.0-rc.1", path = "../services/supervisor" }
 exonum-system-api = { version = "1.0.0-rc.1", path = "../components/system-api" }
 exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../runtimes/rust" }
 
-failure = "0.1"
+anyhow = "1.0.26"
 log = "0.4"
 rpassword = "4.0"
 serde = "1.0"
@@ -28,7 +28,7 @@ serde_derive = "1.0"
 structopt = "0.3"
 tempfile = "3.1"
 toml = "0.5"
-zeroize = "0.9"
+zeroize = "1.1.0"
 
 [dev-dependencies]
 exonum-derive = { version = "1.0.0-rc.1", path = "../components/derive" }

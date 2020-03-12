@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::{exonum_version, os_info, rust_version};
 use exonum_node::ExternalMessage;
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 use pretty_assertions::assert_eq;
@@ -40,14 +39,9 @@ async fn info() {
     let api = testkit.api();
 
     let info: NodeInfo = api.private(ApiKind::System).get("v1/info").await.unwrap();
-    let expected = NodeInfo {
-        consensus_status: ConsensusStatus::Enabled,
-        connected_peers: vec![],
-        exonum_version: exonum_version().unwrap(),
-        rust_version: rust_version().unwrap(),
-        os_info: os_info(),
-    };
-    assert_eq!(info, expected);
+    assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
+    assert!(info.connected_peers.is_empty());
+    assert_eq!(info.rust_version.major, 1);
 }
 
 #[tokio::test]
@@ -55,14 +49,8 @@ async fn stats() {
     let mut testkit = create_testkit();
     let api = testkit.api();
     let info: NodeStats = api.private(ApiKind::System).get("v1/stats").await.unwrap();
-    let expected = NodeStats {
-        height: 0,
-        tx_pool_size: 0,
-        tx_count: 0,
-        tx_cache_size: 0,
-        uptime: 0,
-    };
-    assert_eq!(info, expected);
+    assert_eq!(info.height, 0);
+    assert_eq!(info.tx_cache_size, 0);
 }
 
 #[tokio::test]

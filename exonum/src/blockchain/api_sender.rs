@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::Fail;
 use futures::{channel::mpsc, executor, Future, SinkExt};
+use thiserror::Error;
 
 use std::fmt;
 
@@ -96,6 +96,6 @@ impl<T> fmt::Debug for ApiSender<T> {
 }
 
 /// Errors that can occur during sending a message to the node via `ApiSender`.
-#[derive(Debug, Fail)]
-#[fail(display = "Failed to send API request to the node: the node is being shut down")]
+#[derive(Debug, Error)]
+#[error("Failed to send API request to the node: the node is being shut down")]
 pub struct SendError(());

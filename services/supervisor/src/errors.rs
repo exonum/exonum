@@ -21,6 +21,7 @@ use std::fmt;
 /// Error codes 0-15.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum CommonError {
     /// Deadline exceeded for the current transaction.
     DeadlineExceeded = 0,
@@ -32,6 +33,7 @@ pub enum CommonError {
 /// Error codes 16-31.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum ArtifactError {
     /// Artifact has been already deployed.
     AlreadyDeployed = 16,
@@ -49,6 +51,7 @@ pub enum ArtifactError {
 /// Error codes 32-47.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum ServiceError {
     /// Instance with the given name already exists.
     InstanceExists = 32,
@@ -60,6 +63,7 @@ pub enum ServiceError {
 /// Error codes 48-63.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum ConfigurationError {
     /// Active configuration change proposal already exists.
     ConfigProposeExists = 48,
@@ -85,6 +89,7 @@ impl ConfigurationError {
 /// Error codes 64-79.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum MigrationError {
     /// Migration request has not been registered or accepted.
     MigrationRequestNotRegistered = 64,

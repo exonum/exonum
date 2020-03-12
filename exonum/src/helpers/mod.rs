@@ -39,7 +39,7 @@ mod user_agent;
 /// [`env_logger`]: https://docs.rs/env_logger/
 pub fn init_logger() -> Result<(), SetLoggerError> {
     Builder::from_default_env()
-        .default_format_timestamp_nanos(true)
+        .format_timestamp_nanos()
         .try_init()
 }
 
@@ -78,7 +78,7 @@ pub mod pb_optional_hash {
     use exonum_proto::ProtobufConvert;
 
     /// Deserializes `Option<Hash>` from Protobuf.
-    pub fn from_pb(pb: PbHash) -> Result<Option<Hash>, failure::Error> {
+    pub fn from_pb(pb: PbHash) -> anyhow::Result<Option<Hash>> {
         if pb.get_data().is_empty() {
             Ok(None)
         } else {
@@ -113,7 +113,7 @@ pub mod pb_version {
 
     /// Deserializes `semver::Version` from string.
     #[allow(clippy::needless_pass_by_value)] // False positive, we need a `String` type here.
-    pub fn from_pb(pb: String) -> Result<Version, failure::Error> {
+    pub fn from_pb(pb: String) -> anyhow::Result<Version> {
         pb.parse().map_err(From::from)
     }
 
