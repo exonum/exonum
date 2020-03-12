@@ -78,11 +78,10 @@ impl Decoder for MessagesCodec {
     }
 }
 
-impl Encoder for MessagesCodec {
-    type Item = SignedMessage;
+impl Encoder<SignedMessage> for MessagesCodec {
     type Error = anyhow::Error;
 
-    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, msg: SignedMessage, buf: &mut BytesMut) -> Result<(), Self::Error> {
         self.session.encrypt_msg(&msg.into_bytes(), buf)?;
         Ok(())
     }
