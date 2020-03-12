@@ -198,7 +198,7 @@ async fn nodes_flush_transactions_to_storage_before_commit() {
 
     // Nodes need order of 100ms to create a column family for the tx pool in the debug mode,
     // so we sleep here to make it happen for all nodes.
-    delay_for(Duration::from_millis(300)).await;
+    delay_for(Duration::from_millis(500)).await;
 
     // All transactions should be persisted on all nodes now.
     for node in &nodes {

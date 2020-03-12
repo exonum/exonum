@@ -14,7 +14,7 @@
 
 use anyhow::format_err;
 use exonum::{
-    blockchain::Blockchain,
+    blockchain::{ApiSender, Blockchain},
     crypto::KeyPair,
     helpers::Height,
     merkledb::ObjectHash,
@@ -114,22 +114,21 @@ impl TimingStats {
 
 async fn transaction_task(
     transaction: Verified<AnyTx>,
+    sender: ApiSender,
     blockchain: Blockchain,
     times_to_pool: Arc<Mutex<TimingStats>>,
     times_to_commit: Arc<Mutex<TimingStats>>,
 ) {
+    /// Poll delay foreach transaction.
     const POLL_DELAY: Duration = Duration::from_millis(5);
 
     let tx_hash = transaction.object_hash();
-    blockchain
-        .sender()
-        .broadcast_transaction(transaction)
-        .await
-        .unwrap();
+    sender.broadcast_transaction(transaction).await.unwrap();
     let start = Instant::now();
     let mut in_pool = false;
 
     loop {
+        // The additional block scope is needed to not spill vars across the `await` boundary.
         {
             let snapshot = blockchain.snapshot();
             let snapshot = snapshot.for_core();
@@ -144,7 +143,7 @@ async fn transaction_task(
                 }
                 times_to_commit.lock().unwrap().push(now - start);
                 break;
-            } else if tx_pool.contains(&tx_hash) {
+            } else if !in_pool && tx_pool.contains(&tx_hash) {
                 log::trace!("Transaction {} appeared in pool", tx_hash);
                 times_to_pool.lock().unwrap().push(now - start);
                 in_pool = true;
@@ -200,9 +199,11 @@ async fn main() {
 
     for i in 0..args.tx_count.unwrap_or_else(u64::max_value) {
         let tx = keys.timestamp(MainService::INSTANCE_ID, Height(i));
-        let blockchain = nodes[0].blockchain().to_owned();
+        let sender = nodes[0].blockchain().sender().to_owned();
+        let blockchain = nodes.last().unwrap().blockchain().to_owned();
         let tx_task = transaction_task(
             tx,
+            sender,
             blockchain,
             Arc::clone(&times_to_pool),
             Arc::clone(&times_to_commit),
