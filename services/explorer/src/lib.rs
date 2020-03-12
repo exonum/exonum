@@ -42,7 +42,7 @@
 //! use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit: TestKit = TestKitBuilder::validator()
 //!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     // Add other services here

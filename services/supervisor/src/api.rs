@@ -57,7 +57,7 @@
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Supervisor::simple())
 //!     .build();
@@ -91,7 +91,7 @@
 //! use exonum_supervisor::{ConfigProposalWithHash, Supervisor};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -126,7 +126,7 @@
 //! use exonum_supervisor::{api::DispatcherInfo, Supervisor};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -185,7 +185,7 @@
 //! # fn config_for_artifact() -> Vec<u8> { Vec::new() }
 //! #
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -244,7 +244,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Supervisor::simple())
 //!     // Add some service that supports migrations...
@@ -317,7 +317,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -379,7 +379,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example (but with several validators)...
 //! #     TestKitBuilder::validator()
 //! #         .with_validators(2) // 2 validators to create a config to vote for.
@@ -442,7 +442,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -477,7 +477,7 @@
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //!
@@ -524,7 +524,7 @@
 //! # impl Service for SomeService {}
 //! #
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator()
 //! #         .with(Supervisor::simple())
@@ -576,7 +576,7 @@
 //! # use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.

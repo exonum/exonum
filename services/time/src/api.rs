@@ -40,7 +40,7 @@
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let time_service = TimeServiceFactory::default();
 //! let time_service = Spec::new(time_service)
 //!     .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
@@ -93,7 +93,7 @@
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let time_service = TimeServiceFactory::default();
 //! let time_service = Spec::new(time_service)
 //!     .with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());

@@ -83,7 +83,7 @@
 //! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
@@ -123,7 +123,7 @@
 //! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! # let mut testkit = TestKitBuilder::validator()
 //! #    .with(Spec::new(ExplorerFactory).with_default_instance())
 //! #    .build();
@@ -191,7 +191,7 @@
 //! # impl Service for MyService {}
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -260,7 +260,7 @@
 //! # impl Service for MyService {}
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -320,7 +320,7 @@
 //! # }
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -402,7 +402,7 @@
 //! # impl Service for MyService {}
 //!
 //! # #[tokio::main]
-//! # fn main() -> anyhow::Result<()> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())

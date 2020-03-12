@@ -33,7 +33,7 @@
 //! use exonum_node::{NodeBuilder, NodeConfig};
 //! use exonum_system_api::SystemApiPlugin;
 //!
-//! # async fn run_node() -> Result<(), failure::Error> {
+//! # async fn run_node() -> anyhow::Result<()> {
 //! let node_config: NodeConfig = // ...
 //! #    unimplemented!();
 //! let node_keys = Keys::random();
@@ -57,7 +57,7 @@
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), failure::Error> {
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
