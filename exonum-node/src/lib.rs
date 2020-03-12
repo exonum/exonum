@@ -77,14 +77,17 @@ use exonum_api::{
     AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
     WebServerConfig,
 };
-use futures::{channel::mpsc, TryFutureExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    FutureExt,
+};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
 
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fmt,
+    fmt, io,
     net::SocketAddr,
     sync::Arc,
     thread,
@@ -1205,6 +1208,7 @@ struct Reactor {
     handler_part: HandlerPart<NodeHandler>,
     network_part: NetworkPart,
     internal_part: InternalPart,
+    api_part: oneshot::Receiver<io::Result<()>>,
 }
 
 impl Reactor {
@@ -1214,13 +1218,17 @@ impl Reactor {
 
         let api_manager = ApiManager::new(node.api_manager_config);
         let endpoints = node.channel.endpoints.1;
-        let api_task = api_manager
-            .run(endpoints)
-            .unwrap_or_else(|e| log::error!("Error in actix thread: {}", e));
+        let api_task = api_manager.run(endpoints);
+        let (api_part_tx, api_part) = oneshot::channel();
+
         // Creating a separate thread here seems easier than making `Node::run()` return
         // a non-`Send` future (which, e.g., precludes running nodes with `tokio::spawn`).
         thread::spawn(|| {
-            System::new("exonum-node").block_on(api_task);
+            let res = System::new("exonum-node").block_on(api_task);
+            if let Err(ref err) = res {
+                log::error!("Error in actix thread: {}", err);
+            }
+            api_part_tx.send(res).ok();
         });
 
         let (network_tx, network_rx) = node.channel.network_events;
@@ -1253,18 +1261,32 @@ impl Reactor {
             handler_part,
             network_part,
             internal_part,
+            api_part,
         }
     }
 
-    // FIXME: is joining appropriate here (vs select)? How about joining actix?
+    #[allow(clippy::mut_mut)] // occurs in the `select!` macro
     async fn run(self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
-        tokio::spawn(self.internal_part.run());
-        let network_task = tokio::spawn(self.network_part.run(handshake_params));
+        let internal_task = self.internal_part.run().fuse();
+        futures::pin_mut!(internal_task);
+        let network_task = self.network_part.run(handshake_params).fuse();
+        futures::pin_mut!(network_task);
+        let handler_task = self.handler_part.run().fuse();
+        futures::pin_mut!(handler_task);
+        let mut api_task = self.api_part.fuse();
 
-        self.handler_part.run().await;
-        network_task
-            .await
-            .map_err(|e| format_err!("Error in the network thread: {}", e))
+        // The remaining tasks are dropped after the first task is terminated,
+        // which should free all associated resources.
+        futures::select! {
+            () = internal_task => Ok(()),
+            () = network_task => Ok(()),
+            () = handler_task => Ok(()),
+
+            res = api_task => match res {
+                Err(_) => Err(format_err!("Actix thread panicked")),
+                Ok(res) => res.map_err(From::from),
+            },
+        }
     }
 }
 

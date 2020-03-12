@@ -180,7 +180,17 @@ impl ApiManager {
     }
 
     /// Starts API manager actor with the specified endpoints update stream.
-    pub async fn run<S>(mut self, mut endpoints_rx: S) -> io::Result<()>
+    pub async fn run<S>(mut self, endpoints_rx: S) -> io::Result<()>
+    where
+        S: Stream<Item = UpdateEndpoints> + Unpin,
+    {
+        let res = self.run_inner(endpoints_rx).await;
+        // Stop the HTTP server(s) in any case.
+        self.stop_servers().await;
+        res
+    }
+
+    async fn run_inner<S>(&mut self, mut endpoints_rx: S) -> io::Result<()>
     where
         S: Stream<Item = UpdateEndpoints> + Unpin,
     {
@@ -190,7 +200,6 @@ impl ApiManager {
             self.endpoints = request.endpoints;
             self.start_servers().await?;
         }
-
         Ok(())
     }
 
