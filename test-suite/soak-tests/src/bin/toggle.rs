@@ -22,7 +22,7 @@ use exonum_rust_runtime::{
 };
 use futures::{
     channel::oneshot,
-    future::{self, Either},
+    future::{self, Either, RemoteHandle},
     FutureExt,
 };
 use reqwest::Client;
@@ -101,6 +101,26 @@ async fn probe_api(url: &str, mut cancel_rx: oneshot::Receiver<()>) -> ApiStats 
     stats
 }
 
+#[derive(Debug)]
+struct ApiProbe {
+    cancel_tx: oneshot::Sender<()>,
+    stats: RemoteHandle<ApiStats>,
+}
+
+impl ApiProbe {
+    fn new(url: &'static str) -> Self {
+        let (cancel_tx, cancel_rx) = oneshot::channel();
+        let (stats_task, stats) = probe_api(url, cancel_rx).remote_handle();
+        tokio::spawn(stats_task);
+        Self { cancel_tx, stats }
+    }
+
+    async fn get(self) -> ApiStats {
+        drop(self.cancel_tx);
+        self.stats.await
+    }
+}
+
 /// Runs a network with a service that is frequently switched on / off and that generates
 /// transactions in `after_commit` hook.
 #[derive(Debug, StructOpt)]
@@ -113,6 +133,10 @@ struct Args {
     /// Blockchain height to reach. If not specified, the test will run infinitely.
     #[structopt(name = "max-height", long, short = "H")]
     max_height: Option<u64>,
+
+    /// Disable HTTP API probing.
+    #[structopt(name = "noprobe", long)]
+    no_probe: bool,
 }
 
 #[tokio::main]
@@ -155,18 +179,13 @@ async fn main() {
         },
     );
 
-    let (supervisor_api_tx, supervisor_api_rx) = oneshot::channel();
-    let supervisor_stats_task = probe_api(
-        "http://127.0.0.1:8080/api/services/supervisor/ping",
-        supervisor_api_rx,
-    );
-    let (supervisor_stats_task, supervisor_stats) = supervisor_stats_task.remote_handle();
-    tokio::spawn(supervisor_stats_task);
-
-    let (main_api_tx, main_api_rx) = oneshot::channel();
-    let main_stats_task = probe_api("http://127.0.0.1:8080/api/services/main/ping", main_api_rx);
-    let (main_stats_task, main_stats) = main_stats_task.remote_handle();
-    tokio::spawn(main_stats_task);
+    let probes = if args.no_probe {
+        None
+    } else {
+        let supervisor_probe = ApiProbe::new("http://127.0.0.1:8080/api/services/supervisor/ping");
+        let main_probe = ApiProbe::new("http://127.0.0.1:8080/api/services/main/ping");
+        Some((supervisor_probe, main_probe))
+    };
 
     loop {
         let height = nodes[0].blockchain().last_block().height;
@@ -213,8 +232,11 @@ async fn main() {
         "There are unknown transactions on the blockchain"
     );
 
-    drop(supervisor_api_tx);
-    drop(main_api_tx);
-    println!("Supervisor availability: {:#?}", supervisor_stats.await);
-    println!("Main service availability: {:#?}", main_stats.await);
+    if let Some((supervisor_probe, main_probe)) = probes {
+        println!(
+            "Supervisor availability: {:#?}",
+            supervisor_probe.get().await
+        );
+        println!("Main service availability: {:#?}", main_probe.get().await);
+    }
 }
