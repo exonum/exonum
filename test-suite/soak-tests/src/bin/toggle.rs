@@ -15,6 +15,8 @@
 //! Runs a network with a service that is frequently switched on / off and that generates
 //! transactions in `after_commit` hook.
 
+// cspell:ignore noprobe
+
 use exonum::{helpers::Height, merkledb::ObjectHash, runtime::SnapshotExt};
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
