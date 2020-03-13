@@ -333,11 +333,7 @@ impl ExonumInterface {
     }
 
     fn interface_name(&self) -> &str {
-        self.attrs
-            .interface
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or_default()
+        self.attrs.interface.as_deref().unwrap_or_default()
     }
 
     fn mut_trait_name(&self) -> Ident {

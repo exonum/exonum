@@ -16,12 +16,12 @@ description = "Exonum blockchain example implementing a cryptocurrency."
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "1.0.0-rc.1", path = "../../../exonum" }
-exonum-derive = { version = "1.0.0-rc.1", path = "../../../components/derive" }
-exonum-merkledb = { version = "1.0.0-rc.1", path = "../../../components/merkledb" }
-exonum-proto = { version = "1.0.0-rc.1", path = "../../../components/proto" }
-exonum-cli = { version = "1.0.0-rc.1", path = "../../../cli" }
-exonum-rust-runtime = { version = "1.0.0-rc.1", path = "../../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.2", path = "../../../exonum" }
+exonum-derive = { version = "1.0.0-rc.2", path = "../../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.2", path = "../../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.2", path = "../../../components/proto" }
+exonum-cli = { version = "1.0.0-rc.2", path = "../../../cli" }
+exonum-rust-runtime = { version = "1.0.0-rc.2", path = "../../../runtimes/rust" }
 
 anyhow = "1.0.26"
 protobuf = "2.8.0"
@@ -39,9 +39,9 @@ package = "exonum-cryptocurrency"
 path = "../../cryptocurrency"
 
 [dev-dependencies]
-exonum-explorer-service = { version = "1.0.0-rc.1", path = "../../../services/explorer" }
-exonum-supervisor = { version = "1.0.0-rc.1", path = "../../../services/supervisor" }
-exonum-testkit = { version = "1.0.0-rc.1", path = "../../../test-suite/testkit" }
+exonum-explorer-service = { version = "1.0.0-rc.2", path = "../../../services/explorer" }
+exonum-supervisor = { version = "1.0.0-rc.2", path = "../../../services/supervisor" }
+exonum-testkit = { version = "1.0.0-rc.2", path = "../../../test-suite/testkit" }
 
 assert_matches = "1.2.0"
 bincode = "1.2.1"
@@ -51,7 +51,7 @@ rand = "0.7.0"
 serde_json = "1.0.0"
 
 [build-dependencies]
-exonum-build = { version = "1.0.0-rc.1", path = "../../../components/build" }
+exonum-build = { version = "1.0.0-rc.2", path = "../../../components/build" }
 
 [features]
 default = ["with-serde"]

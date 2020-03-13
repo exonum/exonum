@@ -80,7 +80,7 @@ Include `exonum-cli` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-cli = "1.0.0-rc.1"
+exonum-cli = "1.0.0-rc.2"
 ```
 
 ## License

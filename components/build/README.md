@@ -44,7 +44,7 @@ Include `exonum-build` as a dependency in your `Cargo.toml`:
 
 ```toml
 [build-dependencies]
-exonum-build = "1.0.0-rc.1"
+exonum-build = "1.0.0-rc.2"
 ```
 
 ## Known Issues

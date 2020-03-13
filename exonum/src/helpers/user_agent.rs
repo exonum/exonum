@@ -44,7 +44,7 @@ pub fn os_info() -> String {
 /// Returns a version of the exonum framework.
 #[doc(hidden)]
 pub fn exonum_version() -> Option<Version> {
-    let version = USER_AGENT.split('/').nth(0)?;
+    let version = USER_AGENT.split('/').next()?;
     Version::from_str(version).ok()
 }
 

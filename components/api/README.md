@@ -48,7 +48,7 @@ Include `exonum-api` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-api = "1.0.0-rc.1"
+exonum-api = "1.0.0-rc.2"
 ```
 
 Note that the crate rarely needs to be imported directly; it is re-exported
