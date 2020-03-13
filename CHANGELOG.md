@@ -12,6 +12,17 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Error handling is now performed with the `anyhow` crate instead of `failure`.
   (#1805)
 
+- APIs which previously used futures from the `futures 0.1` crate are now
+  made `async`, or are using `Future`s from the standard library. (#1796, #1804)
+  The main affected APIs are as follows:
+  
+  - Endpoint definitions in the `exonum-api` crate and their counterparts
+    in `exonum-rust-runtime`
+  - Transaction sending with `ApiSender` from the `exonum` crate
+  - Node start-up with `Node::run` (`exonum-node` crate) and `NodeBuilder::run`
+    (`exonum-cli` crate), and shutdown with `ShutdownHandle` (`exonum-node` crate)
+  - HTTP API testing with `TestKitApi` (`exonum-testkit` crate)
+
 #### exonum
 
 - Testkit now does not include incorrect transactions into blocks or memory pool,
@@ -147,10 +158,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Fixed incorrect invalidation of block proposals. (#1782)
 
 - Provided clear coherence period for the transaction pool
-  by introducing the `mempool.flush_config_timeout` configuration parameter.
+  by introducing the `mempool.flush_config_strategy` configuration parameter.
   Previously, transactions were flushed to the persistent pool
   only on block commit. This led to the unexpected behavior of some APIs,
   such as the transaction getter endpoint in the explorer service. (#1809)
+
+- Fixed race condition when two nodes try to establish outgoing connections
+  to each other at the same time. (#1804)
 
 #### exonum-testkit
 

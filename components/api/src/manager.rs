@@ -97,25 +97,28 @@ impl UpdateEndpoints {
 
 async fn with_retries<T>(
     mut action: impl FnMut() -> io::Result<T>,
+    description: String,
     attempts: u16,
     timeout: u64,
 ) -> io::Result<T> {
     let timeout = Duration::from_millis(timeout);
 
-    for _ in 1..=attempts {
+    for attempt in 1..=attempts {
+        log::trace!("{} (attempt #{})", description, attempt);
         match action() {
             Ok(value) => return Ok(value),
             Err(e) => {
-                log::warn!("Action failed: {}", e);
+                log::warn!("{} (attempt #{}) failed: {}", description, attempt, e);
                 delay_for(timeout).await;
             }
         }
     }
 
-    Err(io::Error::new(
-        io::ErrorKind::Other,
-        "Cannot complete action",
-    ))
+    let msg = format!(
+        "Cannot complete {} after {} attempts",
+        description, attempts
+    );
+    Err(io::Error::new(io::ErrorKind::Other, msg))
 }
 
 /// Actor responsible for API management. The actor encapsulates endpoint handlers and
@@ -144,9 +147,14 @@ impl ApiManager {
             let mut aggregator = self.config.api_aggregator.clone();
             aggregator.extend(self.endpoints.clone());
             let server_config = server_config.to_owned();
+            let action_description = format!(
+                "starting {} api on {}",
+                access, server_config.listen_address
+            );
 
             with_retries(
                 move || Self::start_server(aggregator.clone(), access, server_config.clone()),
+                action_description,
                 self.config.server_restart_max_retries,
                 self.config.server_restart_retry_timeout,
             )
@@ -172,7 +180,17 @@ impl ApiManager {
     }
 
     /// Starts API manager actor with the specified endpoints update stream.
-    pub async fn run<S>(mut self, mut endpoints_rx: S) -> io::Result<()>
+    pub async fn run<S>(mut self, endpoints_rx: S) -> io::Result<()>
+    where
+        S: Stream<Item = UpdateEndpoints> + Unpin,
+    {
+        let res = self.run_inner(endpoints_rx).await;
+        // Stop the HTTP server(s) in any case.
+        self.stop_servers().await;
+        res
+    }
+
+    async fn run_inner<S>(&mut self, mut endpoints_rx: S) -> io::Result<()>
     where
         S: Stream<Item = UpdateEndpoints> + Unpin,
     {
@@ -182,7 +200,6 @@ impl ApiManager {
             self.endpoints = request.endpoints;
             self.start_servers().await?;
         }
-
         Ok(())
     }
 
