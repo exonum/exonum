@@ -360,7 +360,7 @@ fn string_panic() {
 #[test]
 fn box_error_panic() {
     let error: Box<dyn std::error::Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
-    let description = error.description().to_owned();
+    let description = error.to_string();
     let panic = make_panic(error);
     assert_eq!(ExecutionError::from_panic(panic).description, description);
 }

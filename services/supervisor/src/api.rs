@@ -631,7 +631,7 @@ use super::{
 #[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct DeployInfoQuery {
-    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.1".
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2".
     pub artifact: String,
     /// Artifact spec bytes as hexadecimal string.
     pub spec: String,
@@ -685,7 +685,7 @@ impl From<DeployRequest> for DeployInfoQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct MigrationInfoQuery {
-    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.1"
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2"
     pub new_artifact: String,
     /// Target service name.
     pub service: String,

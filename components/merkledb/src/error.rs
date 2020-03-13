@@ -14,7 +14,6 @@
 
 //! An implementation of `Error` type.
 
-use std::error::Error as StdError;
 use thiserror::Error;
 
 /// The error type for I/O operations with the `Database`.
@@ -39,6 +38,6 @@ impl Error {
 
 impl From<rocksdb::Error> for Error {
     fn from(err: rocksdb::Error) -> Self {
-        Self::new(err.description())
+        Self::new(err.to_string())
     }
 }

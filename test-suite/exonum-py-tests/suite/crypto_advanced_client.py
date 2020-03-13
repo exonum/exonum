@@ -17,7 +17,7 @@ class ExonumCryptoAdvancedClient:
         self.loader.load_service_proto_files(
             runtime_id=0,
             artifact_name="exonum-supervisor",
-            artifact_version="1.0.0-rc.1",
+            artifact_version="1.0.0-rc.2",
         )
         self.loader.load_service_proto_files(
             runtime_id=0,

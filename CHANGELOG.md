@@ -5,6 +5,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 1.0.0-rc.2 - 2020-03-13
+
 ### Breaking changes
 
 #### General

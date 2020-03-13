@@ -1,6 +1,6 @@
 [package]
 name = "exonum"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -32,11 +32,11 @@ protobuf = { version = "2.8.1", features = ["with-serde"] }
 semver = { version = "0.9.0", features = ["serde"] }
 thiserror = "1.0"
 
-exonum-crypto = { version = "1.0.0-rc.1", path = "../components/crypto" }
-exonum-derive = { version = "1.0.0-rc.1", path = "../components/derive" }
-exonum-keys = { version = "1.0.0-rc.1", path = "../components/keys" }
-exonum-merkledb = { version = "1.0.0-rc.1", path = "../components/merkledb" }
-exonum-proto = { version = "1.0.0-rc.1", path = "../components/proto" }
+exonum-crypto = { version = "1.0.0-rc.2", path = "../components/crypto" }
+exonum-derive = { version = "1.0.0-rc.2", path = "../components/derive" }
+exonum-keys = { version = "1.0.0-rc.2", path = "../components/keys" }
+exonum-merkledb = { version = "1.0.0-rc.2", path = "../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.2", path = "../components/proto" }
 
 [dev-dependencies]
 assert_matches = "1.3.0"
@@ -64,7 +64,7 @@ rocksdb_zstd = ["exonum-merkledb/rocksdb_zstd"]
 rocksdb_bzip2 = ["exonum-merkledb/rocksdb_bzip2"]
 
 [build-dependencies]
-exonum-build = { version = "1.0.0-rc.1", path = "../components/build" }
+exonum-build = { version = "1.0.0-rc.2", path = "../components/build" }
 
 [package.metadata.docs.rs]
 dependencies = [ "protobuf-compiler" ]

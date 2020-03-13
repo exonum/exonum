@@ -63,7 +63,7 @@ impl ExecutionError {
         } else if let Some(s) = any.downcast_ref::<String>() {
             s.clone()
         } else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {
-            error.description().to_string()
+            error.to_string()
         } else if let Some(error) = any.downcast_ref::<anyhow::Error>() {
             error.to_string()
         } else {
