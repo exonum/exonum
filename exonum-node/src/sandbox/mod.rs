@@ -64,6 +64,7 @@ use crate::{
         PoolTransactionsRequest, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
         TransactionsRequest, TransactionsResponse,
     },
+    proposer::{ProposeBlock, StandardProposer},
     state::State,
     ApiSender, Configuration, ConnectInfo, ConnectListConfig, ExternalMessage, MemoryPoolConfig,
     NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, SystemStateProvider,
@@ -927,6 +928,7 @@ pub struct SandboxBuilder {
     rust_runtime: RustRuntimeBuilder,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
+    proposer: Box<dyn ProposeBlock>,
 }
 
 impl Default for SandboxBuilder {
@@ -953,6 +955,7 @@ impl Default for SandboxBuilder {
             rust_runtime: RustRuntimeBuilder::new(),
             instances: Vec::new(),
             artifacts: HashMap::new(),
+            proposer: Box::new(StandardProposer),
         }
     }
 }
@@ -983,6 +986,12 @@ impl SandboxBuilder {
         self.with_artifact(service.artifact_id())
             .with_instance(service.default_instance())
             .with_rust_service(service)
+    }
+
+    /// Customizes block proposal creation.
+    pub fn with_proposer(mut self, proposer: impl ProposeBlock + 'static) -> Self {
+        self.proposer = Box::new(proposer);
+        self
     }
 
     /// Adds instances descriptions to the testkit that will be used for specification of builtin
@@ -1026,6 +1035,7 @@ impl SandboxBuilder {
             self.consensus_config,
             self.validators_count,
         );
+        sandbox.inner.borrow_mut().handler.block_proposer = self.proposer;
 
         sandbox.inner.borrow_mut().sent.clear(); // To clear initial connect messages.
         if self.initialize {

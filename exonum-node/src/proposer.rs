@@ -33,7 +33,7 @@ use exonum::{
     messages::{AnyTx, Verified},
 };
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt};
 
 use crate::State;
 
@@ -55,6 +55,11 @@ impl ProposeParams {
             height: state.height(),
             round: state.round(),
         }
+    }
+
+    /// Current consensus configuration.
+    pub fn consensus_config(&self) -> &ConsensusConfig {
+        &self.consensus_config
     }
 
     /// Current blockchain height.
@@ -98,6 +103,12 @@ impl ProposeTemplate {
 pub trait ProposeBlock: Send {
     /// Creates a block proposal based on the transaction pool and block creation params.
     fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate;
+}
+
+impl fmt::Debug for dyn ProposeBlock {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_tuple("ProposeBlock").finish()
+    }
 }
 
 /// Standard block proposer used by the nodes if no other proposer is specified.
