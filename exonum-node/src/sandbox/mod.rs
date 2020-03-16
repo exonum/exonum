@@ -248,7 +248,7 @@ impl Sandbox {
         secret_key: &SecretKey,
     ) -> Verified<Status> {
         Verified::from_value(
-            Status::new(height, last_hash, pool_size),
+            Status::new(height, height, last_hash, pool_size),
             author,
             secret_key,
         )
@@ -312,14 +312,14 @@ impl Sandbox {
     pub fn create_propose(
         &self,
         validator_id: ValidatorId,
-        height: Height,
+        epoch: Height,
         round: Round,
         last_hash: Hash,
         tx_hashes: impl IntoIterator<Item = Hash>,
         secret_key: &SecretKey,
     ) -> Verified<Propose> {
         Verified::from_value(
-            Propose::new(validator_id, height, round, last_hash, tx_hashes),
+            Propose::new(validator_id, epoch, round, last_hash, tx_hashes),
             self.public_key(validator_id),
             secret_key,
         )
@@ -330,7 +330,7 @@ impl Sandbox {
     pub fn create_precommit(
         &self,
         validator_id: ValidatorId,
-        propose_height: Height,
+        epoch: Height,
         propose_round: Round,
         propose_hash: Hash,
         block_hash: Hash,
@@ -340,7 +340,7 @@ impl Sandbox {
         Verified::from_value(
             Precommit::new(
                 validator_id,
-                propose_height,
+                epoch,
                 propose_round,
                 propose_hash,
                 block_hash,
@@ -355,7 +355,7 @@ impl Sandbox {
     pub fn create_prevote(
         &self,
         validator_id: ValidatorId,
-        propose_height: Height,
+        epoch: Height,
         propose_round: Round,
         propose_hash: Hash,
         locked_round: Round,
@@ -364,7 +364,7 @@ impl Sandbox {
         Verified::from_value(
             Prevote::new(
                 validator_id,
-                propose_height,
+                epoch,
                 propose_round,
                 propose_hash,
                 locked_round,
@@ -379,14 +379,14 @@ impl Sandbox {
     pub fn create_prevote_request(
         from: PublicKey,
         to: PublicKey,
-        height: Height,
+        epoch: Height,
         round: Round,
         propose_hash: Hash,
         validators: BitVec,
         secret_key: &SecretKey,
     ) -> Verified<PrevotesRequest> {
         Verified::from_value(
-            PrevotesRequest::new(to, height, round, propose_hash, validators),
+            PrevotesRequest::new(to, epoch, round, propose_hash, validators),
             from,
             secret_key,
         )
@@ -396,12 +396,12 @@ impl Sandbox {
     pub fn create_propose_request(
         author: PublicKey,
         to: PublicKey,
-        height: Height,
+        epoch: Height,
         propose_hash: Hash,
         secret_key: &SecretKey,
     ) -> Verified<ProposeRequest> {
         Verified::from_value(
-            ProposeRequest::new(to, height, propose_hash),
+            ProposeRequest::new(to, epoch, propose_hash),
             author,
             secret_key,
         )
@@ -519,8 +519,8 @@ impl Sandbox {
                 panic!("Sending PeersRequest to unknown peer {:?}", addr);
             });
         assert_eq!(
-            &self.public_key(ValidatorId(id as u16)),
-            peers_request.payload().to()
+            self.public_key(ValidatorId(id as u16)),
+            peers_request.payload().to
         );
     }
 
@@ -768,7 +768,7 @@ impl Sandbox {
     }
 
     pub fn current_height(&self) -> Height {
-        self.node_state().height()
+        self.node_state().epoch()
     }
 
     pub fn current_leader(&self) -> ValidatorId {
@@ -778,7 +778,7 @@ impl Sandbox {
     pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
         let state = self.node_state();
 
-        let actual_height = state.height();
+        let actual_height = state.epoch();
         let actual_round = state.round();
         assert_eq!(actual_height, expected_height);
         assert_eq!(actual_round, expected_round);

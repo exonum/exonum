@@ -101,8 +101,10 @@ impl Connect {
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::Status")]
 pub struct Status {
-    /// The height to which the message is related.
-    pub height: Height,
+    /// The epoch to which the message is related.
+    pub epoch: Height,
+    /// Current height of the blockchain.
+    pub blockchain_height: Height,
     /// Hash of the last committed block.
     pub last_hash: Hash,
     /// Transactions pool size.
@@ -111,33 +113,20 @@ pub struct Status {
 
 impl Status {
     /// Create new `Status` message.
-    pub fn new(height: Height, last_hash: Hash, pool_size: u64) -> Self {
+    pub fn new(epoch: Height, blockchain_height: Height, last_hash: Hash, pool_size: u64) -> Self {
         Self {
-            height,
+            epoch,
+            blockchain_height,
             last_hash,
             pool_size,
         }
-    }
-
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-
-    /// Hash of the last committed block.
-    pub fn last_hash(&self) -> &Hash {
-        &self.last_hash
-    }
-
-    /// Pool size.
-    pub fn pool_size(&self) -> u64 {
-        self.pool_size
     }
 }
 
 /// Proposal for a new block.
 ///
 /// ### Validation
+///
 /// The message is ignored if it
 ///     * contains incorrect `prev_hash`
 ///     * is sent by non-leader
@@ -159,62 +148,57 @@ pub struct Propose {
     /// The validator id.
     pub validator: ValidatorId,
     /// The height to which the message is related.
-    pub height: Height,
+    pub epoch: Height,
     /// The round to which the message is related.
     pub round: Round,
     /// Hash of the previous block.
     pub prev_hash: Hash,
     /// The list of transactions to include in the next block.
     pub transactions: Vec<Hash>,
+    /// Do nothing instead of approving a new block.
+    pub skip: bool,
 }
 
 impl Propose {
     /// Create new `Propose` message.
     pub fn new(
         validator: ValidatorId,
-        height: Height,
+        epoch: Height,
         round: Round,
         prev_hash: Hash,
         transactions: impl IntoIterator<Item = Hash>,
     ) -> Self {
         Self {
             validator,
-            height,
+            epoch,
             round,
             prev_hash,
             transactions: transactions.into_iter().collect(),
+            skip: false,
         }
     }
 
-    /// The validator id.
-    pub fn validator(&self) -> ValidatorId {
-        self.validator
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the previous block.
-    pub fn prev_hash(&self) -> &Hash {
-        &self.prev_hash
-    }
-    /// The list of transactions to include in the next block.
-    pub fn transactions(&self) -> &[Hash] {
-        &self.transactions
+    pub fn skip(validator: ValidatorId, epoch: Height, round: Round, prev_hash: Hash) -> Self {
+        Self {
+            validator,
+            epoch,
+            round,
+            prev_hash,
+            transactions: vec![],
+            skip: true,
+        }
     }
 }
 
 /// Pre-vote for a new block.
 ///
 /// ### Validation
+///
 /// A node panics if it has already sent a different `Prevote` for the same
 /// round.
 ///
 /// ### Processing
+///
 /// Pre-vote is added to the list of known votes for the same proposal.  If
 /// `locked_round` number from the message is bigger than in a node state,
 /// then a node replies with `PrevotesRequest`.  If there are unknown
@@ -224,6 +208,7 @@ impl Propose {
 /// proposal and `Precommit` is broadcast.
 ///
 /// ### Generation
+///
 /// A node broadcasts `Prevote` in response to `Propose` when it has
 /// received all the transactions.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
@@ -232,7 +217,7 @@ pub struct Prevote {
     /// The validator id.
     pub validator: ValidatorId,
     /// The height to which the message is related.
-    pub height: Height,
+    pub epoch: Height,
     /// The round to which the message is related.
     pub round: Round,
     /// Hash of the corresponding `Propose`.
@@ -245,39 +230,18 @@ impl Prevote {
     /// Create new `Prevote` message.
     pub fn new(
         validator: ValidatorId,
-        height: Height,
+        epoch: Height,
         round: Round,
         propose_hash: Hash,
         locked_round: Round,
     ) -> Self {
         Self {
             validator,
-            height,
+            epoch,
             round,
             propose_hash,
             locked_round,
         }
-    }
-
-    /// The validator id.
-    pub fn validator(&self) -> ValidatorId {
-        self.validator
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the corresponding `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
-    /// Locked round.
-    pub fn locked_round(&self) -> Round {
-        self.locked_round
     }
 }
 
@@ -319,38 +283,26 @@ impl BlockResponse {
         }
     }
 
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-
-    /// Block header.
-    pub fn block(&self) -> &Block {
-        &self.block
-    }
-
-    /// List of precommits.
-    pub fn precommits(&self) -> &[Vec<u8>] {
-        &self.precommits
-    }
-
-    /// List of the transaction hashes.
-    pub fn transactions(&self) -> &[Hash] {
-        &self.transactions
+    /// Verifies Merkle root of transactions in the block.
+    pub fn verify_tx_hash(&self) -> bool {
+        self.block.tx_hash == HashTag::hash_list(&self.transactions)
     }
 }
 
 /// Information about the transactions.
 ///
 /// ### Validation
+///
 /// The message is ignored if
 ///     * its `to` field corresponds to a different node
 ///     * the `transactions` field cannot be parsed or verified
 ///
 /// ### Processing
+///
 /// Returns information about the transactions requested by the hash.
 ///
 /// ### Generation
+///
 /// The message is sent as response to `TransactionsRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::TransactionsResponse")]
@@ -369,28 +321,21 @@ impl TransactionsResponse {
             transactions: transactions.into_iter().collect(),
         }
     }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-
-    /// List of the transactions.
-    pub fn transactions(&self) -> &[Vec<u8>] {
-        &self.transactions
-    }
 }
 
 /// Request for the `Propose`.
 ///
 /// ### Validation
+///
 /// The message is ignored if its `height` is not equal to the node's
 /// height.
 ///
 /// ### Processing
+///
 /// `Propose` is sent as the response.
 ///
 /// ### Generation
+///
 /// A node can send `ProposeRequest` during `Precommit` and `Prevote`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
@@ -398,42 +343,31 @@ impl TransactionsResponse {
 pub struct ProposeRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
-    /// The height to which the message is related.
-    pub height: Height,
+    /// The epoch to which the message is related.
+    pub epoch: Height,
     /// Hash of the `Propose`.
     pub propose_hash: Hash,
 }
 
 impl ProposeRequest {
     /// Create new `ProposeRequest`.
-    pub fn new(to: PublicKey, height: Height, propose_hash: Hash) -> Self {
+    pub fn new(to: PublicKey, epoch: Height, propose_hash: Hash) -> Self {
         Self {
             to,
-            height,
+            epoch,
             propose_hash,
         }
-    }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// Hash of the `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
     }
 }
 
 /// Request for transactions by hash.
 ///
 /// ### Processing
+///
 /// Requested transactions are sent to the recipient.
 ///
 /// ### Generation
+///
 /// This message can be sent during `Propose`, `Prevote` and `Precommit`
 /// handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
@@ -452,16 +386,6 @@ impl TransactionsRequest {
             to,
             txs: txs.into_iter().collect(),
         }
-    }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-
-    /// The list of the transaction hashes.
-    pub fn txs(&self) -> &[Hash] {
-        &self.txs
     }
 }
 
@@ -503,8 +427,8 @@ impl PoolTransactionsRequest {
 pub struct PrevotesRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
-    /// The height to which the message is related.
-    pub height: Height,
+    /// The epoch to which the message is related.
+    pub epoch: Height,
     /// The round to which the message is related.
     pub round: Round,
     /// Hash of the `Propose`.
@@ -517,39 +441,18 @@ impl PrevotesRequest {
     /// Create new `PrevotesRequest`.
     pub fn new(
         to: PublicKey,
-        height: Height,
+        epoch: Height,
         round: Round,
         propose_hash: Hash,
         validators: BitVec,
     ) -> Self {
         Self {
             to,
-            height,
+            epoch,
             round,
             propose_hash,
             validators,
         }
-    }
-
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-    /// The round to which the message is related.
-    pub fn round(&self) -> Round {
-        self.round
-    }
-    /// Hash of the `Propose`.
-    pub fn propose_hash(&self) -> &Hash {
-        &self.propose_hash
-    }
-    /// The list of validators that send pre-votes.
-    pub fn validators(&self) -> BitVec {
-        self.validators.clone()
     }
 }
 
@@ -577,28 +480,27 @@ impl PeersRequest {
     pub fn new(to: PublicKey) -> Self {
         Self { to }
     }
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
 }
 
 /// Request for the block with the given `height`.
 ///
 /// ### Validation
+///
 /// The message is ignored if its `height` is bigger than the node's one.
 ///
 /// ### Processing
+///
 /// `BlockResponse` message is sent as the response.
 ///
 /// ### Generation
+///
 /// This message can be sent during `Status` processing.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::BlockRequest")]
 pub struct BlockRequest {
     /// Public key of the recipient.
     pub to: PublicKey,
-    /// The height to which the message is related.
+    /// The blockchain height to retrieve.
     pub height: Height,
 }
 
@@ -606,21 +508,6 @@ impl BlockRequest {
     /// Create new `BlockRequest`.
     pub fn new(to: PublicKey, height: Height) -> Self {
         Self { to, height }
-    }
-    /// Public key of the recipient.
-    pub fn to(&self) -> &PublicKey {
-        &self.to
-    }
-    /// The height to which the message is related.
-    pub fn height(&self) -> Height {
-        self.height
-    }
-}
-
-impl BlockResponse {
-    /// Verify Merkle root of transactions in the block.
-    pub fn verify_tx_hash(&self) -> bool {
-        self.block().tx_hash == HashTag::hash_list(self.transactions())
     }
 }
 

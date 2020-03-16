@@ -215,14 +215,6 @@ impl BlockProof {
             return Err(ProofError::DoubleEndorsement);
         }
 
-        let correct_heights = self
-            .precommits
-            .iter()
-            .all(|precommit| precommit.payload().height == self.block.height);
-        if !correct_heights {
-            return Err(ProofError::IncorrectHeight);
-        }
-
         let block_hash = self.block.object_hash();
         let correct_block_hashes = self
             .precommits
@@ -266,11 +258,6 @@ pub enum ProofError {
     /// The block is authorized by an insufficient number of precommits.
     #[error("Insufficient number of precommits")]
     NoQuorum,
-
-    /// Block height mentioned in at least one of precommits differs from the height mentioned
-    /// in the block header.
-    #[error("Incorrect block height in at least one of precommits")]
-    IncorrectHeight,
 
     /// Hash of the block in at least one precommit differs from that of the real block.
     #[error("Incorrect block hash in at least one of precommits")]
@@ -683,25 +670,6 @@ mod tests {
             ProofError::ValidatorKeyMismatch
         );
 
-        // Incorrect height in a precommit.
-        let bogus_precommit = Precommit::new(
-            ValidatorId(3),
-            Height(100),
-            Round(1),
-            Hash::zero(),
-            proof.block.object_hash(),
-            Utc::now(),
-        );
-        let bogus_precommit =
-            Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
-        let mut mauled_proof = proof.clone();
-        mauled_proof.precommits.truncate(2);
-        mauled_proof.precommits.push(bogus_precommit);
-        assert_matches!(
-            mauled_proof.verify(&public_keys).unwrap_err(),
-            ProofError::IncorrectHeight
-        );
-
         // Incorrect block hash in a precommit.
         let bogus_precommit = Precommit::new(
             ValidatorId(3),
@@ -903,7 +871,7 @@ mod tests {
         // Check proof invalidation if the block part is mangled.
         call_proof.block_proof.block.height = Height(100);
         let err = call_proof.verify(&public_keys).unwrap_err();
-        assert_matches!(err, ProofError::IncorrectHeight);
+        assert_matches!(err, ProofError::IncorrectBlockHash);
 
         // Check proof invalidation if an error description is supplied.
         call_proof.block_proof.block.height = Height(1);

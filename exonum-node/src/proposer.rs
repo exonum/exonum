@@ -52,7 +52,7 @@ impl ProposeParams {
     pub(crate) fn new(state: &State) -> Self {
         Self {
             consensus_config: state.consensus_config().to_owned(),
-            height: state.height(),
+            height: state.epoch(),
             round: state.round(),
         }
     }

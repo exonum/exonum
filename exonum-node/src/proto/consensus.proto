@@ -25,6 +25,7 @@ import "exonum/common/bit_vec.proto";
 import "exonum/blockchain.proto";
 import "exonum/messages.proto";
 import "exonum/runtime/base.proto";
+
 import "google/protobuf/timestamp.proto";
 
 message Connect {
@@ -34,22 +35,24 @@ message Connect {
 }
 
 message Status {
-  uint64 height = 1;
+  uint64 epoch = 1;
   exonum.crypto.Hash last_hash = 2;
   uint64 pool_size = 3;
+  uint64 blockchain_height = 4;
 }
 
 message Propose {
   uint32 validator = 1;
-  uint64 height = 2;
+  uint64 epoch = 2;
   uint32 round = 3;
   exonum.crypto.Hash prev_hash = 4;
   repeated exonum.crypto.Hash transactions = 5;
+  bool skip = 6;
 }
 
 message Prevote {
   uint32 validator = 1;
-  uint64 height = 2;
+  uint64 epoch = 2;
   uint32 round = 3;
   exonum.crypto.Hash propose_hash = 4;
   uint32 locked_round = 5;
@@ -69,7 +72,7 @@ message TransactionsResponse {
 
 message ProposeRequest {
   exonum.crypto.PublicKey to = 1;
-  uint64 height = 2;
+  uint64 epoch = 2;
   exonum.crypto.Hash propose_hash = 3;
 }
 
@@ -80,7 +83,7 @@ message TransactionsRequest {
 
 message PrevotesRequest {
   exonum.crypto.PublicKey to = 1;
-  uint64 height = 2;
+  uint64 epoch = 2;
   uint32 round = 3;
   exonum.crypto.Hash propose_hash = 4;
   exonum.common.BitVec validators = 5;

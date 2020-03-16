@@ -20,7 +20,7 @@ use crate::{
     events::{error::LogError, network::ConnectedPeerAddr},
     messages::{Connect, Message, PeersRequest, Responses, Service, Status},
     schema::NodeSchema,
-    state::RequestData,
+    state::{PeerState, RequestData},
     NodeHandler, NodeRole,
 };
 
@@ -165,11 +165,14 @@ impl NodeHandler {
     /// Handles the `Status` message. Node sends `BlockRequest` as response if height in the
     /// message is higher than node's height.
     pub(crate) fn handle_status(&mut self, msg: &Verified<Status>) {
-        let height = self.state.height();
+        let epoch = self.state.epoch();
+        let blockchain_height = self.state.blockchain_height();
         trace!(
-            "HANDLE STATUS: current height = {}, msg height = {}",
-            height,
-            msg.payload().height()
+            "HANDLE STATUS: current epoch / height = {} / {}, msg epoch / height = {} / {}",
+            epoch,
+            blockchain_height,
+            msg.payload().epoch,
+            msg.payload().blockchain_height
         );
 
         if !self.state.connect_list().is_peer_allowed(&msg.author()) {
@@ -181,19 +184,15 @@ impl NodeHandler {
         }
 
         let peer = msg.author();
+        let peer_state = PeerState::new(msg.payload());
+        self.state.update_peer_state(peer, peer_state);
 
-        // Handle message from future height
-        if msg.payload().height() > height {
-            let peer = msg.author();
-
-            // Check validator height info
-            if msg.payload().height() > self.state.node_height(&peer) {
-                // Update validator height
-                self.state.set_node_height(peer, msg.payload().height());
-            }
-
-            // Request block
-            self.request(RequestData::Block(height), peer);
+        // Handle message from future epoch / height.
+        if peer_state.blockchain_height > blockchain_height {
+            // Request block.
+            self.request(RequestData::Block(blockchain_height), peer);
+        } else if peer_state.epoch > epoch {
+            // FIXME: Request skip block.
         }
 
         if self.uncommitted_txs_count() == 0 && msg.payload().pool_size > 0 {
@@ -219,7 +218,7 @@ impl NodeHandler {
     /// Handles `NodeTimeout::Status`, broadcasts the `Status` message if it isn't outdated as
     /// result.
     pub(crate) fn handle_status_timeout(&mut self, height: Height) {
-        if self.state.height() == height {
+        if self.state.epoch() == height {
             self.broadcast_status();
             self.add_status_timeout();
         }
@@ -263,7 +262,8 @@ impl NodeHandler {
     /// Broadcasts the `Status` message to all peers.
     pub(crate) fn broadcast_status(&mut self) {
         let status = Status {
-            height: self.state.height(),
+            epoch: self.state.epoch(),
+            blockchain_height: self.state.blockchain_height(),
             last_hash: self.blockchain.as_ref().last_hash(),
             pool_size: self.uncommitted_txs_count(),
         };

@@ -611,7 +611,7 @@ pub fn make_request_propose_from_precommit(
     Sandbox::create_propose_request(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(precommit.validator),
-        precommit.height,
+        precommit.epoch,
         precommit.propose_hash,
         sandbox.secret_key(ValidatorId(0)),
     )
@@ -625,7 +625,7 @@ pub fn make_request_prevote_from_precommit(
     Sandbox::create_prevote_request(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(precommit.validator),
-        precommit.height,
+        precommit.epoch,
         precommit.round,
         precommit.propose_hash,
         validators,
@@ -641,8 +641,8 @@ pub fn make_prevote_from_propose(
 ) -> Verified<Prevote> {
     sandbox.create_prevote(
         ValidatorId(0),
-        propose.as_ref().height(),
-        propose.as_ref().round(),
+        propose.payload().epoch,
+        propose.payload().round,
         propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),

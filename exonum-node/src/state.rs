@@ -36,7 +36,7 @@ use crate::{
     connect_list::ConnectList,
     consensus::RoundAction,
     events::network::ConnectedPeerAddr,
-    messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose},
+    messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose, Status},
     Configuration, ConnectInfo, FlushPoolStrategy,
 };
 
@@ -51,6 +51,36 @@ pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `BlockRequest` message.
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PeerState {
+    pub epoch: Height,
+    pub blockchain_height: Height,
+}
+
+impl PeerState {
+    pub fn new(status: &Status) -> Self {
+        Self {
+            epoch: status.epoch,
+            blockchain_height: status.blockchain_height,
+        }
+    }
+}
+
+impl Default for PeerState {
+    fn default() -> Self {
+        Self {
+            epoch: Height::zero(),
+            blockchain_height: Height::zero(),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct AdvancedPeers {
+    pub peers_with_greater_height: Vec<PublicKey>,
+    pub peers_with_greater_epoch: Vec<PublicKey>,
+}
+
 /// State of the `NodeHandler`.
 #[derive(Debug)]
 pub(crate) struct State {
@@ -62,8 +92,9 @@ pub(crate) struct State {
 
     peers: HashMap<PublicKey, Verified<Connect>>,
     connections: HashMap<PublicKey, ConnectedPeerAddr>,
-    height_start_time: SystemTime,
-    height: Height,
+    epoch_start_time: SystemTime,
+    epoch: Height,
+    blockchain_height: Height,
 
     round: Round,
     locked_round: Round,
@@ -84,9 +115,8 @@ pub(crate) struct State {
     // Our requests state.
     requests: HashMap<RequestData, RequestState>,
 
-    // Maximum of node height in consensus messages.
-    nodes_max_height: BTreeMap<PublicKey, Height>,
-
+    // Maximum of node epoch / height in consensus messages.
+    peer_states: BTreeMap<PublicKey, PeerState>,
     validators_rounds: BTreeMap<ValidatorId, Round>,
 
     incomplete_block: Option<IncompleteBlock>,
@@ -189,7 +219,7 @@ impl VoteMessage for Verified<Precommit> {
 
 impl VoteMessage for Verified<Prevote> {
     fn validator(&self) -> ValidatorId {
-        self.payload().validator()
+        self.payload().validator
     }
 }
 
@@ -454,7 +484,7 @@ impl State {
         connect: Connect,
         peers: HashMap<PublicKey, Verified<Connect>>,
         last_block: &Block,
-        height_start_time: SystemTime,
+        epoch_start_time: SystemTime,
     ) -> Self {
         let validator_id = consensus_config
             .validator_keys
@@ -472,8 +502,9 @@ impl State {
             connect_list: SharedConnectList::from_connect_list(config.connect_list),
             peers,
             connections: HashMap::new(),
-            height: last_block.height.next(),
-            height_start_time,
+            epoch: last_block.height.next(), // FIXME: this is incorrect
+            epoch_start_time,
+            blockchain_height: last_block.height.next(),
             round: Round::zero(),
             locked_round: Round::zero(),
             locked_propose: None,
@@ -489,7 +520,7 @@ impl State {
             unknown_txs: HashMap::new(),
             proposes_confirmed_by_majority: HashMap::new(),
 
-            nodes_max_height: BTreeMap::new(),
+            peer_states: BTreeMap::new(),
             validators_rounds: BTreeMap::new(),
 
             our_connect_message,
@@ -640,9 +671,9 @@ impl State {
 
     /// Returns the leader id for the specified round and current height.
     pub fn leader(&self, round: Round) -> ValidatorId {
-        let height: u64 = self.height().into();
+        let epoch: u64 = self.epoch().into();
         let round: u64 = round.into();
-        ValidatorId(((height + round) % (self.validators().len() as u64)) as u16)
+        ValidatorId(((epoch + round) % (self.validators().len() as u64)) as u16)
     }
 
     /// Updates known round for a validator and returns
@@ -689,31 +720,39 @@ impl State {
         }
     }
 
-    /// Returns the height for a validator identified by the public key.
-    pub(super) fn node_height(&self, key: &PublicKey) -> Height {
-        *self.nodes_max_height.get(key).unwrap_or(&Height::zero())
-    }
-
-    /// Updates known height for a validator identified by the public key.
-    pub(super) fn set_node_height(&mut self, key: PublicKey, height: Height) {
-        *self
-            .nodes_max_height
-            .entry(key)
-            .or_insert_with(Height::zero) = height;
+    /// Updates known height / epoch for a validator identified by the public key.
+    pub(super) fn update_peer_state(&mut self, key: PublicKey, new_state: PeerState) {
+        let current_state = self.peer_states.entry(key).or_default();
+        if current_state.epoch < new_state.epoch {
+            if current_state.blockchain_height <= new_state.blockchain_height {
+                *current_state = new_state;
+            } else {
+                log::warn!(
+                    "Node {:?} has provided inconsistent `Status`: previously known \
+                     peer state was {:?}, and the new one is {:?}",
+                    key,
+                    current_state,
+                    new_state
+                );
+            }
+        }
     }
 
     /// Returns a list of nodes whose height is bigger than one of the current node.
-    pub(super) fn nodes_with_bigger_height(&self) -> Vec<&PublicKey> {
-        self.nodes_max_height
-            .iter()
-            .filter_map(|(key, height)| {
-                if *height > self.height() {
-                    Some(key)
-                } else {
-                    None
-                }
-            })
-            .collect()
+    pub(super) fn advanced_peers(&self) -> AdvancedPeers {
+        let mut peers_with_greater_height = vec![];
+        let mut peers_with_greater_epoch = vec![];
+        for (&key, state) in &self.peer_states {
+            if state.blockchain_height > self.blockchain_height {
+                peers_with_greater_height.push(key);
+            } else if state.epoch > self.epoch {
+                peers_with_greater_epoch.push(key);
+            }
+        }
+        AdvancedPeers {
+            peers_with_greater_height,
+            peers_with_greater_epoch,
+        }
     }
 
     /// Returns sufficient number of votes for current validators number.
@@ -721,14 +760,18 @@ impl State {
         byzantine_quorum(self.validators().len())
     }
 
-    /// Returns current height.
-    pub fn height(&self) -> Height {
-        self.height
+    /// Returns current epoch of the consensus algorithm.
+    pub fn epoch(&self) -> Height {
+        self.epoch
+    }
+
+    pub fn blockchain_height(&self) -> Height {
+        self.blockchain_height
     }
 
     /// Returns start time of the current height.
-    pub(super) fn height_start_time(&self) -> SystemTime {
-        self.height_start_time
+    pub(super) fn epoch_start_time(&self) -> SystemTime {
+        self.epoch_start_time
     }
 
     /// Returns the current round.
@@ -807,14 +850,13 @@ impl State {
         block
     }
 
-    /// Increments the node height by one and resets previous height data.
-    pub(super) fn new_height(&mut self, block_hash: &Hash, height_start_time: SystemTime) {
-        self.height.increment();
-        self.height_start_time = height_start_time;
+    /// Increments the node epoch by one and resets previous epoch data.
+    fn new_epoch(&mut self, epoch_start_time: SystemTime) {
+        self.epoch.increment();
+        self.epoch_start_time = epoch_start_time;
         self.round = Round::first();
         self.locked_round = Round::zero();
         self.locked_propose = None;
-        self.last_hash = *block_hash;
         // TODO: Destruct/construct structure HeightState instead of call clear. (ECR-171)
         self.blocks.clear();
         self.proposes.clear();
@@ -827,6 +869,13 @@ impl State {
         }
         self.requests.clear(); // FIXME: Clear all timeouts. (ECR-171)
         self.incomplete_block = None;
+    }
+
+    /// Increments the node height by one together with entering a new epoch.
+    pub(super) fn new_height(&mut self, block_hash: &Hash, epoch_start_time: SystemTime) {
+        self.new_epoch(epoch_start_time);
+        self.blockchain_height.increment();
+        self.last_hash = *block_hash;
         self.invalid_txs.clear();
     }
 
@@ -859,7 +908,8 @@ impl State {
             }
 
             if propose_state.unknown_txs.is_empty() {
-                full_proposes.push((*propose_hash, propose_state.message().payload().round()));
+                let round = propose_state.message().payload().round;
+                full_proposes.push((*propose_hash, round));
             }
         }
 

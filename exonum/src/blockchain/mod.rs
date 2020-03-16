@@ -406,6 +406,12 @@ impl BlockchainMut {
         self.create_patch_inner(self.fork(), proposer_id, height, tx_hashes, tx_cache)
     }
 
+    /// FIXME
+    pub fn create_skip_patch(&self, proposer_id: ValidatorId, epoch: Height) -> (Hash, Patch) {
+        let _ = (self, proposer_id, epoch);
+        unimplemented!()
+    }
+
     /// Version of `create_patch` that supports user-provided fork. Used in tests.
     pub(crate) fn create_patch_inner<C>(
         &self,

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{PersistentPool, Schema, TransactionCache},
+    blockchain::{BlockProof, PersistentPool, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
     merkledb::BinaryValue,
     messages::Verified,
@@ -64,17 +64,14 @@ impl NodeHandler {
     /// Handles `ProposeRequest` message. For details see the message documentation.
     pub(crate) fn handle_request_propose(&mut self, msg: &Verified<ProposeRequest>) {
         trace!("HANDLE PROPOSE REQUEST");
-        if msg.payload().height() != self.state.height() {
+        if msg.payload().epoch != self.state.epoch() {
             return;
         }
 
-        let propose = if msg.payload().height() == self.state.height() {
-            self.state
-                .propose(&msg.payload().propose_hash)
-                .map(|p| p.message().clone())
-        } else {
-            return;
-        };
+        let propose = self
+            .state
+            .propose(&msg.payload().propose_hash)
+            .map(|propose_state| propose_state.message().clone());
 
         if let Some(propose) = propose {
             self.send_to_peer(msg.author(), propose);
@@ -133,7 +130,7 @@ impl NodeHandler {
     /// Handles `PrevotesRequest` message. For details see the message documentation.
     pub(crate) fn handle_request_prevotes(&mut self, msg: &Verified<PrevotesRequest>) {
         trace!("HANDLE PREVOTES REQUEST");
-        if msg.payload().height() != self.state.height() {
+        if msg.payload().epoch != self.state.epoch() {
             return;
         }
 
@@ -153,29 +150,27 @@ impl NodeHandler {
 
     /// Handles `BlockRequest` message. For details see the message documentation.
     pub(crate) fn handle_request_block(&mut self, msg: &Verified<BlockRequest>) {
+        let height = msg.payload().height;
         trace!(
-            "Handle block request with height:{}, our height: {}",
-            msg.payload().height(),
-            self.state.height()
+            "Handling `BlockRequest` with height: {}, our height: {}",
+            height,
+            self.state.blockchain_height()
         );
-        if msg.payload().height() >= self.state.height() {
+        if height >= self.state.blockchain_height() {
             return;
         }
 
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-
-        let height = msg.payload().height();
-        let block_hash = schema.block_hash_by_height(height).unwrap();
-
-        let block = schema.blocks().get(&block_hash).unwrap();
-        let precommits = schema.precommits(&block_hash);
+        let BlockProof {
+            block, precommits, ..
+        } = schema.block_and_precommits(height).unwrap();
         let transactions = schema.block_transactions(height);
 
         let block_msg = self.sign_message(BlockResponse::new(
             msg.author(),
             block,
-            precommits.iter().map(|p| p.to_bytes()),
+            precommits.iter().map(BinaryValue::to_bytes),
             transactions.iter(),
         ));
         self.send_to_peer(msg.author(), block_msg);

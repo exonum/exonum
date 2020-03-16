@@ -226,13 +226,13 @@ fn test_retrieve_block_and_precommits() {
     let target_height = Height(6);
 
     for _ in 2..=target_height.0 {
-        add_one_height(&sandbox, &sandbox_state)
+        add_one_height(&sandbox, &sandbox_state);
     }
     sandbox.assert_state(target_height, Round(1));
 
-    let bl_proof_option = sandbox.block_and_precommits(target_height.previous());
-    assert!(bl_proof_option.is_some());
-    let block_proof = bl_proof_option.unwrap();
+    let block_proof = sandbox
+        .block_and_precommits(target_height.previous())
+        .unwrap();
     let block = block_proof.block;
     let precommits: Vec<Verified<Precommit>> = block_proof.precommits;
     let expected_height = target_height.previous();
@@ -240,11 +240,10 @@ fn test_retrieve_block_and_precommits() {
 
     assert_eq!(expected_height, block.height);
     for precommit in precommits {
-        assert_eq!(expected_height, precommit.payload().height);
+        assert_eq!(expected_height, precommit.payload().epoch);
         assert_eq!(expected_block_hash, precommit.payload().block_hash);
     }
-    let bl_proof_option = sandbox.block_and_precommits(target_height);
-    assert!(bl_proof_option.is_none());
+    assert!(sandbox.block_and_precommits(target_height).is_none());
 }
 
 #[test]

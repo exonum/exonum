@@ -736,10 +736,10 @@ impl NodeHandler {
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
             time,
-            self.state.height(),
+            self.state.epoch(),
             self.state.round()
         );
-        let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
+        let timeout = NodeTimeout::Round(self.state.epoch(), self.state.round());
         self.add_timeout(timeout, time);
     }
 
@@ -756,10 +756,10 @@ impl NodeHandler {
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
             time,
-            self.state.height(),
+            self.state.epoch(),
             self.state.round()
         );
-        let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
+        let timeout = NodeTimeout::Propose(self.state.epoch(), self.state.round());
         self.add_timeout(timeout, time);
     }
 
@@ -781,7 +781,7 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Status` timeout to the channel.
     fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
-        let height = self.state.height();
+        let height = self.state.epoch();
         self.add_timeout(NodeTimeout::Status(height), time);
     }
 
@@ -834,7 +834,7 @@ impl NodeHandler {
         let ms = previous_round * self.first_round_timeout()
             + (previous_round * previous_round.saturating_sub(1)) / 2
                 * self.round_timeout_increase();
-        self.state.height_start_time() + Duration::from_millis(ms)
+        self.state.epoch_start_time() + Duration::from_millis(ms)
     }
 }
 
