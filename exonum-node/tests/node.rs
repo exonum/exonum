@@ -192,6 +192,7 @@ async fn nodes_commit_blocks() {
 }
 
 #[tokio::test]
+#[cfg_attr(windows, ignore)]
 async fn node_frees_sockets_on_shutdown() {
     let options = Options {
         http_start_port: Some(16_351),

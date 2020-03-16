@@ -101,6 +101,7 @@ use crate::{
         NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
+    proposer::{ProposeBlock, StandardProposer},
     schema::NodeSchema,
     state::{RequestData, State},
 };
@@ -113,6 +114,7 @@ mod events_impl;
 pub mod helpers;
 mod messages;
 mod plugin;
+pub mod proposer;
 mod proto;
 mod requests;
 #[cfg(test)]
@@ -198,6 +200,8 @@ pub(crate) struct NodeHandler {
     config_manager: Option<Box<dyn ConfigManager>>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
+    /// Block proposer.
+    block_proposer: Box<dyn ProposeBlock>,
 }
 
 /// HTTP API configuration options.
@@ -562,6 +566,7 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
+            block_proposer: Box::new(StandardProposer),
         }
     }
 
@@ -601,11 +606,6 @@ impl NodeHandler {
     /// Returns value of the `peers_timeout` field from the current `ConsensusConfig`.
     fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
-    }
-
-    /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
-    fn txs_block_limit(&self) -> u32 {
-        self.state().consensus_config().txs_block_limit
     }
 
     /// Returns value of the minimal propose timeout.

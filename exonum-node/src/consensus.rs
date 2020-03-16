@@ -32,6 +32,7 @@ use crate::{
         Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
         TransactionsResponse,
     },
+    proposer::{ProposeParams, ProposeTemplate},
     schema::NodeSchema,
     state::{IncompleteBlock, ProposeState, RequestData},
     NodeHandler,
@@ -929,66 +930,55 @@ impl NodeHandler {
         if self.state.locked_propose().is_some() {
             return;
         }
-        if let Some(validator_id) = self.state.validator_id() {
-            if self.state.have_prevote(round) {
-                return;
-            }
-            let round = self.state.round();
-            let txs = self.get_txs_for_propose();
+        if self.state.have_prevote(round) {
+            return;
+        }
 
-            let propose = self.sign_message(Propose::new(
-                validator_id,
-                self.state.height(),
-                round,
-                self.state.last_hash(),
-                txs,
-            ));
-            // Put our propose to the consensus messages cache.
-            self.blockchain.persist_changes(
-                |schema| schema.save_message(round, propose.clone()),
-                "Cannot save `Propose` to message cache",
-            );
+        let validator_id = if let Some(validator_id) = self.state.validator_id() {
+            validator_id
+        } else {
+            return;
+        };
+        let round = self.state.round();
+        let txs = self.get_txs_for_propose();
 
-            trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(propose.clone());
-            self.allow_expedited_propose = true;
+        let propose = self.sign_message(Propose::new(
+            validator_id,
+            self.state.height(),
+            round,
+            self.state.last_hash(),
+            txs,
+        ));
+        // Put our propose to the consensus messages cache.
+        self.blockchain.persist_changes(
+            |schema| schema.save_message(round, propose.clone()),
+            "Cannot save `Propose` to message cache",
+        );
 
-            // Save our propose into state
-            let hash = self.state.add_self_propose(propose);
+        trace!("Broadcast propose: {:?}", propose);
+        self.broadcast(propose.clone());
+        self.allow_expedited_propose = true;
 
-            // Send prevote
-            let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
-            if has_majority_prevotes {
-                self.handle_majority_prevotes(round, hash);
-            }
+        // Save our propose into state
+        let hash = self.state.add_self_propose(propose);
+
+        // Send prevote
+        let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
+        if has_majority_prevotes {
+            self.handle_majority_prevotes(round, hash);
         }
     }
 
-    fn get_txs_for_propose(&self) -> Vec<Hash> {
-        let txs_cache_len = self.state.tx_cache_len() as u64;
-        let tx_block_limit = self.txs_block_limit();
-
+    fn get_txs_for_propose(&mut self) -> Vec<Hash> {
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        let pool = schema.transactions_pool();
-        let pool_len = schema.transactions_pool_len();
+        let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
+        let txs_cache_len = self.state.tx_cache_len() as u64;
+        let params = ProposeParams::new(self.state());
+        info!("LEADER: cache = {}", txs_cache_len);
 
-        info!("LEADER: pool = {}, cache = {}", pool_len, txs_cache_len);
-
-        let remaining_tx_count = tx_block_limit.saturating_sub(txs_cache_len as u32);
-        let cache_max_count = std::cmp::min(u64::from(tx_block_limit), txs_cache_len);
-
-        let mut cache_txs: Vec<Hash> = self
-            .state
-            .tx_cache()
-            .keys()
-            .take(cache_max_count as usize)
-            .cloned()
-            .collect();
-        let pool_txs: Vec<Hash> = pool.iter().take(remaining_tx_count as usize).collect();
-
-        cache_txs.extend(pool_txs);
-        cache_txs
+        match self.block_proposer.propose_block(pool, &params) {
+            ProposeTemplate::Ordinary { tx_hashes } => tx_hashes,
+        }
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.

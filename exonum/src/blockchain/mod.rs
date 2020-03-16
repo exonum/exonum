@@ -32,11 +32,11 @@ pub(crate) use crate::runtime::ExecutionError;
 use exonum_crypto::{Hash, KeyPair};
 use exonum_merkledb::{
     access::{Access, RawAccess},
-    Database, Fork, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot, SystemSchema,
-    TemporaryDB,
+    Database, Fork, KeySetIndex, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot,
+    SystemSchema, TemporaryDB,
 };
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, iter, sync::Arc};
 
 use crate::{
     blockchain::config::GenesisConfig,
@@ -51,6 +51,9 @@ mod builder;
 mod schema;
 #[cfg(test)]
 pub mod tests;
+
+/// Iterator type for transactions in `TransactionCache`.
+pub type Transactions<'a> = Box<dyn Iterator<Item = (Hash, Cow<'a, Verified<AnyTx>>)> + 'a>;
 
 /// Container for transactions allowing to look them up by hash digest.
 ///
@@ -72,12 +75,19 @@ pub trait TransactionCache {
     fn contains_transaction(&self, hash: Hash) -> bool {
         self.get_transaction(hash).is_some()
     }
+
+    /// Returns iterator over transactions contained in this cache.
+    fn transactions(&self) -> Transactions<'_>;
 }
 
 /// Cache that does not contain any transactions.
 impl TransactionCache for () {
     fn get_transaction(&self, _hash: Hash) -> Option<Verified<AnyTx>> {
         None
+    }
+
+    fn transactions(&self) -> Transactions<'_> {
+        Box::new(iter::empty())
     }
 }
 
@@ -90,6 +100,13 @@ impl TransactionCache for BTreeMap<Hash, Verified<AnyTx>> {
     fn contains_transaction(&self, hash: Hash) -> bool {
         self.contains_key(&hash)
     }
+
+    fn transactions(&self) -> Transactions<'_> {
+        let it = self
+            .iter()
+            .map(|(tx_hash, tx)| (*tx_hash, Cow::Borrowed(tx)));
+        Box::new(it)
+    }
 }
 
 /// Persistent transaction pool that uses both a provided ephemeral cache and the cache
@@ -98,6 +115,7 @@ impl TransactionCache for BTreeMap<Hash, Verified<AnyTx>> {
 pub struct PersistentPool<'a, C: ?Sized, T: RawAccess> {
     cache: &'a C,
     transactions: MapIndex<T, Hash, Verified<AnyTx>>,
+    transactions_pool: KeySetIndex<T, Hash>,
 }
 
 impl<'a, C, T> PersistentPool<'a, C, T>
@@ -114,6 +132,7 @@ where
         Self {
             cache,
             transactions: schema.transactions(),
+            transactions_pool: schema.transactions_pool(),
         }
     }
 }
@@ -131,6 +150,19 @@ where
 
     fn contains_transaction(&self, hash: Hash) -> bool {
         self.cache.contains_transaction(hash) || self.transactions.contains(&hash)
+    }
+
+    fn transactions(&self) -> Transactions<'_> {
+        // TODO: should transactions be ordered?
+        let pool_it = self.transactions_pool.iter().map(move |tx_hash| {
+            let tx = self
+                .transactions
+                .get(&tx_hash)
+                .expect("Transaction in pool is lost");
+            (tx_hash, Cow::Owned(tx))
+        });
+        let it = self.cache.transactions().chain(pool_it);
+        Box::new(it)
     }
 }
 
