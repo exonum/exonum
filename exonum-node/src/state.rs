@@ -34,7 +34,7 @@ use std::{
 
 use crate::{
     connect_list::ConnectList,
-    consensus::RoundAction,
+    consensus::{BlockKind, RoundAction},
     events::network::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose, Status},
     Configuration, ConnectInfo, FlushPoolStrategy,
@@ -179,10 +179,11 @@ struct RequestState {
 pub struct ProposeState {
     propose: Verified<Propose>,
     unknown_txs: HashSet<Hash>,
+    /// Hash of the block corresponding to the `Propose`, if the block has been executed.
     block_hash: Option<Hash>,
-    // Whether the message has been saved to the consensus messages' cache or not.
+    /// Whether the message has been saved to the consensus messages' cache or not.
     is_saved: bool,
-    // Whether the propose contains invalid transactions or not.
+    /// Whether the propose contains invalid transactions or not.
     is_valid: bool,
 }
 
@@ -194,6 +195,8 @@ pub struct BlockState {
     patch: Option<Patch>,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
+    kind: BlockKind,
+    epoch: Height,
 }
 
 /// Incomplete block.
@@ -344,6 +347,15 @@ impl RequestState {
 }
 
 impl ProposeState {
+    /// Returns kind of the block proposed by this `Propose` message.
+    pub(crate) fn block_kind(&self) -> BlockKind {
+        if self.propose.payload().skip {
+            BlockKind::Skip
+        } else {
+            BlockKind::Normal
+        }
+    }
+
     /// Returns block hash propose was executed.
     pub fn block_hash(&self) -> Option<Hash> {
         self.block_hash
@@ -386,6 +398,16 @@ impl ProposeState {
 }
 
 impl BlockState {
+    /// Returns block kind.
+    pub(crate) fn kind(&self) -> BlockKind {
+        self.kind
+    }
+
+    /// Returns the epoch that the block belongs to.
+    pub fn epoch(&self) -> Height {
+        self.epoch
+    }
+
     /// Returns the changes that should be made for block committing.
     pub fn patch(&mut self) -> Patch {
         self.patch.take().expect("Patch is already committed")
@@ -850,9 +872,11 @@ impl State {
         block
     }
 
-    /// Increments the node epoch by one and resets previous epoch data.
-    fn new_epoch(&mut self, epoch_start_time: SystemTime) {
-        self.epoch.increment();
+    /// Updates the node epoch and resets previous epoch data.
+    pub(super) fn new_epoch(&mut self, new_epoch: Height, epoch_start_time: SystemTime) {
+        debug_assert!(new_epoch > self.epoch);
+
+        self.epoch = new_epoch;
         self.epoch_start_time = epoch_start_time;
         self.round = Round::first();
         self.locked_round = Round::zero();
@@ -872,10 +896,15 @@ impl State {
     }
 
     /// Increments the node height by one together with entering a new epoch.
-    pub(super) fn new_height(&mut self, block_hash: &Hash, epoch_start_time: SystemTime) {
-        self.new_epoch(epoch_start_time);
+    pub(super) fn new_height(
+        &mut self,
+        block_hash: Hash,
+        new_epoch: Height,
+        epoch_start_time: SystemTime,
+    ) {
+        self.new_epoch(new_epoch, epoch_start_time);
         self.blockchain_height.increment();
-        self.last_hash = *block_hash;
+        self.last_hash = block_hash;
         self.invalid_txs.clear();
     }
 
@@ -986,7 +1015,7 @@ impl State {
 
             incomplete_block.unknown_txs.remove(&tx_hash);
             if incomplete_block.unknown_txs.is_empty() {
-                return RoundAction::NewHeight;
+                return RoundAction::NewEpoch;
             }
         }
         RoundAction::None
@@ -1097,24 +1126,40 @@ impl State {
         }
     }
 
-    /// Adds block to the list of blocks for the current height. Returns `BlockState` if it is a
-    /// new block.
+    /// Adds block to the collection of known blocks.
     pub(super) fn add_block(
         &mut self,
         block_hash: Hash,
         patch: Patch,
         txs: Vec<Hash>,
         proposer_id: ValidatorId,
-    ) -> Option<&BlockState> {
-        match self.blocks.entry(block_hash) {
-            Entry::Occupied(..) => None,
-            Entry::Vacant(e) => Some(e.insert(BlockState {
-                hash: block_hash,
-                patch: Some(patch),
-                txs,
-                proposer_id,
-            })),
-        }
+        epoch: Height,
+    ) {
+        self.blocks.entry(block_hash).or_insert(BlockState {
+            hash: block_hash,
+            patch: Some(patch),
+            txs,
+            proposer_id,
+            kind: BlockKind::Normal,
+            epoch,
+        });
+    }
+
+    pub(super) fn add_block_skip(
+        &mut self,
+        block_hash: Hash,
+        patch: Patch,
+        proposer_id: ValidatorId,
+        epoch: Height,
+    ) {
+        self.blocks.entry(block_hash).or_insert(BlockState {
+            hash: block_hash,
+            patch: Some(patch),
+            txs: vec![],
+            proposer_id,
+            kind: BlockKind::Skip,
+            epoch,
+        });
     }
 
     /// Finds unknown transactions in the block and persists transactions along

@@ -22,6 +22,7 @@ mod old;
 mod recovery;
 mod requests;
 mod round_details;
+mod skips;
 mod timeouts;
 mod transactions;
 mod unsynchronized_message;

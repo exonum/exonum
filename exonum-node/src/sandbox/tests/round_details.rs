@@ -25,7 +25,6 @@ use exonum::{
     merkledb::ObjectHash,
     messages::Verified,
 };
-use log::info;
 
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
@@ -59,8 +58,6 @@ fn positive_get_propose_send_prevote() {
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
-
-    info!("time: {:?}", sandbox.time());
 }
 
 // HANDLE FULL PROPOSE
@@ -1698,7 +1695,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         // assert!(sandbox.is_leader());
     }
     let current_round = sandbox.current_round();
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
 
     // this propose will be a valid one when 0 node will become a leader after last commit
     let propose = ProposeBuilder::new(&sandbox)
@@ -1785,7 +1782,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.add_time(Duration::from_millis(
         sandbox.current_round_timeout() - PROPOSE_TIMEOUT,
     ));
-    sandbox.assert_state(sandbox.current_height(), Round(2));
+    sandbox.assert_state(sandbox.current_epoch(), Round(2));
 }
 
 /// - if get full propose:
@@ -2176,8 +2173,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 
 #[test]
 fn handle_precommit_remove_propose_request_ask_precommitters() {
-    let sandbox = timestamping_sandbox_builder().build();
-
+    let sandbox = timestamping_sandbox();
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)

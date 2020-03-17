@@ -22,13 +22,16 @@ use bit_vec::BitVec;
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        Block, BlockProof, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        PersistentPool, Schema, TransactionCache, ValidatorKeys,
+        AdditionalHeaders, Block, BlockData, BlockProof, Blockchain, BlockchainBuilder,
+        BlockchainMut, ConsensusConfig, Epoch, PersistentPool, ProposerId, Schema,
+        TransactionCache, ValidatorKeys,
     },
     crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
     helpers::{user_agent, Height, Round, ValidatorId},
     keys::Keys,
-    merkledb::{BinaryValue, Fork, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
+    merkledb::{
+        BinaryValue, Fork, HashTag, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
+    },
     messages::{AnyTx, Precommit, SignedMessage, Verified},
     runtime::{ArtifactId, SnapshotExt},
 };
@@ -239,18 +242,59 @@ impl Sandbox {
         Verified::from_value(BlockRequest::new(to, height), author, secret_key)
     }
 
+    /// Creates a `BlockRequest` message signed by this validator.
+    pub fn create_skip_request(
+        author: PublicKey,
+        to: PublicKey,
+        epoch: Height,
+        secret_key: &SecretKey,
+    ) -> Verified<BlockRequest> {
+        Verified::from_value(BlockRequest::new(to, epoch), author, secret_key)
+    }
+
     /// Creates a `Status` message signed by this validator.
     pub fn create_status(
         author: PublicKey,
-        height: Height,
+        epoch: Height,
         last_hash: Hash,
         pool_size: u64,
         secret_key: &SecretKey,
     ) -> Verified<Status> {
         Verified::from_value(
-            Status::new(height, height, last_hash, pool_size),
+            Status::new(epoch, epoch, last_hash, pool_size),
             author,
             secret_key,
+        )
+    }
+
+    /// Creates signed `Status` with the next height from the specified validator.
+    pub fn create_status_with_custom_epoch(
+        &self,
+        from: ValidatorId,
+        blockchain_height: Height,
+        epoch: Height,
+    ) -> Verified<Status> {
+        assert!(blockchain_height <= epoch);
+
+        let last_hash = self.last_hash();
+        Verified::from_value(
+            Status::new(epoch, blockchain_height, last_hash, 0),
+            self.public_key(from),
+            self.secret_key(from),
+        )
+    }
+
+    pub fn create_our_status(
+        &self,
+        epoch: Height,
+        blockchain_height: Height,
+        pool_size: u64,
+    ) -> Verified<Status> {
+        let last_hash = self.last_hash();
+        Verified::from_value(
+            Status::new(epoch, blockchain_height, last_hash, pool_size),
+            self.public_key(ValidatorId(0)),
+            self.secret_key(ValidatorId(0)),
         )
     }
 
@@ -308,7 +352,7 @@ impl Sandbox {
         Verified::from_value(PoolTransactionsRequest::new(to), public_key, secret_key)
     }
 
-    /// Creates a `Propose` message signed by this validator.
+    /// Creates a `Propose` message signed by the specified validator.
     pub fn create_propose(
         &self,
         validator_id: ValidatorId,
@@ -320,6 +364,22 @@ impl Sandbox {
     ) -> Verified<Propose> {
         Verified::from_value(
             Propose::new(validator_id, epoch, round, last_hash, tx_hashes),
+            self.public_key(validator_id),
+            secret_key,
+        )
+    }
+
+    /// Creates a `Propose` message to skip a block signed by the specified validator.
+    pub fn create_skip_propose(
+        &self,
+        validator_id: ValidatorId,
+        epoch: Height,
+        round: Round,
+        last_hash: Hash,
+        secret_key: &SecretKey,
+    ) -> Verified<Propose> {
+        Verified::from_value(
+            Propose::skip(validator_id, epoch, round, last_hash),
             self.public_key(validator_id),
             secret_key,
         )
@@ -671,7 +731,6 @@ impl Sandbox {
     /// **NB.** This method does not correctly process transactions that mutate the `Dispatcher`,
     /// e.g., starting new services.
     pub fn compute_block_hashes(&self, txs: &[Verified<AnyTx>]) -> (Hash, Hash) {
-        let height = self.current_height();
         let mut blockchain = self.blockchain_mut();
 
         let mut hashes = vec![];
@@ -688,7 +747,8 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let (_, patch) = blockchain.create_patch(ValidatorId(0), height, &hashes, &());
+        let block_data = BlockData::new(ValidatorId(0), Height(0));
+        let (_, patch) = blockchain.create_patch(&block_data, &hashes, &());
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
@@ -709,6 +769,25 @@ impl Sandbox {
             .with_state_hash(&state_hash)
             .with_error_hash(&error_hash)
             .build()
+    }
+
+    pub fn create_block_skip(&self) -> Block {
+        let mut block = Block {
+            height: self.current_blockchain_height().previous(),
+            tx_count: 0,
+            prev_hash: self.last_hash(),
+            tx_hash: HashTag::empty_list_hash(),
+            state_hash: self.last_block().state_hash,
+            error_hash: HashTag::empty_map_hash(),
+            additional_headers: AdditionalHeaders::default(),
+        };
+        block
+            .additional_headers
+            .insert::<ProposerId>(self.current_leader());
+        block
+            .additional_headers
+            .insert::<Epoch>(self.current_epoch());
+        block
     }
 
     pub fn get_proof_to_index(&self, index_name: &str) -> MapProof<String, Hash> {
@@ -767,20 +846,24 @@ impl Sandbox {
         schema.block_and_precommits(height)
     }
 
-    pub fn current_height(&self) -> Height {
+    pub fn current_epoch(&self) -> Height {
         self.node_state().epoch()
+    }
+
+    pub fn current_blockchain_height(&self) -> Height {
+        self.node_state().blockchain_height()
     }
 
     pub fn current_leader(&self) -> ValidatorId {
         self.node_state().leader(self.current_round())
     }
 
-    pub fn assert_state(&self, expected_height: Height, expected_round: Round) {
+    pub fn assert_state(&self, expected_epoch: Height, expected_round: Round) {
         let state = self.node_state();
 
-        let actual_height = state.epoch();
+        let actual_epoch = state.epoch();
         let actual_round = state.round();
-        assert_eq!(actual_height, expected_height);
+        assert_eq!(actual_epoch, expected_epoch);
         assert_eq!(actual_round, expected_round);
     }
 

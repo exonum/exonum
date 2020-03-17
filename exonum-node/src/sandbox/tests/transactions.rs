@@ -265,7 +265,7 @@ fn response_size_larger_than_max_message_len() {
             + TX_RES_PB_OVERHEAD_PAYLOAD * 2
             + tx1.to_bytes().len()
             + tx2.to_bytes().len()) as u32;
-        let actual_from = sandbox.current_height().next();
+        let actual_from = sandbox.current_epoch().next();
 
         TxConfig::create_signed(
             sandbox.public_key(ValidatorId(0)),

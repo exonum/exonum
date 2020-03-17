@@ -49,7 +49,7 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     sandbox.broadcast(&propose);
     sandbox.broadcast(&prevote);
 
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     let sandbox_restarted = sandbox.restart();
@@ -108,7 +108,7 @@ fn should_not_vote_after_node_restart() {
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(Round(1), Some(propose.object_hash()));
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     // Simulate node restart.
@@ -173,7 +173,7 @@ fn should_save_precommit_to_consensus_cache() {
 
     sandbox.broadcast(&precommit);
 
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     // Simulate node restart
