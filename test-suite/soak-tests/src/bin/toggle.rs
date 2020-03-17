@@ -34,9 +34,8 @@ use tokio::time::delay_for;
 use std::{fmt, time::Duration};
 
 use exonum_soak_tests::{
-    run_nodes,
     services::{MainConfig, MainService, MainServiceInterface, TogglingSupervisor},
-    RunHandle,
+    NetworkBuilder, RunHandle,
 };
 
 struct ApiStats {
@@ -160,10 +159,8 @@ async fn main() {
     let supervisor = Spec::new(TogglingSupervisor).with_default_instance();
 
     let mut set_api = false;
-    let nodes = run_nodes(
-        args.node_count,
-        2_000,
-        |node_cfg| {
+    let nodes = NetworkBuilder::new(args.node_count, 2_000)
+        .modify_config(|node_cfg| {
             // Enable public HTTP server for a single node.
             if !set_api {
                 node_cfg.api.public_api_address = Some("127.0.0.1:8080".parse().unwrap());
@@ -174,12 +171,12 @@ async fn main() {
             node_cfg.consensus.first_round_timeout *= 2;
             node_cfg.consensus.min_propose_timeout *= 2;
             node_cfg.consensus.max_propose_timeout *= 2;
-        },
-        |genesis, rt| {
+        })
+        .init_node(|genesis, rt| {
             supervisor.clone().deploy(genesis, rt);
             main_service.clone().deploy(genesis, rt);
-        },
-    );
+        })
+        .build();
 
     let probes = if args.no_probe {
         None

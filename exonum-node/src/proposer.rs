@@ -114,6 +114,12 @@ impl fmt::Debug for dyn ProposeBlock {
     }
 }
 
+impl ProposeBlock for Box<dyn ProposeBlock> {
+    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate {
+        (**self).propose_block(pool, params)
+    }
+}
+
 /// Standard block proposer used by the nodes if no other proposer is specified.
 #[derive(Debug, Clone)]
 pub struct StandardProposer;
