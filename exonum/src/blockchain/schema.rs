@@ -56,6 +56,7 @@ define_names!(
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
+    SKIP_BLOCK => "skip_block";
     PRECOMMITS => "precommits";
     CONSENSUS_CONFIG => "consensus_config";
 );
@@ -209,6 +210,23 @@ impl<T: Access> Schema<T> {
         self.access.get_proof_list((BLOCK_TRANSACTIONS, &height))
     }
 
+    /// Returns an entry storing the latest skip block for the node.
+    fn skip_block_entry(&self) -> Entry<T::Base, Block> {
+        self.access.get_entry(SKIP_BLOCK)
+    }
+
+    #[doc(hidden)]
+    pub fn skip_block(&self) -> Option<Block> {
+        self.skip_block_entry().get()
+    }
+
+    #[doc(hidden)]
+    pub fn skip_block_with_precommits(&self) -> Option<BlockProof> {
+        let block = self.skip_block_entry().get()?;
+        let precommits = self.precommits(&block.object_hash()).iter().collect();
+        Some(BlockProof::new(block, precommits))
+    }
+
     /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<T::Base, Verified<Precommit>> {
         self.access.get_list((PRECOMMITS, hash))
@@ -357,6 +375,19 @@ where
         let aux = err.split_aux();
         self.call_errors_map(height).put(&call, err);
         self.call_errors_aux(height).put(&call, aux);
+    }
+
+    pub(super) fn clear_skip_block(&mut self) {
+        if let Some(pseudo_block) = self.skip_block_entry().take() {
+            let block_hash = pseudo_block.object_hash();
+            self.precommits(&block_hash).clear();
+        }
+    }
+
+    pub(super) fn store_skip_block(&mut self, pseudo_block: Block) {
+        // TODO: maybe it makes sense to use a circular buffer here.
+        self.clear_skip_block();
+        self.skip_block_entry().set(pseudo_block);
     }
 }
 

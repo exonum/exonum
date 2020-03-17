@@ -117,7 +117,7 @@ fn setup_blockchain_for_index_proofs() -> Box<dyn Snapshot> {
     fork.get_value_set("test.set").insert(2_u64);
     blockchain.merge(fork.into_patch()).unwrap();
 
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), Height(1), &[], &());
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), &[], &());
     blockchain.commit(patch, block_hash, vec![]).unwrap();
     blockchain.snapshot()
 }

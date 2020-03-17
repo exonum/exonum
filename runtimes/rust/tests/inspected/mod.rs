@@ -64,13 +64,7 @@ pub fn create_block_with_transactions(
     transactions: Vec<Verified<AnyTx>>,
 ) -> (Hash, Patch) {
     let tx_hashes = add_transactions_into_pool(blockchain, transactions);
-
-    let height = {
-        let snapshot = blockchain.snapshot();
-        CoreSchema::new(&snapshot).next_height()
-    };
-
-    blockchain.create_patch(ValidatorId::zero(), height, &tx_hashes, &())
+    blockchain.create_patch(ValidatorId::zero(), &tx_hashes, &())
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {

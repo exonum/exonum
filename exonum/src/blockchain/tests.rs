@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::KeyPair;
+use chrono::Utc;
+use exonum_crypto::{Hash, KeyPair};
 use exonum_derive::{BinaryValue, FromAccess};
 use exonum_merkledb::{
     access::{Access, FromAccess},
@@ -32,8 +33,8 @@ use crate::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         Blockchain, BlockchainMut, PersistentPool, Schema, TransactionCache,
     },
-    helpers::{Height, ValidatorId},
-    messages::Verified,
+    helpers::{Height, Round, ValidatorId},
+    messages::{Precommit, Verified},
     runtime::{
         catch_panic,
         migrations::{InitMigrationError, MigrationScript},
@@ -350,12 +351,7 @@ fn execute_transaction(
         })
         .unwrap();
 
-    let height = {
-        let snapshot = blockchain.snapshot();
-        Schema::new(&snapshot).next_height()
-    };
-
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId::zero(), height, &[tx_hash], &());
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId::zero(), &[tx_hash], &());
 
     blockchain.commit(patch, block_hash, vec![]).unwrap();
     let snapshot = blockchain.snapshot();
@@ -748,7 +744,7 @@ fn blockchain_height() {
     assert_eq!(schema.next_height(), Height(1));
 
     // Create one block.
-    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[], &());
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), &[], &());
     blockchain.merge(patch).unwrap();
 
     // Check that height is 1.
@@ -771,7 +767,7 @@ fn state_aggregation() {
         &mut blockchain,
         Transaction::AddValue(10).sign(TEST_SERVICE_ID, &keys),
     )
-    .expect("Transaction must success");
+    .expect("Transaction must succeed");
 
     let snapshot = blockchain.snapshot();
     let expected_indexes = vec![
@@ -799,8 +795,7 @@ fn no_data_race_for_transaction_pool() {
     let tx_hash = tx.object_hash();
     let mut tx_cache = BTreeMap::new();
     tx_cache.insert(tx_hash, tx.clone());
-    let (block_hash, patch) =
-        blockchain.create_patch(ValidatorId(0), Height(1), &[tx_hash], &tx_cache);
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), &[tx_hash], &tx_cache);
 
     let snapshot = blockchain.snapshot();
     let is_known = PersistentPool::new(&snapshot, &tx_cache).contains_transaction(tx_hash);
@@ -821,4 +816,112 @@ fn no_data_race_for_transaction_pool() {
     let schema = Schema::new(&snapshot);
     assert_eq!(schema.transactions_len(), 1);
     assert_eq!(schema.transactions_pool_len(), 0);
+}
+
+#[test]
+fn executing_block_skip() {
+    let mut blockchain = create_blockchain(
+        RuntimeInspector::default(),
+        vec![InitAction::Noop.into_default_instance()],
+    );
+    let (block_hash, patch) = blockchain.create_skip_patch(ValidatorId(0), Height(1));
+
+    let validator_keys = KeyPair::random();
+    let precommit = Precommit {
+        validator: ValidatorId(0),
+        epoch: Height(1),
+        round: Round(1),
+        propose_hash: Hash::zero(),
+        block_hash,
+        time: Utc::now(),
+    };
+    let precommit = Verified::from_value(
+        precommit,
+        validator_keys.public_key(),
+        validator_keys.secret_key(),
+    );
+    blockchain
+        .commit_skip(patch, block_hash, vec![precommit])
+        .unwrap();
+
+    // Check that the blockchain height remained the same.
+    let last_block = blockchain.as_ref().last_block();
+    assert_eq!(last_block.height, Height(0));
+    assert_eq!(last_block.object_hash(), blockchain.as_ref().last_hash());
+
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    let block_proof = schema.skip_block_with_precommits().unwrap();
+    assert_eq!(block_proof.block.height, Height(0));
+    assert_eq!(block_proof.block.prev_hash, last_block.object_hash());
+    assert_eq!(block_proof.block.epoch(), Some(Height(1)));
+    assert_eq!(block_proof.precommits.len(), 1);
+    block_proof.verify(&[validator_keys.public_key()]).unwrap();
+}
+
+#[test]
+fn clearing_block_skip() {
+    let mut blockchain = create_blockchain(
+        RuntimeInspector::default(),
+        vec![InitAction::Noop.into_default_instance()],
+    );
+    let (block_hash, patch) = blockchain.create_skip_patch(ValidatorId(0), Height(1));
+
+    let validator_keys = KeyPair::random();
+    let mut precommit_payload = Precommit {
+        validator: ValidatorId(0),
+        epoch: Height(1),
+        round: Round(1),
+        propose_hash: Hash::zero(),
+        block_hash,
+        time: Utc::now(),
+    };
+    let precommit = Verified::from_value(
+        precommit_payload.clone(),
+        validator_keys.public_key(),
+        validator_keys.secret_key(),
+    );
+    blockchain
+        .commit_skip(patch, block_hash, vec![precommit])
+        .unwrap();
+
+    // Commit a new block skip.
+    let (new_block_hash, patch) = blockchain.create_skip_patch(ValidatorId(0), Height(2));
+    assert_ne!(new_block_hash, block_hash);
+    precommit_payload.block_hash = new_block_hash;
+    precommit_payload.epoch = Height(2);
+
+    let precommit = Verified::from_value(
+        precommit_payload.clone(),
+        validator_keys.public_key(),
+        validator_keys.secret_key(),
+    );
+    blockchain
+        .commit_skip(patch, new_block_hash, vec![precommit])
+        .unwrap();
+
+    // Check that the new block skip is correct.
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    let block_proof = schema.skip_block_with_precommits().unwrap();
+    assert_eq!(block_proof.block.height, Height(0));
+    assert_eq!(block_proof.block.epoch(), Some(Height(2)));
+    assert_eq!(block_proof.precommits.len(), 1);
+    block_proof.verify(&[validator_keys.public_key()]).unwrap();
+
+    // Check that the old precommit has been erased.
+    assert!(schema.precommits(&block_hash).is_empty());
+
+    // Commit an ordinary block.
+    execute_transaction(
+        &mut blockchain,
+        Transaction::AddValue(10).sign(TEST_SERVICE_ID, &validator_keys),
+    )
+    .expect("Transaction must succeed");
+
+    // Check that the block skip is now erased together with its precommits.
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    assert!(schema.skip_block().is_none());
+    assert!(schema.precommits(&new_block_hash).is_empty());
 }

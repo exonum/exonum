@@ -134,12 +134,11 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
-    let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
-
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &());
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), &tx_hashes, &());
     let consensus_keys = consensus_keys();
 
+    let height = blockchain.as_ref().last_block().height.next();
     let precommit = Verified::from_value(
         Precommit::new(
             ValidatorId(0),

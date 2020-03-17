@@ -55,6 +55,16 @@ impl BlockHeaderKey for ProposerId {
     type Value = ValidatorId;
 }
 
+/// Epoch of the consensus algorithm. Only present for pseudo-blocks created when
+/// the consensus algorithm is idle.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Epoch(());
+
+impl BlockHeaderKey for Epoch {
+    const NAME: &'static str = "epoch";
+    type Value = Height;
+}
+
 /// Expandable set of headers allowed to be added to the block.
 ///
 /// In a serialized form, headers are represented as a sequence of
@@ -127,6 +137,16 @@ impl Block {
     #[doc(hidden)]
     pub fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
         self.additional_headers.insert::<K>(value);
+    }
+
+    /// Adds the epoch to this block.
+    pub(super) fn add_epoch(&mut self, epoch: Height) {
+        self.add_header::<Epoch>(epoch);
+    }
+
+    /// Retrieves the epoch associated with this block, or `None` if the epoch is not recorded.
+    pub fn epoch(&self) -> Option<Height> {
+        self.get_header::<Epoch>().unwrap_or(None)
     }
 
     /// Gets the value of an additional header for the specified key type, which is specified via

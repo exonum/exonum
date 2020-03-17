@@ -17,8 +17,8 @@
 pub use self::{
     api_sender::{ApiSender, SendError},
     block::{
-        AdditionalHeaders, Block, BlockHeaderKey, BlockProof, CallProof, IndexProof, ProofError,
-        ProposerId,
+        AdditionalHeaders, Block, BlockHeaderKey, BlockProof, CallProof, Epoch, IndexProof,
+        ProofError, ProposerId,
     },
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
@@ -32,8 +32,8 @@ pub(crate) use crate::runtime::ExecutionError;
 use exonum_crypto::{Hash, KeyPair};
 use exonum_merkledb::{
     access::{Access, RawAccess},
-    Database, Fork, KeySetIndex, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot,
-    SystemSchema, TemporaryDB,
+    Database, Fork, HashTag, KeySetIndex, MapIndex, ObjectHash, Patch, Result as StorageResult,
+    Snapshot, SystemSchema, TemporaryDB,
 };
 
 use std::{borrow::Cow, collections::BTreeMap, iter, sync::Arc};
@@ -329,10 +329,16 @@ impl BlockchainMut {
             .validate()
             .expect("Invalid consensus config");
         let mut fork = self.fork();
-        // Write genesis configuration to the blockchain.
-        Schema::new(&fork)
-            .consensus_config_entry()
-            .set(genesis_config.consensus_config);
+        {
+            let schema = Schema::new(&fork);
+            // Write genesis configuration to the blockchain.
+            schema
+                .consensus_config_entry()
+                .set(genesis_config.consensus_config);
+            // Touch the transactions pool index (without this, there are edge cases where
+            // the pool will forget transactions submitted immediately after the genesis block).
+            schema.transactions_pool().clear();
+        }
 
         for spec in genesis_config.artifacts {
             self.dispatcher
@@ -370,7 +376,7 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch).unwrap();
 
-        let (_, patch) = self.create_patch(ValidatorId::zero(), Height::zero(), &[], &());
+        let (_, patch) = self.create_patch(ValidatorId::zero(), &[], &());
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -396,20 +402,37 @@ impl BlockchainMut {
     pub fn create_patch<C>(
         &self,
         proposer_id: ValidatorId,
-        height: Height,
         tx_hashes: &[Hash],
         tx_cache: &C,
     ) -> (Hash, Patch)
     where
         C: TransactionCache + ?Sized,
     {
-        self.create_patch_inner(self.fork(), proposer_id, height, tx_hashes, tx_cache)
+        self.create_patch_inner(self.fork(), proposer_id, tx_hashes, tx_cache)
     }
 
-    /// FIXME
+    #[doc(hidden)]
     pub fn create_skip_patch(&self, proposer_id: ValidatorId, epoch: Height) -> (Hash, Patch) {
-        let _ = (self, proposer_id, epoch);
-        unimplemented!()
+        let prev_block = self.inner.last_block();
+
+        let mut pseudo_block = Block {
+            height: prev_block.height, // not increased!
+            tx_count: 0,
+            prev_hash: prev_block.object_hash(),
+            tx_hash: HashTag::empty_list_hash(),
+            state_hash: prev_block.state_hash,
+            error_hash: HashTag::empty_map_hash(),
+            additional_headers: AdditionalHeaders::new(),
+        };
+        pseudo_block.add_header::<ProposerId>(proposer_id);
+        // Pseudo-blocks are distinguished by the epoch rather than `height` / `prev_hash`.
+        pseudo_block.add_epoch(epoch);
+
+        let block_hash = pseudo_block.object_hash();
+        let fork = self.fork();
+        let mut schema = Schema::new(&fork);
+        schema.store_skip_block(pseudo_block);
+        (block_hash, fork.into_patch())
     }
 
     /// Version of `create_patch` that supports user-provided fork. Used in tests.
@@ -417,13 +440,14 @@ impl BlockchainMut {
         &self,
         mut fork: Fork,
         proposer_id: ValidatorId,
-        height: Height,
         tx_hashes: &[Hash],
         tx_cache: &C,
     ) -> (Hash, Patch)
     where
         C: TransactionCache + ?Sized,
     {
+        let height = Schema::new(&fork).next_height();
+
         // Skip execution for genesis block.
         if height > Height(0) {
             let errors = self.dispatcher.before_transactions(&mut fork);
@@ -470,9 +494,11 @@ impl BlockchainMut {
     ) -> (Patch, Block) {
         let prev_hash = self.inner.last_hash();
 
-        let schema = Schema::new(&fork);
+        let mut schema = Schema::new(&fork);
         let error_hash = schema.call_errors_map(height).object_hash();
         let tx_hash = schema.block_transactions(height).object_hash();
+        schema.clear_skip_block();
+
         let patch = fork.into_patch();
         let state_hash = SystemSchema::new(&patch).state_hash();
 
@@ -536,6 +562,22 @@ impl BlockchainMut {
         self.merge(new_fork.into_patch())?;
 
         Ok(())
+    }
+
+    #[doc(hidden)]
+    pub fn commit_skip<I>(
+        &mut self,
+        patch: Patch,
+        block_hash: Hash,
+        precommits: I,
+    ) -> anyhow::Result<()>
+    where
+        I: IntoIterator<Item = Verified<Precommit>>,
+    {
+        let fork: Fork = patch.into();
+        let schema = Schema::new(&fork);
+        schema.precommits(&block_hash).extend(precommits);
+        self.merge(fork.into_patch()).map_err(Into::into)
     }
 
     /// Adds a transaction into pool of uncommitted transactions.
