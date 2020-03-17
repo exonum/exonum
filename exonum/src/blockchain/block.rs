@@ -248,12 +248,20 @@ impl BlockProof {
     /// Verifies that the block in this proof is endorsed by the Byzantine majority of provided
     /// validators.
     pub fn verify(&self, validator_keys: &[PublicKey]) -> Result<(), ProofError> {
-        // FIXME: check epoch.
         if self.precommits.len() < byzantine_quorum(validator_keys.len()) {
             return Err(ProofError::NoQuorum);
         }
         if self.precommits.len() > validator_keys.len() {
             return Err(ProofError::DoubleEndorsement);
+        }
+
+        let epoch = self.block.epoch().ok_or(ProofError::NoEpoch)?;
+        let correct_epochs = self
+            .precommits
+            .iter()
+            .all(|precommit| precommit.payload().epoch == epoch);
+        if !correct_epochs {
+            return Err(ProofError::IncorrectEpoch);
         }
 
         let block_hash = self.block.object_hash();
@@ -299,6 +307,15 @@ pub enum ProofError {
     /// The block is authorized by an insufficient number of precommits.
     #[error("Insufficient number of precommits")]
     NoQuorum,
+
+    /// Block header does not include additional header for the consensus epoch.
+    #[error("Block header does not include additional header for the consensus epoch")]
+    NoEpoch,
+
+    /// Block epoch mentioned in at least one of precommits differs from the height mentioned
+    /// in the block header.
+    #[error("Incorrect block epoch in at least one of precommits")]
+    IncorrectEpoch,
 
     /// Hash of the block in at least one precommit differs from that of the real block.
     #[error("Incorrect block hash in at least one of precommits")]
@@ -643,6 +660,7 @@ mod tests {
         block
             .additional_headers
             .insert::<ProposerId>(ValidatorId(1));
+        block.additional_headers.insert::<Epoch>(Height(1));
 
         let precommits = keys.iter().enumerate().map(|(i, keypair)| {
             let precommit = Precommit::new(
@@ -670,6 +688,39 @@ mod tests {
         // We can remove one `Precommit` without disturbing the proof integrity.
         proof.precommits.truncate(3);
         proof.verify(&public_keys).unwrap();
+    }
+
+    #[test]
+    fn block_proof_without_epoch() {
+        let mut block = Block {
+            height: Height(1),
+            tx_count: 0,
+            prev_hash: Hash::zero(),
+            tx_hash: Hash::zero(),
+            state_hash: HashTag::empty_map_hash(),
+            error_hash: HashTag::empty_map_hash(),
+            additional_headers: AdditionalHeaders::default(),
+        };
+        block
+            .additional_headers
+            .insert::<ProposerId>(ValidatorId(1));
+
+        let keypair = KeyPair::random();
+        let precommit = Precommit::new(
+            ValidatorId(0),
+            Height(1),
+            Round(1),
+            Hash::zero(),
+            block.object_hash(),
+            Utc::now(),
+        );
+        let precommit = Verified::from_value(precommit, keypair.public_key(), keypair.secret_key());
+
+        let proof = BlockProof::new(block, vec![precommit]);
+        assert_matches!(
+            proof.verify(&[keypair.public_key()]).unwrap_err(),
+            ProofError::NoEpoch
+        );
     }
 
     #[test]
@@ -709,6 +760,25 @@ mod tests {
         assert_matches!(
             proof.verify(&expected_public_keys).unwrap_err(),
             ProofError::ValidatorKeyMismatch
+        );
+
+        // Incorrect height in a precommit.
+        let bogus_precommit = Precommit::new(
+            ValidatorId(3),
+            Height(100),
+            Round(1),
+            Hash::zero(),
+            proof.block.object_hash(),
+            Utc::now(),
+        );
+        let bogus_precommit =
+            Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
+        let mut mauled_proof = proof.clone();
+        mauled_proof.precommits.truncate(2);
+        mauled_proof.precommits.push(bogus_precommit);
+        assert_matches!(
+            mauled_proof.verify(&public_keys).unwrap_err(),
+            ProofError::IncorrectEpoch
         );
 
         // Incorrect block hash in a precommit.
