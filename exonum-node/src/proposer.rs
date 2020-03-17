@@ -88,6 +88,9 @@ pub enum ProposeTemplate {
         /// Hashes of the transactions in the proposal.
         tx_hashes: Vec<Hash>,
     },
+
+    /// Skip block for this epoch of the consensus algorithm.
+    Skip,
 }
 
 impl ProposeTemplate {
@@ -123,5 +126,20 @@ impl ProposeBlock for StandardProposer {
             .take(max_transactions as usize)
             .map(|(tx_hash, _)| tx_hash);
         ProposeTemplate::ordinary(tx_hashes)
+    }
+}
+
+/// Block proposer that skips a block if there are no uncommitted transactions.
+#[derive(Debug, Clone)]
+pub struct SkipEmptyBlocks;
+
+impl ProposeBlock for SkipEmptyBlocks {
+    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate {
+        match StandardProposer.propose_block(pool, params) {
+            ProposeTemplate::Ordinary { tx_hashes } if tx_hashes.is_empty() => {
+                ProposeTemplate::Skip
+            }
+            other => other,
+        }
     }
 }

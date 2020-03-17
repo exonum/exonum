@@ -976,6 +976,7 @@ impl Sandbox {
             config,
             inner.handler.api_state.clone(),
             None,
+            Box::new(StandardProposer),
         );
         handler.initialize();
 
@@ -1277,6 +1278,7 @@ fn sandbox_with_services_uninitialized(
         config,
         api_state,
         None,
+        Box::new(StandardProposer),
     );
     handler.initialize();
 

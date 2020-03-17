@@ -515,6 +515,7 @@ impl NodeRole {
 
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         blockchain: BlockchainMut,
         external_address: &str,
@@ -523,6 +524,7 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
         config_manager: Option<Box<dyn ConfigManager>>,
+        block_proposer: Box<dyn ProposeBlock>,
     ) -> Self {
         let last_block = blockchain.as_ref().last_block();
         let snapshot = blockchain.snapshot();
@@ -566,7 +568,7 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
-            block_proposer: Box::new(StandardProposer),
+            block_proposer,
         }
     }
 
@@ -992,6 +994,7 @@ pub struct NodeBuilder {
     node_config: NodeConfig,
     node_keys: Keys,
     config_manager: Option<Box<dyn ConfigManager>>,
+    block_proposer: Box<dyn ProposeBlock>,
     plugins: Vec<Box<dyn NodePlugin>>,
 }
 
@@ -1028,6 +1031,7 @@ impl NodeBuilder {
             node_keys,
             config_manager: None,
             plugins: vec![],
+            block_proposer: Box::new(StandardProposer),
         }
     }
 
@@ -1063,6 +1067,13 @@ impl NodeBuilder {
         self
     }
 
+    /// Sets custom `Propose` creation logic for the node.
+    #[doc(hidden)] // unstable
+    pub fn with_block_proposer<T: ProposeBlock + 'static>(mut self, proposer: T) -> Self {
+        self.block_proposer = Box::new(proposer);
+        self
+    }
+
     /// Adds a plugin.
     pub fn with_plugin<T: NodePlugin + 'static>(mut self, plugin: T) -> Self {
         self.plugins.push(Box::new(plugin));
@@ -1079,6 +1090,7 @@ impl NodeBuilder {
             self.node_keys,
             self.config_manager,
             self.plugins,
+            self.block_proposer,
         )
     }
 }
@@ -1092,6 +1104,7 @@ impl Node {
         node_keys: Keys,
         config_manager: Option<Box<dyn ConfigManager>>,
         plugins: Vec<Box<dyn NodePlugin>>,
+        block_proposer: Box<dyn ProposeBlock>,
     ) -> Self {
         crypto::init();
 
@@ -1147,6 +1160,7 @@ impl Node {
             config,
             api_state,
             config_manager,
+            block_proposer,
         );
         handler.plugins = plugins;
 

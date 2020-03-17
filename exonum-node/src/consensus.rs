@@ -1003,15 +1003,26 @@ impl NodeHandler {
             return;
         };
         let round = self.state.round();
-        let txs = self.get_txs_for_propose();
 
-        let propose = self.sign_message(Propose::new(
-            validator_id,
-            self.state.epoch(),
-            round,
-            self.state.last_hash(),
-            txs,
-        ));
+        let propose_template = self.get_propose_template();
+        let propose = match propose_template {
+            ProposeTemplate::Ordinary { tx_hashes } => Propose::new(
+                validator_id,
+                self.state.epoch(),
+                round,
+                self.state.last_hash(),
+                tx_hashes,
+            ),
+
+            ProposeTemplate::Skip => Propose::skip(
+                validator_id,
+                self.state.epoch(),
+                round,
+                self.state.last_hash(),
+            ),
+        };
+        let propose = self.sign_message(propose);
+
         // Put our propose to the consensus messages cache.
         self.blockchain.persist_changes(
             |schema| schema.save_message(round, propose.clone()),
@@ -1032,16 +1043,14 @@ impl NodeHandler {
         }
     }
 
-    fn get_txs_for_propose(&mut self) -> Vec<Hash> {
-        let snapshot = self.blockchain.snapshot();
-        let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
+    fn get_propose_template(&mut self) -> ProposeTemplate {
         let txs_cache_len = self.state.tx_cache_len() as u64;
-        let params = ProposeParams::new(self.state());
         info!("LEADER: cache = {}", txs_cache_len);
 
-        match self.block_proposer.propose_block(pool, &params) {
-            ProposeTemplate::Ordinary { tx_hashes } => tx_hashes,
-        }
+        let snapshot = self.blockchain.snapshot();
+        let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
+        let params = ProposeParams::new(self.state());
+        self.block_proposer.propose_block(pool, &params)
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
