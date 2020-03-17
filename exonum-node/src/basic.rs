@@ -166,11 +166,11 @@ impl NodeHandler {
     /// message is higher than node's height.
     pub(crate) fn handle_status(&mut self, msg: &Verified<Status>) {
         let epoch = self.state.epoch();
-        let blockchain_height = self.state.blockchain_height();
+        let block_height = self.state.blockchain_height();
         trace!(
             "HANDLE STATUS: current epoch / height = {} / {}, msg epoch / height = {} / {}",
             epoch,
-            blockchain_height,
+            block_height,
             msg.payload().epoch,
             msg.payload().blockchain_height
         );
@@ -188,11 +188,16 @@ impl NodeHandler {
         self.state.update_peer_state(peer, peer_state);
 
         // Handle message from future epoch / height.
-        if peer_state.blockchain_height > blockchain_height {
-            // Request block.
-            self.request(RequestData::Block(blockchain_height), peer);
+        if peer_state.blockchain_height > block_height {
+            // Request a block with the larger height.
+            self.request(RequestData::Block(block_height), peer);
         } else if peer_state.epoch > epoch {
-            // FIXME: Request skip block.
+            // Request a block with the larger height or a pseudo-block with the larger epoch.
+            let data = RequestData::BlockOrEpoch {
+                block_height,
+                epoch,
+            };
+            self.request(data, peer);
         }
 
         if self.uncommitted_txs_count() == 0 && msg.payload().pool_size > 0 {

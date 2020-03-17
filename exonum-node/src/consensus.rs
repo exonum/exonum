@@ -245,10 +245,19 @@ impl NodeHandler {
 
         let block = &msg.payload().block;
         let block_hash = block.object_hash();
+        let epoch = block
+            .epoch()
+            .ok_or_else(|| format_err!("Received block without `epoch` field"))?;
 
         // TODO: Add block with greater height to queue. (ECR-171)
-        if self.state.blockchain_height() != block.height {
-            bail!("Received block has another height, msg={:?}", msg);
+        let is_next_height = self.state.blockchain_height() == block.height;
+        let is_future_epoch =
+            self.state.blockchain_height() == block.height.next() && self.state.epoch() <= epoch;
+        if !is_next_height && !is_future_epoch {
+            bail!(
+                "Received block has inappropriate height or epoch, msg={:?}",
+                msg
+            );
         }
 
         // Check block content.
@@ -265,16 +274,15 @@ impl NodeHandler {
         if self.state.incomplete_block().is_some() {
             bail!("Already there is an incomplete block, msg={:?}", msg);
         }
-        if !msg.payload().verify_tx_hash() {
-            bail!("Received block has invalid tx_hash, msg={:?}", msg);
-        }
         if block.get_header::<ProposerId>()?.is_none() {
             bail!("Received block without `proposer_id` header");
         }
-
-        let epoch = block
-            .epoch()
-            .ok_or_else(|| format_err!("Received block without `epoch` field"))?;
+        if block.is_skip() && !msg.payload().transactions.is_empty() {
+            bail!("Received block skip with non-empty transactions");
+        }
+        if !msg.payload().verify_tx_hash() {
+            bail!("Received block has invalid tx_hash, msg={:?}", msg);
+        }
 
         let precommits = into_verified(&msg.payload().precommits)?;
         self.validate_precommits(&precommits, epoch, block_hash)?;
@@ -464,8 +472,13 @@ impl NodeHandler {
                 .epoch()
                 .expect("`epoch` header should be checked in `validate_block_response`");
 
-            let (computed_block_hash, patch) = self.create_block(proposer_id, epoch, &transactions);
-            // Verify block_hash.
+            let (computed_block_hash, patch) = if header.is_skip() {
+                self.create_block_skip(proposer_id, epoch)
+            } else {
+                self.create_block(proposer_id, epoch, &transactions)
+            };
+
+            // Verify `block_hash`.
             assert_eq!(
                 computed_block_hash, block_hash,
                 "Block_hash incorrect in the received block={:?}. Either a node's \
@@ -473,9 +486,15 @@ impl NodeHandler {
                 header
             );
 
-            self.state
-                .add_block(computed_block_hash, patch, transactions, proposer_id, epoch);
+            if header.is_skip() {
+                self.state
+                    .add_block_skip(block_hash, patch, proposer_id, epoch);
+            } else {
+                self.state
+                    .add_block(block_hash, patch, transactions, proposer_id, epoch);
+            }
         }
+
         self.commit(block_hash, precommits.into_iter(), None);
         self.request_next_block();
     }
@@ -1044,6 +1063,7 @@ impl NodeHandler {
                 RequestData::Propose(propose_hash) => self
                     .sign_message(ProposeRequest::new(peer, self.state.epoch(), propose_hash))
                     .into(),
+
                 RequestData::ProposeTransactions(ref propose_hash) => {
                     let txs: Vec<_> = self
                         .state
@@ -1056,9 +1076,11 @@ impl NodeHandler {
                     self.sign_message(TransactionsRequest::new(peer, txs))
                         .into()
                 }
+
                 RequestData::PoolTransactions => {
                     self.sign_message(PoolTransactionsRequest::new(peer)).into()
                 }
+
                 RequestData::BlockTransactions => {
                     let txs: Vec<_> = match self.state.incomplete_block() {
                         Some(incomplete_block) => {
@@ -1069,6 +1091,7 @@ impl NodeHandler {
                     self.sign_message(TransactionsRequest::new(peer, txs))
                         .into()
                 }
+
                 RequestData::Prevotes(round, propose_hash) => self
                     .sign_message(PrevotesRequest::new(
                         peer,
@@ -1078,10 +1101,19 @@ impl NodeHandler {
                         self.state.known_prevotes(round, propose_hash),
                     ))
                     .into(),
+
                 RequestData::Block(height) => {
                     self.sign_message(BlockRequest::new(peer, height)).into()
                 }
+
+                RequestData::BlockOrEpoch {
+                    block_height,
+                    epoch,
+                } => self
+                    .sign_message(BlockRequest::with_epoch(peer, block_height, epoch))
+                    .into(),
             };
+
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, message);
         }
@@ -1181,15 +1213,10 @@ impl NodeHandler {
         }
 
         // TODO: Randomize next peer. (ECR-171)
-        let advanced_peers = self.state.advanced_peers();
-        let blockchain_height = self.state.blockchain_height();
-        for peer in advanced_peers.peers_with_greater_height {
-            if self.state.peers().contains_key(&peer) {
-                self.request(RequestData::Block(blockchain_height), peer);
-                break;
-            }
+        let peers = self.state.advanced_peers();
+        if let Some((peer, data)) = peers.send_message(&self.state) {
+            self.request(data, peer);
         }
-        // FIXME: send requests for block skips
     }
 
     /// Removes the specified request from the pending request list.

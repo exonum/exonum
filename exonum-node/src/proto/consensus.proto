@@ -94,6 +94,7 @@ message PeersRequest { exonum.crypto.PublicKey to = 1; }
 message BlockRequest {
   exonum.crypto.PublicKey to = 1;
   uint64 height = 2;
+  uint64 epoch = 3;
 }
 
 message PoolTransactionsRequest {

@@ -997,11 +997,9 @@ fn block_request_with_invalid_precommits() {
     test_block_request_with_epoch(Height(7), Height(5), true);
 }
 
-fn test_skip_request(epoch: Height, precommit_epoch: Height) {
-    let sandbox = timestamping_sandbox();
+fn test_skip_request(sandbox: &TimestampingSandbox, epoch: Height, precommit_epoch: Height) {
     let propose_hash = Hash::zero();
-
-    let mut block = sandbox.create_block(&[tx.clone()]);
+    let mut block = sandbox.create_block_skip();
     block.additional_headers.insert::<Epoch>(epoch);
     let block_hash = block.object_hash();
 
@@ -1024,10 +1022,11 @@ fn test_skip_request(epoch: Height, precommit_epoch: Height) {
     sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
     sandbox.send(
         sandbox.public_key(ValidatorId(3)),
-        &Sandbox::create_block_request(
+        &Sandbox::create_full_block_request(
             sandbox.public_key(ValidatorId(0)),
             sandbox.public_key(ValidatorId(3)),
-            Height(10),
+            Height(1),
+            Height(1),
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
@@ -1043,10 +1042,75 @@ fn test_skip_request(epoch: Height, precommit_epoch: Height) {
 
     if precommit_epoch == epoch {
         sandbox.assert_state(epoch.next(), Round(1));
-        assert_eq!(sandbox.node_state().blockchain_height(), Height(2));
-        let our_status = sandbox.create_our_status(epoch.next(), Height(2), 0);
+        assert_eq!(sandbox.node_state().blockchain_height(), Height(1));
+        let our_status = sandbox.create_our_status(epoch.next(), Height(1), 0);
         sandbox.broadcast(&our_status);
     } else {
         assert_eq!(sandbox.current_epoch(), Height(1));
     }
+}
+
+#[test]
+fn skip_request() {
+    test_skip_request(&timestamping_sandbox(), Height(7), Height(7));
+}
+
+#[test]
+fn skip_request_with_invalid_precommits() {
+    test_skip_request(&timestamping_sandbox(), Height(7), Height(6));
+}
+
+#[test]
+fn sequential_skip_requests() {
+    let sandbox = timestamping_sandbox();
+    test_skip_request(&sandbox, Height(4), Height(4));
+
+    // Since the node doesn't achieve the epoch indicated in the peer status (10),
+    // it should ask the node again, this time with a greater epoch (5 instead of 1).
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &Sandbox::create_full_block_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            Height(1),
+            Height(5),
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+}
+
+#[test]
+fn skip_request_with_small_epoch() {
+    let sandbox = timestamping_sandbox();
+    add_one_height(&sandbox, &SandboxState::new());
+
+    let propose_hash = Hash::zero();
+    let past_epoch = Height(1);
+    let mut block = sandbox.create_block_skip();
+    block.additional_headers.insert::<Epoch>(past_epoch);
+    let block_hash = block.object_hash();
+
+    let precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            past_epoch,
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    sandbox.recv(&Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        block,
+        precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+    sandbox.assert_state(Height(2), Round(1));
 }

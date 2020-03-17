@@ -19,7 +19,7 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::ProposerId,
+    blockchain::{Epoch, ProposerId},
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
@@ -1541,23 +1541,10 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
-/// scenario: // COMMIT:
-/// // - handle queued messages
-/// idea:
-/// - same as positive scenario, but
-///     - start from 1 height
-///     - one precommit get from 0 round and queue it
-/// - code is based on `handle_precommit_positive_scenario_commit()`
-/// with following updates:
-///     - use manually created tx because we need to know which tx will be used
-///       in `add_one_height()` function
-///         - take into account that in `add_one_height()` tx will be generated
-///         and in `add_one_height_with_transaction` tx is taken as param
-///     - predict & calculate blocks which would be created in
-///       `handle_precommit_positive_scenario_commit()` on zero and one heights
-///     - if we know block from 1st height we can construct valid precommit for 1st height and
-///       receive it earlier: on zero height.
-///     this early precommit will be queued and will be used after 1st height will be achieved
+/// Same as positive scenario, but
+///
+/// - Start from 1 height
+/// - One precommit is received from 0 round and queued.
 #[test]
 fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox = timestamping_sandbox();
@@ -1585,6 +1572,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .build();
     second_block.height = Height(2);
     second_block.prev_hash = first_block.object_hash();
+    second_block.additional_headers.insert::<Epoch>(Height(2));
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -1614,7 +1602,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&precommit_1); //early precommit from future height
+    sandbox.recv(&precommit_1); // Early precommit from future height
 
     sandbox.assert_state(Height(1), Round(1));
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx]);

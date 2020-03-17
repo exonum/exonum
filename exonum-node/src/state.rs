@@ -81,6 +81,31 @@ pub(crate) struct AdvancedPeers {
     pub peers_with_greater_epoch: Vec<PublicKey>,
 }
 
+impl AdvancedPeers {
+    /// Forms a message to send to a connected peer to query a (pseudo-)block with
+    /// a larger height / epoch.
+    pub fn send_message(&self, state: &State) -> Option<(PublicKey, RequestData)> {
+        let block_height = state.blockchain_height();
+        for peer in &self.peers_with_greater_height {
+            if state.peers().contains_key(peer) {
+                return Some((*peer, RequestData::Block(block_height)));
+            }
+        }
+
+        let data = RequestData::BlockOrEpoch {
+            block_height,
+            epoch: state.epoch(),
+        };
+        for peer in &self.peers_with_greater_epoch {
+            if state.peers().contains_key(peer) {
+                return Some((*peer, data));
+            }
+        }
+
+        None
+    }
+}
+
 /// State of the `NodeHandler`.
 #[derive(Debug)]
 pub(crate) struct State {
@@ -163,6 +188,8 @@ pub(crate) enum RequestData {
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
     Block(Height),
+    /// Represents `BlockRequest` message with `epoch` field set.
+    BlockOrEpoch { block_height: Height, epoch: Height },
 }
 
 #[derive(Debug)]
@@ -314,7 +341,7 @@ impl RequestData {
                 TRANSACTIONS_REQUEST_TIMEOUT
             }
             Self::Prevotes(..) => PREVOTES_REQUEST_TIMEOUT,
-            Self::Block(..) => BLOCK_REQUEST_TIMEOUT,
+            Self::Block(..) | Self::BlockOrEpoch { .. } => BLOCK_REQUEST_TIMEOUT,
         };
         Duration::from_millis(ms)
     }

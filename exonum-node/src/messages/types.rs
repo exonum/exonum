@@ -502,12 +502,25 @@ pub struct BlockRequest {
     pub to: PublicKey,
     /// The blockchain height to retrieve.
     pub height: Height,
+    /// The epoch to retrieve if the blockchain height is not reached by the node.
+    /// This value is set to `Height(0)` to signal to skip this stage of message processing.
+    pub epoch: Height,
 }
 
 impl BlockRequest {
-    /// Create new `BlockRequest`.
+    /// Creates a new `BlockRequest`.
     pub fn new(to: PublicKey, height: Height) -> Self {
-        Self { to, height }
+        Self {
+            to,
+            height,
+            epoch: Height(0),
+        }
+    }
+
+    /// Creates a new `BlockRequest` with the specified epoch.
+    pub fn with_epoch(to: PublicKey, height: Height, epoch: Height) -> Self {
+        debug_assert!(epoch > Height(0));
+        Self { to, height, epoch }
     }
 }
 

@@ -23,7 +23,7 @@ use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
         AdditionalHeaders, Block, BlockData, BlockProof, Blockchain, BlockchainBuilder,
-        BlockchainMut, ConsensusConfig, Epoch, PersistentPool, ProposerId, Schema,
+        BlockchainMut, ConsensusConfig, Epoch, PersistentPool, ProposerId, Schema, SkipFlag,
         TransactionCache, ValidatorKeys,
     },
     crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
@@ -243,13 +243,15 @@ impl Sandbox {
     }
 
     /// Creates a `BlockRequest` message signed by this validator.
-    pub fn create_skip_request(
+    pub fn create_full_block_request(
         author: PublicKey,
         to: PublicKey,
+        block_height: Height,
         epoch: Height,
         secret_key: &SecretKey,
     ) -> Verified<BlockRequest> {
-        Verified::from_value(BlockRequest::new(to, epoch), author, secret_key)
+        let request = BlockRequest::with_epoch(to, block_height, epoch);
+        Verified::from_value(request, author, secret_key)
     }
 
     /// Creates a `Status` message signed by this validator.
@@ -787,6 +789,7 @@ impl Sandbox {
         block
             .additional_headers
             .insert::<Epoch>(self.current_epoch());
+        block.additional_headers.insert::<SkipFlag>(());
         block
     }
 

@@ -18,7 +18,7 @@ pub use self::{
     api_sender::{ApiSender, SendError},
     block::{
         AdditionalHeaders, Block, BlockHeaderKey, BlockProof, CallProof, Epoch, IndexProof,
-        ProofError, ProposerId,
+        ProofError, ProposerId, SkipFlag,
     },
     builder::BlockchainBuilder,
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
@@ -451,6 +451,7 @@ impl BlockchainMut {
         pseudo_block.add_header::<ProposerId>(block_data.proposer);
         // Pseudo-blocks are distinguished by the epoch rather than `height` / `prev_hash`.
         pseudo_block.add_epoch(block_data.epoch);
+        pseudo_block.set_skip();
 
         let block_hash = pseudo_block.object_hash();
         let fork = self.fork();

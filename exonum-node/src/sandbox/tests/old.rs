@@ -15,7 +15,7 @@
 use std::time::Duration;
 
 use exonum::{
-    blockchain::{AdditionalHeaders, Block, ProposerId},
+    blockchain::{AdditionalHeaders, Block, Epoch, ProposerId},
     helpers::{Height, Round, ValidatorId},
     merkledb::{HashTag, ObjectHash},
     messages::Verified,
@@ -76,6 +76,7 @@ fn create_propose(sandbox: &Sandbox) -> Verified<Propose> {
 fn create_block(sandbox: &Sandbox) -> Block {
     let mut additional_headers = AdditionalHeaders::new();
     additional_headers.insert::<ProposerId>(ValidatorId(2));
+    additional_headers.insert::<Epoch>(sandbox.current_epoch());
 
     Block {
         height: Height(1),

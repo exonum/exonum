@@ -55,14 +55,23 @@ impl BlockHeaderKey for ProposerId {
     type Value = ValidatorId;
 }
 
-/// Epoch of the consensus algorithm. Only present for pseudo-blocks created when
-/// the consensus algorithm is idle.
+/// Epoch of the consensus algorithm. This field must be present in all correctly formed blocks.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Epoch(());
 
 impl BlockHeaderKey for Epoch {
     const NAME: &'static str = "epoch";
     type Value = Height;
+}
+
+/// Flag the presence of which indicates that a block is formed as a result of skipping
+/// ordinary block creation.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct SkipFlag(());
+
+impl BlockHeaderKey for SkipFlag {
+    const NAME: &'static str = "skip";
+    type Value = ();
 }
 
 /// Expandable set of headers allowed to be added to the block.
@@ -147,6 +156,17 @@ impl Block {
     /// Retrieves the epoch associated with this block, or `None` if the epoch is not recorded.
     pub fn epoch(&self) -> Option<Height> {
         self.get_header::<Epoch>().unwrap_or(None)
+    }
+
+    /// Adds the `skip` flag to this block.
+    pub(super) fn set_skip(&mut self) {
+        self.add_header::<SkipFlag>(());
+    }
+
+    /// Checks if this block is formed as a result of skipping ordinary block creation.
+    pub fn is_skip(&self) -> bool {
+        self.get_header::<SkipFlag>()
+            .map_or(false, |flag| flag.is_some())
     }
 
     /// Gets the value of an additional header for the specified key type, which is specified via
