@@ -228,6 +228,7 @@ impl BlockProof {
     /// Verifies that the block in this proof is endorsed by the Byzantine majority of provided
     /// validators.
     pub fn verify(&self, validator_keys: &[PublicKey]) -> Result<(), ProofError> {
+        // FIXME: check epoch.
         if self.precommits.len() < byzantine_quorum(validator_keys.len()) {
             return Err(ProofError::NoQuorum);
         }

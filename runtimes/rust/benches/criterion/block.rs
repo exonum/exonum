@@ -41,10 +41,11 @@ use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
-        ApiSender, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig, ValidatorKeys,
+        ApiSender, BlockData, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
+        ValidatorKeys,
     },
     crypto::{Hash, KeyPair},
-    helpers::ValidatorId,
+    helpers::{Height, ValidatorId},
     merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
     messages::{AnyTx, Verified},
     runtime::SnapshotExt,
@@ -123,7 +124,8 @@ fn create_consensus_config_and_blockchain_base(
 }
 
 fn execute_block(blockchain: &BlockchainMut, txs: &[Hash]) -> (Hash, Patch) {
-    blockchain.create_patch(ValidatorId::zero(), txs, &())
+    let block_data = BlockData::new(ValidatorId(0), Height(100));
+    blockchain.create_patch(&block_data, txs, &())
 }
 
 mod timestamping {

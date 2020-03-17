@@ -271,6 +271,24 @@ impl Blockchain {
     }
 }
 
+/// Block metadata provided to `BlockchainMut::create_patch` by the consensus algorithm.
+#[derive(Debug, Clone)]
+pub struct BlockData {
+    proposer: ValidatorId,
+    epoch: Height,
+}
+
+impl BlockData {
+    /// Creates a new `BlockData` instance.
+    ///
+    /// # Stability
+    ///
+    /// This method is considered unstable.
+    pub fn new(proposer: ValidatorId, epoch: Height) -> Self {
+        Self { proposer, epoch }
+    }
+}
+
 /// Mutable blockchain capable of processing transactions.
 ///
 /// `BlockchainMut` combines [`Blockchain`] resources with a service dispatcher. The resulting
@@ -376,7 +394,8 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch).unwrap();
 
-        let (_, patch) = self.create_patch(ValidatorId::zero(), &[], &());
+        let block_data = BlockData::new(ValidatorId(0), Height(0));
+        let (_, patch) = self.create_patch(&block_data, &[], &());
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -391,6 +410,10 @@ impl BlockchainMut {
     /// Executes the given transactions from the pool. Collects the resulting changes
     /// from the current storage state and returns them with the hash of the resulting block.
     ///
+    /// # Stability
+    ///
+    /// This method is considered unstable.
+    ///
     /// # Arguments
     ///
     /// - `tx_cache` is an ephemeral [transaction cache] used to retrieve transactions
@@ -401,18 +424,19 @@ impl BlockchainMut {
     /// [`PersistentPool`]: struct.PersistentPool.html
     pub fn create_patch<C>(
         &self,
-        proposer_id: ValidatorId,
+        block_data: &BlockData,
         tx_hashes: &[Hash],
         tx_cache: &C,
     ) -> (Hash, Patch)
     where
         C: TransactionCache + ?Sized,
     {
-        self.create_patch_inner(self.fork(), proposer_id, tx_hashes, tx_cache)
+        self.create_patch_inner(self.fork(), block_data, tx_hashes, tx_cache)
     }
 
-    #[doc(hidden)]
-    pub fn create_skip_patch(&self, proposer_id: ValidatorId, epoch: Height) -> (Hash, Patch) {
+    /// Executes a new block skip and returns the corresponding patch.
+    #[doc(hidden)] // unstable
+    pub fn create_skip_patch(&self, block_data: &BlockData) -> (Hash, Patch) {
         let prev_block = self.inner.last_block();
 
         let mut pseudo_block = Block {
@@ -424,9 +448,9 @@ impl BlockchainMut {
             error_hash: HashTag::empty_map_hash(),
             additional_headers: AdditionalHeaders::new(),
         };
-        pseudo_block.add_header::<ProposerId>(proposer_id);
+        pseudo_block.add_header::<ProposerId>(block_data.proposer);
         // Pseudo-blocks are distinguished by the epoch rather than `height` / `prev_hash`.
-        pseudo_block.add_epoch(epoch);
+        pseudo_block.add_epoch(block_data.epoch);
 
         let block_hash = pseudo_block.object_hash();
         let fork = self.fork();
@@ -439,7 +463,7 @@ impl BlockchainMut {
     pub(crate) fn create_patch_inner<C>(
         &self,
         mut fork: Fork,
-        proposer_id: ValidatorId,
+        block_data: &BlockData,
         tx_hashes: &[Hash],
         tx_cache: &C,
     ) -> (Hash, Patch)
@@ -471,7 +495,7 @@ impl BlockchainMut {
             }
         }
 
-        let (patch, block) = self.create_block_header(fork, proposer_id, height, tx_hashes);
+        let (patch, block) = self.create_block_header(fork, block_data, height, tx_hashes);
         log::trace!("Executing {:?}", block);
 
         // Calculate block hash.
@@ -488,7 +512,7 @@ impl BlockchainMut {
     fn create_block_header(
         &self,
         fork: Fork,
-        proposer_id: ValidatorId,
+        block_data: &BlockData,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Patch, Block) {
@@ -511,8 +535,8 @@ impl BlockchainMut {
             error_hash,
             additional_headers: AdditionalHeaders::new(),
         };
-
-        block.add_header::<ProposerId>(proposer_id);
+        block.add_header::<ProposerId>(block_data.proposer);
+        block.add_epoch(block_data.epoch);
 
         (patch, block)
     }

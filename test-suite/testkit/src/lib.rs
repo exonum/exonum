@@ -121,7 +121,7 @@ pub use exonum_rust_runtime::spec::Spec;
 
 use exonum::{
     blockchain::{
-        config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
+        config::GenesisConfig, ApiSender, BlockData, Blockchain, BlockchainBuilder, BlockchainMut,
         ConsensusConfig,
     },
     crypto::{self, Hash},
@@ -459,7 +459,8 @@ impl TestKit {
         let validator_id = self.leader().validator_id().unwrap();
 
         let guard = self.processing_lock.lock().unwrap();
-        let (block_hash, patch) = self.blockchain.create_patch(validator_id, tx_hashes, &());
+        let block_data = BlockData::new(validator_id, new_block_height);
+        let (block_hash, patch) = self.blockchain.create_patch(&block_data, tx_hashes, &());
 
         let precommits: Vec<_> = self
             .network()

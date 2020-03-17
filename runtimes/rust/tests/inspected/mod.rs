@@ -17,7 +17,7 @@
 use exonum::{
     blockchain::{
         config::{GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, ConsensusConfig, Schema as CoreSchema,
+        BlockData, Blockchain, BlockchainMut, ConsensusConfig, Schema as CoreSchema,
     },
     crypto::Hash,
     helpers::{Height, ValidatorId},
@@ -64,7 +64,8 @@ pub fn create_block_with_transactions(
     transactions: Vec<Verified<AnyTx>>,
 ) -> (Hash, Patch) {
     let tx_hashes = add_transactions_into_pool(blockchain, transactions);
-    blockchain.create_patch(ValidatorId::zero(), &tx_hashes, &())
+    let block_data = BlockData::new(ValidatorId(0), Height(100));
+    blockchain.create_patch(&block_data, &tx_hashes, &())
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {

@@ -16,8 +16,8 @@
 
 use exonum::{
     blockchain::{
-        config::GenesisConfigBuilder, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
-        ConsensusConfig,
+        config::GenesisConfigBuilder, ApiSender, BlockData, Blockchain, BlockchainBuilder,
+        BlockchainMut, ConsensusConfig,
     },
     crypto::{self, KeyPair, PublicKey},
     merkledb::{ObjectHash, TemporaryDB},
@@ -135,10 +135,12 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
     blockchain.add_transactions_into_pool(transactions);
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), &tx_hashes, &());
-    let consensus_keys = consensus_keys();
 
     let height = blockchain.as_ref().last_block().height.next();
+    let block_data = BlockData::new(ValidatorId(0), height);
+    let (block_hash, patch) = blockchain.create_patch(&block_data, &tx_hashes, &());
+    let consensus_keys = consensus_keys();
+
     let precommit = Verified::from_value(
         Precommit::new(
             ValidatorId(0),
