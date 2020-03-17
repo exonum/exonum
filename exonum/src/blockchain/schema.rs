@@ -221,7 +221,7 @@ impl<T: Access> Schema<T> {
     }
 
     #[doc(hidden)]
-    pub fn skip_block_with_precommits(&self) -> Option<BlockProof> {
+    pub fn skip_block_and_precommits(&self) -> Option<BlockProof> {
         let block = self.skip_block_entry().get()?;
         let precommits = self.precommits(&block.object_hash()).iter().collect();
         Some(BlockProof::new(block, precommits))

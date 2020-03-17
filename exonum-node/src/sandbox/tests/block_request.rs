@@ -1114,3 +1114,102 @@ fn skip_request_with_small_epoch() {
     ));
     sandbox.assert_state(Height(2), Round(1));
 }
+
+fn send_skip_request(block_height: Height, epoch: Height) -> TimestampingSandbox {
+    let sandbox = timestamping_sandbox();
+    let propose_hash = Hash::zero();
+    let block_epoch = Height(8);
+    let mut block = sandbox.create_block_skip();
+    block.additional_headers.insert::<Epoch>(block_epoch);
+    let block_hash = block.object_hash();
+
+    let precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            block_epoch,
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    // Reach some large epoch (9).
+    let block_response = Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(0)),
+        block,
+        precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    sandbox.recv(&block_response);
+    sandbox.broadcast(&sandbox.create_our_status(block_epoch.next(), Height(1), 0));
+
+    let request = Sandbox::create_full_block_request(
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(0)),
+        block_height,
+        epoch,
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    sandbox.recv(&request);
+    sandbox
+}
+
+#[test]
+fn handle_skip_request() {
+    let sandbox = send_skip_request(Height(1), Height(3));
+
+    let proof = sandbox.skip_block_and_precommits().unwrap();
+    let response = Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(1)),
+        proof.block,
+        proof.precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.send(sandbox.public_key(ValidatorId(1)), &response);
+}
+
+#[test]
+fn ignoring_skip_request_with_future_epoch() {
+    let _sandbox = send_skip_request(Height(1), Height(20));
+    // The sandbox will panic on drop if it sent a response.
+}
+
+#[test]
+fn ignoring_skip_request_with_future_height() {
+    let _sandbox = send_skip_request(Height(2), Height(7));
+    // The sandbox will panic on drop if it sent a response.
+}
+
+#[test]
+fn handle_outdated_skip_request() {
+    let sandbox = timestamping_sandbox();
+    let tx = gen_timestamping_tx();
+    add_one_height_with_transactions(&sandbox, &SandboxState::new(), vec![&tx]);
+
+    let request = Sandbox::create_full_block_request(
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(0)),
+        Height(1),
+        Height(1),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    sandbox.recv(&request);
+
+    let proof = sandbox.block_and_precommits(Height(1)).unwrap();
+    let response = Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(1)),
+        proof.block,
+        proof.precommits,
+        vec![tx.object_hash()],
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.send(sandbox.public_key(ValidatorId(1)), &response);
+}

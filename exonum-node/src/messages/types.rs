@@ -522,6 +522,15 @@ impl BlockRequest {
         debug_assert!(epoch > Height(0));
         Self { to, height, epoch }
     }
+
+    /// Returns the effective value of `epoch` in this request.
+    pub fn epoch(&self) -> Option<Height> {
+        if self.epoch == Height(0) {
+            None
+        } else {
+            Some(self.epoch)
+        }
+    }
 }
 
 /// This type describes all possible types of Exonum messages

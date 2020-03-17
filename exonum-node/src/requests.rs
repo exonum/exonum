@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{BlockProof, PersistentPool, Schema, TransactionCache},
+    blockchain::{PersistentPool, Schema, TransactionCache},
     crypto::{Hash, PublicKey},
     merkledb::BinaryValue,
     messages::Verified,
@@ -151,28 +151,42 @@ impl NodeHandler {
     /// Handles `BlockRequest` message. For details see the message documentation.
     pub(crate) fn handle_request_block(&mut self, msg: &Verified<BlockRequest>) {
         let height = msg.payload().height;
+        let current_height = self.state.blockchain_height();
         trace!(
             "Handling `BlockRequest` with height: {}, our height: {}",
             height,
-            self.state.blockchain_height()
+            current_height
         );
-        if height >= self.state.blockchain_height() {
+
+        if height > current_height {
             return;
         }
-
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
-        let BlockProof {
-            block, precommits, ..
-        } = schema.block_and_precommits(height).unwrap();
-        let transactions = schema.block_transactions(height);
 
-        let block_msg = self.sign_message(BlockResponse::new(
-            msg.author(),
-            block,
-            precommits.iter().map(BinaryValue::to_bytes),
-            transactions.iter(),
-        ));
-        self.send_to_peer(msg.author(), block_msg);
+        let mut proof_and_transactions = None;
+        if height == current_height {
+            if let Some(epoch) = msg.payload().epoch() {
+                if self.state.epoch() >= epoch {
+                    if let Some(proof) = schema.skip_block_and_precommits() {
+                        proof_and_transactions = Some((proof, vec![]));
+                    }
+                }
+            }
+        } else {
+            let proof = schema.block_and_precommits(height).unwrap();
+            let transactions = schema.block_transactions(height).iter().collect();
+            proof_and_transactions = Some((proof, transactions));
+        };
+
+        if let Some((proof, transactions)) = proof_and_transactions {
+            let block_msg = self.sign_message(BlockResponse::new(
+                msg.author(),
+                proof.block,
+                proof.precommits.iter().map(BinaryValue::to_bytes),
+                transactions,
+            ));
+            self.send_to_peer(msg.author(), block_msg);
+        }
     }
 }

@@ -849,6 +849,12 @@ impl Sandbox {
         schema.block_and_precommits(height)
     }
 
+    pub fn skip_block_and_precommits(&self) -> Option<BlockProof> {
+        let snapshot = self.blockchain().snapshot();
+        let schema = snapshot.for_core();
+        schema.skip_block_and_precommits()
+    }
+
     pub fn current_epoch(&self) -> Height {
         self.node_state().epoch()
     }
