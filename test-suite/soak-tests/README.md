@@ -12,6 +12,10 @@ The crate exposes the following binaries:
 - [`send_txs`](src/bin/send_txs.rs). Tests sending transactions to a service
   via `Blockchain::sender()`.
 
+- [`sleepy`](src/bin/sleepy.rs). Tests custom block proposal creation
+  (namely, the mode in which nodes do not create blocks unless they have
+  uncommitted transactions).
+
 ## Usage
 
 Run the selected binary like this:
