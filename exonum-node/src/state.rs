@@ -533,6 +533,7 @@ impl State {
         connect: Connect,
         peers: HashMap<PublicKey, Verified<Connect>>,
         last_block: &Block,
+        last_block_skip: Option<&Block>,
         epoch_start_time: SystemTime,
     ) -> Self {
         let validator_id = consensus_config
@@ -546,12 +547,16 @@ impl State {
             config.keys.consensus_sk(),
         );
 
+        let last_epoch = last_block_skip
+            .map_or_else(|| last_block.epoch(), Block::epoch)
+            .expect("No `epoch` recorded in the saved block");
+
         Self {
             validator_state: validator_id.map(|id| ValidatorState::new(ValidatorId(id as u16))),
             connect_list: SharedConnectList::from_connect_list(config.connect_list),
             peers,
             connections: HashMap::new(),
-            epoch: last_block.height.next(), // FIXME: this is incorrect
+            epoch: last_epoch.next(),
             epoch_start_time,
             blockchain_height: last_block.height.next(),
             round: Round::zero(),

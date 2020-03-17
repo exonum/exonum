@@ -526,9 +526,11 @@ impl NodeHandler {
         config_manager: Option<Box<dyn ConfigManager>>,
         block_proposer: Box<dyn ProposeBlock>,
     ) -> Self {
-        let last_block = blockchain.as_ref().last_block();
         let snapshot = blockchain.snapshot();
-        let consensus_config = Schema::new(&snapshot).consensus_config();
+        let schema = Schema::new(&snapshot);
+        let last_block = schema.last_block();
+        let last_block_skip = schema.skip_block();
+        let consensus_config = schema.consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
         let connect = Connect::new(
@@ -548,6 +550,7 @@ impl NodeHandler {
             connect,
             peers,
             &last_block,
+            last_block_skip.as_ref(),
             system_state.current_time(),
         );
 

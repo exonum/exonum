@@ -88,6 +88,11 @@ fn approving_skip_propose_normal_workflow() {
     assert_eq!(sandbox.node_state().blockchain_height(), Height(1));
     let our_status = sandbox.create_our_status(Height(2), Height(1), 0);
     sandbox.broadcast(&our_status);
+
+    // Check that the epoch is preserved across node restarts.
+    let current_time = sandbox.time();
+    let sandbox = sandbox.restart_with_time(current_time);
+    sandbox.assert_state(Height(2), Round(1));
 }
 
 #[derive(Debug, Clone, Copy)]
