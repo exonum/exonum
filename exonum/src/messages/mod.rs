@@ -94,7 +94,7 @@
 //! // Further, check whether it is a `Precommit` message.
 //! assert_matches!(
 //!     verified.payload(),
-//!      CoreMessage::Precommit(ref precommit) if precommit.height == Height(15)
+//!     CoreMessage::Precommit(ref precommit) if precommit.epoch == Height(15)
 //! );
 //! ```
 
