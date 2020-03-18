@@ -139,14 +139,14 @@ impl StartService {
             .ok_or_else(|| {
                 let msg = format!(
                     "Discarded start of service `{}` from the unknown artifact `{}`.",
-                    self.name, self.artifact.name,
+                    self.name, self.artifact,
                 );
                 ArtifactError::UnknownArtifact.with_description(msg)
             })?;
         if artifact_state.status != ArtifactStatus::Active {
             let msg = format!(
                 "Discarded start of service `{}` from the non-active artifact `{}`.",
-                self.name, self.artifact.name,
+                self.name, self.artifact,
             );
             return Err(ArtifactError::UnknownArtifact.with_description(msg));
         }
