@@ -25,17 +25,19 @@ use exonum_rust_runtime::{DefaultInstance, Service, TxStub};
 use serde_derive::{Deserialize, Serialize};
 
 #[exonum_interface(auto_ids)]
-pub trait ConfigUpdater<Ctx> {
+pub trait Supervisor<Ctx> {
     type Output;
+
     fn update_config(&self, ctx: Ctx, arg: TxConfig) -> Self::Output;
+    fn stop_service(&self, ctx: Ctx, service_id: InstanceId) -> Self::Output;
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("ConfigUpdater"))]
-#[service_factory(artifact_name = "config_updater", artifact_version = "0.1.0")]
-pub struct ConfigUpdaterService;
+#[service_dispatcher(implements("Supervisor"))]
+#[service_factory(artifact_name = "supervisor", artifact_version = "0.1.0")]
+pub struct SupervisorService;
 
-impl ConfigUpdater<ExecutionContext<'_>> for ConfigUpdaterService {
+impl Supervisor<ExecutionContext<'_>> for SupervisorService {
     type Output = Result<(), ExecutionError>;
 
     fn update_config(&self, mut ctx: ExecutionContext<'_>, arg: TxConfig) -> Self::Output {
@@ -45,15 +47,20 @@ impl ConfigUpdater<ExecutionContext<'_>> for ConfigUpdaterService {
             .set(ConsensusConfig::from_bytes(arg.config.into()).unwrap());
         Ok(())
     }
+
+    fn stop_service(&self, mut ctx: ExecutionContext<'_>, service_id: InstanceId) -> Self::Output {
+        ctx.supervisor_extensions()
+            .initiate_stopping_service(service_id)
+    }
 }
 
-impl Service for ConfigUpdaterService {}
+impl Service for SupervisorService {}
 
-impl ConfigUpdaterService {
+impl SupervisorService {
     pub const ID: InstanceId = SUPERVISOR_INSTANCE_ID;
 }
 
-impl DefaultInstance for ConfigUpdaterService {
+impl DefaultInstance for SupervisorService {
     const INSTANCE_ID: InstanceId = Self::ID;
     const INSTANCE_NAME: &'static str = "config-updater";
 }
@@ -80,7 +87,7 @@ impl TxConfig {
         };
 
         TxStub
-            .update_config(ConfigUpdaterService::ID, msg)
+            .update_config(SupervisorService::ID, msg)
             .sign(from, signer)
     }
 }

@@ -732,7 +732,6 @@ impl NodeHandler {
             |schema| schema.consensus_messages_cache().clear(),
             "Cannot clear consensus messages",
         );
-        // FIXME: persist epoch.
 
         match block_kind {
             BlockKind::Normal => {
@@ -786,7 +785,7 @@ impl NodeHandler {
         self.broadcast_status();
         self.add_status_timeout();
 
-        // Add timeout for first round.
+        // Add timeout for the first round.
         self.add_round_timeout();
         // Send propose if we are the round leader.
         if self.state.is_leader() {
@@ -1049,8 +1048,8 @@ impl NodeHandler {
 
         let snapshot = self.blockchain.snapshot();
         let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
-        let params = ProposeParams::new(self.state());
-        self.block_proposer.propose_block(pool, &params)
+        let params = ProposeParams::new(self.state(), &snapshot);
+        self.block_proposer.propose_block(pool, params)
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.

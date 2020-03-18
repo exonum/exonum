@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{crypto::PublicKey, helpers::Height, messages::Verified};
+use exonum::{crypto::PublicKey, helpers::Height, merkledb::ObjectHash, messages::Verified};
 use log::{error, info, trace};
 use rand::Rng;
 
@@ -35,7 +35,12 @@ impl NodeHandler {
             Message::Service(Service::Status(msg)) => self.handle_status(&msg),
             Message::Service(Service::AnyTx(msg)) => {
                 if let Err(e) = self.handle_tx(msg.clone()) {
-                    log::warn!("Failed to process transaction {:?}: {}", msg.payload(), e);
+                    log::warn!(
+                        "Failed to process transaction {:?} (hash = {:?}): {}",
+                        msg.payload(),
+                        msg.object_hash(),
+                        e
+                    );
                 }
             }
 

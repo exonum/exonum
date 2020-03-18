@@ -26,7 +26,7 @@
 //! [Exonum white paper]: https://bitfury.com/content/downloads/wp_consensus_181227.pdf
 
 use exonum::{
-    blockchain::{ConsensusConfig, PersistentPool, TransactionCache},
+    blockchain::{Blockchain, ConsensusConfig, PersistentPool, TransactionCache},
     crypto::Hash,
     helpers::{Height, Round},
     merkledb::Snapshot,
@@ -42,18 +42,20 @@ pub type Pool<'a> = PersistentPool<'a, BTreeMap<Hash, Verified<AnyTx>>, &'a dyn 
 
 /// Block proposal parameters supplied to the proposer from the node.
 #[derive(Debug)]
-pub struct ProposeParams {
+pub struct ProposeParams<'a> {
     consensus_config: ConsensusConfig,
     height: Height,
     round: Round,
+    snapshot: &'a dyn Snapshot,
 }
 
-impl ProposeParams {
-    pub(crate) fn new(state: &State) -> Self {
+impl<'a> ProposeParams<'a> {
+    pub(crate) fn new(state: &State, snapshot: &'a dyn Snapshot) -> Self {
         Self {
             consensus_config: state.consensus_config().to_owned(),
             height: state.epoch(),
             round: state.round(),
+            snapshot,
         }
     }
 
@@ -70,6 +72,11 @@ impl ProposeParams {
     /// Current consensus round.
     pub fn round(&self) -> Round {
         self.round
+    }
+
+    /// Returns the snapshot of the current blockchain state.
+    pub fn snapshot(&self) -> &'a dyn Snapshot {
+        self.snapshot
     }
 }
 
@@ -105,7 +112,7 @@ impl ProposeTemplate {
 /// Proposal creation logic.
 pub trait ProposeBlock: Send {
     /// Creates a block proposal based on the transaction pool and block creation params.
-    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate;
+    fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate;
 }
 
 impl fmt::Debug for dyn ProposeBlock {
@@ -115,7 +122,7 @@ impl fmt::Debug for dyn ProposeBlock {
 }
 
 impl ProposeBlock for Box<dyn ProposeBlock> {
-    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate {
+    fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         (**self).propose_block(pool, params)
     }
 }
@@ -125,12 +132,24 @@ impl ProposeBlock for Box<dyn ProposeBlock> {
 pub struct StandardProposer;
 
 impl ProposeBlock for StandardProposer {
-    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate {
+    fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         let max_transactions = params.consensus_config.txs_block_limit;
+        let snapshot = params.snapshot();
+
         let tx_hashes = pool
             .transactions()
-            .take(max_transactions as usize)
-            .map(|(tx_hash, _)| tx_hash);
+            .filter_map(|(tx_hash, tx)| {
+                // TODO: this is wildly inefficient.
+                // It should be easy to cache tx status within single height; however,
+                // spanning cache across multiple heights would be significantly harder.
+                if Blockchain::check_tx(snapshot, tx.as_ref()).is_ok() {
+                    Some(tx_hash)
+                } else {
+                    None
+                }
+            })
+            .take(max_transactions as usize);
+
         ProposeTemplate::ordinary(tx_hashes)
     }
 }
@@ -140,7 +159,7 @@ impl ProposeBlock for StandardProposer {
 pub struct SkipEmptyBlocks;
 
 impl ProposeBlock for SkipEmptyBlocks {
-    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate {
+    fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         match StandardProposer.propose_block(pool, params) {
             ProposeTemplate::Ordinary { tx_hashes } if tx_hashes.is_empty() => {
                 ProposeTemplate::Skip

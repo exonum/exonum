@@ -258,10 +258,8 @@ fn test_store_txs_positions() {
     );
 
     let committed_height = Height(rng.gen_range(2, 30_u64));
-    {
-        for _ in 1..committed_height.0 {
-            add_one_height(&sandbox, &sandbox_state)
-        }
+    for _ in 1..committed_height.0 {
+        add_one_height(&sandbox, &sandbox_state);
     }
     let num_txs = rng.gen_range(3, 100);
     let committed_block1 = generator

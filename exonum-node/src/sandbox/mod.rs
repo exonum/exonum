@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod config_updater;
 mod guarded_queue;
 mod sandbox_tests_helper;
+mod supervisor;
 mod tests;
 mod timestamping;
 
@@ -51,9 +51,9 @@ use std::{
 };
 
 use self::{
-    config_updater::ConfigUpdaterService,
     guarded_queue::GuardedQueue,
     sandbox_tests_helper::{BlockBuilder, PROPOSE_TIMEOUT},
+    supervisor::SupervisorService,
     timestamping::TimestampingService,
 };
 use crate::{
@@ -1315,7 +1315,7 @@ pub fn timestamping_sandbox() -> Sandbox {
 pub fn timestamping_sandbox_builder() -> SandboxBuilder {
     SandboxBuilder::new()
         .with_default_rust_service(TimestampingService)
-        .with_default_rust_service(ConfigUpdaterService)
+        .with_default_rust_service(SupervisorService)
 }
 
 #[cfg(test)]

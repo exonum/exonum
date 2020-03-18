@@ -1124,16 +1124,17 @@ impl State {
 
                     if transactions.contains(hash) {
                         if !transaction_pool.contains(hash) {
-                            bail!(
-                                "Received propose with already \
-                                 committed transaction"
-                            )
+                            bail!("Received propose with already committed transaction");
                         }
                     } else if self.invalid_txs.contains(hash) {
                         // If the propose contains an invalid transaction,
                         // we don't stop processing, since we expect this propose to
                         // be declined by the consensus rules.
-                        error!("Received propose with transaction known as invalid");
+                        error!(
+                            "Received propose {:?} with transaction {:?} known as invalid",
+                            msg.payload(),
+                            hash
+                        );
                         is_valid = false;
                     } else {
                         unknown_txs.insert(*hash);

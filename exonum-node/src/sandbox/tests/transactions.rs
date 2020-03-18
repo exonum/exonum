@@ -29,8 +29,8 @@ use crate::{
     messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
     proposer::{Pool, ProposeBlock, ProposeParams, ProposeTemplate},
     sandbox::{
-        config_updater::TxConfig,
         sandbox_tests_helper::*,
+        supervisor::{Supervisor, SupervisorService, TxConfig},
         timestamping::{
             Timestamping as _, TimestampingService, TimestampingTxGenerator, DATA_SIZE,
         },
@@ -38,6 +38,7 @@ use crate::{
     },
     state::TRANSACTIONS_REQUEST_TIMEOUT,
 };
+use exonum::blockchain::Blockchain;
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
 const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
@@ -726,7 +727,7 @@ impl WhitelistProposer {
 }
 
 impl ProposeBlock for WhitelistProposer {
-    fn propose_block(&mut self, pool: Pool<'_>, params: &ProposeParams) -> ProposeTemplate {
+    fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         let tx_hashes = pool.transactions().filter_map(|(tx_hash, tx)| {
             if tx.author() == self.key {
                 Some(tx_hash)
@@ -838,4 +839,85 @@ fn custom_proposer_does_not_influence_external_proposes() {
         0,
         sandbox.secret_key(ValidatorId(0)),
     ));
+}
+
+#[test]
+fn not_proposing_incorrect_transactions() {
+    let sandbox = timestamping_sandbox();
+    add_one_height(&sandbox, &SandboxState::new());
+
+    let tx = gen_timestamping_tx();
+    let stop_service_tx =
+        KeyPair::random().stop_service(SupervisorService::ID, TimestampingService::ID);
+
+    // Send both transactions to the sandbox.
+    sandbox.recv(&tx);
+    sandbox.recv(&stop_service_tx);
+
+    // Accept the block with the transaction stopping the TS service, but not `tx`
+    // (say, we didn't manage to broadcast it).
+    let stop_propose = sandbox.create_propose(
+        ValidatorId(3),
+        Height(2),
+        Round(1),
+        sandbox.last_hash(),
+        vec![stop_service_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(3)),
+    );
+    let block = sandbox.create_block(&[stop_service_tx]);
+
+    let stop_precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            Height(2),
+            Round(1),
+            stop_propose.object_hash(),
+            block.object_hash(),
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    sandbox.recv(&stop_propose);
+    sandbox.broadcast(&sandbox.create_prevote(
+        ValidatorId(0),
+        Height(2),
+        Round(1),
+        stop_propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+
+    for precommit in stop_precommits {
+        sandbox.recv(&precommit);
+    }
+    sandbox.broadcast(&sandbox.create_our_status(Height(3), Height(3), 1));
+
+    // The transaction is incorrect now.
+    let snapshot = sandbox.blockchain().snapshot();
+    assert!(Blockchain::check_tx(&snapshot, &tx).is_err());
+
+    // Create a proposal.
+    assert!(sandbox.is_leader());
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+
+    let propose = sandbox.create_propose(
+        ValidatorId(0),
+        Height(3),
+        Round(1),
+        sandbox.last_hash(),
+        vec![], // `tx` is incorrect and should not be included into the proposal.
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&propose);
+    let prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(3),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&prevote);
 }
