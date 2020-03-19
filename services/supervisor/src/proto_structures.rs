@@ -55,12 +55,16 @@ pub struct DeployRequest {
     /// Artifact identifier.
     pub artifact: ArtifactId,
 
-    /// Additional information for the runtime to deploy.
+    /// Additional information for the runtime necessary to deploy the artifact.
     #[serde(with = "HexForm")]
     pub spec: Vec<u8>,
 
     /// The height until which the deployment procedure should be completed.
     pub deadline_height: Height,
+
+    /// Seed to allow several deployments with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl DeployRequest {
@@ -70,6 +74,7 @@ impl DeployRequest {
             artifact,
             deadline_height,
             spec: Vec::new(),
+            seed: 0,
         }
     }
 
@@ -118,8 +123,10 @@ impl DeployResult {
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
+
     /// Instance name.
     pub name: String,
+
     /// Instance configuration.
     #[serde(with = "HexForm")]
     pub config: Vec<u8>,
@@ -348,13 +355,36 @@ impl From<ConfigPropose> for ConfigVote {
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::MigrationRequest")]
+#[non_exhaustive]
 pub struct MigrationRequest {
     /// New artifact identifier.
     pub new_artifact: ArtifactId,
+
     /// Name of service for a migration.
     pub service: String,
+
     /// The height until which the migration procedure should be completed.
     pub deadline_height: Height,
+
+    /// Seed to allow several migrations with the same params.
+    #[serde(default)]
+    pub seed: u64,
+}
+
+impl MigrationRequest {
+    /// Creates a new migration request.
+    pub fn new(
+        new_artifact: ArtifactId,
+        service: impl Into<String>,
+        deadline_height: Height,
+    ) -> Self {
+        Self {
+            new_artifact,
+            service: service.into(),
+            deadline_height,
+            seed: 0,
+        }
+    }
 }
 
 /// Confirmation that migration has ended for a validator.

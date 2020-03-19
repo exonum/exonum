@@ -696,6 +696,9 @@ pub struct MigrationInfoQuery {
     pub service: String,
     /// Deadline height.
     pub deadline_height: u64,
+    /// Seed to allow several migrations with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl TryFrom<MigrationInfoQuery> for MigrationRequest {
@@ -713,6 +716,7 @@ impl TryFrom<MigrationInfoQuery> for MigrationRequest {
             new_artifact,
             service: query.service,
             deadline_height,
+            seed: query.seed,
         };
 
         Ok(request)
@@ -728,6 +732,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
             new_artifact,
             service: request.service,
             deadline_height,
+            seed: request.seed,
         }
     }
 }

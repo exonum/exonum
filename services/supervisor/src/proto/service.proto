@@ -33,6 +33,8 @@ message DeployRequest {
   bytes spec = 2;
   // The height until which the deployment procedure should be completed.
   uint64 deadline_height = 3;
+  // Seed to allow several deployments with the same params.
+  uint64 seed = 4;
 }
 
 // Confirmation that artifact deployment has ended for a validator.
@@ -143,6 +145,8 @@ message MigrationRequest {
   string service = 2;
   // The height until which the migration procedure should be completed.
   uint64 deadline_height = 3;
+  // Seed to allow several migrations with the same params.
+  uint64 seed = 4;
 }
 
 // Confirmation that migration has ended for a validator.

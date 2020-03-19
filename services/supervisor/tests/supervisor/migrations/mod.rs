@@ -237,11 +237,11 @@ async fn migration() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV02.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV02.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -289,11 +289,11 @@ async fn migration_two_scripts_sequential() {
 
     // Request migration to 0.2.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV02.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV02.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -312,11 +312,11 @@ async fn migration_two_scripts_sequential() {
 
     // Request migration to 0.5.
     let deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV05.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV05.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -360,11 +360,11 @@ async fn migration_fail() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: FailingMigrationServiceV07.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        FailingMigrationServiceV07.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -389,11 +389,11 @@ async fn complex_migration() {
     // Request migration to 0.5.
     // This migration will require two migration requests.
     let deadline_height = DEADLINE_HEIGHT;
-    let mut request = MigrationRequest {
-        new_artifact: MigrationServiceV05.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let mut request = MigrationRequest::new(
+        MigrationServiceV05.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -443,11 +443,11 @@ async fn no_migration_support() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV05.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV05.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     // Despite the fact that migration should fail, the transaction with request
     // should be executed successfully.
@@ -481,11 +481,11 @@ async fn migration_consensus() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV02.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV02.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -540,11 +540,11 @@ async fn migration_no_consensus() {
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
     let new_artifact = MigrationServiceV02.artifact_id();
-    let request = MigrationRequest {
-        new_artifact: new_artifact.clone(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        new_artifact.clone(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
     send_migration_request(&mut testkit, request.clone()).await;
 
     // Check that the target artifact cannot be unloaded now.
@@ -619,11 +619,11 @@ async fn migration_hash_divergence() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV02.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV02.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -683,11 +683,11 @@ async fn fast_forward_migration() {
 
     // Request migration.
     let deadline_height = DEADLINE_HEIGHT;
-    let request = MigrationRequest {
-        new_artifact: MigrationServiceV01_1.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let request = MigrationRequest::new(
+        MigrationServiceV01_1.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
@@ -711,11 +711,11 @@ async fn mixed_migration() {
     // Request migration to 0.5.1.
     // This migration will require three migration requests.
     let deadline_height = DEADLINE_HEIGHT;
-    let mut request = MigrationRequest {
-        new_artifact: MigrationServiceV05_1.artifact_id(),
-        service: MigrationService::INSTANCE_NAME.into(),
+    let mut request = MigrationRequest::new(
+        MigrationServiceV05_1.artifact_id(),
+        MigrationService::INSTANCE_NAME,
         deadline_height,
-    };
+    );
 
     send_migration_request(&mut testkit, request.clone()).await;
 
