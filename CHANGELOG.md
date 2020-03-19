@@ -5,6 +5,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### New Features
+
+#### exonum-cli
+
+- Several constants in the `command` module became public. (#1821)
+
 ## 1.0.0-rc.2 - 2020-03-13
 
 ### Breaking changes
