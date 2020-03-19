@@ -388,19 +388,18 @@ async fn complex_migration() {
 
     // Request migration to 0.5.
     // This migration will require two migration requests.
-    let deadline_height = DEADLINE_HEIGHT;
+    let deadline_height = Height(100); // some large number; the migration will succeed before.
     let mut request = MigrationRequest::new(
         MigrationServiceV05.artifact_id(),
         MigrationService::INSTANCE_NAME,
         deadline_height,
     );
-
     send_migration_request(&mut testkit, request.clone()).await;
 
     // After the first migration step, version should be "0.2".
     wait_for_migration_success(
         &mut testkit,
-        deadline_height,
+        DEADLINE_HEIGHT,
         request.clone(),
         Version::new(0, 2, 0),
     )
@@ -408,19 +407,16 @@ async fn complex_migration() {
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
-
     migration_service::v02::verify_schema(prefixed);
 
     // Request the same migration.
-    let new_deadline_height = Height(DEADLINE_HEIGHT.0 * 2);
-    request.deadline_height = new_deadline_height;
-
+    request.seed += 1;
     send_migration_request(&mut testkit, request.clone()).await;
 
     // Now we finally should have version "0.5".
     wait_for_migration_success(
         &mut testkit,
-        new_deadline_height,
+        Height(DEADLINE_HEIGHT.0 * 2),
         request,
         Version::new(0, 5, 0),
     )
@@ -428,7 +424,6 @@ async fn complex_migration() {
 
     let snapshot = testkit.snapshot();
     let prefixed = Prefixed::new(MigrationService::INSTANCE_NAME, snapshot.as_ref());
-
     migration_service::v05::verify_schema(prefixed);
 }
 

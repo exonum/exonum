@@ -29,6 +29,8 @@ use exonum::{
 };
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
+use std::sync::atomic::Ordering;
+
 use exonum_supervisor::{
     api::DeployInfoQuery, AsyncEventState, DeployRequest, DeployResult, Supervisor,
     SupervisorInterface,
@@ -37,7 +39,14 @@ use exonum_supervisor::{
 use self::failing_runtime::{FailingRuntime, FailingRuntimeError};
 
 mod failing_runtime {
-    use std::str::FromStr;
+    use std::{
+        collections::HashSet,
+        str::FromStr,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
+    };
 
     use exonum::merkledb::Snapshot;
     use exonum::runtime::{
@@ -54,7 +63,8 @@ mod failing_runtime {
     pub(crate) struct FailingRuntime {
         // We have only one artifact that can be deployed,
         // and store its status as bool for simplicity.
-        artifact_deployed: bool,
+        deployed_artifacts: HashSet<ArtifactId>,
+        failure_switch: Arc<AtomicBool>,
     }
 
     pub(crate) const FAILING_RUNTIME_ID: u32 = 3;
@@ -62,6 +72,7 @@ mod failing_runtime {
     impl FailingRuntime {
         pub const ARTIFACT_SHOULD_BE_DEPLOYED: &'static str = "success";
         pub const ARTIFACT_SHOULD_FAIL: &'static str = "fail";
+        pub const CONTROLLED_ARTIFACT: &'static str = "controlled";
         pub const ARTIFACT_VERSION: &'static str = "0.1.0";
 
         pub fn artifact_should_fail() -> ArtifactId {
@@ -72,11 +83,19 @@ mod failing_runtime {
             Self::artifact(Self::ARTIFACT_SHOULD_BE_DEPLOYED)
         }
 
+        pub fn controlled_artifact() -> ArtifactId {
+            Self::artifact(Self::CONTROLLED_ARTIFACT)
+        }
+
         fn artifact(artifact_name: &str) -> ArtifactId {
             // Parsing from string is just easier and requires less imports.
             let artifact_id_str =
                 format!("{}:{}:{}", Self::ID, artifact_name, Self::ARTIFACT_VERSION);
             ArtifactId::from_str(&artifact_id_str).unwrap()
+        }
+
+        pub fn failure_switch(&self) -> Arc<AtomicBool> {
+            Arc::clone(&self.failure_switch)
         }
     }
 
@@ -92,29 +111,31 @@ mod failing_runtime {
 
     impl Runtime for FailingRuntime {
         fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> Receiver {
-            let result = {
-                if artifact.runtime_id != FAILING_RUNTIME_ID {
-                    Err(FailingRuntimeError::GenericError.into())
-                } else if artifact.name.as_str() == Self::ARTIFACT_SHOULD_FAIL {
+            let result = if artifact.runtime_id != FAILING_RUNTIME_ID {
+                Err(FailingRuntimeError::GenericError.into())
+            } else if artifact.name == Self::ARTIFACT_SHOULD_FAIL {
+                Err(FailingRuntimeError::PlannedError.into())
+            } else if artifact.name == Self::ARTIFACT_SHOULD_BE_DEPLOYED {
+                Ok(())
+            } else if artifact.name == Self::CONTROLLED_ARTIFACT {
+                let should_fail = self.failure_switch.load(Ordering::Acquire);
+                if should_fail {
                     Err(FailingRuntimeError::PlannedError.into())
-                } else if artifact.name.as_str() == Self::ARTIFACT_SHOULD_BE_DEPLOYED {
-                    Ok(())
                 } else {
-                    panic!("Attempt to deploy an artifact not expected by failing runtime")
+                    Ok(())
                 }
+            } else {
+                panic!("Attempt to deploy an artifact not expected by failing runtime");
             };
 
+            if result.is_ok() {
+                self.deployed_artifacts.insert(artifact);
+            }
             Receiver::with_result(result)
         }
 
         fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-            if id.runtime_id == FAILING_RUNTIME_ID
-                && id.name.as_str() == Self::ARTIFACT_SHOULD_BE_DEPLOYED
-            {
-                return self.artifact_deployed;
-            }
-            // All the other artifacts are not deployed in any sense.
-            false
+            self.deployed_artifacts.contains(id)
         }
 
         /// Initiates adding a new service and sets the counter value for this.
@@ -365,6 +386,43 @@ async fn deploy_failure_because_cannot_deploy() {
     let api = testkit.api();
     let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, fail_state(Height(2)));
+}
+
+/// Checks that the artifact deployment may be restarted with the same params and different seed.
+#[tokio::test]
+async fn deploy_success_after_failure() {
+    let rt = FailingRuntime::default();
+    let failure_switch = rt.failure_switch();
+    failure_switch.store(true, Ordering::Release);
+
+    let mut testkit = TestKitBuilder::validator()
+        .with(Supervisor::simple())
+        .with_additional_runtime(rt)
+        .build();
+    let api = testkit.api();
+
+    let mut deploy_request = DeployRequest::new(FailingRuntime::controlled_artifact(), Height(100));
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
+
+    // The first deploy should fail.
+    let state = get_deploy_status(&api, &deploy_request).await;
+    assert_deploy_state(state, AsyncEventState::Pending);
+    testkit.create_blocks_until(DEPLOY_HEIGHT.next());
+    let state = get_deploy_status(&api, &deploy_request).await;
+    assert_deploy_state(state, fail_state(Height(1)));
+
+    // The second deploy should succeed.
+    failure_switch.store(false, Ordering::Release);
+    deploy_request.seed += 1;
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
+    let block = testkit.create_block();
+    block[tx_hash].status().unwrap();
+
+    testkit.create_blocks_until(Height(10));
+    let state = get_deploy_status(&api, &deploy_request).await;
+    assert_deploy_state(state, AsyncEventState::Succeed);
 }
 
 /// This test has the same idea as `deploy_failure_because_not_confirmed`,
