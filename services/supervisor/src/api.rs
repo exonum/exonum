@@ -20,9 +20,9 @@
 //!
 //! - Public API:
 //!
-//!     - [Obtaining consensus configuration](#obtaining-consensus-configuration)
-//!     - [Obtaining pending configuration proposal](#obtaining-pending-configuration-proposal)
-//!     - [Obtaining deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
+//!     - [Obtain consensus configuration](#obtain-consensus-configuration)
+//!     - [Obtain pending configuration proposal](#obtain-pending-configuration-proposal)
+//!     - [Obtain deployed artifacts and services](#obtain-deployed-artifacts-and-services)
 //!
 //! - Private API:
 //!
@@ -31,13 +31,13 @@
 //!     - [Request to accept new configuration](#request-to-accept-new-configuration)
 //!     - [Vote for configuration proposal](#vote-for-configuration-proposal)
 //!     - [Obtain current configuration number](#obtain-current-configuration-number)
-//!     - [Obtain current supervisor operating mode](#obtain-current-supervisor-operating-mode)
-//!     - [Check the deployment status](#check-deployment-status)
-//!     - [Check the migration status](#check-migration-status)
+//!     - [Obtain supervisor configuration](#obtain-supervisor-configuration)
+//!     - [Check deployment status](#check-deployment-status)
+//!     - [Check migration status](#check-migration-status)
 //!
 //! # Public API
 //!
-//! ## Obtaining Consensus Configuration
+//! ## Obtain Consensus Configuration
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -71,7 +71,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Pending Configuration Proposal
+//! ## Obtain Pending Configuration Proposal
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -107,7 +107,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Deployed Artifacts And Services
+//! ## Obtain Deployed Artifacts And Services
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -458,7 +458,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Supervisor Configuration
+//! ## Obtain Supervisor Configuration
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -492,7 +492,7 @@
 //! # }
 //! ```
 //!
-//! ## Check the Deployment Status
+//! ## Check Deployment Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -553,7 +553,7 @@
 //! # }
 //! ```
 //!
-//! ## Check the Migration Status
+//! ## Check Migration Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
