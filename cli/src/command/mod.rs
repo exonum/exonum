@@ -16,7 +16,10 @@
 
 pub use self::{
     finalize::Finalize,
-    generate_config::GenerateConfig,
+    generate_config::{
+        GenerateConfig, DEFAULT_EXONUM_LISTEN_PORT, MASTER_KEY_FILE_NAME, PRIVATE_CONFIG_FILE_NAME,
+        PUBLIC_CONFIG_FILE_NAME,
+    },
     generate_template::GenerateTemplate,
     maintenance::{Maintenance, MaintenanceAction},
     run::{NodeRunConfig, Run},
