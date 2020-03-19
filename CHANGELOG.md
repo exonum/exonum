@@ -13,6 +13,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   after the launch. `artifacts-dir` parameter has been renamed to
   `blockchain-path`. Configuration files are now stored inside `config`
   subdirectory. (#1822)
+
 ### New Features
 
 #### exonum-cli
