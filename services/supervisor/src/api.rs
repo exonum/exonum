@@ -637,6 +637,9 @@ pub struct DeployInfoQuery {
     pub spec: String,
     /// Deadline height.
     pub deadline_height: u64,
+    /// Seed to distinguish among deploys with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl TryFrom<DeployInfoQuery> for DeployRequest {
@@ -659,6 +662,7 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
             artifact,
             spec,
             deadline_height,
+            seed: query.seed,
         };
 
         Ok(request)
@@ -675,6 +679,7 @@ impl From<DeployRequest> for DeployInfoQuery {
             artifact,
             spec,
             deadline_height,
+            seed: request.seed,
         }
     }
 }
@@ -792,10 +797,10 @@ impl PrivateApi {
     /// by the current node, and returns its hash.
     async fn deploy_artifact(
         state: ServiceApiState,
-        artifact: DeployRequest,
+        request: DeployRequest,
     ) -> Result<Hash, api::Error> {
         Self::broadcaster(&state)?
-            .request_artifact_deploy((), artifact)
+            .request_artifact_deploy((), request)
             .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
