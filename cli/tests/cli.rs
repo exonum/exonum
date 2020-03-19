@@ -190,14 +190,6 @@ fn is_run_node_config(result: StandardResult) -> bool {
     }
 }
 
-fn touch(path: impl AsRef<Path>) {
-    OpenOptions::new()
-        .create(true)
-        .write(true)
-        .open(path)
-        .unwrap();
-}
-
 fn copy_secured(from: impl AsRef<Path>, to: impl AsRef<Path>) -> anyhow::Result<()> {
     let mut source_file = fs::File::open(&from)?;
 
@@ -469,21 +461,14 @@ fn test_full_workflow() {
 fn test_run_dev() {
     let env = ConfigSpec::new_without_pass();
 
-    let artifacts_dir = env.output_dir().join("artifacts");
-    // Mocks existence of old DB files that are supposed to be cleaned up.
-    let db_dir = artifacts_dir.join("db");
-    fs::create_dir_all(&db_dir).unwrap();
-    let old_db_file = db_dir.join("content.foo");
-    touch(&old_db_file);
+    let blockchain_dir = env.output_dir().join("blockchain");
     // Checks run-dev command.
     let feedback = env
         .command("run-dev")
-        .with_arg("-a")
-        .with_arg(&artifacts_dir)
+        .with_arg("--blockchain-path")
+        .with_arg(&blockchain_dir)
         .run();
     assert!(is_run_node_config(feedback.unwrap()));
-    // Tests cleaning up.
-    assert!(!old_db_file.exists());
 }
 
 #[test]
