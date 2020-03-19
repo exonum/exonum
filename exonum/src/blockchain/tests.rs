@@ -31,7 +31,7 @@ use std::{
 use crate::{
     blockchain::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        BlockData, Blockchain, BlockchainMut, PersistentPool, Schema, TransactionCache,
+        BlockParams, Blockchain, BlockchainMut, PersistentPool, Schema, TransactionCache,
     },
     helpers::{Height, Round, ValidatorId},
     messages::{Precommit, Verified},
@@ -352,10 +352,9 @@ fn execute_transaction(
         .unwrap();
 
     let epoch = blockchain.as_ref().last_block().epoch().unwrap().next();
-    let block_data = BlockData::new(ValidatorId(0), epoch);
-    let (block_hash, patch) = blockchain.create_patch(&block_data, &[tx_hash], &());
+    let patch = blockchain.create_patch(BlockParams::new(ValidatorId(0), epoch, &[tx_hash]), &());
 
-    blockchain.commit(patch, block_hash, vec![]).unwrap();
+    blockchain.commit(patch, vec![]).unwrap();
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     let location = schema.transactions_locations().get(&tx_hash).unwrap();
@@ -746,9 +745,9 @@ fn blockchain_height() {
     assert_eq!(schema.next_height(), Height(1));
 
     // Create one block.
-    let block_data = BlockData::new(ValidatorId(0), Height(1));
-    let (_, patch) = blockchain.create_patch(&block_data, &[], &());
-    blockchain.merge(patch).unwrap();
+    let block_params = BlockParams::new(ValidatorId(0), Height(1), &[]);
+    let patch = blockchain.create_patch(block_params, &());
+    blockchain.merge(patch.into_inner()).unwrap();
 
     // Check that height is 1.
     let snapshot = blockchain.snapshot();
@@ -799,8 +798,10 @@ fn no_data_race_for_transaction_pool() {
     let mut tx_cache = BTreeMap::new();
     tx_cache.insert(tx_hash, tx.clone());
 
-    let block_data = BlockData::new(ValidatorId(0), Height(1));
-    let (block_hash, patch) = blockchain.create_patch(&block_data, &[tx_hash], &tx_cache);
+    let patch = blockchain.create_patch(
+        BlockParams::new(ValidatorId(0), Height(1), &[tx_hash]),
+        &tx_cache,
+    );
 
     let snapshot = blockchain.snapshot();
     let is_known = PersistentPool::new(&snapshot, &tx_cache).contains_transaction(tx_hash);
@@ -816,7 +817,7 @@ fn no_data_race_for_transaction_pool() {
     blockchain.merge(fork.into_patch()).unwrap();
 
     // Accept the block and check that the core schema remains logically consistent.
-    blockchain.commit(patch, block_hash, vec![]).unwrap();
+    blockchain.commit(patch, vec![]).unwrap();
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     assert_eq!(schema.transactions_len(), 1);
@@ -829,8 +830,8 @@ fn executing_block_skip() {
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
     );
-    let block_data = BlockData::new(ValidatorId(0), Height(1));
-    let (block_hash, patch) = blockchain.create_skip_patch(&block_data);
+    let block_params = BlockParams::skip(ValidatorId(0), Height(1));
+    let patch = blockchain.create_patch(block_params, &());
 
     let validator_keys = KeyPair::random();
     let precommit = Precommit {
@@ -838,7 +839,7 @@ fn executing_block_skip() {
         epoch: Height(1),
         round: Round(1),
         propose_hash: Hash::zero(),
-        block_hash,
+        block_hash: patch.block_hash(),
         time: Utc::now(),
     };
     let precommit = Verified::from_value(
@@ -846,9 +847,7 @@ fn executing_block_skip() {
         validator_keys.public_key(),
         validator_keys.secret_key(),
     );
-    blockchain
-        .commit_skip(patch, block_hash, vec![precommit])
-        .unwrap();
+    blockchain.commit(patch, vec![precommit]).unwrap();
 
     // Check that the blockchain height remained the same.
     let last_block = blockchain.as_ref().last_block();
@@ -871,8 +870,9 @@ fn clearing_block_skip() {
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
     );
-    let block_data = BlockData::new(ValidatorId(0), Height(1));
-    let (block_hash, patch) = blockchain.create_skip_patch(&block_data);
+    let block_params = BlockParams::skip(ValidatorId(0), Height(1));
+    let patch = blockchain.create_patch(block_params, &());
+    let block_hash = patch.block_hash();
 
     let validator_keys = KeyPair::random();
     let mut precommit_payload = Precommit {
@@ -888,13 +888,12 @@ fn clearing_block_skip() {
         validator_keys.public_key(),
         validator_keys.secret_key(),
     );
-    blockchain
-        .commit_skip(patch, block_hash, vec![precommit])
-        .unwrap();
+    blockchain.commit(patch, vec![precommit]).unwrap();
 
     // Commit a new block skip.
-    let block_data = BlockData::new(ValidatorId(0), Height(2));
-    let (new_block_hash, patch) = blockchain.create_skip_patch(&block_data);
+    let block_params = BlockParams::skip(ValidatorId(0), Height(2));
+    let patch = blockchain.create_patch(block_params, &());
+    let new_block_hash = patch.block_hash();
     assert_ne!(new_block_hash, block_hash);
     precommit_payload.block_hash = new_block_hash;
     precommit_payload.epoch = Height(2);
@@ -904,9 +903,7 @@ fn clearing_block_skip() {
         validator_keys.public_key(),
         validator_keys.secret_key(),
     );
-    blockchain
-        .commit_skip(patch, new_block_hash, vec![precommit])
-        .unwrap();
+    blockchain.commit(patch, vec![precommit]).unwrap();
 
     // Check that the new block skip is correct.
     let snapshot = blockchain.snapshot();

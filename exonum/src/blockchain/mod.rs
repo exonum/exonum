@@ -273,19 +273,104 @@ impl Blockchain {
 
 /// Block metadata provided to `BlockchainMut::create_patch` by the consensus algorithm.
 #[derive(Debug, Clone)]
-pub struct BlockData {
+pub struct BlockParams<'a> {
     proposer: ValidatorId,
     epoch: Height,
+    contents: BlockContents<'a>,
 }
 
-impl BlockData {
-    /// Creates a new `BlockData` instance.
-    ///
-    /// # Stability
-    ///
-    /// This method is considered unstable.
-    pub fn new(proposer: ValidatorId, epoch: Height) -> Self {
-        Self { proposer, epoch }
+impl<'a> BlockParams<'a> {
+    /// Creates a new `BlockParams` instance for a normal block.
+    pub fn new(proposer: ValidatorId, epoch: Height, tx_hashes: &'a [Hash]) -> Self {
+        Self {
+            proposer,
+            epoch,
+            contents: BlockContents::Transactions(tx_hashes),
+        }
+    }
+
+    /// Creates a new `BlockParams` instance for a block skip.
+    pub fn skip(proposer: ValidatorId, epoch: Height) -> Self {
+        Self {
+            proposer,
+            epoch,
+            contents: BlockContents::Skip,
+        }
+    }
+
+    /// Creates `BlockParams` with the provided contents.
+    pub fn with_contents(
+        contents: BlockContents<'a>,
+        proposer: ValidatorId,
+        epoch: Height,
+    ) -> Self {
+        Self {
+            proposer,
+            epoch,
+            contents,
+        }
+    }
+
+    fn for_genesis_block() -> Self {
+        Self {
+            proposer: ValidatorId(0),
+            epoch: Height(0),
+            contents: BlockContents::Transactions(&[]),
+        }
+    }
+}
+
+/// Contents of a block.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum BlockContents<'a> {
+    /// Contents of an ordinary block: a list of transactions to execute.
+    Transactions(&'a [Hash]),
+    /// Contents of a block skip: execute no transactions and no service hooks.
+    Skip,
+}
+
+/// Block kind, acting as an abridged version of `BlockContents`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub enum BlockKind {
+    /// Ordinary block with transactions.
+    Normal,
+    /// Block skip.
+    Skip,
+}
+
+/// Database patch corresponding to a block of transactions.
+///
+/// `BlockPatches` can be obtained by `BlockchainMut::create_patch` and are consumed
+/// by `BlockchainMut::commit`.
+#[derive(Debug)]
+pub struct BlockPatch {
+    inner: Patch,
+    block_hash: Hash,
+    kind: BlockKind,
+}
+
+impl BlockPatch {
+    /// Converts this patch into the raw DB patch.
+    pub fn into_inner(self) -> Patch {
+        self.inner
+    }
+
+    /// Returns the hash of the created block.
+    pub fn block_hash(&self) -> Hash {
+        self.block_hash
+    }
+
+    /// Returns the block kind.
+    pub fn kind(&self) -> BlockKind {
+        self.kind
+    }
+}
+
+impl AsRef<Patch> for BlockPatch {
+    fn as_ref(&self) -> &Patch {
+        &self.inner
     }
 }
 
@@ -394,8 +479,8 @@ impl BlockchainMut {
         let patch = self.dispatcher.commit_block(fork);
         self.merge(patch).unwrap();
 
-        let block_data = BlockData::new(ValidatorId(0), Height(0));
-        let (_, patch) = self.create_patch(&block_data, &[], &());
+        let block_params = BlockParams::for_genesis_block();
+        let BlockPatch { inner: patch, .. } = self.create_patch(block_params, &());
         // On the other hand, we need to notify runtimes *after* the block has been created.
         // Otherwise, benign operations (e.g., calling `height()` on the core schema) will panic.
         self.dispatcher.notify_runtimes_about_commit(&patch);
@@ -422,21 +507,22 @@ impl BlockchainMut {
     ///
     /// [transaction cache]: trait.TransactionCache.html
     /// [`PersistentPool`]: struct.PersistentPool.html
-    pub fn create_patch<C>(
-        &self,
-        block_data: &BlockData,
-        tx_hashes: &[Hash],
-        tx_cache: &C,
-    ) -> (Hash, Patch)
+    #[allow(clippy::needless_pass_by_value)]
+    // ^-- `BlockParams` is passed by value for future compatibility.
+    pub fn create_patch<C>(&self, block_params: BlockParams<'_>, tx_cache: &C) -> BlockPatch
     where
         C: TransactionCache + ?Sized,
     {
-        self.create_patch_inner(self.fork(), block_data, tx_hashes, tx_cache)
+        match block_params.contents {
+            BlockContents::Transactions(tx_hashes) => {
+                self.create_patch_inner(self.fork(), &block_params, tx_hashes, tx_cache)
+            }
+            BlockContents::Skip => self.create_skip_patch(&block_params),
+        }
     }
 
     /// Executes a new block skip and returns the corresponding patch.
-    #[doc(hidden)] // unstable
-    pub fn create_skip_patch(&self, block_data: &BlockData) -> (Hash, Patch) {
+    fn create_skip_patch(&self, block_data: &BlockParams<'_>) -> BlockPatch {
         let prev_block = self.inner.last_block();
 
         let mut pseudo_block = Block {
@@ -457,17 +543,22 @@ impl BlockchainMut {
         let fork = self.fork();
         let mut schema = Schema::new(&fork);
         schema.store_skip_block(pseudo_block);
-        (block_hash, fork.into_patch())
+
+        BlockPatch {
+            inner: fork.into_patch(),
+            block_hash,
+            kind: BlockKind::Skip,
+        }
     }
 
     /// Version of `create_patch` that supports user-provided fork. Used in tests.
     pub(crate) fn create_patch_inner<C>(
         &self,
         mut fork: Fork,
-        block_data: &BlockData,
+        block_data: &BlockParams<'_>,
         tx_hashes: &[Hash],
         tx_cache: &C,
-    ) -> (Hash, Patch)
+    ) -> BlockPatch
     where
         C: TransactionCache + ?Sized,
     {
@@ -507,13 +598,18 @@ impl BlockchainMut {
         schema.block_hashes_by_height().push(block_hash);
         // Save block.
         schema.blocks().put(&block_hash, block);
-        (block_hash, fork.into_patch())
+
+        BlockPatch {
+            inner: fork.into_patch(),
+            block_hash,
+            kind: BlockKind::Normal,
+        }
     }
 
     fn create_block_header(
         &self,
         fork: Fork,
-        block_data: &BlockData,
+        block_data: &BlockParams<'_>,
         height: Height,
         tx_hashes: &[Hash],
     ) -> (Patch, Block) {
@@ -571,38 +667,29 @@ impl BlockchainMut {
 
     /// Commits to the blockchain a new block with the indicated changes (patch),
     /// hash and `Precommit` messages. Runtimes are then notified about the committed block.
-    pub fn commit<I>(&mut self, patch: Patch, block_hash: Hash, precommits: I) -> anyhow::Result<()>
+    pub fn commit<I>(&mut self, patch: BlockPatch, precommits: I) -> anyhow::Result<()>
     where
         I: IntoIterator<Item = Verified<Precommit>>,
     {
-        let fork: Fork = patch.into();
+        let fork: Fork = patch.inner.into();
         let schema = Schema::new(&fork);
-        schema.precommits(&block_hash).extend(precommits);
-        let patch = self.dispatcher.commit_block_and_notify_runtimes(fork);
-        self.merge(patch)?;
+        schema.precommits(&patch.block_hash).extend(precommits);
 
-        // TODO: this makes `commit` non-atomic; can this be avoided? (ECR-4319)
-        let new_fork = self.fork();
-        Schema::new(&new_fork).update_transaction_count();
-        self.merge(new_fork.into_patch())?;
+        match patch.kind {
+            BlockKind::Skip => {
+                self.merge(fork.into_patch())?;
+            }
+            BlockKind::Normal => {
+                let patch = self.dispatcher.commit_block_and_notify_runtimes(fork);
+                self.merge(patch)?;
 
+                // TODO: this makes `commit` non-atomic; can this be avoided? (ECR-4319)
+                let new_fork = self.fork();
+                Schema::new(&new_fork).update_transaction_count();
+                self.merge(new_fork.into_patch())?;
+            }
+        }
         Ok(())
-    }
-
-    #[doc(hidden)]
-    pub fn commit_skip<I>(
-        &mut self,
-        patch: Patch,
-        block_hash: Hash,
-        precommits: I,
-    ) -> anyhow::Result<()>
-    where
-        I: IntoIterator<Item = Verified<Precommit>>,
-    {
-        let fork: Fork = patch.into();
-        let schema = Schema::new(&fork);
-        schema.precommits(&block_hash).extend(precommits);
-        self.merge(fork.into_patch()).map_err(Into::into)
     }
 
     /// Adds a transaction into pool of uncommitted transactions.

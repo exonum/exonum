@@ -17,11 +17,14 @@
 use anyhow::bail;
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{Block, ConsensusConfig, PersistentPool, TransactionCache, ValidatorKeys},
+    blockchain::{
+        Block, BlockKind, BlockPatch, ConsensusConfig, PersistentPool, TransactionCache,
+        ValidatorKeys,
+    },
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
-    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Patch, Snapshot},
+    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Snapshot},
     messages::{AnyTx, Precommit, Verified},
 };
 use log::{error, trace};
@@ -34,7 +37,7 @@ use std::{
 
 use crate::{
     connect_list::ConnectList,
-    consensus::{BlockKind, RoundAction},
+    consensus::RoundAction,
     events::network::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose, Status},
     Configuration, ConnectInfo, FlushPoolStrategy,
@@ -219,7 +222,7 @@ pub struct ProposeState {
 pub struct BlockState {
     hash: Hash,
     // Changes that should be made for block committing.
-    patch: Option<Patch>,
+    patch: Option<BlockPatch>,
     txs: Vec<Hash>,
     proposer_id: ValidatorId,
     kind: BlockKind,
@@ -375,7 +378,7 @@ impl RequestState {
 
 impl ProposeState {
     /// Returns kind of the block proposed by this `Propose` message.
-    pub(crate) fn block_kind(&self) -> BlockKind {
+    pub fn block_kind(&self) -> BlockKind {
         if self.propose.payload().skip {
             BlockKind::Skip
         } else {
@@ -426,7 +429,7 @@ impl ProposeState {
 
 impl BlockState {
     /// Returns block kind.
-    pub(crate) fn kind(&self) -> BlockKind {
+    pub fn kind(&self) -> BlockKind {
         self.kind
     }
 
@@ -436,7 +439,7 @@ impl BlockState {
     }
 
     /// Returns the changes that should be made for block committing.
-    pub fn patch(&mut self) -> Patch {
+    pub fn patch(&mut self) -> BlockPatch {
         self.patch.take().expect("Patch is already committed")
     }
 
@@ -1162,35 +1165,19 @@ impl State {
     /// Adds block to the collection of known blocks.
     pub(super) fn add_block(
         &mut self,
-        block_hash: Hash,
-        patch: Patch,
+        patch: BlockPatch,
         txs: Vec<Hash>,
         proposer_id: ValidatorId,
         epoch: Height,
     ) {
+        let block_hash = patch.block_hash();
+        let kind = patch.kind();
         self.blocks.entry(block_hash).or_insert(BlockState {
             hash: block_hash,
             patch: Some(patch),
             txs,
             proposer_id,
-            kind: BlockKind::Normal,
-            epoch,
-        });
-    }
-
-    pub(super) fn add_block_skip(
-        &mut self,
-        block_hash: Hash,
-        patch: Patch,
-        proposer_id: ValidatorId,
-        epoch: Height,
-    ) {
-        self.blocks.entry(block_hash).or_insert(BlockState {
-            hash: block_hash,
-            patch: Some(patch),
-            txs: vec![],
-            proposer_id,
-            kind: BlockKind::Skip,
+            kind,
             epoch,
         });
     }

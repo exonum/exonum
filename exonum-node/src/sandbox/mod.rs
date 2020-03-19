@@ -22,7 +22,7 @@ use bit_vec::BitVec;
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        AdditionalHeaders, Block, BlockData, BlockProof, Blockchain, BlockchainBuilder,
+        AdditionalHeaders, Block, BlockParams, BlockProof, Blockchain, BlockchainBuilder,
         BlockchainMut, ConsensusConfig, Epoch, PersistentPool, ProposerId, Schema, SkipFlag,
         TransactionCache, ValidatorKeys,
     },
@@ -749,8 +749,8 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let block_data = BlockData::new(ValidatorId(0), Height(0));
-        let (_, patch) = blockchain.create_patch(&block_data, &hashes, &());
+        let block_data = BlockParams::new(ValidatorId(0), Height(0), &hashes);
+        let patch = blockchain.create_patch(block_data, &());
 
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
@@ -759,7 +759,7 @@ impl Sandbox {
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
-        let block = (&patch as &dyn Snapshot).for_core().last_block();
+        let block = (patch.as_ref() as &dyn Snapshot).for_core().last_block();
         (block.state_hash, block.error_hash)
     }
 

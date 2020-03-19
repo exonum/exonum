@@ -15,11 +15,12 @@
 use anyhow::{bail, format_err};
 use exonum::{
     blockchain::{
-        BlockData, Blockchain, BlockchainMut, PersistentPool, ProposerId, Schema, TransactionCache,
+        BlockContents, BlockKind, BlockParams, BlockPatch, Blockchain, BlockchainMut,
+        PersistentPool, ProposerId, Schema, TransactionCache,
     },
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
-    merkledb::{BinaryValue, Fork, ObjectHash, Patch},
+    merkledb::{BinaryValue, Fork, ObjectHash},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
     runtime::ExecutionError,
 };
@@ -94,12 +95,6 @@ impl fmt::Display for HandleTxError {
             Self::Invalid(e) => write!(formatter, "Transaction failed preliminary checks: {}", e),
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum BlockKind {
-    Normal,
-    Skip,
 }
 
 // TODO Reduce view invocations. (ECR-171)
@@ -472,11 +467,13 @@ impl NodeHandler {
                 .epoch()
                 .expect("`epoch` header should be checked in `validate_block_response`");
 
-            let (computed_block_hash, patch) = if header.is_skip() {
-                self.create_block_skip(proposer_id, epoch)
+            let block_contents = if header.is_skip() {
+                BlockContents::Skip
             } else {
-                self.create_block(proposer_id, epoch, &transactions)
+                BlockContents::Transactions(&transactions)
             };
+            let patch = self.create_block(proposer_id, epoch, block_contents);
+            let computed_block_hash = patch.block_hash();
 
             // Verify `block_hash`.
             assert_eq!(
@@ -486,13 +483,8 @@ impl NodeHandler {
                 header
             );
 
-            if header.is_skip() {
-                self.state
-                    .add_block_skip(block_hash, patch, proposer_id, epoch);
-            } else {
-                self.state
-                    .add_block(block_hash, patch, transactions, proposer_id, epoch);
-            }
+            self.state
+                .add_block(patch, transactions, proposer_id, epoch);
         }
 
         self.commit(block_hash, precommits.into_iter(), None);
@@ -733,12 +725,12 @@ impl NodeHandler {
             "Cannot clear consensus messages",
         );
 
+        self.blockchain
+            .commit(block_state.patch(), precommits)
+            .expect("Cannot commit block");
+
         match block_kind {
             BlockKind::Normal => {
-                // Commit block patch to the storage.
-                self.blockchain
-                    .commit(block_state.patch(), block_hash, precommits)
-                    .expect("Cannot commit block");
                 // Update node state.
                 self.state
                     .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
@@ -756,13 +748,12 @@ impl NodeHandler {
             }
 
             BlockKind::Skip => {
-                self.blockchain
-                    .commit_skip(block_state.patch(), block_hash, precommits)
-                    .expect("Cannot commit block skip");
                 // Update state to the new epoch (but not a new height).
                 self.state
                     .new_epoch(block_epoch.next(), self.system_state.current_time());
             }
+
+            _ => unreachable!("No other block kinds are supported"),
         }
 
         let snapshot = self.blockchain.snapshot();
@@ -1132,16 +1123,11 @@ impl NodeHandler {
         &mut self,
         proposer_id: ValidatorId,
         epoch: Height,
-        tx_hashes: &[Hash],
-    ) -> (Hash, Patch) {
-        let block_data = BlockData::new(proposer_id, epoch);
+        contents: BlockContents<'_>,
+    ) -> BlockPatch {
+        let block_params = BlockParams::with_contents(contents, proposer_id, epoch);
         self.blockchain
-            .create_patch(&block_data, tx_hashes, self.state.tx_cache())
-    }
-
-    fn create_block_skip(&mut self, proposer_id: ValidatorId, epoch: Height) -> (Hash, Patch) {
-        let block_data = BlockData::new(proposer_id, epoch);
-        self.blockchain.create_skip_patch(&block_data)
+            .create_patch(block_params, self.state.tx_cache())
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
@@ -1155,30 +1141,19 @@ impl NodeHandler {
         }
 
         let propose = propose_state.message().payload().to_owned();
-        let block_hash = match block_kind {
-            BlockKind::Normal => {
-                let (block_hash, patch) = self.create_block(
-                    propose.validator,
-                    propose.epoch,
-                    propose.transactions.as_slice(),
-                );
-                self.state.add_block(
-                    block_hash,
-                    patch,
-                    propose.transactions,
-                    propose.validator,
-                    propose.epoch,
-                );
-                block_hash
-            }
-
-            BlockKind::Skip => {
-                let (block_hash, patch) = self.create_block_skip(propose.validator, propose.epoch);
-                self.state
-                    .add_block_skip(block_hash, patch, propose.validator, propose.epoch);
-                block_hash
-            }
+        let block_contents = match block_kind {
+            BlockKind::Normal => BlockContents::Transactions(&propose.transactions),
+            BlockKind::Skip => BlockContents::Skip,
+            _ => unreachable!("No other block kinds are supported"),
         };
+        let patch = self.create_block(propose.validator, propose.epoch, block_contents);
+        let block_hash = patch.block_hash();
+        self.state.add_block(
+            patch,
+            propose.transactions,
+            propose.validator,
+            propose.epoch,
+        );
         self.state
             .propose_mut(propose_hash)
             .unwrap()

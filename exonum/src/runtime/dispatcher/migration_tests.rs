@@ -24,7 +24,7 @@ use std::time::Duration;
 
 use super::*;
 use crate::{
-    blockchain::{ApiSender, Block, BlockData, BlockchainMut},
+    blockchain::{ApiSender, Block, BlockParams, BlockchainMut},
     helpers::{Height, ValidatorId},
     runtime::{
         migrations::{InitMigrationError, MigrationError},
@@ -285,11 +285,11 @@ impl Rig {
     }
 
     fn create_block(&mut self, fork: Fork) -> Block {
-        let block_data = BlockData::new(ValidatorId(0), Height(100));
-        let (block_hash, patch) = self
+        let block_params = BlockParams::new(ValidatorId(0), Height(100), &[]);
+        let patch = self
             .blockchain
-            .create_patch_inner(fork, &block_data, &[], &());
-        self.blockchain.commit(patch, block_hash, vec![]).unwrap();
+            .create_patch_inner(fork, &block_params, &[], &());
+        self.blockchain.commit(patch, vec![]).unwrap();
         self.blockchain.as_ref().last_block()
     }
 

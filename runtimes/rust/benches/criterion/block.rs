@@ -41,12 +41,12 @@ use criterion::{Criterion, ParameterizedBenchmark, Throughput};
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
-        ApiSender, BlockData, Blockchain, BlockchainBuilder, BlockchainMut, ConsensusConfig,
-        ValidatorKeys,
+        ApiSender, BlockParams, BlockPatch, Blockchain, BlockchainBuilder, BlockchainMut,
+        ConsensusConfig, ValidatorKeys,
     },
     crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
-    merkledb::{Database, DbOptions, ObjectHash, Patch, RocksDB},
+    merkledb::{Database, DbOptions, ObjectHash, RocksDB},
     messages::{AnyTx, Verified},
     runtime::SnapshotExt,
 };
@@ -123,9 +123,9 @@ fn create_consensus_config_and_blockchain_base(
     (consensus_config, blockchain_base)
 }
 
-fn execute_block(blockchain: &BlockchainMut, txs: &[Hash]) -> (Hash, Patch) {
-    let block_data = BlockData::new(ValidatorId(0), Height(100));
-    blockchain.create_patch(&block_data, txs, &())
+fn execute_block(blockchain: &BlockchainMut, txs: &[Hash]) -> BlockPatch {
+    let block_params = BlockParams::new(ValidatorId(0), Height(100), txs);
+    blockchain.create_patch(block_params, &())
 }
 
 mod timestamping {
@@ -530,10 +530,10 @@ fn prepare_blockchain(
         let tx_hashes = prepare_txs(blockchain, transactions[start..end].to_vec());
         assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
-        let (block_hash, patch) = execute_block(blockchain, &tx_hashes);
+        let patch = execute_block(blockchain, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
-        blockchain.commit(patch, block_hash, iter::empty()).unwrap();
+        blockchain.commit(patch, iter::empty()).unwrap();
     }
 }
 
