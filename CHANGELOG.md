@@ -14,6 +14,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `POST` endpoints now expect JSON-encoded input rather than
   hex-encoded Protobuf. (#1823)
 
+- `supervisor_name` method was removed. Use `Supervisor::NAME` instead. (#1823)
+
 ### New Features
 
 #### exonum-cli

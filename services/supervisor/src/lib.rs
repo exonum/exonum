@@ -186,11 +186,6 @@ mod proto_structures;
 mod schema;
 mod transactions;
 
-/// Returns the `Supervisor` entity name.
-pub const fn supervisor_name() -> &'static str {
-    Supervisor::NAME
-}
-
 /// Error message emitted when the `Supervisor` is installed as a non-privileged service.
 const NOT_SUPERVISOR_MSG: &str = "`Supervisor` is installed as a non-privileged service. \
                                   For correct operation, `Supervisor` needs to have numeric ID 0.";
