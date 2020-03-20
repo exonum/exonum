@@ -56,7 +56,7 @@ define_names!(
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
-    SKIP_BLOCK => "skip_block";
+    BLOCK_SKIP => "block_skip";
     PRECOMMITS => "precommits";
     CONSENSUS_CONFIG => "consensus_config";
 );
@@ -211,18 +211,22 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns an entry storing the latest skip block for the node.
-    fn skip_block_entry(&self) -> Entry<T::Base, Block> {
-        self.access.get_entry(SKIP_BLOCK)
+    fn block_skip_entry(&self) -> Entry<T::Base, Block> {
+        self.access.get_entry(BLOCK_SKIP)
     }
 
-    #[doc(hidden)]
-    pub fn skip_block(&self) -> Option<Block> {
-        self.skip_block_entry().get()
+    /// Returns the recorded [block skip], if any.
+    ///
+    /// [block skip]: enum.BlockContents#variant.Skip
+    pub fn block_skip(&self) -> Option<Block> {
+        self.block_skip_entry().get()
     }
 
-    #[doc(hidden)]
-    pub fn skip_block_and_precommits(&self) -> Option<BlockProof> {
-        let block = self.skip_block_entry().get()?;
+    /// Returns the recorded [block skip] together with authenticating information.
+    ///
+    /// [block skip]: enum.BlockContents#variant.Skip
+    pub fn block_skip_and_precommits(&self) -> Option<BlockProof> {
+        let block = self.block_skip_entry().get()?;
         let precommits = self.precommits(&block.object_hash()).iter().collect();
         Some(BlockProof::new(block, precommits))
     }
@@ -377,17 +381,17 @@ where
         self.call_errors_aux(height).put(&call, aux);
     }
 
-    pub(super) fn clear_skip_block(&mut self) {
-        if let Some(pseudo_block) = self.skip_block_entry().take() {
-            let block_hash = pseudo_block.object_hash();
+    pub(super) fn clear_block_skip(&mut self) {
+        if let Some(block_skip) = self.block_skip_entry().take() {
+            let block_hash = block_skip.object_hash();
             self.precommits(&block_hash).clear();
         }
     }
 
-    pub(super) fn store_skip_block(&mut self, pseudo_block: Block) {
+    pub(super) fn store_block_skip(&mut self, block_skip: Block) {
         // TODO: maybe it makes sense to use a circular buffer here.
-        self.clear_skip_block();
-        self.skip_block_entry().set(pseudo_block);
+        self.clear_block_skip();
+        self.block_skip_entry().set(block_skip);
     }
 }
 

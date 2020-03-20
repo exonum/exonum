@@ -1163,7 +1163,7 @@ fn send_skip_request(block_height: Height, epoch: Height) -> TimestampingSandbox
 fn handle_skip_request() {
     let sandbox = send_skip_request(Height(1), Height(3));
 
-    let proof = sandbox.skip_block_and_precommits().unwrap();
+    let proof = sandbox.block_skip_and_precommits().unwrap();
     let response = Sandbox::create_block_response(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(ValidatorId(1)),

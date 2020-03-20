@@ -197,7 +197,7 @@ impl NodeHandler {
             // Request a block with the larger height.
             self.request(RequestData::Block(block_height), peer);
         } else if peer_state.epoch > epoch {
-            // Request a block with the larger height or a pseudo-block with the larger epoch.
+            // Request a block with the larger height or a block skip with a larger epoch.
             let data = RequestData::BlockOrEpoch {
                 block_height,
                 epoch,

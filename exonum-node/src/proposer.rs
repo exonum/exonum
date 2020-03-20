@@ -14,12 +14,41 @@
 
 //! Utilities allowing to customize proposal creation logic for an Exonum node.
 //!
-//! # Stability and safety
+//! To customize block proposals, you should supply a [`ProposeBlock`] implementation
+//! to the [`NodeBuilder`]:
+//!
+//! ```
+//! # use exonum::{keys::Keys, merkledb::TemporaryDB};
+//! # use exonum_node::{generate_testnet_config, NodeBuilder, NodeConfig};
+//! use exonum_node::proposer::SkipEmptyBlocks;
+//!
+//! # async fn not_run() -> anyhow::Result<()> {
+//! # let (node_config, keys) = generate_testnet_config(1, 2_000).pop().unwrap();
+//! let node_config: NodeConfig = // ...
+//! #    node_config;
+//! let node_keys: Keys = // ...
+//! #    keys;
+//! let database = TemporaryDB::new();
+//! let node = NodeBuilder::new(database, node_config, node_keys)
+//!     .with_block_proposer(SkipEmptyBlocks)
+//!     // specify other node params...
+//!     .build();
+//! node.run().await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! [`ProposeBlock`]: trait.ProposeBlock.html
+//! [`NodeBuilder`]: ../struct.NodeBuilder.html#method.with_block_proposer
+//!
+//! # Stability
 //!
 //! The contents of this module is considered unstable and experimental. It may change in any way
 //! between `exonum-node` releases.
 //!
-//! Using custom proposer logic can lead to consensus hang-up and other adverse effects.
+//! # Safety
+//!
+//! **USING CUSTOM PROPOSER LOGIC CAN LEAD TO CONSENSUS HANG-UP AND OTHER ADVERSE EFFECTS.**
 //! Consensus safety and liveness properties proven in the [Exonum white paper]
 //! **DO NOT HOLD** for arbitrary proposal creation logic.
 //!
@@ -81,6 +110,9 @@ impl<'a> ProposeParams<'a> {
 }
 
 /// Propose template returned by the proposal creator.
+///
+/// This type is effectively the owned version of `BlockContents` from `exonum::blockchain`.
+/// See its documentation for more details about supported block types.
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum ProposeTemplate {
@@ -90,7 +122,8 @@ pub enum ProposeTemplate {
     ///
     /// - Transactions with the specified hashes are known to the node
     /// - Transaction hashes do not repeat
-    /// - The amount of hashes is not higher than the constraints in the `ConsensusConfig`.
+    /// - The amount of hashes is not higher than the constraints in the `ConsensusConfig`
+    /// - Transactions with the specified hashes are correct (i.e., pass `Blockchain::check_tx`).
     Ordinary {
         /// Hashes of the transactions in the proposal.
         tx_hashes: Vec<Hash>,
@@ -110,6 +143,23 @@ impl ProposeTemplate {
 }
 
 /// Proposal creation logic.
+///
+/// An implementation of this trait can be supplied to a node to change how the node will
+/// form block proposals. Some use cases for this functionality are as follows:
+///
+/// - Whitelist or blacklist public keys authorizing transactions
+/// - Whitelist, blacklist, otherwise filter and/or prioritize transactions by the called
+///   service + method combination. As an example, this may be used to implement
+///   "crypto-economics", in which all transactions need to pay a fee, solve a proof-of-work, etc.
+/// - Restrict the number of transactions and their size in a more flexible manner than
+///   supported on the consensus level
+/// - Skip block creation if certain conditions are met by returning [`ProposeTemplate::Skip`].
+///
+/// The block proposer is set for each node individually and does not necessarily need to agree
+/// among nodes. At the same time, some proposer implementations (such as whitelisting or blacklisting)
+/// do not work effectively unless adopted by all validator nodes.
+///
+/// [`ProposeTemplate::Skip`]: enum.ProposeTemplate.html#variant.Skip
 pub trait ProposeBlock: Send {
     /// Creates a block proposal based on the transaction pool and block creation params.
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate;

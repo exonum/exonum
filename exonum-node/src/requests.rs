@@ -168,7 +168,7 @@ impl NodeHandler {
         if height == current_height {
             if let Some(epoch) = msg.payload().epoch() {
                 if self.state.epoch() >= epoch {
-                    if let Some(proof) = schema.skip_block_and_precommits() {
+                    if let Some(proof) = schema.block_skip_and_precommits() {
                         proof_and_transactions = Some((proof, vec![]));
                     }
                 }

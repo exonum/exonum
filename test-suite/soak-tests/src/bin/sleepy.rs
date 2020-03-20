@@ -39,7 +39,7 @@ use exonum_soak_tests::{
 fn get_epoch(blockchain: &Blockchain) -> Height {
     let snapshot = blockchain.snapshot();
     let schema = snapshot.for_core();
-    let last_block = schema.skip_block().unwrap_or_else(|| schema.last_block());
+    let last_block = schema.block_skip().unwrap_or_else(|| schema.last_block());
     last_block
         .epoch()
         .expect("No epoch recorded in a saved block")

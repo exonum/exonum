@@ -529,7 +529,7 @@ impl NodeHandler {
         let snapshot = blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let last_block = schema.last_block();
-        let last_block_skip = schema.skip_block();
+        let last_block_skip = schema.block_skip();
         let consensus_config = schema.consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
@@ -1071,7 +1071,13 @@ impl NodeBuilder {
     }
 
     /// Sets custom `Propose` creation logic for the node.
-    #[doc(hidden)] // unstable
+    ///
+    /// # Stability and safety
+    ///
+    /// Using a custom proposer **CAN LEAD TO CONSENSUS FAILURE.** See the [`proposer`] module docs
+    /// for more details.
+    ///
+    /// [`proposer`]: proposer/index.html
     pub fn with_block_proposer<T: ProposeBlock + 'static>(mut self, proposer: T) -> Self {
         self.block_proposer = Box::new(proposer);
         self

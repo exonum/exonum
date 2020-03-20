@@ -64,8 +64,9 @@ impl BlockHeaderKey for Epoch {
     type Value = Height;
 }
 
-/// Flag the presence of which indicates that a block is formed as a result of skipping
-/// ordinary block creation.
+/// Flag indicating a [block skip]. This flag is not set for normal blocks.
+///
+/// [block skip]: enum.BlockContents.html#variant.Skip
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct SkipFlag(());
 

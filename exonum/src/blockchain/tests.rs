@@ -856,7 +856,7 @@ fn executing_block_skip() {
 
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
-    let block_proof = schema.skip_block_and_precommits().unwrap();
+    let block_proof = schema.block_skip_and_precommits().unwrap();
     assert_eq!(block_proof.block.height, Height(0));
     assert_eq!(block_proof.block.prev_hash, last_block.object_hash());
     assert_eq!(block_proof.block.epoch(), Some(Height(1)));
@@ -908,7 +908,7 @@ fn clearing_block_skip() {
     // Check that the new block skip is correct.
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
-    let block_proof = schema.skip_block_and_precommits().unwrap();
+    let block_proof = schema.block_skip_and_precommits().unwrap();
     assert_eq!(block_proof.block.height, Height(0));
     assert_eq!(block_proof.block.epoch(), Some(Height(2)));
     assert_eq!(block_proof.precommits.len(), 1);
@@ -927,6 +927,6 @@ fn clearing_block_skip() {
     // Check that the block skip is now erased together with its precommits.
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
-    assert!(schema.skip_block().is_none());
+    assert!(schema.block_skip().is_none());
     assert!(schema.precommits(&new_block_hash).is_empty());
 }
