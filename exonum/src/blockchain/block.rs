@@ -422,7 +422,7 @@ impl IndexProof {
 /// [transaction]: ../runtime/struct.AnyTx.html
 /// [core schema]: struct.Schema.html
 /// [`ExecutionError`]: ../runtime/struct.ExecutionError.html
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, BinaryValue, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct CallProof {
     /// Proof of authenticity for the block header.
@@ -439,6 +439,34 @@ pub struct CallProof {
     /// If the call is successful, the error description should be `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_description: Option<String>,
+}
+
+impl ProtobufConvert for CallProof {
+    type ProtoStruct = schema::proofs::CallProof;
+
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut inner = Self::ProtoStruct::default();
+        inner.set_block_proof(self.block_proof.to_pb());
+        inner.set_call_proof(self.call_proof.to_pb());
+        inner.set_error_description(self.error_description.clone().unwrap_or_default());
+        inner
+    }
+
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, anyhow::Error> {
+        let block_proof = BlockProof::from_pb(pb.take_block_proof())?;
+        let call_proof = MapProof::from_pb(pb.take_call_proof())?;
+        let error_description = pb.get_error_description();
+        let error_description = if error_description.is_empty() {
+            None
+        } else {
+            Some(error_description.to_owned())
+        };
+        Ok(Self {
+            block_proof,
+            call_proof,
+            error_description,
+        })
+    }
 }
 
 impl CallProof {

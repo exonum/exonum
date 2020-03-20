@@ -16,13 +16,6 @@ syntax = "proto3";
 
 package exonum.runtime._details;
 
-// Additional details about an `ExecutionError` that do not influence
-// blockchain state hash.
-message ExecutionErrorAux {
-  // Human-readable error description.
-  string description = 1;
-}
-
 // Information about a modified service instance. This type is considered
 // an implementation detail of the core.
 message ModifiedInstanceInfo {
