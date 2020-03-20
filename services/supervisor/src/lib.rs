@@ -45,7 +45,9 @@
 //! Key point here is that user **should not** send transactions to the supervisor by himself.
 //!
 //! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
-//! of the nodes should receive a [`DeployRequest`] message through API.
+//! of the nodes should receive a [`DeployRequest`] message through API. You may use the `seed`
+//! field of `DeployRequest` to retry the request with the same params. To check the current
+//! status of a request, you may use the `deploy-status` endpoint.
 //!
 //! To request a config change, one node should submit a [`ConfigPropose`] message through API.
 //! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
@@ -61,7 +63,8 @@
 //! Supervisor service provides a functionality to perform data migrations for services.
 //! Request for migration is sent through private REST API and contains the name of instance
 //! to migrate, end artifact version to achieve after migration, and deadline height until which
-//! migration should be completed.
+//! migration should be completed. Similar to artifact deployment, you may check the request
+//! status via the `migration-status` endpoint.
 //!
 //! ### Requirements
 //!
@@ -89,8 +92,8 @@
 //! lack of report at the deadline height), migration is considered failed and rolled back.
 //!
 //! After fixing the reason for migration failure, the migration attempt can be performed once again.
-//! It will require a different deadline height though, since `MigrationRequest` objects are considered
-//! unique and supervisor won't attempt to perform the same `MigrationRequest` again.
+//! It will require a different deadline height or a different seed, since `MigrationRequest` objects
+//! are considered unique and supervisor won't attempt to perform the same `MigrationRequest` again.
 //!
 //! ### Complex Migrations
 //!
@@ -99,7 +102,7 @@
 //! and 0.2 -> 0.3), supervisor will execute one migration script at the time.
 //!
 //! After the first migration request to version 0.3, migration will be performed for version 0.2,
-//! and you need to create the same migration request with a different deadline height.
+//! and you need to create the same migration request with a different deadline height or seed.
 //! After the second migration request, the version will be updated to 0.3.
 //!
 //! To put it simply, you may need to perform the same migration request several times until every
