@@ -95,7 +95,7 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
     let dir_path = dir.path().as_os_str();
     let args = vec![
         "run-dev".as_ref(),
-        "-a".as_ref(),
+        "--blockchain-path".as_ref(),
         dir_path,
         "--public-api-address".as_ref(),
         public_addr.as_ref(),
