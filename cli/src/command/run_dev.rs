@@ -40,7 +40,7 @@ pub struct RunDev {
     /// are located in <blockchain_path>/config directory. Existing files and directories are
     /// reused. To generate new node configuration and start a new blockchain, the user must
     /// use --clean flag or specify an another directory.
-    #[structopt(long)]
+    #[structopt(long, short = "-p")]
     pub blockchain_path: PathBuf,
     /// Listen address for node public API.
     ///
