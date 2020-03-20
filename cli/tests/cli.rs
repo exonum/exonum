@@ -470,6 +470,8 @@ fn test_run_dev() {
     let env = ConfigSpec::new_without_pass();
 
     let blockchain_dir = env.output_dir().join("blockchain");
+
+    let old_db_file = mock_old_db_files(&blockchain_dir);
     // Checks run-dev command.
     let feedback = env
         .command("run-dev")
@@ -477,6 +479,8 @@ fn test_run_dev() {
         .with_arg(&blockchain_dir)
         .run();
     assert!(is_run_node_config(feedback.unwrap()));
+    // By default, no cleanup is done
+    assert!(old_db_file.exists());
 }
 
 #[test]
@@ -484,11 +488,8 @@ fn test_run_dev_with_cleanup() {
     let env = ConfigSpec::new_without_pass();
 
     let blockchain_dir = env.output_dir().join("blockchain");
-    // Mocks existence of old DB files that are supposed to be cleaned up.
-    let db_dir = blockchain_dir.join("db");
-    fs::create_dir_all(&db_dir).unwrap();
-    let old_db_file = db_dir.join("content.foo");
-    touch(&old_db_file);
+
+    let old_db_file = mock_old_db_files(&blockchain_dir);
     // Checks run-dev command.
     let feedback = env
         .command("run-dev")
@@ -576,6 +577,14 @@ fn different_supervisor_modes_in_public_configs() -> anyhow::Result<()> {
         .to_string()
         .contains("Found public configs with different general configuration."));
     Ok(())
+}
+
+fn mock_old_db_files(blockchain_dir: &PathBuf) -> PathBuf {
+    let db_dir = blockchain_dir.join("db");
+    fs::create_dir_all(&db_dir).unwrap();
+    let old_db_file = db_dir.join("content.foo");
+    touch(&old_db_file);
+    old_db_file
 }
 
 fn public_config(supervisor_mode: SupervisorMode) -> NodePublicConfig {
