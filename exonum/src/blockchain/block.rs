@@ -30,7 +30,6 @@ use crate::{
     proto::schema,
     runtime::{ExecutionError, ExecutionErrorAux},
 };
-use protobuf::well_known_types::Empty;
 
 /// Trait that represents a key in block header entry map. Provides
 /// a mapping between `NAME` of the entry and its value.
