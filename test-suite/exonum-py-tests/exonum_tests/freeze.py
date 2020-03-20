@@ -37,7 +37,7 @@ class FreezeTests(unittest.TestCase):
 
         # Freeze the service
         instances = {"crypto": {"artifact": "cryptocurrency", "action": "freeze"}}
-        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, deploy=False)
+        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, artifact_action="none")
 
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
         with Launcher(cryptocurrency_advanced_config) as launcher:
@@ -79,7 +79,7 @@ class FreezeTests(unittest.TestCase):
 
         # Freeze the service
         instances = {"crypto": {"artifact": "cryptocurrency", "action": "freeze"}}
-        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, deploy=False)
+        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, artifact_action="none")
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
         with Launcher(cryptocurrency_advanced_config) as launcher:
             launcher.deploy_all()
@@ -89,7 +89,7 @@ class FreezeTests(unittest.TestCase):
 
         # Resume the service
         instances = {"crypto": {"artifact": "cryptocurrency", "action": "resume"}}
-        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, deploy=False)
+        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances, artifact_action="none")
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
         with Launcher(cryptocurrency_advanced_config) as launcher:
             launcher.deploy_all()
