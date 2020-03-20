@@ -15,12 +15,12 @@
 //! Standard Exonum CLI command used to run the node with default parameters
 //! for developing purposes.
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
-use std::{net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{fs, net::SocketAddr, path::PathBuf, str::FromStr};
 
 use crate::command::{
     finalize::Finalize,
@@ -39,7 +39,7 @@ pub struct RunDev {
     /// Database is located in <blockchain_path>/db directory, node configuration files
     /// are located in <blockchain_path>/config directory. Existing files and directories are
     /// reused. To generate new node configuration and start a new blockchain, the user must
-    /// manually delete existing <blockchain_path> directory or specify a new one.
+    /// use --clean flag or specify an another directory.
     #[structopt(long)]
     pub blockchain_path: PathBuf,
     /// Listen address for node public API.
@@ -52,9 +52,21 @@ pub struct RunDev {
     /// Private API is used by node administrators for node monitoring and control.
     #[structopt(long, default_value = "127.0.0.1:8081")]
     pub private_api_address: SocketAddr,
+    /// Clean existing blockchain database and configuration files before run.
+    #[structopt(long)]
+    pub clean: bool,
 }
 
 impl RunDev {
+    fn cleanup(&self) -> Result<(), Error> {
+        let database_dir = self.blockchain_path.join("db");
+        if database_dir.exists() {
+            fs::remove_dir_all(&self.blockchain_path)
+                .context("Expected DATABASE_PATH directory being removable")?;
+        }
+        Ok(())
+    }
+
     fn allowed_origins(addr: SocketAddr, kind: &str) -> String {
         let mut allow_origin = format!("http://{}", addr);
         if addr.ip().is_loopback() {
@@ -72,6 +84,10 @@ impl RunDev {
 
 impl ExonumCommand for RunDev {
     fn execute(self) -> Result<StandardResult, Error> {
+        if self.clean {
+            self.cleanup()?;
+        }
+
         let config_dir = self.blockchain_path.join("config");
         let node_config_path = config_dir.join("node.toml");
         let common_config_path = config_dir.join("template.toml");
