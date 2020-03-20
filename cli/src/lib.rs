@@ -217,7 +217,7 @@ impl NodeBuilder {
         let temp_dir = TempDir::new()?;
         let mut this = Self::with_args(vec![
             OsString::from("run-dev"),
-            OsString::from("--artifacts-dir"),
+            OsString::from("--blockchain-path"),
             temp_dir.path().into(),
         ]);
         this.temp_dir = Some(temp_dir);
