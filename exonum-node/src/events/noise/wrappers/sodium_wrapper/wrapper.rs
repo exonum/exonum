@@ -12,10 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-// ECR-1771 for the details.
-#![allow(bare_trait_objects)]
-
 use byteorder::{ByteOrder, LittleEndian};
 use bytes::BytesMut;
 use snow::{Builder, HandshakeState, TransportState};
@@ -116,20 +112,17 @@ impl TransportWrapper {
     /// Decrypts `msg` using Noise session.
     ///
     /// Decryption consists of the following steps:
-    /// 1. Message splits to packets of length smaller or equal to 65_535 bytes.
+    /// 1. Message splits to packets of length smaller or equal to 65535 bytes.
     /// 2. Then each packet is decrypted by selected noise algorithm.
     /// 3. Append all decrypted packets to `decoded_message`.
-    pub fn decrypt_msg(
-        &mut self,
-        len: usize,
-        buf: &mut BytesMut,
-    ) -> Result<BytesMut, failure::Error> {
+    pub fn decrypt_msg(&mut self, len: usize, buf: &mut BytesMut) -> anyhow::Result<BytesMut> {
         debug_assert!(len + HEADER_LENGTH <= buf.len());
         let data = buf.split_to(len + HEADER_LENGTH).to_vec();
         let data = &data[HEADER_LENGTH..];
 
         let len = decrypted_msg_len(data.len());
-        let mut decrypted_message = vec![0; len];
+        let mut decrypted_message = BytesMut::with_capacity(len);
+        decrypted_message.resize(len, 0);
 
         let mut read = vec![0_u8; MAX_MESSAGE_LENGTH];
         for (i, msg) in data.chunks(MAX_MESSAGE_LENGTH).enumerate() {
@@ -140,18 +133,19 @@ impl TransportWrapper {
             decrypted_message[start..end].copy_from_slice(&read[..len]);
         }
 
-        Ok(BytesMut::from(decrypted_message))
+        Ok(decrypted_message)
     }
 
     /// Encrypts `msg` using Noise session
     ///
     /// Encryption consists of the following steps:
-    /// 1. Message splits to packets of length smaller or equal to 65_535 bytes.
+    ///
+    /// 1. Message splits to packets of length smaller or equal to 65535 bytes.
     /// 2. Then each packet is encrypted by selected noise algorithm.
     /// 3. Result message: first 4 bytes is message length(`len').
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
-    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> Result<(), failure::Error> {
+    pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> anyhow::Result<()> {
         //TODO: don't use additional allocations [ECR-2213]
         const CHUNK_LENGTH: usize = MAX_MESSAGE_LENGTH - TAG_LENGTH;
         let len = encrypted_msg_len(msg.len());

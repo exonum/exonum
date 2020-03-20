@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
+![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
 
 `exonum-explorer` provides explorer API
 for the [Exonum blockchain framework](https://exonum.com/). For example,
@@ -25,8 +25,8 @@ Include `exonum-explorer` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "1.0.0-rc.1"
-exonum-explorer = "1.0.0-rc.1"
+exonum = "1.0.0-rc.2"
+exonum-explorer = "1.0.0-rc.2"
 ```
 
 ## License

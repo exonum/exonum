@@ -15,21 +15,16 @@
 // These functions transform source error types into other.
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-use failure::Error;
-use log::error;
+use anyhow::Error;
 
 use std::{error::Error as StdError, fmt::Display};
-
-pub fn log_error<E: Display>(error: E) {
-    error!("An error occurred: {}", error)
-}
 
 pub trait LogError {
     fn log_error(self);
 }
 
 pub fn into_failure<E: StdError + Sync + Send + 'static>(error: E) -> Error {
-    Error::from_boxed_compat(Box::new(error))
+    Error::new(error)
 }
 
 impl<T, E> LogError for Result<T, E>
@@ -38,7 +33,7 @@ where
 {
     fn log_error(self) {
         if let Err(error) = self {
-            error!("An error occurred: {}", error);
+            log::error!("An error occurred: {}", error);
         }
     }
 }

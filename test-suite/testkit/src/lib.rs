@@ -27,7 +27,7 @@
 //! use serde_derive::*;
 //! use exonum_derive::*;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
-//! use exonum_testkit::{ApiKind, TestKitBuilder};
+//! use exonum_testkit::{ApiKind, Spec, TestKitBuilder};
 //! use exonum_rust_runtime::{ServiceFactory, ExecutionContext, Service};
 //!
 //! // Simple service implementation.
@@ -59,16 +59,13 @@
 //!     }
 //! }
 //!
-//! # fn main() {
 //! // Create testkit for network with four validators
 //! // and add a builtin timestamping service with ID=1.
-//! let service = TimestampingService;
-//! let artifact = service.artifact_id();
+//! let service = Spec::new(TimestampingService)
+//!     .with_instance(SERVICE_ID, "timestamping", ());
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_validators(4)
-//!     .with_artifact(artifact.clone())
-//!     .with_instance(artifact.into_default_instance(SERVICE_ID, "timestamping"))
-//!     .with_rust_service(service)
+//!     .with(service)
 //!     .build();
 //!
 //! // Create a few transactions.
@@ -93,18 +90,34 @@
 //! assert!(schema.transactions().contains(&tx2.object_hash()));
 //! assert!(schema.transactions().contains(&tx3.object_hash()));
 //! assert!(schema.transactions().contains(&tx4.object_hash()));
-//! # }
 //! ```
 
-#![warn(missing_debug_implementations, missing_docs)]
-#![deny(unsafe_code, bare_trait_objects)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
 
 pub use crate::{
-    api::{ApiKind, RequestBuilder, TestKitApi},
+    api::{ApiKind, RequestBuilder, TestKitApi, TestKitApiClient},
     builder::TestKitBuilder,
     network::{TestNetwork, TestNode},
 };
 pub use exonum_explorer as explorer;
+pub use exonum_rust_runtime::spec::Spec;
 
 use exonum::{
     blockchain::{
@@ -118,19 +131,23 @@ use exonum::{
     runtime::{InstanceId, RuntimeInstance, SnapshotExt},
 };
 use exonum_api::{
-    backends::actix::SystemRuntime, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig,
-    UpdateEndpoints, WebServerConfig,
+    ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints, WebServerConfig,
 };
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
-use futures::{sync::mpsc, Future, Stream};
-use tokio_core::reactor::Core;
+use futures::{
+    channel::mpsc,
+    future,
+    prelude::*,
+    stream::{self, BoxStream},
+    StreamExt,
+};
 
 #[cfg(feature = "exonum-node")]
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     fmt, iter, mem,
     net::SocketAddr,
     sync::{Arc, Mutex},
@@ -138,7 +155,6 @@ use std::{
 
 use crate::{
     checkpoint_db::{CheckpointDb, CheckpointDbHandler},
-    poll_events::{poll_events, poll_latest},
     server::TestKitActor,
 };
 
@@ -147,7 +163,6 @@ mod builder;
 mod checkpoint_db;
 pub mod migrations;
 mod network;
-mod poll_events;
 pub mod server;
 
 type ApiNotifierChannel = (
@@ -156,11 +171,40 @@ type ApiNotifierChannel = (
 );
 
 /// Testkit for testing blockchain services. It offers simple network configuration emulation
-/// (with no real network setup).
+/// with no real network setup.
+///
+/// # Transaction Checks
+///
+/// The testkit strives to emulate consensus rules and other behavior as close as possible.
+/// As a result, the testkit checks incoming transactions regardless of their source
+/// with [`Blockchain::check_tx`] and does not create blocks with incorrect transactions.
+/// Exonum nodes never include transactions failing `check_tx` in block proposals,
+/// and any proposal with such a transaction is incorrect per consensus rules.
+///
+/// Similarly, incorrect transactions are not included to the pool of the testkit
+/// since they are not included into the pools of real Exonum nodes and are not broadcast
+/// by the nodes. Note that it is still possible to obtain an incorrect transaction in the pool,
+/// e.g., by stopping the service targeted by an otherwise valid transaction. Again, the testkit
+/// does not differ in this regard from real nodes.
+///
+/// The testkit will panic if explicitly asked to create a block with an incorrect transaction
+/// (e.g., via [`create_block_with_transaction`]) or to add it to the pool via [`add_tx`].
+/// If an incorrect transaction is being added to pool or block implicitly (e.g.,
+/// via [`create_block`] or by generating a transaction in the service), the testkit will ignore
+/// the transaction and log this event with the `warn` level.
+///
+/// [`Blockchain::check_tx`]: https://docs.rs/exonum/latest/exonum/blockchain/struct.Blockchain.html#method.check_tx
+/// [`create_block_with_transaction`]: #method.create_block_with_transaction
+/// [`add_tx`]: #method.add_tx
+/// [`create_block`]: #method.create_block
+///
+/// # Examples
+///
+/// See the [crate-level docs](index.html) for examples of usage.
 pub struct TestKit {
     blockchain: BlockchainMut,
     db_handler: CheckpointDbHandler<TemporaryDB>,
-    events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync>,
+    events_stream: BoxStream<'static, ()>,
     processing_lock: Arc<Mutex<()>>,
     network: TestNetwork,
     api_sender: ApiSender,
@@ -192,16 +236,8 @@ impl TestKit {
         id: InstanceId,
         constructor: impl BinaryValue,
     ) -> Self {
-        let artifact = service_factory.artifact_id();
-        TestKitBuilder::validator()
-            .with_artifact(artifact.clone())
-            .with_instance(
-                artifact
-                    .into_default_instance(id, name)
-                    .with_constructor(constructor),
-            )
-            .with_rust_service(service_factory)
-            .build()
+        let spec = Spec::new(service_factory).with_instance(id, name, constructor);
+        TestKitBuilder::validator().with(spec).build()
     }
 
     fn assemble(
@@ -234,18 +270,25 @@ impl TestKit {
         let processing_lock = Arc::new(Mutex::new(()));
         let processing_lock_ = Arc::clone(&processing_lock);
 
-        let events_stream: Box<dyn Stream<Item = (), Error = ()> + Send + Sync> =
-            Box::new(api_channel.1.and_then(move |transaction| {
-                let _guard = processing_lock_.lock().unwrap();
+        let events_stream = api_channel.1.map(move |transaction| {
+            let _guard = processing_lock_.lock().unwrap();
+            let snapshot = db.snapshot();
+            if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                log::warn!(
+                    "Did not add transaction {:?} to pool because it is incorrect. {}",
+                    transaction.payload(),
+                    error
+                );
+            } else {
                 BlockchainMut::add_transactions_into_db_pool(db.as_ref(), iter::once(transaction));
-                Ok(())
-            }));
+            }
+        });
 
         Self {
             blockchain,
             db_handler,
             api_sender,
-            events_stream,
+            events_stream: events_stream.boxed(),
             processing_lock,
             network,
             api_notifier_channel,
@@ -291,8 +334,11 @@ impl TestKit {
     /// which is off by default.
     #[cfg(feature = "exonum-node")]
     pub fn poll_control_messages(&mut self) -> Vec<ExternalMessage> {
-        use crate::poll_events::poll_all;
-        poll_all(&mut self.control_channel.1)
+        let mut buffer = vec![];
+        while let Some(message) = self.control_channel.1.next().now_or_never().flatten() {
+            buffer.push(message);
+        }
+        buffer
     }
 
     /// Creates an instance of `TestKitApi` to test the API provided by services.
@@ -302,9 +348,14 @@ impl TestKit {
 
     /// Updates API aggregator for the testkit and caches it for further use.
     fn update_aggregator(&mut self) -> ApiAggregator {
-        if let Some(Ok(update)) = poll_latest(&mut self.api_notifier_channel.1) {
+        let mut maybe_update = None;
+        while let Some(update) = self.api_notifier_channel.1.next().now_or_never().flatten() {
+            maybe_update = Some(update);
+        }
+
+        if let Some(update) = maybe_update {
             let mut aggregator = self.create_api_aggregator();
-            aggregator.extend(update.endpoints);
+            aggregator.extend(update.into_endpoints());
             self.api_aggregator = aggregator;
         }
         self.api_aggregator.clone()
@@ -313,7 +364,9 @@ impl TestKit {
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) {
-        poll_events(&mut self.events_stream);
+        while let Some(()) = self.events_stream.next().now_or_never().flatten() {
+            // Do nothing; all work is done in the stream itself.
+        }
     }
 
     /// Returns a snapshot of the current blockchain state.
@@ -341,7 +394,7 @@ impl TestKit {
     /// ```
     /// # use serde_derive::{Serialize, Deserialize};
     /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
-    /// # use exonum_testkit::{TestKit, TestKitBuilder};
+    /// # use exonum_testkit::{Spec, TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
     /// # use exonum::{crypto::{Hash, KeyPair, PublicKey, SecretKey}, runtime::ExecutionError};
     /// # use exonum_rust_runtime::{ExecutionContext, Service, ServiceFactory};
@@ -374,17 +427,11 @@ impl TestKit {
     /// # fn expensive_setup(_: &mut TestKit) {}
     /// # fn assert_something_about(_: &TestKit) {}
     /// #
-    /// # fn main() {
     /// // ...with this ID:
     /// const SERVICE_ID: u32 = 1;
     ///
-    /// let service = ExampleService;
-    /// let artifact = service.artifact_id();
-    /// let mut testkit = TestKitBuilder::validator()
-    ///     .with_artifact(artifact.clone())
-    ///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
-    ///     .with_rust_service(ExampleService)
-    ///     .build();
+    /// let service = Spec::new(ExampleService).with_instance(SERVICE_ID, "example", ());
+    /// let mut testkit = TestKitBuilder::validator().with(service).build();
     /// expensive_setup(&mut testkit);
     /// let keys = KeyPair::random();
     /// let tx_a = keys.example_tx(SERVICE_ID, "foo".into());
@@ -400,47 +447,39 @@ impl TestKit {
     /// testkit.create_block_with_transaction(tx_b);
     /// assert_something_about(&testkit);
     /// testkit.rollback();
-    /// # }
     /// ```
     pub fn rollback(&mut self) {
         self.db_handler.rollback()
     }
 
+    /// Creates a block with the specified transaction hashes.
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let saved_consensus_config = self.consensus_config();
         let validator_id = self.leader().validator_id().unwrap();
 
         let guard = self.processing_lock.lock().unwrap();
-        let (block_hash, patch) = self.blockchain.create_patch(
-            validator_id,
-            new_block_height,
-            tx_hashes,
-            &mut BTreeMap::new(),
-        );
+        let (block_hash, patch) =
+            self.blockchain
+                .create_patch(validator_id, new_block_height, tx_hashes, &());
 
         let precommits: Vec<_> = self
             .network()
             .validators()
             .iter()
-            .map(|v| v.create_precommit(new_block_height, block_hash))
+            .map(|validator| validator.create_precommit(new_block_height, block_hash))
             .collect();
 
         self.blockchain
-            .commit(
-                patch,
-                block_hash,
-                precommits.into_iter(),
-                &mut BTreeMap::new(),
-            )
+            .commit(patch, block_hash, precommits.into_iter())
             .unwrap();
         drop(guard);
 
-        // Modify the self configuration
+        // Modify the self configuration.
         let actual_consensus_config = self.consensus_config();
         if actual_consensus_config != saved_consensus_config {
             self.network_mut()
-                .update_consensus_config(actual_consensus_config);
+                .update_consensus_config(&actual_consensus_config);
         }
 
         self.poll_events();
@@ -466,7 +505,8 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics if any of transactions has been already committed to the blockchain.
-    /// - Panics if any of the transactions is incorrect.
+    /// - Panics if any of transactions in the created block is incorrect.
+    ///   See the [type-level docs](#transaction-checks) for more details.
     pub fn create_block_with_transactions<I>(&mut self, txs: I) -> BlockWithTransactions
     where
         I: IntoIterator<Item = Verified<AnyTx>>,
@@ -477,8 +517,6 @@ impl TestKit {
         let tx_hashes: Vec<_> = txs
             .into_iter()
             .map(|tx| {
-                self.check_tx(&tx);
-
                 let tx_id = tx.object_hash();
                 let tx_not_found = !schema.transactions().contains(&tx_id);
                 let tx_in_pool = schema.transactions_pool().contains(&tx_id);
@@ -507,10 +545,11 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - Panics if given transaction has been already committed to the blockchain.
-    /// - Panics if any of the transactions is incorrect.
+    /// - Panics if the given transaction has been already committed to the blockchain.
+    /// - Panics if the transaction is incorrect. See the [type-level docs](#transaction-checks)
+    ///   for more details.
     pub fn create_block_with_transaction(&mut self, tx: Verified<AnyTx>) -> BlockWithTransactions {
-        self.create_block_with_transactions(vec![tx])
+        self.create_block_with_transactions(iter::once(tx))
     }
 
     /// Creates block with the specified transactions. The transactions must be previously
@@ -523,6 +562,8 @@ impl TestKit {
     /// # Panics
     ///
     /// - Panics in the case any of transaction hashes are not in the pool.
+    /// - Panics if any of transactions in the created block is incorrect.
+    ///   See the [type-level docs](#transaction-checks) for more details.
     pub fn create_block_with_tx_hashes(
         &mut self,
         tx_hashes: &[crypto::Hash],
@@ -532,43 +573,84 @@ impl TestKit {
         let snapshot = self.blockchain.snapshot();
         let schema = snapshot.for_core();
         for hash in tx_hashes {
-            assert!(schema.transactions_pool().contains(hash));
+            assert!(
+                schema.transactions_pool().contains(hash),
+                "Transaction with hash {:?} is not found in the transaction pool",
+                hash
+            );
+
+            let transaction = schema
+                .transactions()
+                .get(hash)
+                .expect("Transaction is saved in pool, but not in the `transactions` map");
+            if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                panic!(
+                    "Cannot create block with incorrect transaction (hash = {:?}): {}",
+                    hash, error
+                );
+            }
         }
         self.do_create_block(tx_hashes)
     }
 
-    /// Creates block with all transactions in the pool.
+    /// Creates a block with all correct transactions in the pool.
+    ///
+    /// Transaction correctness is defined per [`Blockchain::check_tx`] method.
+    /// See the [type-level docs](#transaction-checks) for more details.
     ///
     /// # Return value
     ///
     /// Returns information about the created block.
+    ///
+    /// [`Blockchain::check_tx`]: https://docs.rs/exonum/latest/exonum/blockchain/struct.Blockchain.html#method.check_tx
     pub fn create_block(&mut self) -> BlockWithTransactions {
         self.poll_events();
-        let tx_hashes: Vec<_> = self
-            .snapshot()
-            .for_core()
+        let snapshot = self.snapshot();
+        let core_schema = snapshot.for_core();
+        let transactions = core_schema.transactions();
+        let filter_transactions = |hash: &Hash| {
+            let transaction = transactions
+                .get(hash)
+                .expect("Transaction is saved in pool, but not in the `transactions` map");
+            if let Err(error) = Blockchain::check_tx(&snapshot, &transaction) {
+                log::warn!(
+                    "Skipped transaction with hash = {:?} when creating a block \
+                     because the transaction is incorrect: {}",
+                    hash,
+                    error
+                );
+                false
+            } else {
+                true
+            }
+        };
+
+        let tx_hashes: Vec<_> = core_schema
             .transactions_pool()
             .iter()
+            .filter(filter_transactions)
             .collect();
         self.do_create_block(&tx_hashes)
     }
 
-    /// Adds transaction into persistent pool.
+    /// Adds a transaction into the persistent pool.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the transaction is incorrect. See the [type-level docs](#transaction-checks)
+    ///   for more details.
     pub fn add_tx(&mut self, transaction: Verified<AnyTx>) {
-        self.check_tx(&transaction);
-
+        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
+            panic!(
+                "Attempt to add incorrect transaction in the pool: {}",
+                error
+            );
+        }
         self.blockchain
             .add_transactions_into_pool(iter::once(transaction));
     }
 
-    /// Calls `Blockchain::check_tx` and panics on an error.
-    fn check_tx(&self, transaction: &Verified<AnyTx>) {
-        if let Err(error) = Blockchain::check_tx(&self.blockchain.snapshot(), &transaction) {
-            panic!("Attempt to add invalid tx in the pool: {}", error);
-        }
-    }
-
-    /// Checks if transaction can be found in pool
+    /// Checks if a transaction with the specified hash is found in the transaction pool.
     pub fn is_tx_in_pool(&self, tx_hash: &Hash) -> bool {
         self.snapshot()
             .for_core()
@@ -585,11 +667,10 @@ impl TestKit {
     /// # extern crate exonum;
     /// # use exonum::helpers::Height;
     /// # use exonum_testkit::TestKitBuilder;
-    /// # fn main() {
     /// let mut testkit = TestKitBuilder::validator().build();
     /// testkit.create_blocks_until(Height(5));
     /// assert_eq!(Height(5), testkit.height());
-    /// # }
+    /// ```
     pub fn create_blocks_until(&mut self, height: Height) {
         while self.height() < height {
             self.create_block();
@@ -615,7 +696,7 @@ impl TestKit {
     ///
     /// # Panics
     ///
-    /// - Panics if validator with the given id is absent in test network.
+    /// - Panics if validator with the given ID is absent in the test network.
     pub fn validator(&self, id: ValidatorId) -> TestNode {
         self.network.validators()[id.0 as usize].clone()
     }
@@ -640,11 +721,11 @@ impl TestKit {
         &mut self.network
     }
 
-    fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let events_stream = self.remove_events_stream();
+    async fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+        let events_task = self.remove_events_stream();
         let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
 
-        let (api_aggregator, actor_handle) = TestKitActor::spawn(self);
+        let (api_aggregator, actor_task) = TestKitActor::spawn(self).await;
         let mut servers = HashMap::new();
         servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
         servers.insert(
@@ -657,16 +738,15 @@ impl TestKit {
             server_restart_max_retries: 5,
             server_restart_retry_timeout: 500,
         };
-        let api_manager = ApiManager::new(api_manager_config, endpoints_rx);
-        let system_runtime = SystemRuntime::start(api_manager).unwrap();
 
-        // Run the event stream in a separate thread in order to put transactions to mempool
-        // when they are received. Otherwise, a client would need to call a `poll_events` analogue
-        // each time after a transaction is posted.
-        let mut core = Core::new().unwrap();
-        core.run(events_stream).unwrap();
-        system_runtime.stop().unwrap();
-        actor_handle.join().unwrap();
+        let manager_task = ApiManager::new(api_manager_config)
+            .run(endpoints_rx)
+            .unwrap_or_else(|e| {
+                log::error!("Error running testkit server API: {}", e);
+            });
+
+        // FIXME: what's the appropriate strategy here?
+        future::join3(events_task, manager_task, actor_task).await;
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.
@@ -677,9 +757,9 @@ impl TestKit {
     /// # Returned value
     ///
     /// Future that runs the event stream of this testkit to completion.
-    pub(crate) fn remove_events_stream(&mut self) -> impl Future<Item = (), Error = ()> {
-        let stream = mem::replace(&mut self.events_stream, Box::new(futures::stream::empty()));
-        stream.for_each(|_| Ok(()))
+    pub(crate) fn remove_events_stream(&mut self) -> impl Future<Output = ()> {
+        let stream = mem::replace(&mut self.events_stream, Box::pin(stream::empty()));
+        stream.for_each(|_| async {})
     }
 
     /// Returns the node in the emulated network, from whose perspective the testkit operates.
@@ -764,7 +844,12 @@ impl TestKit {
 /// }
 ///
 /// let service = AfterCommitService::new();
-/// let mut testkit = TestKit::for_rust_service(service.clone(), "after_commit", SERVICE_ID, ());
+/// let mut testkit = TestKit::for_rust_service(
+///     service.clone(),
+///     "after_commit",
+///     SERVICE_ID,
+///     (),
+/// );
 /// testkit.create_blocks_until(Height(5));
 /// assert_eq!(service.counter(), 5);
 ///

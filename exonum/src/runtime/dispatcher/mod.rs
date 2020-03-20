@@ -18,10 +18,6 @@ use exonum_merkledb::{
     migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
     Database, Fork, Patch, Snapshot,
 };
-use futures::{
-    future::{self, Either},
-    Future,
-};
 use log::{error, info};
 use semver::Version;
 
@@ -43,14 +39,16 @@ use crate::{
     },
 };
 
-use self::schema::{MigrationTransition, ModifiedInstanceInfo};
+use self::schema::{ArtifactAction, MigrationTransition, ModifiedInstanceInfo};
 use super::{
-    error::{CallSite, CallType, ErrorKind, ExecutionError},
+    error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
     migrations::{
         InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
+        MigrationType,
     },
-    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime,
+    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime, RuntimeFeature,
 };
+use crate::runtime::RuntimeIdentifier;
 
 #[cfg(test)]
 mod migration_tests;
@@ -100,8 +98,6 @@ impl CommittedServices {
                 let resolved_id = *self.instance_names.get(name)?;
                 (resolved_id, self.instances.get(&resolved_id)?)
             }
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         };
         Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
@@ -130,10 +126,8 @@ impl MigrationThread {
             Ok(Ok(hash)) => Ok(hash),
             Ok(Err(MigrationError::Custom(description))) => Err(description),
             Ok(Err(MigrationError::Helper(e))) => {
-                // TODO: Is panicking OK here?
                 panic!("Migration terminated with database error: {}", e);
             }
-            Ok(Err(MigrationError::__NonExhaustive)) => unreachable!("Never actually constructed"),
             Err(e) => Err(ExecutionError::description_from_panic(e)),
         };
         MigrationStatus(result)
@@ -269,12 +263,12 @@ impl Dispatcher {
                 ArtifactStatus::Active,
                 "BUG: Artifact should not be in pending state."
             );
+
             self.deploy_artifact(artifact.clone(), state.deploy_spec)
-                .wait()
                 .unwrap_or_else(|err| {
                     panic!(
-                        "BUG: Can't restore state, artifact {:?} has not been deployed now, \
-                         but was deployed previously. Reported error: {}",
+                        "BUG: Cannot restore blockchain state; artifact `{}` failed to deploy \
+                         after successful previous deployment. Reported error: {}",
                         artifact, err
                     );
                 });
@@ -283,12 +277,12 @@ impl Dispatcher {
         // Restart active service instances.
         for state in schema.instances().values() {
             let data_version = state.data_version().to_owned();
+            self.update_service_status(snapshot, &state);
+
+            // Restart a migration script if it is not finished locally.
             let status = state
                 .status
                 .expect("BUG: Stored service instance should have a determined status.");
-            self.update_service_status(snapshot, &state.spec, status.clone());
-
-            // Restart a migration script if it is not finished locally.
             if let Some(target) = status.ongoing_migration_target() {
                 if schema.local_migration_result(&state.spec.name).is_none() {
                     self.start_migration_script(target, state.spec, data_version);
@@ -300,6 +294,28 @@ impl Dispatcher {
         for runtime in self.runtimes.values_mut() {
             runtime.on_resume();
         }
+    }
+
+    /// Adds a built-in artifact to the dispatcher. Unlike artifacts added via `commit_artifact` +
+    /// `deploy_artifact`, this method skips artifact commitment; the artifact
+    /// is synchronously deployed and marked as `Active`.
+    ///
+    /// # Panics
+    ///
+    /// This method treats errors during artifact deployment as fatal and panics on them.
+    pub(crate) fn add_builtin_artifact(
+        &mut self,
+        fork: &Fork,
+        artifact: ArtifactId,
+        payload: Vec<u8>,
+    ) {
+        Schema::new(fork)
+            .add_active_artifact(&artifact, payload.clone())
+            .unwrap_or_else(|err| {
+                panic!("Cannot deploy a built-in artifact: {}", err);
+            });
+        self.deploy_artifact(artifact, payload)
+            .unwrap_or_else(|err| panic!("Cannot deploy a built-in artifact: {}", err));
     }
 
     /// Add a built-in service with the predefined identifier.
@@ -332,7 +348,6 @@ impl Dispatcher {
         if should_rollback && res.is_ok() {
             res = Err(CoreError::IncorrectCall.into());
         }
-
         res
     }
 
@@ -345,13 +360,12 @@ impl Dispatcher {
         let pending_instances = schema.take_modified_instances();
         let patch = fork.into_patch();
         for (state, _) in pending_instances {
-            let status = state.status;
             debug_assert_eq!(
-                status,
+                state.status,
                 Some(InstanceStatus::Active),
                 "BUG: The built-in service instance must have an active status at startup"
             );
-            self.update_service_status(&patch, &state.spec, status.unwrap());
+            self.update_service_status(&patch, &state);
         }
         patch
     }
@@ -366,21 +380,25 @@ impl Dispatcher {
         &mut self,
         artifact: ArtifactId,
         payload: Vec<u8>,
-    ) -> impl Future<Item = (), Error = ExecutionError> {
+    ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok());
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             let runtime_id = artifact.runtime_id;
-            let future = runtime
+            runtime
                 .deploy_artifact(artifact, payload)
+                .wait()
                 .map_err(move |mut err| {
                     err.set_runtime_id(runtime_id);
                     err
-                });
-            Either::A(future)
+                })
         } else {
-            Either::B(future::err(CoreError::IncorrectRuntime.into()))
+            let msg = format!(
+                "Cannot deploy an artifact `{}` depending on the unknown runtime with ID {}",
+                artifact, artifact.runtime_id
+            );
+            Err(CoreError::IncorrectRuntime.with_description(msg))
         }
     }
 
@@ -403,6 +421,13 @@ impl Dispatcher {
             .unwrap_or_else(|err| panic!("BUG: Can't commit the artifact, error: {}", err));
     }
 
+    pub(crate) fn unload_artifact(
+        fork: &Fork,
+        artifact: &ArtifactId,
+    ) -> Result<(), ExecutionError> {
+        Schema::new(fork).unload_artifact(artifact)
+    }
+
     /// Initiates migration of an existing stopped service to a newer artifact.
     /// The migration script is started once the block corresponding to `fork`
     /// is committed.
@@ -411,20 +436,22 @@ impl Dispatcher {
         fork: &Fork,
         new_artifact: ArtifactId,
         service_name: &str,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<MigrationType, ExecutionError> {
         let mut schema = Schema::new(fork);
         let instance_state = schema.check_migration_initiation(&new_artifact, service_name)?;
         let maybe_script =
             self.get_migration_script(&new_artifact, instance_state.data_version())?;
-        if let Some(script) = maybe_script {
+        let migration_type = if let Some(script) = maybe_script {
             let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
             schema.add_pending_migration(instance_state, migration);
+            MigrationType::Async
         } else {
             // No migration script means that the service instance may be immediately updated to
             // the new artifact version.
-            schema.fast_forward_migration(instance_state, new_artifact.version);
-        }
-        Ok(())
+            schema.fast_forward_migration(instance_state, new_artifact);
+            MigrationType::FastForward
+        };
+        Ok(migration_type)
     }
 
     /// Initiates migration rollback. The rollback will actually be performed once
@@ -460,7 +487,7 @@ impl Dispatcher {
         Ok(())
     }
 
-    /// Initiates stopping of an existing service instance in the blockchain. The stopping
+    /// Initiates stopping an existing service instance in the blockchain. The stopping
     /// service is active (i.e., processes transactions and the `after_transactions` hook)
     /// until the block built on top of the provided `fork` is committed.
     pub(crate) fn initiate_stopping_service(
@@ -468,19 +495,51 @@ impl Dispatcher {
         instance_id: InstanceId,
     ) -> Result<(), ExecutionError> {
         Schema::new(fork)
-            .initiate_stopping_service(instance_id)
+            .initiate_simple_service_transition(instance_id, InstanceStatus::Stopped)
+            .map_err(From::from)
+    }
+
+    pub(crate) fn initiate_freezing_service(
+        &self,
+        fork: &Fork,
+        instance_id: InstanceId,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(fork);
+        let instance_state = schema.get_instance(instance_id).ok_or_else(|| {
+            let msg = format!("Cannot freeze unknown service {}", instance_id);
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
+
+        let runtime_id = instance_state.spec.artifact.runtime_id;
+        let runtime = self.runtime_by_id(runtime_id).unwrap_or_else(|| {
+            panic!(
+                "BUG: runtime absent for an artifact `{}` associated with service `{}`",
+                instance_state.spec.artifact,
+                instance_state.spec.as_descriptor()
+            );
+        });
+
+        if !runtime.is_supported(&RuntimeFeature::FreezingServices) {
+            let runtime_description = RuntimeIdentifier::transform(runtime_id).ok().map_or_else(
+                || format!("Runtime with ID {}", runtime_id),
+                |id| id.to_string(),
+            );
+            let msg = format!("{} does not support freezing services", runtime_description);
+            return Err(CommonError::FeatureNotSupported.with_description(msg));
+        }
+
+        schema
+            .initiate_simple_service_transition(instance_id, InstanceStatus::Frozen)
             .map_err(From::from)
     }
 
     fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
-            self.deploy_artifact(artifact, payload)
-                .wait()
-                .unwrap_or_else(|e| {
-                    // In this case artifact deployment error is fatal because there are
-                    // confirmation that this node can deploy this artifact.
-                    panic!("Unable to deploy registered artifact. {}", e)
-                });
+            self.deploy_artifact(artifact, payload).unwrap_or_else(|e| {
+                // In this case artifact deployment error is fatal because the deploy
+                // was committed on the network level.
+                panic!("Unable to deploy registered artifact. {}", e);
+            });
         }
     }
 
@@ -498,11 +557,25 @@ impl Dispatcher {
         let call_info = &tx.as_ref().call_info;
         let instance = Schema::new(snapshot)
             .get_instance(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+            .ok_or_else(|| {
+                let msg = format!(
+                    "Cannot dispatch transaction to unknown service with ID {}",
+                    call_info.instance_id
+                );
+                CoreError::IncorrectInstanceId.with_description(msg)
+            })?;
 
         match instance.status {
             Some(InstanceStatus::Active) => Ok(()),
-            _ => Err(CoreError::ServiceNotActive.into()),
+            status => {
+                let status_str = status.map_or_else(|| "none".to_owned(), |st| st.to_string());
+                let msg = format!(
+                    "Cannot dispatch transaction to non-active service `{}` (status: {})",
+                    instance.spec.as_descriptor(),
+                    status_str
+                );
+                Err(CoreError::ServiceNotActive.with_description(msg))
+            }
         }
     }
 
@@ -529,13 +602,23 @@ impl Dispatcher {
         tx: &Verified<AnyTx>,
     ) -> Result<(), ExecutionError> {
         let call_info = &tx.as_ref().call_info;
-        let (runtime_id, runtime) = self
-            .runtime_for_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        let (runtime_id, runtime) =
+            self.runtime_for_service(call_info.instance_id)
+                .ok_or_else(|| {
+                    let msg = format!(
+                        "Cannot dispatch transaction to unknown service with ID {}",
+                        call_info.instance_id
+                    );
+                    CoreError::IncorrectInstanceId.with_description(msg)
+                })?;
 
-        let instance = self
-            .get_service(call_info.instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        let instance = self.get_service(call_info.instance_id).ok_or_else(|| {
+            let msg = format!(
+                "Cannot dispatch transaction to inactive service with ID {}",
+                call_info.instance_id
+            );
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
 
         let mut should_rollback = false;
         let context = ExecutionContext::for_transaction(
@@ -651,9 +734,20 @@ impl Dispatcher {
 
         let patch = fork.into_patch();
 
-        // Block futures with pending deployments.
-        for (artifact, deploy_spec) in pending_artifacts {
-            self.block_until_deployed(artifact, deploy_spec);
+        // Process changed artifacts, blocking on futures with pending deployments.
+        for (artifact, action) in pending_artifacts {
+            match action {
+                ArtifactAction::Deploy(deploy_spec) => {
+                    self.block_until_deployed(artifact, deploy_spec);
+                }
+                ArtifactAction::Unload => {
+                    let runtime = self
+                        .runtimes
+                        .get_mut(&artifact.runtime_id)
+                        .expect("BUG: Cannot obtain runtime for an unloaded artifact");
+                    runtime.unload_artifact(&artifact);
+                }
+            }
         }
 
         // Notify runtime about changes in service instances.
@@ -661,9 +755,10 @@ impl Dispatcher {
             let data_version = state.data_version().to_owned();
             let status = state
                 .status
+                .as_ref()
                 .expect("BUG: Service status cannot be changed to `None`");
 
-            self.update_service_status(&patch, &state.spec, status.clone());
+            self.update_service_status(&patch, &state);
             if modified_info.migration_transition == Some(MigrationTransition::Start) {
                 let target = status
                     .ongoing_migration_target()
@@ -680,9 +775,14 @@ impl Dispatcher {
         new_artifact: &ArtifactId,
         data_version: &Version,
     ) -> Result<Option<MigrationScript>, ExecutionError> {
-        let runtime = self
-            .runtime_by_id(new_artifact.runtime_id)
-            .ok_or(CoreError::IncorrectRuntime)?;
+        let runtime = self.runtime_by_id(new_artifact.runtime_id).ok_or_else(|| {
+            let msg = format!(
+                "Cannot extract a migration script from artifact `{}` which corresponds to \
+                 unknown runtime with ID {}",
+                new_artifact, new_artifact.runtime_id,
+            );
+            CoreError::IncorrectRuntime.with_description(msg)
+        })?;
         runtime
             .migrate(new_artifact, data_version)
             .map_err(From::from)
@@ -879,29 +979,29 @@ impl Dispatcher {
     ///
     /// This method assumes that it was previously checked if runtime can change the state
     /// of the service, and will panic if it cannot be done.
-    fn update_service_status(
-        &mut self,
-        snapshot: &dyn Snapshot,
-        instance: &InstanceSpec,
-        status: InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, snapshot: &dyn Snapshot, instance: &InstanceState) {
+        let runtime_id = instance.spec.artifact.runtime_id;
         // Notify the runtime that the service has been committed.
-        let runtime = self.runtimes.get_mut(&instance.artifact.runtime_id).expect(
+        let runtime = self.runtimes.get_mut(&runtime_id).expect(
             "BUG: `update_service_status` was invoked for incorrect runtime, \
              this should never happen because of preemptive checks.",
         );
-        runtime.update_service_status(snapshot, instance, &status);
+        runtime.update_service_status(snapshot, instance);
 
+        let status = instance
+            .status
+            .clone()
+            .expect("BUG: instance status cannot change to `None`");
         info!(
             "Committing service instance {:?} with status {}",
-            instance, status
+            instance.spec, status
         );
 
         self.service_infos.insert(
-            instance.id,
+            instance.spec.id,
             ServiceInfo {
-                runtime_id: instance.artifact.runtime_id,
-                name: instance.name.to_owned(),
+                runtime_id,
+                name: instance.spec.name.clone(),
                 status,
             },
         );
@@ -921,12 +1021,11 @@ impl Mailbox {
     }
 }
 
-type ExecutionFuture = Box<dyn Future<Item = (), Error = ExecutionError> + Send>;
+/// The actions that will be performed after the deployment is finished.
+pub type ThenFn = Box<dyn FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send>;
 
 /// Action to be performed by the dispatcher.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
+#[non_exhaustive]
 pub enum Action {
     /// Start artifact deployment.
     StartDeploy {
@@ -936,23 +1035,18 @@ pub enum Action {
         spec: Vec<u8>,
         /// The actions that will be performed after the deployment is finished.
         /// For example, this closure may create a transaction with the deployment confirmation.
-        then: Box<dyn FnOnce(Result<(), ExecutionError>) -> ExecutionFuture + Send>,
+        then: ThenFn,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl fmt::Debug for Action {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Action::StartDeploy { artifact, spec, .. } => formatter
+            Self::StartDeploy { artifact, spec, .. } => formatter
                 .debug_struct("StartDeploy")
                 .field("artifact", artifact)
                 .field("spec", spec)
                 .finish(),
-            Action::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -960,21 +1054,15 @@ impl fmt::Debug for Action {
 impl Action {
     fn execute(self, dispatcher: &mut Dispatcher) {
         match self {
-            Action::StartDeploy {
+            Self::StartDeploy {
                 artifact,
                 spec,
                 then,
             } => {
-                dispatcher
-                    .deploy_artifact(artifact.clone(), spec)
-                    .then(then)
-                    .wait()
-                    .unwrap_or_else(|e| {
-                        error!("Deploying artifact {:?} failed: {}", artifact, e);
-                    });
+                then(dispatcher.deploy_artifact(artifact.clone(), spec)).unwrap_or_else(|e| {
+                    error!("Deploying artifact {:?} failed: {}", artifact, e);
+                });
             }
-
-            Action::__NonExhaustive => unreachable!(),
         }
     }
 }

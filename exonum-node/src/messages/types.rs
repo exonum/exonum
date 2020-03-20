@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 use exonum::{
@@ -282,16 +283,12 @@ impl Prevote {
 
 /// Information about a block.
 ///
-/// ### Validation
-/// The message is ignored if
-///     * its `to` field corresponds to a different node
-///     * the `block`, `transaction` and `precommits` fields cannot be
-///     parsed or verified
-///
 /// ### Processing
+///
 /// The block is added to the blockchain.
 ///
 /// ### Generation
+///
 /// The message is sent as response to `BlockRequest`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::BlockResponse")]
@@ -669,7 +666,7 @@ pub enum ExonumMessage {
 }
 
 impl TryFrom<SignedMessage> for ExonumMessage {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: SignedMessage) -> Result<Self, Self::Error> {
         Self::from_bytes(value.payload.into())
@@ -677,7 +674,7 @@ impl TryFrom<SignedMessage> for ExonumMessage {
 }
 
 impl TryFrom<&SignedMessage> for ExonumMessage {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &SignedMessage) -> Result<Self, Self::Error> {
         let bytes = std::borrow::Cow::Borrowed(value.payload.as_ref());

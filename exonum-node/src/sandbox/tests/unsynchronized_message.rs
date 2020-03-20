@@ -108,7 +108,7 @@ fn test_queue_propose_message_from_next_height() {
     );
 
     sandbox.recv(&future_propose);
-    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx.clone()]);
+    add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx]);
 
     info!(
         "last_block={:#?}, hash={:?}",

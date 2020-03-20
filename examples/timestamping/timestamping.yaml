@@ -23,11 +23,11 @@ artifacts:
   time:
     runtime: rust
     name: "exonum-time"
-    version: "1.0.0-rc.1"
+    version: "1.0.0-rc.2"
   timestamping:
     runtime: rust
     name: "exonum-timestamping"
-    version: "1.0.0-rc.1"
+    version: "1.0.0-rc.2"
 
 instances:
   time:

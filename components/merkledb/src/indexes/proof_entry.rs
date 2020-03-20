@@ -265,8 +265,8 @@ mod tests {
                 vec![self.0]
             }
 
-            fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-                u8::from_bytes(bytes).map(CustomHash)
+            fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
+                u8::from_bytes(bytes).map(Self)
             }
         }
 

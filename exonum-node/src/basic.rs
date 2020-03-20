@@ -33,10 +33,14 @@ impl NodeHandler {
 
             Message::Service(Service::Connect(msg)) => self.handle_connect(msg),
             Message::Service(Service::Status(msg)) => self.handle_status(&msg),
-            // ignore tx duplication error,
-            Message::Service(Service::AnyTx(msg)) => drop(self.handle_tx(msg)),
+            Message::Service(Service::AnyTx(msg)) => {
+                if let Err(e) = self.handle_tx(msg.clone()) {
+                    log::warn!("Failed to process transaction {:?}: {}", msg.payload(), e);
+                }
+            }
+
             Message::Responses(Responses::BlockResponse(msg)) => {
-                self.handle_block(&msg).log_error()
+                self.handle_block(msg);
             }
             Message::Responses(Responses::TransactionsResponse(msg)) => {
                 self.handle_txs_batch(&msg).log_error()
@@ -246,6 +250,7 @@ impl NodeHandler {
         }
         self.add_peer_exchange_timeout();
     }
+
     /// Handles `NodeTimeout::UpdateApiState`.
     /// Node update internal `ApiState` and `NodeRole`.
     pub(crate) fn handle_update_api_state_timeout(&mut self) {

@@ -115,13 +115,11 @@ use crate::{
 /// (such as a `Snapshot`) is used as the base. The caller is advised to check
 /// mutability in advance with the help of [`is_mutable()`].
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// [`RawAccess`]: ../access/trait.RawAccess.html
 /// [`RawAccessMut`]: ../access/trait.RawAccessMut.html
 /// [`is_mutable()`]: #method.is_mutable
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum GenericRawAccess<'a> {
     /// Borrowed snapshot.
     Snapshot(&'a dyn Snapshot),
@@ -135,10 +133,6 @@ pub enum GenericRawAccess<'a> {
     ReadonlyFork(ReadonlyFork<'a>),
     /// Owned readonly fork.
     OwnedReadonlyFork(OwnedReadonlyFork),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl GenericRawAccess<'_> {
@@ -203,8 +197,6 @@ impl AsReadonly for GenericRawAccess<'_> {
             // Translate access to readonly for forks.
             Fork(fork) => ReadonlyFork(fork.readonly()),
             OwnedFork(fork) => OwnedReadonlyFork(fork.as_readonly()),
-
-            __NonExhaustive => unreachable!(),
         }
     }
 }
@@ -249,7 +241,6 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
             GenericRawAccess::OwnedFork(fork) => fork.snapshot(),
             GenericRawAccess::ReadonlyFork(ro_fork) => ro_fork.snapshot(),
             GenericRawAccess::OwnedReadonlyFork(ro_fork) => ro_fork.snapshot(),
-            GenericRawAccess::__NonExhaustive => unreachable!(),
         }
     }
 
@@ -266,7 +257,6 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
             GenericRawAccess::OwnedReadonlyFork(ro_fork) => {
                 GenericChanges::Ref(ro_fork.changes(address))
             }
-            GenericRawAccess::__NonExhaustive => unreachable!(),
         }
     }
 }
@@ -275,10 +265,8 @@ impl<'a> RawAccess for GenericRawAccess<'a> {
 impl RawAccessMut for GenericRawAccess<'_> {}
 
 /// Generic access containing any kind of accesses supported by the database.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum GenericAccess<T> {
     /// Access to the entire database.
     Raw(T),
@@ -288,33 +276,29 @@ pub enum GenericAccess<T> {
     Migration(Migration<T>),
     /// Scratchpad for a migration.
     Scratchpad(Scratchpad<T>),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl<T: RawAccess> From<T> for GenericAccess<T> {
     fn from(access: T) -> Self {
-        GenericAccess::Raw(access)
+        Self::Raw(access)
     }
 }
 
 impl<T: RawAccess> From<Prefixed<T>> for GenericAccess<T> {
     fn from(access: Prefixed<T>) -> Self {
-        GenericAccess::Prefixed(access)
+        Self::Prefixed(access)
     }
 }
 
 impl<T: RawAccess> From<Migration<T>> for GenericAccess<T> {
     fn from(access: Migration<T>) -> Self {
-        GenericAccess::Migration(access)
+        Self::Migration(access)
     }
 }
 
 impl<T: RawAccess> From<Scratchpad<T>> for GenericAccess<T> {
     fn from(access: Scratchpad<T>) -> Self {
-        GenericAccess::Scratchpad(access)
+        Self::Scratchpad(access)
     }
 }
 
@@ -326,11 +310,10 @@ impl<T: RawAccess> Access for GenericAccess<T> {
         addr: IndexAddress,
     ) -> Result<Option<IndexMetadata<Vec<u8>>>, AccessError> {
         match self {
-            GenericAccess::Raw(access) => access.get_index_metadata(addr),
-            GenericAccess::Prefixed(access) => access.get_index_metadata(addr),
-            GenericAccess::Migration(access) => access.get_index_metadata(addr),
-            GenericAccess::Scratchpad(access) => access.get_index_metadata(addr),
-            GenericAccess::__NonExhaustive => unreachable!(),
+            Self::Raw(access) => access.get_index_metadata(addr),
+            Self::Prefixed(access) => access.get_index_metadata(addr),
+            Self::Migration(access) => access.get_index_metadata(addr),
+            Self::Scratchpad(access) => access.get_index_metadata(addr),
         }
     }
 
@@ -340,11 +323,10 @@ impl<T: RawAccess> Access for GenericAccess<T> {
         index_type: IndexType,
     ) -> Result<ViewWithMetadata<Self::Base>, AccessError> {
         match self {
-            GenericAccess::Raw(access) => access.get_or_create_view(addr, index_type),
-            GenericAccess::Prefixed(access) => access.get_or_create_view(addr, index_type),
-            GenericAccess::Migration(access) => access.get_or_create_view(addr, index_type),
-            GenericAccess::Scratchpad(access) => access.get_or_create_view(addr, index_type),
-            GenericAccess::__NonExhaustive => unreachable!(),
+            Self::Raw(access) => access.get_or_create_view(addr, index_type),
+            Self::Prefixed(access) => access.get_or_create_view(addr, index_type),
+            Self::Migration(access) => access.get_or_create_view(addr, index_type),
+            Self::Scratchpad(access) => access.get_or_create_view(addr, index_type),
         }
     }
 
@@ -354,11 +336,10 @@ impl<T: RawAccess> Access for GenericAccess<T> {
         Self::Base: AsReadonly<Readonly = Self::Base>,
     {
         match self {
-            GenericAccess::Raw(access) => access.group_keys(base_addr),
-            GenericAccess::Prefixed(access) => access.group_keys(base_addr),
-            GenericAccess::Migration(access) => access.group_keys(base_addr),
-            GenericAccess::Scratchpad(access) => access.group_keys(base_addr),
-            GenericAccess::__NonExhaustive => unreachable!(),
+            Self::Raw(access) => access.group_keys(base_addr),
+            Self::Prefixed(access) => access.group_keys(base_addr),
+            Self::Migration(access) => access.group_keys(base_addr),
+            Self::Scratchpad(access) => access.group_keys(base_addr),
         }
     }
 }
@@ -371,11 +352,10 @@ impl ErasedAccess<'_> {
     /// Checks if the underlying access is mutable.
     pub fn is_mutable(&self) -> bool {
         match self {
-            GenericAccess::Raw(access) => access.is_mutable(),
-            GenericAccess::Prefixed(prefixed) => prefixed.access().is_mutable(),
-            GenericAccess::Migration(migration) => migration.access().is_mutable(),
-            GenericAccess::Scratchpad(scratchpad) => scratchpad.access().is_mutable(),
-            GenericAccess::__NonExhaustive => unreachable!(),
+            Self::Raw(access) => access.is_mutable(),
+            Self::Prefixed(prefixed) => prefixed.access().is_mutable(),
+            Self::Migration(migration) => migration.access().is_mutable(),
+            Self::Scratchpad(scratchpad) => scratchpad.access().is_mutable(),
         }
     }
 }
@@ -404,35 +384,38 @@ impl<'a> IntoErased<'a> for ReadonlyFork<'a> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<'a, T> IntoErased<'a> for Prefixed<T>
 where
     T: Into<GenericRawAccess<'a>>,
 {
     fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
-        let access: GenericRawAccess = access.into();
+        let access: GenericRawAccess<'_> = access.into();
         GenericAccess::Prefixed(Prefixed::new(prefix, access))
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<'a, T> IntoErased<'a> for Migration<T>
 where
     T: Into<GenericRawAccess<'a>>,
 {
     fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
-        let access: GenericRawAccess = access.into();
+        let access: GenericRawAccess<'_> = access.into();
         GenericAccess::Migration(Migration::new(prefix, access))
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<'a, T> IntoErased<'a> for Scratchpad<T>
 where
     T: Into<GenericRawAccess<'a>>,
 {
     fn into_erased(self) -> ErasedAccess<'a> {
         let (prefix, access) = self.into_parts();
-        let access: GenericRawAccess = access.into();
+        let access: GenericRawAccess<'_> = access.into();
         GenericAccess::Scratchpad(Scratchpad::new(prefix, access))
     }
 }

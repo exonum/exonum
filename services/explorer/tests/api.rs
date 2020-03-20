@@ -18,11 +18,11 @@ use exonum::{
     crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
     merkledb::{BinaryValue, HashTag, ObjectHash},
-    runtime::{ErrorKind, ExecutionError},
+    runtime::{ErrorKind, ExecutionError, ExecutionStatus},
 };
 use exonum_api as api;
 use exonum_explorer::{api::*, BlockchainExplorer, TransactionInfo};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use serde_json::{json, Value};
 
 use crate::counter::{CounterInterface, CounterService, SERVICE_ID};
@@ -32,20 +32,21 @@ mod counter;
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(CounterService)
-        .with_default_rust_service(ExplorerFactory)
+        .with(Spec::new(CounterService).with_default_instance())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)
 }
 
-#[test]
-fn test_explorer_blocks_basic() {
+#[tokio::test]
+async fn test_explorer_blocks_basic() {
     let (mut testkit, api) = init_testkit();
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(0));
@@ -57,6 +58,7 @@ fn test_explorer_blocks_basic() {
     let response: serde_json::Value = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
     assert_eq!(
         response,
@@ -77,9 +79,10 @@ fn test_explorer_blocks_basic() {
     // Check empty block creation
     testkit.create_block();
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
 
     let mut headers = AdditionalHeaders::new();
@@ -99,6 +102,7 @@ fn test_explorer_blocks_basic() {
     let response: serde_json::Value = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=1&add_precommits=true")
+        .await
         .unwrap();
 
     let snapshot = testkit.snapshot();
@@ -127,6 +131,7 @@ fn test_explorer_blocks_basic() {
     let response: serde_json::Value = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=1&add_blocks_time=true")
+        .await
         .unwrap();
     assert_eq!(
         response,
@@ -139,65 +144,69 @@ fn test_explorer_blocks_basic() {
                 "tx_hash": HashTag::empty_list_hash(),
                 "state_hash": blocks[0].block.state_hash,
                 "error_hash": blocks[0].block.error_hash,
-                "time": precommit.payload().time(),
+                "time": precommit.payload().time,
                 "additional_headers": blocks[0].block.additional_headers,
             }],
         })
     );
 }
 
-#[test]
-fn test_explorer_api_block_request() {
+#[tokio::test]
+async fn test_explorer_api_block_request() {
     let (mut testkit, api) = init_testkit();
     testkit.create_block();
 
     let response: Value = api
         .public(ApiKind::Explorer)
         .get("v1/block?height=1")
+        .await
         .unwrap();
     assert_eq!(response["height"], 1);
 
     let response = api
         .public(ApiKind::Explorer)
         .get::<Value>("v1/block?height=10")
+        .await
         .unwrap_err();
 
     assert_eq!(response.http_code, api::HttpStatusCode::NOT_FOUND);
     assert_eq!(response.body.title, "Failed to get block info");
     assert_eq!(
         response.body.detail,
-        "Requested block height(10) exceeds the blockchain height (1)"
+        "Requested block height (10) exceeds the blockchain height (1)"
     );
     assert_eq!(response.body.source, "2:explorer");
 }
 
-fn create_sample_block(testkit: &mut TestKit) {
+async fn create_sample_block(testkit: &mut TestKit) {
     let height = testkit.height().next().0;
     if height == 2 || height == 5 {
         let tx = KeyPair::random().increment(SERVICE_ID, height);
-        testkit.api().send(tx.clone());
+        testkit.api().send(tx).await;
     }
     testkit.create_block();
 }
 
-#[test]
-fn test_explorer_blocks_skip_empty_small() {
+#[tokio::test]
+async fn test_explorer_blocks_skip_empty_small() {
     let (mut testkit, api) = init_testkit();
-    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit).await;
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert!(blocks.is_empty());
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(2));
 
-    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit).await;
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].block.height, Height(2));
@@ -206,21 +215,23 @@ fn test_explorer_blocks_skip_empty_small() {
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(2));
     assert_eq!(range.start, Height(0));
     assert_eq!(range.end, Height(3));
 
-    create_sample_block(&mut testkit);
-    create_sample_block(&mut testkit);
+    create_sample_block(&mut testkit).await;
+    create_sample_block(&mut testkit).await;
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(2));
@@ -228,25 +239,27 @@ fn test_explorer_blocks_skip_empty_small() {
     assert_eq!(range.end, Height(5));
 }
 
-#[test]
-fn test_explorer_blocks_skip_empty() {
+#[tokio::test]
+async fn test_explorer_blocks_skip_empty() {
     let (mut testkit, api) = init_testkit();
     for _ in 0..5 {
-        create_sample_block(&mut testkit);
+        create_sample_block(&mut testkit).await;
     }
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=1&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(5));
     assert_eq!(range.start, Height(5));
     assert_eq!(range.end, Height(6));
 
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=3&skip_empty_blocks=true")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -255,17 +268,18 @@ fn test_explorer_blocks_skip_empty() {
     assert_eq!(range.end, Height(6));
 }
 
-#[test]
-fn test_explorer_blocks_bounds() {
+#[tokio::test]
+async fn test_explorer_blocks_bounds() {
     let (mut testkit, api) = init_testkit();
     for _ in 0..5 {
-        create_sample_block(&mut testkit);
+        create_sample_block(&mut testkit).await;
     }
 
     // Check `latest` param
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&skip_empty_blocks=true&latest=4")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 1);
     assert_eq!(blocks[0].block.height, Height(2));
@@ -273,9 +287,10 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(5));
 
     // Check `earliest` param
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&earliest=3")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 3);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -283,9 +298,10 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(6));
 
     // Check `earliest` & `latest`
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=10&latest=4&earliest=3")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(4));
@@ -293,9 +309,10 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(5));
 
     // Check that `count` takes precedence over `earliest`.
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=4&earliest=1")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(4));
@@ -303,9 +320,10 @@ fn test_explorer_blocks_bounds() {
     assert_eq!(range.end, Height(5));
 
     // Check `latest` param isn't exceed the height.
-    let BlocksRange { blocks, range } = api
+    let BlocksRange { blocks, range, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=2&latest=5")
+        .await
         .unwrap();
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(5));
@@ -315,18 +333,20 @@ fn test_explorer_blocks_bounds() {
     // Check `latest` param is exceed the height.
     let result: Result<BlocksRange, api::Error> = api
         .public(ApiKind::Explorer)
-        .get("v1/blocks?count=2&latest=6");
+        .get("v1/blocks?count=2&latest=6")
+        .await;
     assert!(result.is_err());
 }
 
-#[test]
-fn test_explorer_blocks_loaded_info() {
+#[tokio::test]
+async fn test_explorer_blocks_loaded_info() {
     let (mut testkit, api) = init_testkit();
     testkit.create_blocks_until(Height(6));
 
     let BlocksRange { blocks, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=4")
+        .await
         .unwrap();
     assert!(blocks
         .iter()
@@ -335,6 +355,7 @@ fn test_explorer_blocks_loaded_info() {
     let BlocksRange { blocks, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=4&add_blocks_time=true")
+        .await
         .unwrap();
     assert!(blocks
         .iter()
@@ -343,14 +364,15 @@ fn test_explorer_blocks_loaded_info() {
     let BlocksRange { blocks, .. } = api
         .public(ApiKind::Explorer)
         .get("v1/blocks?count=4&add_precommits=true")
+        .await
         .unwrap();
     assert!(blocks
         .iter()
         .all(|info| info.time.is_none() && info.precommits.is_some()));
 }
 
-#[test]
-fn test_explorer_transaction_info() {
+#[tokio::test]
+async fn test_explorer_transaction_info() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
 
@@ -360,6 +382,7 @@ fn test_explorer_transaction_info() {
             "v1/transactions?hash={}",
             &tx.object_hash().to_hex()
         ))
+        .await
         .unwrap_err();
 
     assert_eq!(info.http_code, api::HttpStatusCode::NOT_FOUND);
@@ -370,7 +393,7 @@ fn test_explorer_transaction_info() {
     );
     assert_eq!(info.body.source, "2:explorer");
 
-    api.send(tx.clone());
+    api.send(tx.clone()).await;
     testkit.poll_events();
 
     let info: Value = api
@@ -379,6 +402,7 @@ fn test_explorer_transaction_info() {
             "v1/transactions?hash={}",
             &tx.object_hash().to_hex()
         ))
+        .await
         .unwrap();
     assert_eq!(
         info,
@@ -395,6 +419,7 @@ fn test_explorer_transaction_info() {
             "v1/transactions?hash={}",
             &tx.object_hash().to_hex()
         ))
+        .await
         .unwrap();
     assert!(info.is_committed());
     let committed = info.as_committed().unwrap();
@@ -409,15 +434,15 @@ fn test_explorer_transaction_info() {
         .check_against_hash(block.header().tx_hash)
         .is_ok());
 
-    let proof = block.error_proof(CallInBlock::transaction(0));
-    let proof = proof.check_against_hash(block.header().error_hash).unwrap();
-    let (&call_location, status) = proof.all_entries().next().unwrap();
+    let proof = block.call_proof(CallInBlock::transaction(0));
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+    let (call_location, status) = proof.verify(&validator_keys).unwrap();
     assert_eq!(call_location, CallInBlock::transaction(0));
-    assert!(status.is_none());
+    assert!(status.is_ok());
 }
 
-#[test]
-fn test_explorer_transaction_statuses() {
+#[tokio::test]
+async fn test_explorer_transaction_statuses() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
     let error_tx = KeyPair::random().increment(SERVICE_ID, 0);
@@ -466,47 +491,44 @@ fn test_explorer_transaction_statuses() {
     let snapshot = testkit.snapshot();
     let explorer = BlockchainExplorer::new(&snapshot);
     let block_info = explorer.block(testkit.height()).unwrap();
-    let proof = block_info.error_proof(CallInBlock::transaction(0));
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 0);
-    let proof = block_info.error_proof(CallInBlock::transaction(1));
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-    assert_eq!(
-        proof.entries().next().unwrap().1.description(),
-        "Adding zero does nothing!"
-    );
-    let proof = block_info.error_proof(CallInBlock::transaction(2));
-    let proof = proof.check_against_hash(block.header.error_hash).unwrap();
-    assert_eq!(proof.entries().count(), 1);
-    assert_eq!(
-        proof.entries().next().unwrap().1.kind(),
-        ErrorKind::Unexpected
-    );
+
+    let proof = block_info.call_proof(CallInBlock::transaction(0));
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert!(res.is_ok());
+
+    let proof = block_info.call_proof(CallInBlock::transaction(1));
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert_eq!(res.unwrap_err().description(), "Adding zero does nothing!");
+
+    let proof = block_info.call_proof(CallInBlock::transaction(2));
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert_eq!(res.unwrap_err().kind(), ErrorKind::Unexpected);
 
     // Now, the same statuses retrieved via explorer web API.
-    let statuses: Vec<_> = [
+    let mut statuses = Vec::new();
+
+    for &hash in &[
         tx.object_hash(),
         error_tx.object_hash(),
         panicking_tx.object_hash(),
-    ]
-    .iter()
-    .map(|hash| {
+    ] {
         let info: TransactionInfo = api
             .public(ApiKind::Explorer)
-            .query(&TransactionQuery::new(*hash))
+            .query(&TransactionQuery::new(hash))
             .get("v1/transactions")
+            .await
             .unwrap();
-        info.as_committed().unwrap().status().map_err(Clone::clone)
-    })
-    .collect();
+        statuses.push(info.as_committed().unwrap().status().map_err(Clone::clone));
+    }
+
     check_statuses(&statuses);
 }
 
 /// Checks that `ExplorerApi` accepts valid transactions and discards transactions with
 /// the incorrect instance ID.
-#[test]
-fn test_explorer_add_invalid_transaction() {
+#[tokio::test]
+async fn test_explorer_add_invalid_transaction() {
     let (_testkit, api) = init_testkit();
 
     // Send valid transaction.
@@ -517,6 +539,7 @@ fn test_explorer_add_invalid_transaction() {
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
+        .await
         .expect("Failed to send valid transaction.");
     assert_eq!(response.tx_hash, tx.object_hash());
 
@@ -527,6 +550,7 @@ fn test_explorer_add_invalid_transaction() {
         .public(ApiKind::Explorer)
         .query(&json!({ "tx_body": data }))
         .post::<TransactionResponse>("v1/transactions")
+        .await
         .expect_err("Expected transaction send to finish with error.");
 
     assert_eq!(response.http_code, api::HttpStatusCode::BAD_REQUEST);
@@ -541,172 +565,126 @@ fn test_explorer_add_invalid_transaction() {
     assert_eq!(response.body.source, "2:explorer");
 }
 
-#[test]
-fn test_explorer_api_with_before_transactions_error() {
+#[tokio::test]
+async fn test_explorer_api_with_before_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let key_pair = KeyPair::random();
     let tx = key_pair.increment(SERVICE_ID, 13);
 
     // This tx lead to error in before_transaction on the next transaction
-    testkit.create_block_with_transaction(tx.clone());
-    let response = api
+    testkit.create_block_with_transaction(tx);
+    let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID))
+        .get("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
+    assert!(response.0.is_ok());
 
     let tx = key_pair.increment(SERVICE_ID, 1);
     // So perform one more tx to check the error
     testkit.create_block_with_transaction(tx.clone());
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(2),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .query(&CallStatusQuery::new(Height(2), SERVICE_ID).with_proof())
+        .get("v1/call_status/before_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    let execution_error = response.status.0.unwrap_err();
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    let execution_error = res.unwrap_err();
     assert!(execution_error.description().contains("Number 13"));
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx.object_hash(),
-        })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
+        .query(&TransactionStatusQuery::new(tx.object_hash()).with_proof())
+        .get("v1/call_status/transaction")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
 
-    let response = api
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    assert!(res.is_ok());
+
+    let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID))
+        .get("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
+    assert!(response.0.is_ok());
 }
 
-#[test]
-fn test_explorer_api_with_transaction_error() {
+#[tokio::test]
+async fn test_explorer_api_with_transaction_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 0);
 
     testkit.create_block_with_transaction(tx.clone());
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx.object_hash(),
-        })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
+        .query(&TransactionStatusQuery::new(tx.object_hash()).with_proof())
+        .get("v1/call_status/transaction")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    let execution_error = response.status.0.unwrap_err();
+
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+    let validator_keys = [testkit.us().public_keys().consensus_key];
+
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    let execution_error = res.unwrap_err();
     assert!(execution_error
         .description()
         .contains("Adding zero does nothing!"));
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
 }
 
-#[test]
-fn test_explorer_api_with_after_transactions_error() {
+#[tokio::test]
+async fn test_explorer_api_with_after_transactions_error() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 42);
 
-    testkit.create_block_with_transaction(tx.clone());
+    testkit.create_block_with_transaction(tx);
 
-    let response = api
+    let response: ExecutionStatus = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID))
+        .get("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    let execution_error = response.status.0.unwrap_err();
+    let execution_error = response.0.unwrap_err();
     assert!(execution_error
         .description()
         .contains("What's the question?"));
 
-    let response = api
+    let response: CallStatusResponse = api
         .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
+        .query(&CallStatusQuery::new(Height(1), SERVICE_ID).with_proof())
+        .get("v1/call_status/after_transactions")
+        .await
         .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
 
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx.object_hash(),
-        })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-}
+    let proof = match response {
+        CallStatusResponse::Proof(proof) => proof,
+        other => panic!("Unexpected proof format: {:?}", other),
+    };
+    let validator_keys = [testkit.us().public_keys().consensus_key];
 
-#[test]
-fn test_explorer_api_without_error() {
-    let (mut testkit, api) = init_testkit();
-    let tx = KeyPair::random().increment(SERVICE_ID, 1);
-
-    testkit.create_block_with_transaction(tx.clone());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/before_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&TransactionQuery {
-            hash: tx.object_hash(),
-        })
-        .get::<CallStatusResponse>("v1/call_status/transaction")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
-
-    let response = api
-        .public(ApiKind::Explorer)
-        .query(&CallStatusQuery {
-            height: Height(1),
-            service_id: SERVICE_ID,
-        })
-        .get::<CallStatusResponse>("v1/call_status/after_transactions")
-        .expect("Explorer Api unexpectedly failed");
-    assert!(response.status.0.is_ok());
+    let (_, res) = proof.verify(&validator_keys).unwrap();
+    let execution_error = res.unwrap_err();
+    assert!(execution_error
+        .description()
+        .contains("What's the question?"));
 }

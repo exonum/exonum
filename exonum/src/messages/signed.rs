@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::{ensure, Error};
 use exonum_merkledb::{impl_serde_hex_for_binary_value, BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
 use serde::{
     de::{Deserialize, Deserializer},
     ser::{Serialize, Serializer},
@@ -33,7 +33,7 @@ use crate::{
 
 impl SignedMessage {
     /// Verifies message signature and returns the corresponding checked message.
-    pub fn into_verified<T>(self) -> Result<Verified<T>, failure::Error>
+    pub fn into_verified<T>(self) -> anyhow::Result<Verified<T>>
     where
         T: TryFrom<Self>,
     {
@@ -44,7 +44,7 @@ impl SignedMessage {
         );
         // Deserializes message.
         let inner = T::try_from(self.clone())
-            .map_err(|_| failure::format_err!("Failed to decode message from payload."))?;
+            .map_err(|_| anyhow::format_err!("Failed to decode message from payload."))?;
 
         Ok(Verified { raw: self, inner })
     }
@@ -83,6 +83,7 @@ impl<T> PartialEq for Verified<T> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T> Verified<T> {
     /// Returns reference to the underlying signed message.
     pub fn as_raw(&self) -> &SignedMessage {
@@ -190,10 +191,10 @@ where
         self.raw.to_bytes()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let raw = SignedMessage::from_bytes(bytes)?;
         let inner =
-            T::try_from(&raw).map_err(|_| failure::format_err!("Unable to decode message"))?;
+            T::try_from(&raw).map_err(|_| anyhow::format_err!("Unable to decode message"))?;
         Ok(Self { raw, inner })
     }
 }

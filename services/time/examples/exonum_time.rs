@@ -21,12 +21,13 @@
 //!
 //! [runtime docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
 
-use exonum_cli::NodeBuilder;
+use exonum_cli::{NodeBuilder, Spec};
 use exonum_time::TimeServiceFactory;
 
-fn main() -> Result<(), failure::Error> {
-    exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_rust_service(TimeServiceFactory::default())
-        .run()
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    exonum::helpers::init_logger()?;
+
+    let time_service = TimeServiceFactory::default();
+    NodeBuilder::new().with(Spec::new(time_service)).run().await
 }

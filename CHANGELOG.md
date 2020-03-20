@@ -3,6 +3,179 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## 1.0.0-rc.2 - 2020-03-13
+
+### Breaking changes
+
+#### General
+
+- Error handling is now performed with the `anyhow` crate instead of `failure`.
+  (#1805)
+
+- APIs which previously used futures from the `futures 0.1` crate are now
+  made `async`, or are using `Future`s from the standard library. (#1796, #1804)
+  The main affected APIs are as follows:
+  
+  - Endpoint definitions in the `exonum-api` crate and their counterparts
+    in `exonum-rust-runtime`
+  - Transaction sending with `ApiSender` from the `exonum` crate
+  - Node start-up with `Node::run` (`exonum-node` crate) and `NodeBuilder::run`
+    (`exonum-cli` crate), and shutdown with `ShutdownHandle` (`exonum-node` crate)
+  - HTTP API testing with `TestKitApi` (`exonum-testkit` crate)
+
+#### exonum
+
+- Testkit now does not include incorrect transactions into blocks or memory pool,
+  similar to real Exonum nodes. (#1785)
+
+- `Runtime::deploy_artifact` no longer returns `Box<dyn Future<...>>`. Instead a
+  special communication channel is used to send deployment status from the
+  runtime to the dispatcher. (#1788)
+
+- `Schema::call_errors` was removed in favor of more comprehensive
+  `call_records` method. (#1792)
+
+- `Blockchain::create_patch` and `Blockchain::commit` signatures were changed
+  due to unsoundness of the previous implementation; see "Bug Fixes" section
+  for more details. (#1809)
+- Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
+  error. (#1806)
+
+### exonum-api
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-cli
+
+- `NodeBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+- Submodules of the `command` module were made private; the relevant data types
+  are now exported from the `command` module directly. Similarly,
+  `io` module was made private. (#1799)
+
+#### exonum-explorer
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-proto
+
+- `impl_binary_value_for_pb_message` macro was removed. Use the `BinaryValue`
+  derive macro from the `exonum-derive` crate instead. (#1805)
+
+#### exonum-rust-runtime
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-supervisor
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-system-api
+
+- Public api module has been removed. List of endpoints from private api has
+  been changed. (#1790) Current list of the endpoints:
+
+  - `v1/info` - obtains information about the node;
+  - `v1/stats` - obtains statistics of the node;
+  - `v1/peers` - adds a peer to the Exonum node;
+  - `v1/consensus_status` - enables or disables consensus on the node;
+  - `v1/shutdown` - shuts down the node.
+
+- API data types were made non-exhaustive where appropriate. (#1799)
+
+### exonum-testkit
+
+- `TestKitBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+### New Features
+
+#### exonum
+
+- Exonum now supports service freezing. A frozen service has fixed state (i.e.,
+  does not process transactions and service hooks), but, unlike stopped services,
+  the service HTTP API remains active. (#1780)
+
+- Core and the explorer service now support retrieving call status with
+  a cryptographic proof of authenticity. (#1792)
+  
+- Exonum now supports unloading of unused service artifacts. This operation
+  may be used to free resources associated with artifacts in the runtime
+  hosting them. (#1794)
+
+#### exonum-supervisor
+
+- Supervisor service supports service freezing. (#1781)
+
+- `supervisor/services` endpoint has been added which obtains information
+  about deployed artifacts and available services. (#1790)
+
+- Supervisor service supports artifact unloading. (#1798)
+
+#### exonum-rust-runtime
+
+- Rust services support freezing. (#1780)
+
+- HTTP API of Rust services is now switched on during data migrations. (#1780)
+
+#### exonum-testkit
+
+- Testkit server now returns info on emulated nodes. (#1799)
+
+### Internal Improvements
+
+#### exonum
+
+- Core now provides more thorough / context-dependent error descriptions
+  related to service lifecycle. (#1806)
+
+#### exonum-merkledb
+
+- Index clearing now uses range deletions for RocksDB, providing
+  a significant performance boost for this operation. (#1791)
+
+### Bug Fixes
+
+#### exonum
+
+- Fixed bug related to nodes forgetting transactions after executing
+  a block with them. Previously, nodes forgot all transactions
+  in the executed blocks; such transactions were removed from
+  the ephemeral transaction cache, but were not flushed to the DB
+  or anywhere else. This could lead to consensus hang-up. (#1809)
+
+#### exonum-node
+
+- Fixed potential node hang-up if the node received a proposal and
+  a supermajority of transactions approving it before all transactions
+  in the proposal are known. (#1781)
+
+- Switched off broadcasting of transactions which the node considers
+  incorrect. (#1781)
+
+- Fixed incorrect invalidation of block proposals. (#1782)
+
+- Provided clear coherence period for the transaction pool
+  by introducing the `mempool.flush_config_strategy` configuration parameter.
+  Previously, transactions were flushed to the persistent pool
+  only on block commit. This led to the unexpected behavior of some APIs,
+  such as the transaction getter endpoint in the explorer service. (#1809)
+
+- Fixed race condition when two nodes try to establish outgoing connections
+  to each other at the same time. (#1804)
+
+#### exonum-testkit
+
+- Testkit now does not include incorrect transactions into blocks or memory pool,
+  similar to real Exonum nodes. (#1785)
+
+- Added a method to get reference to the underlying API client for the `TestKitApi`.
+  (#1811)
+
 ## 1.0.0-rc.1 - 2020-02-07
 
 ### Breaking changes
@@ -559,7 +732,7 @@ Key points:
 
 - #1345: Implement a new `Transaction` trait [ECR-3222]
 
-- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+- #1361: First step of persistent dynamic services implementation [ECR-3276]
 
 - #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
 

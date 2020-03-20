@@ -12,12 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use exonum::runtime::{ExecutionError, ExecutionFail};
 use exonum_derive::*;
+
+use std::fmt;
 
 /// General errors that can occur within supervisor interaction.
 /// Error codes 0-15.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum CommonError {
     /// Deadline exceeded for the current transaction.
     DeadlineExceeded = 0,
@@ -29,6 +33,7 @@ pub enum CommonError {
 /// Error codes 16-31.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum ArtifactError {
     /// Artifact has been already deployed.
     AlreadyDeployed = 16,
@@ -46,6 +51,7 @@ pub enum ArtifactError {
 /// Error codes 32-47.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum ServiceError {
     /// Instance with the given name already exists.
     InstanceExists = 32,
@@ -57,6 +63,7 @@ pub enum ServiceError {
 /// Error codes 48-63.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum ConfigurationError {
     /// Active configuration change proposal already exists.
     ConfigProposeExists = 48,
@@ -72,10 +79,17 @@ pub enum ConfigurationError {
     InvalidConfig = 53,
 }
 
+impl ConfigurationError {
+    pub(crate) fn malformed_propose(description: impl fmt::Display) -> ExecutionError {
+        Self::MalformedConfigPropose.with_description(description)
+    }
+}
+
 /// Configuration-related errors group.
 /// Error codes 64-79.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
+#[non_exhaustive]
 pub enum MigrationError {
     /// Migration request has not been registered or accepted.
     MigrationRequestNotRegistered = 64,

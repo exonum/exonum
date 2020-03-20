@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
+![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
 
 `exonum-cli` crate provides an extensible command line interface for Exonum
 nodes.
@@ -66,7 +66,7 @@ Running an Exonum node with default settings:
 use exonum_cli::NodeBuilder;
 use exonum_cryptocurrency_advanced as cryptocurrency;
 
-fn main() -> Result<(), failure::Error> {
+fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger().unwrap();
     NodeBuilder::new()
         .with_service(cryptocurrency::CryptocurrencyService)
@@ -80,7 +80,7 @@ Include `exonum-cli` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-cli = "1.0.0-rc.1"
+exonum-cli = "1.0.0-rc.2"
 ```
 
 ## License

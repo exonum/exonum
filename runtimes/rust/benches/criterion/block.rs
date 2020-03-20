@@ -52,7 +52,7 @@ use exonum::{
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tempfile::TempDir;
 
-use std::{collections::BTreeMap, iter, sync::Arc};
+use std::{iter, sync::Arc};
 
 use exonum_rust_runtime::{DefaultInstance, RustRuntime};
 
@@ -123,12 +123,7 @@ fn create_consensus_config_and_blockchain_base(
 }
 
 fn execute_block(blockchain: &BlockchainMut, height: u64, txs: &[Hash]) -> (Hash, Patch) {
-    blockchain.create_patch(
-        ValidatorId::zero(),
-        Height(height),
-        txs,
-        &mut BTreeMap::new(),
-    )
+    blockchain.create_patch(ValidatorId::zero(), Height(height), txs, &())
 }
 
 mod timestamping {
@@ -191,6 +186,7 @@ mod timestamping {
 }
 
 mod cryptocurrency {
+    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
     use exonum::{
         crypto::PublicKey,
         merkledb::access::AccessExt,
@@ -532,12 +528,10 @@ fn prepare_blockchain(
         let tx_hashes = prepare_txs(blockchain, transactions[start..end].to_vec());
         assert_transactions_in_pool(blockchain.as_ref(), &tx_hashes);
 
-        let (block_hash, patch) = execute_block(blockchain, i as u64, &tx_hashes);
+        let (block_hash, patch) = execute_block(blockchain, i as u64 + 1, &tx_hashes);
         // We make use of the fact that `Blockchain::commit()` doesn't check
         // precommits in any way (they are checked beforehand by the consensus algorithm).
-        blockchain
-            .commit(patch, block_hash, iter::empty(), &mut BTreeMap::new())
-            .unwrap();
+        blockchain.commit(patch, block_hash, iter::empty()).unwrap();
     }
 }
 

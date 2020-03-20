@@ -7,6 +7,8 @@ branches:
   - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
   # Branch names endings with "-release" (for example "0.9.0-release").
   - /-release$/
+  # Branch names endings with "-dev" (for example "update-rust-dev").
+  - /-dev$/
 
 addons:
   apt:
@@ -39,7 +41,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.38.0
+  - 1.41.0
 
 cache:
   npm: true
@@ -50,7 +52,6 @@ cache:
   - $HOME/.kcov
 
 dist: bionic
-sudo: required
 
 env:
   global:
@@ -88,7 +89,7 @@ jobs:
     - npm run cspell
     - npm run md
     # Clippy lints.
-    - cargo clippy --all --tests --examples --benches --features "long_benchmarks"
+    - cargo clippy --all --tests --examples --benches --all-features
     # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc
@@ -132,9 +133,13 @@ jobs:
   - name: unit-test
     script:
     - cargo test --all --lib --tests --benches
+
+  # Doc tests.
+  - name: doc-test
+    script:
     - cargo test --all --doc
 
-  # Run examples.
+  # Run examples and soak tests.
   - name: examples
     script:
     - cargo run -p exonum-merkledb --example manual_migration
@@ -146,6 +151,9 @@ jobs:
     - cargo run -p exonum-testkit --example timestamping
     - cargo run -p exonum-supervisor --example configuration_change
     - cargo run -p exonum-time --example simple_service
+    - cargo run -p exonum-soak-tests --bin toggle -- -H 10
+    - cargo run -p exonum-soak-tests --bin send_txs -- -T 100
+    - cargo run -p exonum-keys --example key-generator -- -p passphrase -s a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344
 
   # Integration tests.
   - name: integration-tests
@@ -165,6 +173,7 @@ jobs:
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo build -p exonum-testkit-server
     - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --example cryptocurrency-migration --force
     - cargo build -p exonum-cryptocurrency --example demo
     script:
     - python3 -m exonum_tests -v
@@ -175,12 +184,6 @@ jobs:
     after_script:
     - deactivate
     - rm -rf .venv
-
-  # Check compatibility with Rust 1.36.
-  - name: 1.36-compat
-    rust: 1.36.0
-    script:
-    - cargo check --all --benches --tests --bins --examples --features "long_benchmarks"
 
 notifications:
   webhooks:

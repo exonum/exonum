@@ -27,7 +27,6 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{ExecutionError, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_rust_runtime::ServiceFactory;
 use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -43,12 +42,12 @@ mod failing_runtime {
     use exonum::merkledb::Snapshot;
     use exonum::runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        oneshot::Receiver,
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceSpec, InstanceStatus, Mailbox,
-        MethodId, Runtime, WellKnownRuntime,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceState, Mailbox, MethodId, Runtime,
+        WellKnownRuntime,
     };
     use exonum_derive::ExecutionFail;
-    use futures::{Future, IntoFuture};
 
     /// Runtime which can fail within deployment.
     #[derive(Debug, Default)]
@@ -92,11 +91,7 @@ mod failing_runtime {
     }
 
     impl Runtime for FailingRuntime {
-        fn deploy_artifact(
-            &mut self,
-            artifact: ArtifactId,
-            _spec: Vec<u8>,
-        ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+        fn deploy_artifact(&mut self, artifact: ArtifactId, _spec: Vec<u8>) -> Receiver {
             let result = {
                 if artifact.runtime_id != FAILING_RUNTIME_ID {
                     Err(FailingRuntimeError::GenericError.into())
@@ -109,7 +104,7 @@ mod failing_runtime {
                 }
             };
 
-            Box::new(result.into_future())
+            Receiver::with_result(result)
         }
 
         fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -142,12 +137,7 @@ mod failing_runtime {
         }
 
         /// Commits status for the `SampleService` instance with the specified ID.
-        fn update_service_status(
-            &mut self,
-            _snapshot: &dyn Snapshot,
-            _spec: &InstanceSpec,
-            _status: &InstanceStatus,
-        ) {
+        fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {
             unimplemented!("This runtime does not support service instantiation");
         }
 
@@ -198,9 +188,7 @@ fn testkit_with_failing_runtime(validator_count: u16) -> TestKit {
     TestKitBuilder::validator()
         .with_logger()
         .with_validators(validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .with_additional_runtime(FailingRuntime::default())
         .build()
 }
@@ -211,21 +199,16 @@ fn build_result_transaction(
     request: &DeployRequest,
     result: Result<(), ExecutionError>,
 ) -> Verified<AnyTx> {
-    testkit
-        .network()
-        .validators()
+    let validators = testkit.network().validators();
+    let validator = validators
         .iter()
         .find(|validator| validator.validator_id() == Some(VALIDATOR_OTHER))
-        .map(|validator| {
-            validator.service_keypair().report_deploy_result(
-                SUPERVISOR_INSTANCE_ID,
-                DeployResult {
-                    request: request.clone(),
-                    result: result.into(),
-                },
-            )
-        })
-        .unwrap()
+        .unwrap();
+
+    validator.service_keypair().report_deploy_result(
+        SUPERVISOR_INSTANCE_ID,
+        DeployResult::new(request.clone(), result),
+    )
 }
 
 /// Creates `AsyncEventState::Failed` for planned error of `FailingRuntime`.
@@ -237,19 +220,21 @@ fn fail_state(height: Height) -> AsyncEventState {
 }
 
 /// Sends a deploy request through API.
-fn send_deploy_request(api: &TestKitApi, request: &DeployRequest) -> Hash {
+async fn send_deploy_request(api: &TestKitApi, request: &DeployRequest) -> Hash {
     api.private(ApiKind::Service("supervisor"))
         .query(request)
         .post("deploy-artifact")
+        .await
         .expect("Call for `deploy-artifact` API endpoint failed")
 }
 
 /// Gets a deploy status for a certain request.
-fn get_deploy_status(api: &TestKitApi, request: &DeployRequest) -> AsyncEventState {
+async fn get_deploy_status(api: &TestKitApi, request: &DeployRequest) -> AsyncEventState {
     let query = DeployInfoQuery::from(request.clone());
     api.private(ApiKind::Service("supervisor"))
         .query(&query)
         .get("deploy-status")
+        .await
         .expect("Call for `deploy-status` API endpoint failed")
 }
 
@@ -297,23 +282,19 @@ fn assert_deploy_state(actual: AsyncEventState, expected: AsyncEventState) {
 /// Test for self-checking the `FailingRuntime` concept and `deploy-status` endpoint.
 /// This test checks the normal conditions: deploy for our node succeed, was confirmed
 /// by the other node and should be deployed within network.
-#[test]
-fn deploy_success() {
+#[tokio::test]
+async fn deploy_success() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy.
@@ -325,29 +306,25 @@ fn deploy_success() {
 
     // Check that status is `Succeed`.
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Succeed);
 }
 
 /// Checks that deployment fails if there was no enough confirmations
 /// when the deadline height was achieved.
-#[test]
-fn deploy_failure_because_not_confirmed() {
+#[tokio::test]
+async fn deploy_failure_because_not_confirmed() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Do NOT confirm a deploy.
@@ -355,29 +332,24 @@ fn deploy_failure_because_not_confirmed() {
 
     // Check that status is `Failed` at the deadline height.
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Timeout);
 }
 
 /// Checks that if deployment attempt fails for our node, the deploy
 /// is failed despite the confirmation from other node.
-#[test]
-fn deploy_failure_because_cannot_deploy() {
+#[tokio::test]
+async fn deploy_failure_because_cannot_deploy() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_fail(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request = DeployRequest::new(FailingRuntime::artifact_should_fail(), DEPLOY_HEIGHT);
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
@@ -391,7 +363,7 @@ fn deploy_failure_because_cannot_deploy() {
     // the deployment is scheduled itself for the next block, but is performed in
     // `after_commit`, thus height is 2.
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, fail_state(Height(2)));
 }
 
@@ -401,8 +373,8 @@ fn deploy_failure_because_cannot_deploy() {
 ///
 /// Motivation: there was a bug which caused `Supervisor` to attempt deployments
 /// every block until the deadline height.
-#[test]
-fn deploy_failure_check_no_extra_actions() {
+#[tokio::test]
+async fn deploy_failure_check_no_extra_actions() {
     // Choose some bigger height to verify that no extra actions are performed
     // after deployment activities and before deadline height.
     const BIGGER_DEPLOY_HEIGHT: Height = Height(10);
@@ -410,18 +382,14 @@ fn deploy_failure_check_no_extra_actions() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_fail(),
-        spec: Vec::new(),
-        deadline_height: BIGGER_DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_fail(), BIGGER_DEPLOY_HEIGHT);
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy (it should not affect the overall failure).
@@ -435,7 +403,7 @@ fn deploy_failure_check_no_extra_actions() {
     assert_eq!(block.transactions.len(), 1);
 
     // Check that deployment is already marked as failed.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, fail_state(Height(2)));
 
     // Ensure that there are no more transactions until the deadline height.
@@ -450,28 +418,24 @@ fn deploy_failure_check_no_extra_actions() {
     // Check the deployment status again (after the deadline),
     // it should not change.
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, fail_state(Height(2)));
 }
 
 /// Checks that if other node sends a failure report, deployment fails as well.
-#[test]
-fn deploy_failure_because_other_node_cannot_deploy() {
+#[tokio::test]
+async fn deploy_failure_because_other_node_cannot_deploy() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
@@ -485,7 +449,7 @@ fn deploy_failure_because_other_node_cannot_deploy() {
     // Check that status is `Failed` on the same height when failure report
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     let fail_state = AsyncEventState::Failed {
         height: Height(1),
         error,
@@ -495,8 +459,8 @@ fn deploy_failure_because_other_node_cannot_deploy() {
 
 /// Checks that after unsuccessful deploy attempt we can perform another try and it can
 /// result in a success.
-#[test]
-fn deploy_successfully_after_failure() {
+#[tokio::test]
+async fn deploy_successfully_after_failure() {
     // 1. Perform the same routine as in `deploy_failure_because_other_node_cannot_deploy`:
     // - attempt to deploy an artifact that can be deployed;
     // - receive failure report from the other node;
@@ -505,18 +469,14 @@ fn deploy_successfully_after_failure() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Send a notification that a node can not deploy the artifact.
@@ -530,7 +490,7 @@ fn deploy_successfully_after_failure() {
     // Check that status is `Failed` on the same height when failure report
     // was received from other node (in the second block, which corresponds to height 1).
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     let fail_state = AsyncEventState::Failed {
         height: Height(1),
         error,
@@ -547,18 +507,16 @@ fn deploy_successfully_after_failure() {
 
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: NEW_DEPLOY_HEIGHT,
-    };
-
-    let tx_hash = send_deploy_request(&api, &deploy_request);
+    let deploy_request = DeployRequest::new(
+        FailingRuntime::artifact_should_be_deployed(),
+        NEW_DEPLOY_HEIGHT,
+    );
+    let tx_hash = send_deploy_request(&api, &deploy_request).await;
     let block = testkit.create_block();
     block[tx_hash].status().unwrap();
 
     // Check that request is now pending.
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Pending);
 
     // Confirm deploy.
@@ -570,27 +528,24 @@ fn deploy_successfully_after_failure() {
 
     // Check that status is `Succeed`.
     let api = testkit.api();
-    let state = get_deploy_status(&api, &deploy_request);
+    let state = get_deploy_status(&api, &deploy_request).await;
     assert_deploy_state(state, AsyncEventState::Succeed);
 }
 
 /// Checks that `deploy-status` returns `NotFound` for unknown requests.
-#[test]
-fn not_requested_deploy_status() {
+#[tokio::test]
+async fn not_requested_deploy_status() {
     let mut testkit = testkit_with_failing_runtime(VALIDATORS_AMOUNT);
     let api = testkit.api();
 
-    let deploy_request = DeployRequest {
-        artifact: FailingRuntime::artifact_should_be_deployed(),
-        spec: Vec::new(),
-        deadline_height: DEPLOY_HEIGHT,
-    };
-
+    let deploy_request =
+        DeployRequest::new(FailingRuntime::artifact_should_be_deployed(), DEPLOY_HEIGHT);
     let query = DeployInfoQuery::from(deploy_request);
     let error = api
         .private(ApiKind::Service("supervisor"))
         .query(&query)
         .get::<AsyncEventState>("deploy-status")
+        .await
         .expect_err("Call for `deploy-status` API endpoint succeed, but was expected to fail");
 
     assert_eq!(u16::from(error.http_code), 404);

@@ -20,6 +20,7 @@ use exonum_derive::ExecutionFail;
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(kind = "runtime")]
+#[non_exhaustive]
 pub enum Error {
     /// Cannot deploy artifact because it has non-empty specification.
     IncorrectArtifactId = 0,

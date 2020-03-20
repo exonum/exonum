@@ -15,9 +15,9 @@
 //! Standard Exonum CLI command used to combine a private and all the public parts of the
 //! node configuration in a single file.
 
+use anyhow::{bail, ensure, format_err, Error};
 use exonum::crypto::PublicKey;
 use exonum_node::{ConnectInfo, ConnectListConfig, NodeApiConfig};
-use failure::{bail, ensure, format_err, Error};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -32,6 +32,7 @@ use crate::{
 /// Generate final node configuration using public configs
 /// of other nodes in the network.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Finalize {
     /// Path to a private part of a node configuration.
     pub private_config_path: PathBuf,
@@ -107,7 +108,7 @@ impl Finalize {
         })
     }
 
-    fn get_consensus_key(config: &NodePublicConfig) -> Result<PublicKey, failure::Error> {
+    fn get_consensus_key(config: &NodePublicConfig) -> anyhow::Result<PublicKey> {
         Ok(config
             .validator_keys
             .ok_or_else(|| format_err!("Expected validator keys in public config: {:#?}", config))?
@@ -124,13 +125,13 @@ impl Finalize {
                 let public_key = Self::get_consensus_key(config).unwrap();
                 // `skipped_key` is a consensus key of the current node. We don't need
                 // to include `ConnectInfo` with this key in the connect list.
-                if public_key != *key_to_skip {
+                if public_key == *key_to_skip {
+                    None
+                } else {
                     Some(ConnectInfo {
                         public_key,
                         address: config.address.clone().unwrap(),
                     })
-                } else {
-                    None
                 }
             })
             .collect();

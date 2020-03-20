@@ -12,24 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
+use anyhow::format_err;
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
-    impl_binary_key_for_binary_value, Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash,
-    ProofEntry, ProofListIndex, ProofMapIndex,
+    impl_binary_key_for_binary_value,
+    indexes::{Entries, Values},
+    Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
-use failure::format_err;
 
 use std::fmt;
 
-use super::{Block, BlockProof, ConsensusConfig, ExecutionError};
+use super::{Block, BlockProof, CallProof, ConsensusConfig};
 use crate::{
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Precommit, Verified},
     proto::schema::blockchain as pb_blockchain,
-    runtime::InstanceId,
+    runtime::{ExecutionError, ExecutionErrorAux, InstanceId},
 };
 
 /// Defines `&str` constants with given name and value.
@@ -46,6 +48,7 @@ macro_rules! define_names {
 define_names!(
     TRANSACTIONS => "transactions";
     CALL_ERRORS => "call_errors";
+    CALL_ERRORS_AUX => "call_errors_aux";
     TRANSACTIONS_LEN => "transactions_len";
     TRANSACTIONS_POOL => "transactions_pool";
     TRANSACTIONS_POOL_LEN => "transactions_pool_len";
@@ -116,48 +119,43 @@ impl<T: Access> Schema<T> {
         self.access.get_map(TRANSACTIONS)
     }
 
-    /// Returns a record of errors that occurred during execution of a particular block.
-    ///
-    /// This method can be used to build a proof that execution of a certain transaction
-    /// ended up with a particular status.
-    /// For an execution that resulted in an error, this will be an usual proof of existence.
-    /// If the transaction was executed successfully, such a proof will be a proof of absence.
-    /// Since the number of transactions in a block is mentioned in the block header, the user
-    /// will be able to distinguish absence of error (meaning successful execution) from
-    /// the absence of a transaction with such an index. Indeed, if the index is less
-    /// than amount of transactions in block, the proof denotes successful execution;
-    /// otherwise, the transaction with the given index does not exist in the block.
-    ///
-    /// Similarly, execution errors of the `before_transactions` / `after_transactions`
-    /// hooks can be proven to external clients. Discerning successful execution
-    /// from a non-existing service requires prior knowledge though.
-    ///
-    /// Proofs obtained with this method should not be mixed up with a proof of transaction
-    /// commitment. To verify that a certain transaction was committed, use a proof from
-    /// the `block_transactions` index.
-    // TODO: Retain historic information about services [ECR-3922]
-    pub fn call_errors(
+    pub(crate) fn call_errors_map(
         &self,
         block_height: Height,
     ) -> ProofMapIndex<T::Base, CallInBlock, ExecutionError> {
         self.access.get_proof_map((CALL_ERRORS, &block_height.0))
     }
 
+    /// Returns auxiliary information about an error that does not influence blockchain state hash.
+    fn call_errors_aux(
+        &self,
+        block_height: Height,
+    ) -> MapIndex<T::Base, CallInBlock, ExecutionErrorAux> {
+        self.access.get_map((CALL_ERRORS_AUX, &block_height.0))
+    }
+
+    /// Returns a record of errors that occurred during execution of a particular block.
+    /// If the block is not committed, returns `None`.
+    pub fn call_records(&self, block_height: Height) -> Option<CallRecords<T>> {
+        self.block_hash_by_height(block_height)?;
+        Some(CallRecords {
+            height: block_height,
+            errors: self.call_errors_map(block_height),
+            errors_aux: self.call_errors_aux(block_height),
+            access: self.access.clone(),
+        })
+    }
+
     /// Returns the result of the execution for a transaction with the specified location.
     /// If the location does not correspond to a transaction, returns `None`.
     pub fn transaction_result(&self, location: TxLocation) -> Option<Result<(), ExecutionError>> {
-        if self.block_transactions(location.block_height).len()
-            <= u64::from(location.position_in_block)
-        {
+        let records = self.call_records(location.block_height)?;
+        let txs_in_block = self.block_transactions(location.block_height).len();
+        if txs_in_block <= u64::from(location.position_in_block) {
             return None;
         }
-
-        let call_location = CallInBlock::transaction(location.position_in_block);
-        let call_result = match self.call_errors(location.block_height).get(&call_location) {
-            None => Ok(()),
-            Some(e) => Err(e),
-        };
-        Some(call_result)
+        let status = records.get(CallInBlock::transaction(location.position_in_block));
+        Some(status)
     }
 
     /// Returns an entry that represents a count of committed transactions in the blockchain.
@@ -307,25 +305,131 @@ where
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.
+    ///
+    /// **NB.** This method does not remove transactions from the `transactions_pool`.
+    /// The pool is updated during block commit in `update_transaction_count` in order to avoid
+    /// data race between commit and adding transactions into the pool.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash, height: Height, tx: Verified<AnyTx>) {
         if !self.transactions().contains(hash) {
             self.transactions().put(hash, tx)
-        }
-
-        if self.transactions_pool().contains(hash) {
-            self.transactions_pool().remove(hash);
-            let txs_pool_len = self.transactions_pool_len_index().get().unwrap();
-            self.transactions_pool_len_index().set(txs_pool_len - 1);
         }
 
         self.block_transactions(height).push(*hash);
     }
 
     /// Updates transaction count of the blockchain.
-    pub(crate) fn update_transaction_count(&mut self, count: u64) {
+    pub(crate) fn update_transaction_count(&mut self) {
+        let block_transactions = self.block_transactions(self.height());
+        let count = block_transactions.len();
+
         let mut len_index = self.transactions_len_index();
         let new_len = len_index.get().unwrap_or(0) + count;
         len_index.set(new_len);
+
+        // Determine the number of committed transactions present in the pool (besides the pool,
+        // transactions can be taken from the non-persistent cache). Remove the committed transactions
+        // from the pool.
+        let mut pool = self.transactions_pool();
+        let pool_count = block_transactions
+            .iter()
+            .filter(|tx_hash| {
+                if pool.contains(tx_hash) {
+                    pool.remove(tx_hash);
+                    true
+                } else {
+                    false
+                }
+            })
+            .count();
+
+        let mut pool_len_index = self.transactions_pool_len_index();
+        let new_pool_len = pool_len_index.get().unwrap_or(0) - pool_count as u64;
+        pool_len_index.set(new_pool_len);
+    }
+
+    /// Saves an error to the blockchain.
+    pub(crate) fn save_error(
+        &mut self,
+        height: Height,
+        call: CallInBlock,
+        mut err: ExecutionError,
+    ) {
+        let aux = err.split_aux();
+        self.call_errors_map(height).put(&call, err);
+        self.call_errors_aux(height).put(&call, aux);
+    }
+}
+
+/// Information about call errors within a specific block.
+///
+/// This data type can be used to get information or build proofs that execution
+/// of a certain call ended up with a particular status.
+#[derive(Debug)]
+pub struct CallRecords<T: Access> {
+    height: Height,
+    errors: ProofMapIndex<T::Base, CallInBlock, ExecutionError>,
+    errors_aux: MapIndex<T::Base, CallInBlock, ExecutionErrorAux>,
+    access: T,
+}
+
+impl<T: Access> CallRecords<T> {
+    /// Iterates over errors in a block.
+    pub fn errors(&self) -> CallErrorsIter<'_> {
+        CallErrorsIter {
+            errors_iter: self.errors.iter(),
+            aux_iter: self.errors_aux.values(),
+        }
+    }
+
+    /// Returns a result of a call execution.
+    ///
+    /// # Return value
+    ///
+    /// This method will return `Ok(())` both if the call completed successfully, or if
+    /// was not performed at all. The caller is responsible to distinguish these two outcomes.
+    pub fn get(&self, call: CallInBlock) -> Result<(), ExecutionError> {
+        match self.errors.get(&call) {
+            Some(mut err) => {
+                let aux = self
+                    .errors_aux
+                    .get(&call)
+                    .expect("BUG: Aux info is not saved for an error");
+                err.recombine_with_aux(aux);
+                Err(err)
+            }
+            None => Ok(()),
+        }
+    }
+
+    /// Returns a cryptographic proof of authenticity for a top-level call within a block.
+    pub fn get_proof(&self, call: CallInBlock) -> CallProof {
+        let block_proof = Schema::new(self.access.clone())
+            .block_and_precommits(self.height)
+            .unwrap();
+        let error_description = self.errors_aux.get(&call).map(|aux| aux.description);
+        let call_proof = self.errors.get_proof(call);
+        CallProof::new(block_proof, call_proof, error_description)
+    }
+}
+
+/// Iterator over errors in a block returned by `CallRecords::errors()`.
+#[derive(Debug)]
+pub struct CallErrorsIter<'a> {
+    errors_iter: Entries<'a, CallInBlock, ExecutionError>,
+    aux_iter: Values<'a, ExecutionErrorAux>,
+}
+
+impl Iterator for CallErrorsIter<'_> {
+    type Item = (CallInBlock, ExecutionError);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (call, mut error) = self.errors_iter.next()?;
+        let aux = self
+            .aux_iter
+            .next()
+            .expect("BUG: Aux info is not saved for an error");
+        error.recombine_with_aux(aux);
+        Some((call, error))
     }
 }
 
@@ -347,9 +451,6 @@ where
 /// assert!(CallInBlock::after_transactions(0) < CallInBlock::after_transactions(1));
 /// ```
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// # See also
 ///
 /// Not to be confused with [`CallSite`], which provides information about a call in which
@@ -365,6 +466,7 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)] // builtin traits
 #[derive(Serialize, Deserialize, BinaryValue, ObjectHash)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum CallInBlock {
     /// Call of `before_transactions` hook in a service.
     BeforeTransactions {
@@ -381,10 +483,6 @@ pub enum CallInBlock {
         /// Numerical service identifier.
         id: InstanceId,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl ProtobufConvert for CallInBlock {
@@ -393,25 +491,24 @@ impl ProtobufConvert for CallInBlock {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            CallInBlock::BeforeTransactions { id } => pb.set_before_transactions(*id),
-            CallInBlock::Transaction { index } => pb.set_transaction(*index),
-            CallInBlock::AfterTransactions { id } => pb.set_after_transactions(*id),
-            CallInBlock::__NonExhaustive => unreachable!("Never actually constructed"),
+            Self::BeforeTransactions { id } => pb.set_before_transactions(*id),
+            Self::Transaction { index } => pb.set_transaction(*index),
+            Self::AfterTransactions { id } => pb.set_after_transactions(*id),
         }
         pb
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         if pb.has_before_transactions() {
-            Ok(CallInBlock::BeforeTransactions {
+            Ok(Self::BeforeTransactions {
                 id: pb.get_before_transactions(),
             })
         } else if pb.has_transaction() {
-            Ok(CallInBlock::Transaction {
+            Ok(Self::Transaction {
                 index: pb.get_transaction(),
             })
         } else if pb.has_after_transactions() {
-            Ok(CallInBlock::AfterTransactions {
+            Ok(Self::AfterTransactions {
                 id: pb.get_after_transactions(),
             })
         } else {
@@ -423,17 +520,17 @@ impl ProtobufConvert for CallInBlock {
 impl CallInBlock {
     /// Creates a location corresponding to a `before_transactions` call.
     pub fn before_transactions(id: InstanceId) -> Self {
-        CallInBlock::BeforeTransactions { id }
+        Self::BeforeTransactions { id }
     }
 
     /// Creates a location corresponding to a transaction.
     pub fn transaction(index: u32) -> Self {
-        CallInBlock::Transaction { index }
+        Self::Transaction { index }
     }
 
     /// Creates a location corresponding to a `after_transactions` call.
     pub fn after_transactions(id: InstanceId) -> Self {
-        CallInBlock::AfterTransactions { id }
+        Self::AfterTransactions { id }
     }
 }
 
@@ -442,16 +539,15 @@ impl_binary_key_for_binary_value!(CallInBlock);
 impl fmt::Display for CallInBlock {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CallInBlock::BeforeTransactions { id } => write!(
+            Self::BeforeTransactions { id } => write!(
                 formatter,
                 "`before_transactions` for service with ID {}",
                 id
             ),
-            CallInBlock::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
-            CallInBlock::AfterTransactions { id } => {
+            Self::Transaction { index } => write!(formatter, "transaction #{}", index + 1),
+            Self::AfterTransactions { id } => {
                 write!(formatter, "`after_transactions` for service with ID {}", id)
             }
-            CallInBlock::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 }

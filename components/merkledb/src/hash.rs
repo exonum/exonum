@@ -14,7 +14,9 @@
 
 use byteorder::{ByteOrder, LittleEndian};
 use exonum_crypto::{hash, Hash, HashStream, HASH_SIZE};
-use failure::Fail;
+use thiserror::Error;
+
+use std::error::Error as StdError;
 
 use crate::{proof_map::ProofPath, BinaryValue};
 
@@ -42,12 +44,10 @@ const EMPTY_MAP_HASH: [u8; HASH_SIZE] = [
 /// Different hashes for leaf and branch nodes of the list are used to secure Merkle tree
 /// from the pre-image attack. See more information [here][rfc6962].
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// [rfc6962]: https://tools.ietf.org/html/rfc6962#section-2.1
 #[derive(Copy, Clone, Debug)]
 #[repr(u8)]
+#[non_exhaustive]
 pub enum HashTag {
     /// Hash prefix of a blob (i.e., a type implementing [`BinaryValue`], which is stored in the DB
     /// as byte sequence).
@@ -64,10 +64,6 @@ pub enum HashTag {
     /// Hash prefix of a branch node in a Merkle Patricia tree built for
     /// a [Merkelized map](indexes/proof_map/struct.ProofMapIndex.html).
     MapBranchNode = 4,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive = 255,
 }
 
 impl HashTag {
@@ -78,12 +74,12 @@ impl HashTag {
 
     /// Obtains a hashed value of a leaf in a Merkle tree.
     pub fn hash_leaf(value: &[u8]) -> Hash {
-        HashTag::Blob.hash_stream().update(value).hash()
+        Self::Blob.hash_stream().update(value).hash()
     }
 
     /// Obtains a hashed value of a branch in a Merkle tree.
     pub fn hash_node(left_hash: &Hash, right_hash: &Hash) -> Hash {
-        HashTag::ListBranchNode
+        Self::ListBranchNode
             .hash_stream()
             .update(left_hash.as_ref())
             .update(right_hash.as_ref())
@@ -92,7 +88,7 @@ impl HashTag {
 
     /// Obtains a hashed value of a Merkle tree branch with one child.
     pub fn hash_single_node(hash: &Hash) -> Hash {
-        HashTag::ListBranchNode
+        Self::ListBranchNode
             .hash_stream()
             .update(hash.as_ref())
             .hash()
@@ -109,7 +105,7 @@ impl HashTag {
         LittleEndian::write_u64(&mut len_bytes, len);
 
         HashStream::new()
-            .update(&[HashTag::ListNode as u8])
+            .update(&[Self::ListNode as u8])
             .update(&len_bytes)
             .update(root.as_ref())
             .hash()
@@ -137,7 +133,7 @@ impl HashTag {
     /// ```
     pub fn hash_map_node(root: Hash) -> Hash {
         HashStream::new()
-            .update(&[HashTag::MapNode as u8])
+            .update(&[Self::MapNode as u8])
             .update(root.as_ref())
             .hash()
     }
@@ -154,7 +150,7 @@ impl HashTag {
     /// [`ProofMapIndex`]: indexes/proof_map/struct.ProofMapIndex.html#impl-ObjectHash
     pub fn hash_map_branch(branch_node: &[u8]) -> Hash {
         HashStream::new()
-            .update(&[HashTag::MapBranchNode as u8])
+            .update(&[Self::MapBranchNode as u8])
             .update(branch_node)
             .hash()
     }
@@ -175,7 +171,7 @@ impl HashTag {
         path.write_compressed(&mut path_buffer);
 
         HashStream::new()
-            .update(&[HashTag::MapBranchNode as u8])
+            .update(&[Self::MapBranchNode as u8])
             .update(&path_buffer[..])
             .update(child_hash.as_ref())
             .hash()
@@ -264,23 +260,16 @@ impl ObjectHash for [u8] {
 
 /// Errors that can occur while validating a `ListProof` or `MapProof` against
 /// a trusted collection hash.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-#[derive(Debug, Fail)]
-pub enum ValidationError<E: Fail> {
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum ValidationError<E: StdError + 'static> {
     /// The hash of the proof is not equal to the trusted root hash.
-    #[fail(display = "hash of the proof is not equal to the trusted hash of the list")]
+    #[error("hash of the proof is not equal to the trusted hash of the index")]
     UnmatchedRootHash,
 
     /// The proof is malformed.
-    #[fail(display = "Malformed proof: {}", _0)]
-    Malformed(#[fail(cause)] E),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    #[fail(display = "")]
-    __NonExhaustive,
+    #[error("Malformed proof: {}", _0)]
+    Malformed(#[source] E),
 }
 
 #[cfg(test)]

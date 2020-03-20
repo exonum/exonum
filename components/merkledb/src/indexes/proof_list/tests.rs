@@ -1215,8 +1215,7 @@ mod root_hash {
 
     #[test]
     fn object_hash_with_strings() {
-        const STRING: &str =
-            "All human beings are born free and equal in dignity and rights. \
+        const STRING: &str = "All human beings are born free and equal in dignity and rights. \
              They are endowed with reason and conscience and should act towards one another \
              in a spirit of brotherhood.";
 

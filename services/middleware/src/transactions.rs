@@ -14,6 +14,7 @@
 
 //! Transaction logic for `MiddlewareService`.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum::runtime::{AnyTx, CoreError, ExecutionContext, ExecutionError, InstanceId};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
@@ -49,7 +50,8 @@ pub struct CheckedCall {
 mod pb_version_req {
     use super::*;
 
-    pub fn from_pb(pb: String) -> Result<VersionReq, failure::Error> {
+    #[allow(clippy::needless_pass_by_value)] // required by `exonum-proto`
+    pub fn from_pb(pb: String) -> anyhow::Result<VersionReq> {
         pb.parse().map_err(From::from)
     }
 
@@ -197,7 +199,7 @@ impl MiddlewareInterface<ExecutionContext<'_>> for MiddlewareService {
         }
 
         // TODO: use interface name from `call_info` once it's added there
-        let method = MethodDescriptor::new("", "", arg.inner.call_info.method_id);
+        let method = MethodDescriptor::inherent(arg.inner.call_info.method_id);
         FallthroughAuth(context).generic_call_mut(instance_id, method, arg.inner.arguments)
     }
 
@@ -205,7 +207,7 @@ impl MiddlewareInterface<ExecutionContext<'_>> for MiddlewareService {
         let mut fallthrough_auth = FallthroughAuth(context);
         for call in arg.inner {
             // TODO: use interface name from `call_info` once it's added there
-            let method = MethodDescriptor::new("", "", call.call_info.method_id);
+            let method = MethodDescriptor::inherent(call.call_info.method_id);
             fallthrough_auth.generic_call_mut(
                 call.call_info.instance_id,
                 method,

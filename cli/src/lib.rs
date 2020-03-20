@@ -43,10 +43,10 @@
 //! `exonum-cli` also supports additional CLI commands for performing maintenance actions by node
 //! administrators and easier debugging.
 //!
-//! * `run-dev` command automatically generates network configuration with a single node and runs
-//! it. This command can be useful for fast testing of the services during development process.
-//! * `maintenance` command allows to clear node's consensus messages with `clear-cache`, and
-//! restart node's service migration script with `restart-migration`.
+//! - `run-dev` command automatically generates network configuration with a single node and runs
+//!   it. This command can be useful for fast testing of the services during development process.
+//! - `maintenance` command allows to clear node's consensus messages with `clear-cache`, and
+//!   restart node's service migration script with `restart-migration`.
 //!
 //! ## How to Extend Parameters
 //!
@@ -55,25 +55,51 @@
 //! additional parameters and use `flatten` macro attribute of [`serde`][serde] and
 //! [`structopt`][structopt] libraries.
 //!
-//! ```ignore
+//! ```
+//! use exonum_cli::command::{Run, ExonumCommand};
+//! use serde::{Deserialize, Serialize};
+//! use structopt::StructOpt;
+//!
 //! #[derive(Serialize, Deserialize, StructOpt)]
 //! struct MyRunCommand {
 //!     #[serde(flatten)]
 //!     #[structopt(flatten)]
-//!     default: Run
-//!     /// My awesome parameter
-//!     secret_number: i32
+//!     inner: Run,
+//!
+//!     /// My awesome parameter.
+//!     #[structopt(name = "secret", long, default_value = "0")]
+//!     secret_number: i32,
 //! }
+//!
+//! // Usage. We use `StructOpt::from_iter` for testing purposes;
+//! // the real app should use `StructOpt::from_args`.
+//! let command = MyRunCommand::from_iter(vec![
+//!     "executable",
+//!     "-c", "./node.toml",
+//!     "--db-path", "./db",
+//!     "--secret", "42",
+//! ]);
+//! assert_eq!(command.secret_number, 42);
+//! # drop(|| -> anyhow::Result<()> {
+//! command.inner.execute()?;
+//! # Ok(())
+//! # });
 //! ```
 //!
 //! You can also create own list of commands by implementing an enum with a similar principle:
 //!
-//! ```ignore
+//! ```
+//! use exonum_cli::command::Run;
+//! use structopt::StructOpt;
+//!
+//! // `MyRunCommand` defined as in the previous example...
+//! # #[derive(StructOpt)] pub struct MyRunCommand {}
+//!
 //! #[derive(StructOpt)]
-//! enum MyCommands {
-//!     #[structopt(name = "run")
+//! pub enum MyCommands {
+//!     #[structopt(name = "run")]
 //!     DefaultRun(Run),
-//!     #[structopt(name = "my-run")
+//!     #[structopt(name = "my-run")]
 //!     MyAwesomeRun(MyRunCommand),
 //! }
 //! ```
@@ -85,19 +111,40 @@
 //! [serde]: https://crates.io/crates/serde
 //! [structopt]: https://crates.io/crates/structopt
 
-#![deny(missing_docs)]
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
 
-pub use crate::config_manager::DefaultConfigManager;
+pub use crate::{
+    config_manager::DefaultConfigManager,
+    io::{load_config_file, save_config_file},
+};
+pub use exonum_rust_runtime::spec::Spec;
 pub use structopt;
 
 use exonum::{
-    blockchain::config::{GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
+    blockchain::config::{GenesisConfig, GenesisConfigBuilder},
     merkledb::RocksDB,
     runtime::{RuntimeInstance, WellKnownRuntime},
 };
 use exonum_explorer_service::ExplorerFactory;
 use exonum_node::{Node, NodeBuilder as CoreNodeBuilder};
-use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, ServiceFactory};
+use exonum_rust_runtime::{spec::Deploy, RustRuntimeBuilder};
 use exonum_supervisor::{Supervisor, SupervisorConfig};
 use exonum_system_api::SystemApiPlugin;
 use structopt::StructOpt;
@@ -105,11 +152,11 @@ use tempfile::TempDir;
 
 use std::{env, ffi::OsString, iter, path::PathBuf};
 
-use crate::command::{run::NodeRunConfig, Command, ExonumCommand, StandardResult};
+use crate::command::{Command, ExonumCommand, NodeRunConfig, StandardResult};
 
 pub mod command;
 pub mod config;
-pub mod io;
+mod io;
 pub mod password;
 
 mod config_manager;
@@ -120,7 +167,7 @@ mod config_manager;
 pub struct NodeBuilder {
     rust_runtime: RustRuntimeBuilder,
     external_runtimes: Vec<RuntimeInstance>,
-    builtin_instances: Vec<InstanceInitParams>,
+    genesis_config: GenesisConfigBuilder,
     args: Option<Vec<OsString>>,
     temp_dir: Option<TempDir>,
 }
@@ -135,11 +182,9 @@ impl NodeBuilder {
     /// Creates a new builder.
     pub fn new() -> Self {
         Self {
-            rust_runtime: RustRuntimeBuilder::new()
-                .with_factory(Supervisor)
-                .with_factory(ExplorerFactory),
+            genesis_config: GenesisConfigBuilder::default(),
+            rust_runtime: RustRuntimeBuilder::new(),
             external_runtimes: vec![],
-            builtin_instances: vec![],
             args: None,
             temp_dir: None,
         }
@@ -154,9 +199,7 @@ impl NodeBuilder {
         I::Item: Into<OsString>,
     {
         let mut this = Self::new();
-        let executable = env::current_exe()
-            .map(PathBuf::into_os_string)
-            .unwrap_or_else(|_| "node".into());
+        let executable = env::current_exe().map_or_else(|_| "node".into(), PathBuf::into_os_string);
         let all_args = iter::once(executable)
             .chain(args.into_iter().map(Into::into))
             .collect();
@@ -170,7 +213,7 @@ impl NodeBuilder {
     /// # Return value
     ///
     /// Returns an error if the temporary directory cannot be created.
-    pub fn development_node() -> Result<Self, failure::Error> {
+    pub fn development_node() -> anyhow::Result<Self> {
         let temp_dir = TempDir::new()?;
         let mut this = Self::with_args(vec![
             OsString::from("run-dev"),
@@ -181,9 +224,10 @@ impl NodeBuilder {
         Ok(this)
     }
 
-    /// Adds new Rust service to the list of available services.
-    pub fn with_rust_service(mut self, service: impl ServiceFactory) -> Self {
-        self.rust_runtime = self.rust_runtime.with_factory(service);
+    /// Adds a deploy spec to this builder. The spec may contain artifacts and service instances
+    /// to deploy at the blockchain start.
+    pub fn with(mut self, spec: impl Deploy) -> Self {
+        spec.deploy(&mut self.genesis_config, &mut self.rust_runtime);
         self
     }
 
@@ -193,22 +237,6 @@ impl NodeBuilder {
     pub fn with_external_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         self.external_runtimes.push(runtime.into());
         self
-    }
-
-    /// Adds a service instance that will be available immediately after creating a genesis block.
-    ///
-    /// For Rust services, the service factory needs to be separately supplied
-    /// via [`with_rust_service`](#method.with_rust_service).
-    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
-        self.builtin_instances.push(instance.into());
-        self
-    }
-
-    /// Adds a default Rust service instance that will be available immediately after creating a
-    /// genesis block.
-    pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
-        self.with_instance(service.default_instance())
-            .with_rust_service(service)
     }
 
     /// Executes a command received from the command line.
@@ -221,7 +249,7 @@ impl NodeBuilder {
     /// - `Ok(None)` if the command executed successfully and did not lead to node creation
     /// - `Err(_)` if an error occurred during command execution
     #[doc(hidden)] // unstable
-    pub fn execute_command(self) -> Result<Option<Node>, failure::Error> {
+    pub fn execute_command(mut self) -> anyhow::Result<Option<Node>> {
         let command = if let Some(args) = self.args {
             Command::from_iter(args)
         } else {
@@ -229,8 +257,14 @@ impl NodeBuilder {
         };
 
         if let StandardResult::Run(run_config) = command.execute()? {
-            let genesis_config = Self::genesis_config(&run_config, self.builtin_instances);
+            // Deploy "default" services (supervisor and the explorer).
+            let supervisor = Self::supervisor_service(&run_config);
+            supervisor.deploy(&mut self.genesis_config, &mut self.rust_runtime);
+            Spec::new(ExplorerFactory)
+                .with_default_instance()
+                .deploy(&mut self.genesis_config, &mut self.rust_runtime);
 
+            let genesis_config = Self::genesis_config(&run_config, self.genesis_config);
             let db_options = &run_config.node_config.private_config.database;
             let database = RocksDB::open(run_config.db_path, db_options)?;
 
@@ -256,45 +290,31 @@ impl NodeBuilder {
     }
 
     /// Configures the node using parameters provided by user from stdin and then runs it.
-    pub fn run(mut self) -> Result<(), failure::Error> {
+    pub async fn run(mut self) -> anyhow::Result<()> {
         // Store temporary directory until the node is done.
         let _temp_dir = self.temp_dir.take();
         if let Some(node) = self.execute_command()? {
-            node.run()
+            node.run().await
         } else {
             Ok(())
         }
     }
 
-    fn genesis_config(
-        run_config: &NodeRunConfig,
-        default_instances: Vec<InstanceInitParams>,
-    ) -> GenesisConfig {
-        let mut builder = GenesisConfigBuilder::with_consensus_config(
-            run_config.node_config.public_config.consensus.clone(),
-        );
+    fn genesis_config(run_config: &NodeRunConfig, builder: GenesisConfigBuilder) -> GenesisConfig {
         // Add builtin services to genesis config.
-        builder = builder
-            .with_artifact(Supervisor.artifact_id())
-            .with_instance(Self::supervisor_service(&run_config))
-            .with_artifact(ExplorerFactory.artifact_id())
-            .with_instance(ExplorerFactory.default_instance());
-        // Add default instances.
-        for instance in default_instances {
-            builder = builder
-                .with_artifact(instance.instance_spec.artifact.clone())
-                .with_instance(instance)
-        }
-        builder.build()
+        let mut config = builder.build();
+        // Override consensus config.
+        config.consensus_config = run_config.node_config.public_config.consensus.clone();
+        config
     }
 
-    fn supervisor_service(run_config: &NodeRunConfig) -> InstanceInitParams {
+    fn supervisor_service(run_config: &NodeRunConfig) -> impl Deploy {
         let mode = run_config
             .node_config
             .public_config
             .general
             .supervisor_mode
             .clone();
-        Supervisor::builtin_instance(SupervisorConfig { mode })
+        Supervisor::builtin_instance(SupervisorConfig::new(mode))
     }
 }

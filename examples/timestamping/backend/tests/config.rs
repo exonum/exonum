@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use exonum::runtime::{CoreError, ErrorMatch, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID};
-use exonum_rust_runtime::ServiceFactory;
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
-use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 use exonum_time::{MockTimeProvider, TimeServiceFactory};
 
 use std::time::SystemTime;
@@ -32,48 +31,34 @@ const SECOND_TIME_SERVICE_NAME: &str = "time2";
 fn init_testkit(second_time_service: bool) -> (TestKit, MockTimeProvider) {
     let mock_provider = MockTimeProvider::new(SystemTime::now().into());
     let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
-    let time_service_artifact = time_service.artifact_id();
-    let timestamping = TimestampingService;
-    let timestamping_artifact = timestamping.artifact_id();
+    let mut time_service =
+        Spec::new(time_service).with_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME, ());
+    if second_time_service {
+        time_service =
+            time_service.with_instance(SECOND_TIME_SERVICE_ID, SECOND_TIME_SERVICE_NAME, ());
+    }
+
+    let config = Config {
+        time_service_name: TIME_SERVICE_NAME.to_owned(),
+    };
+    let timestamping =
+        Spec::new(TimestampingService).with_instance(SERVICE_ID, SERVICE_NAME, config);
 
     let testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
-        .with_rust_service(time_service)
-        .with_rust_service(timestamping)
-        .with_artifact(time_service_artifact.clone())
-        .with_instance(
-            time_service_artifact.into_default_instance(TIME_SERVICE_ID, TIME_SERVICE_NAME),
-        )
-        .with_artifact(timestamping_artifact.clone())
-        .with_instance(
-            timestamping_artifact
-                .into_default_instance(SERVICE_ID, SERVICE_NAME)
-                .with_constructor(Config {
-                    time_service_name: TIME_SERVICE_NAME.to_owned(),
-                }),
-        );
-
-    let testkit = if second_time_service {
-        let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
-        let time_service_artifact = time_service.artifact_id();
-        testkit
-            .with_instance(
-                time_service_artifact
-                    .into_default_instance(SECOND_TIME_SERVICE_ID, SECOND_TIME_SERVICE_NAME),
-            )
-            .build()
-    } else {
-        testkit.build()
-    };
+        .with(Supervisor::simple())
+        .with(time_service)
+        .with(timestamping)
+        .build();
 
     (testkit, mock_provider)
 }
 
 /// Creates block with `ConfigPropose` tx and returns `Result` with new
 /// configuration or corresponding `ExecutionError`.
-fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), ExecutionError> {
+async fn propose_configuration(
+    testkit: &mut TestKit,
+    config: Config,
+) -> Result<(), ExecutionError> {
     let tx = ConfigPropose::immediate(0).service_config(SERVICE_ID, config.clone());
     let keypair = testkit.network().us().service_keypair();
     let tx = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, tx);
@@ -87,25 +72,28 @@ fn propose_configuration(testkit: &mut TestKit, config: Config) -> Result<(), Ex
         .api()
         .public(ApiKind::Service(SERVICE_NAME))
         .get("v1/timestamps/config")
+        .await
         .expect("Failed to get service configuration");
 
     assert_eq!(config.time_service_name, new_config.time_service_name);
     Ok(())
 }
 
-#[test]
-fn test_propose_configuration() {
+#[tokio::test]
+async fn test_propose_configuration() {
     let (mut testkit, _) = init_testkit(true);
     let config = Config {
         time_service_name: SECOND_TIME_SERVICE_NAME.to_string(),
     };
 
     // Propose valid configuration.
-    propose_configuration(&mut testkit, config).expect("Configuration proposal failed.");
+    propose_configuration(&mut testkit, config)
+        .await
+        .expect("Configuration proposal failed.");
 }
 
-#[test]
-fn test_propose_invalid_configuration() {
+#[tokio::test]
+async fn test_propose_invalid_configuration() {
     let (mut testkit, _) = init_testkit(false);
     let incorrect_names = vec!["", " ", "illegal.illegal", "not_service", SERVICE_NAME];
 
@@ -116,6 +104,7 @@ fn test_propose_invalid_configuration() {
 
         // Propose configuration with invalid time service name.
         let err = propose_configuration(&mut testkit, config)
+            .await
             .expect_err("Configuration proposal should fail.");
 
         let expected_err =

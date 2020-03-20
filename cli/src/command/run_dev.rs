@@ -15,8 +15,8 @@
 //! Standard Exonum CLI command used to run the node with default parameters
 //! for developing purposes.
 
+use anyhow::{Context, Error};
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use failure::{Error, ResultExt};
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
@@ -32,6 +32,7 @@ use crate::command::{
 
 /// Run application in development mode (generate configuration and db files automatically).
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RunDev {
     /// The path where configuration and db files will be generated.
     #[structopt(long, short = "a")]
@@ -93,7 +94,7 @@ impl ExonumCommand for RunDev {
         generate_template.execute()?;
 
         let generate_config = GenerateConfig {
-            common_config: common_config.clone(),
+            common_config,
             output_dir: self.artifacts_dir.clone(),
             peer_address: "127.0.0.1:6200".parse().unwrap(),
             listen_address: None,

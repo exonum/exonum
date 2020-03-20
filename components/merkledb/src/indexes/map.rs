@@ -341,7 +341,7 @@ mod tests {
 
         let mut index = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
-        index.put(&KEY, 0);
+        index.put(KEY, 0);
         assert_eq!(true, index.contains(KEY));
         index.remove(KEY);
         assert_eq!(false, index.contains(KEY));
@@ -356,7 +356,7 @@ mod tests {
         let mut index = fork.get_map(IDX_NAME);
         assert_eq!(false, index.contains(KEY));
 
-        index.put(&KEY, 0);
+        index.put(KEY, 0);
         assert_eq!(true, index.contains(KEY));
 
         index.remove(KEY);

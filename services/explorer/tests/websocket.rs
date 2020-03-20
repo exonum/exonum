@@ -14,18 +14,16 @@
 
 //! WebSocket API tests.
 
-use actix_web::ws::CloseCode;
+use actix_web_actors::ws::CloseCode;
 use assert_matches::assert_matches;
 use exonum::{
-    crypto::KeyPair,
-    helpers::Height,
-    merkledb::ObjectHash,
-    runtime::{CoreError, ExecutionError, SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID},
+    crypto::KeyPair, helpers::Height, merkledb::ObjectHash,
+    runtime::SUPERVISOR_INSTANCE_ID as SUPERVISOR_ID,
 };
 use exonum_explorer::api::websocket::Notification;
-use exonum_rust_runtime::{DefaultInstance, ServiceFactory};
+use exonum_rust_runtime::DefaultInstance;
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
-use exonum_testkit::{TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{Spec, TestKit, TestKitApi, TestKitBuilder};
 use serde::de::DeserializeOwned;
 use serde_json::{json, Value};
 use websocket::{
@@ -87,8 +85,8 @@ fn assert_closure(mut client: Client<TcpStream>) {
 
 fn init_testkit() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(CounterService)
-        .with_default_rust_service(ExplorerFactory)
+        .with(Spec::new(CounterService).with_default_instance())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)
@@ -134,11 +132,13 @@ fn test_send_transaction() {
 
     // Check response on sent message.
     let response: Value = receive_message(&mut client).unwrap();
+    let expected_msg = "Execution error with code `core:7` occurred: \
+        Cannot dispatch transaction to unknown service with ID 101";
     assert_eq!(
         response,
         json!({
             "result": "error",
-            "description": ExecutionError::from(CoreError::IncorrectInstanceId).to_string(),
+            "description": expected_msg,
         })
     );
 }
@@ -267,7 +267,7 @@ fn test_transactions_subscribe_with_bad_filter() {
     let alice = KeyPair::random();
     let reset_tx = alice.reset(SERVICE_ID, ());
     let inc_tx = alice.increment(SERVICE_ID, 3);
-    testkit.create_block_with_transactions(vec![reset_tx.clone(), inc_tx.clone()]);
+    testkit.create_block_with_transactions(vec![reset_tx, inc_tx]);
 
     assert_no_message(&mut client);
 }
@@ -357,10 +357,8 @@ fn test_blocks_and_tx_subscriptions() {
 #[test]
 fn connections_shut_down_on_service_stop() {
     let mut testkit = TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(Supervisor::simple())
         .build();
 
     let api = testkit.api();

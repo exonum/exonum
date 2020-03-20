@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
+![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
 
 `exonum-explorer-service` provides HTTP endpoints for exploring
 Exonum blockchains.
@@ -26,10 +26,10 @@ on a blockchain; an attempt to create a second service instance will lead to
 an error in the service constructor.
 
 The API types necessary to interact with the service HTTP API are defined in
-a separate crate, [`exonum-explorer`]. The base explorer provides Rust language
-APIs for retrieving info from the blockchain, while this crate translates these
-APIs into REST and WebSocket endpoints and packages this logic as an Exonum
-service.
+a separate crate, [`exonum-explorer`][explorer]. The base explorer provides
+Rust language APIs for retrieving info from the blockchain, while this crate
+translates these APIs into REST and WebSocket endpoints and packages this logic
+as an Exonum service.
 
 Thus, this crate is useful if you want to provide the way for external apps to
 query the blockchain info.
@@ -44,8 +44,8 @@ Include `exonum-explorer-service` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "1.0.0-rc.1"
-exonum-explorer-service = "1.0.0-rc.1"
+exonum = "1.0.0-rc.2"
+exonum-explorer-service = "1.0.0-rc.2"
 ```
 
 The explorer service should usually be initialized at the blockchain start

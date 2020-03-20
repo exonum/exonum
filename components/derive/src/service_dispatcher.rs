@@ -30,7 +30,7 @@ impl FromMeta for ServiceInterface {
         match meta {
             Meta::NameValue(name_and_value) => {
                 let flag_name = name_and_value.path.get_ident().map(ToString::to_string);
-                if flag_name.as_ref().map(String::as_str) == Some("raw") {
+                if flag_name.as_deref() == Some("raw") {
                     let mut this = Self::from_value(&name_and_value.lit)?;
                     this.is_raw = true;
                     Ok(this)

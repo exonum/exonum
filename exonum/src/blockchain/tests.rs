@@ -18,7 +18,6 @@ use exonum_merkledb::{
     access::{Access, FromAccess},
     BinaryValue, Error as MerkledbError, ObjectHash, ProofListIndex, Snapshot, SystemSchema,
 };
-use futures::{Future, IntoFuture};
 use pretty_assertions::assert_eq;
 use semver::Version;
 
@@ -31,16 +30,17 @@ use std::{
 use crate::{
     blockchain::{
         config::{ConsensusConfig, GenesisConfig, GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, Schema,
+        Blockchain, BlockchainMut, PersistentPool, Schema, TransactionCache,
     },
     helpers::{Height, ValidatorId},
     messages::Verified,
     runtime::{
         catch_panic,
         migrations::{InitMigrationError, MigrationScript},
+        oneshot::Receiver,
         AnyTx, ArtifactId, CallInfo, CommonError, CoreError, Dispatcher, DispatcherSchema,
         ErrorMatch, ExecutionContext, ExecutionError, ExecutionFail, InstanceId, InstanceSpec,
-        InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
+        InstanceState, InstanceStatus, Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime,
         SUPERVISOR_INSTANCE_ID,
     },
 };
@@ -98,16 +98,16 @@ impl InitAction {
 impl Execute for InitAction {
     fn execute(self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            InitAction::Noop => Ok(()),
-            InitAction::Panic => panic!(PANIC_STR),
-            InitAction::Error(code, description) => Err(ExecutionError::service(code, description)),
+            Self::Noop => Ok(()),
+            Self::Panic => panic!(PANIC_STR),
+            Self::Error(code, description) => Err(ExecutionError::service(code, description)),
         }
     }
 }
 
 impl Default for InitAction {
     fn default() -> Self {
-        InitAction::Noop
+        Self::Noop
     }
 }
 
@@ -123,13 +123,13 @@ enum AfterTransactionsAction {
 impl Execute for AfterTransactionsAction {
     fn execute(self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            AfterTransactionsAction::AddValue(value) => {
+            Self::AddValue(value) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(value);
                 Ok(())
             }
 
-            AfterTransactionsAction::Panic => panic!(PANIC_STR),
+            Self::Panic => panic!(PANIC_STR),
         }
     }
 }
@@ -157,34 +157,34 @@ enum Transaction {
 impl Transaction {
     fn sign(self, instance_id: InstanceId, keypair: &KeyPair) -> Verified<AnyTx> {
         let tx = AnyTx::new(CallInfo::new(instance_id, 0), self.into_bytes());
-        tx.sign_with_keypair(&keypair)
+        tx.sign_with_keypair(keypair)
     }
 }
 
 impl Execute for Transaction {
     fn execute(self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
-            Transaction::AddValue(value) => {
+            Self::AddValue(value) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(value);
                 Ok(())
             }
 
-            Transaction::Panic => {
+            Self::Panic => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(42);
                 panic!(PANIC_STR);
             }
 
-            Transaction::MerkledbError => panic!(MerkledbError::new(PANIC_STR)),
+            Self::MerkledbError => panic!(MerkledbError::new(PANIC_STR)),
 
-            Transaction::ExecutionError(code, description) => {
+            Self::ExecutionError(code, description) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(42);
                 Err(ExecutionError::service(code, description))
             }
 
-            Transaction::DeployArtifact(artifact_id) => {
+            Self::DeployArtifact(artifact_id) => {
                 // Code below will panic if there is already deployed artifact with the
                 // same ID. This sort of expected behavior, since we're intentionally skipping
                 // the `start_deploy` step (which will make the test nature much more complex).
@@ -192,11 +192,11 @@ impl Execute for Transaction {
                 Ok(())
             }
 
-            Transaction::AddService(spec, constructor) => {
+            Self::AddService(spec, constructor) => {
                 context.initiate_adding_service(spec, constructor)
             }
 
-            Transaction::StopService(instance_id) => {
+            Self::StopService(instance_id) => {
                 Dispatcher::initiate_stopping_service(context.fork, instance_id)
             }
         }
@@ -226,7 +226,7 @@ impl RuntimeInspector {
     fn new(available: Vec<ArtifactId>) -> Self {
         Self {
             available,
-            ..Default::default()
+            ..Self::default()
         }
     }
 
@@ -255,16 +255,13 @@ impl Default for RuntimeInspector {
 }
 
 impl Runtime for RuntimeInspector {
-    fn deploy_artifact(
-        &mut self,
-        artifact: ArtifactId,
-        _deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    fn deploy_artifact(&mut self, artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
         assert!(self.available.contains(&artifact));
         assert!(!self.deployed.contains(&artifact));
 
         self.deployed.push(artifact);
-        Box::new(Ok(()).into_future())
+
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
@@ -293,13 +290,7 @@ impl Runtime for RuntimeInspector {
         Ok(())
     }
 
-    fn update_service_status(
-        &mut self,
-        _snapshot: &dyn Snapshot,
-        _spec: &InstanceSpec,
-        _status: &InstanceStatus,
-    ) {
-    }
+    fn update_service_status(&mut self, _snapshot: &dyn Snapshot, _state: &InstanceState) {}
 
     fn migrate(
         &self,
@@ -364,16 +355,9 @@ fn execute_transaction(
         Schema::new(&snapshot).next_height()
     };
 
-    let (block_hash, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
-        height,
-        &[tx_hash],
-        &mut BTreeMap::new(),
-    );
+    let (block_hash, patch) = blockchain.create_patch(ValidatorId::zero(), height, &[tx_hash], &());
 
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     let location = schema.transactions_locations().get(&tx_hash).unwrap();
@@ -437,7 +421,7 @@ fn after_transactions_failure_causes_genesis_failure() {
 
 #[test]
 fn handling_tx_panic_error() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -479,7 +463,7 @@ fn handling_tx_panic_error() {
 #[test]
 #[should_panic]
 fn handling_tx_merkledb_error() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -503,7 +487,7 @@ fn initialize_service_ok() {
 
 #[test]
 fn deploy_available() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let artifact_id = ArtifactId::from_raw_parts(
         RuntimeInspector::ID,
@@ -524,7 +508,7 @@ fn deploy_available() {
 
 #[test]
 fn deploy_already_deployed() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -541,14 +525,14 @@ fn deploy_already_deployed() {
     // Since `RuntimeInspector` transactions skip the `start_deploy`,
     // we expect transaction to panic (`commit_service` is called within transaction body).
     let expect_err = ErrorMatch::any_unexpected()
-        .with_description_containing("Artifact with the given identifier is already deployed");
+        .with_description_containing("Cannot deploy artifact `255:runtime-inspector:1.0.0` twice");
     assert_eq!(actual_err, expect_err);
 }
 
 #[test]
 #[should_panic(expected = "assertion failed: self.available.contains(&artifact)")]
 fn deploy_unavailable_artifact() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -569,7 +553,7 @@ fn deploy_unavailable_artifact() {
 
 #[test]
 fn start_stop_service_instance() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -629,22 +613,22 @@ fn start_stop_service_instance() {
 /// instance IDs.
 #[test]
 fn test_check_tx() {
-    let keys = exonum_crypto::KeyPair::random();
-
+    let keys = KeyPair::random();
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
         vec![InitAction::Noop.into_default_instance()],
     );
 
     let snapshot = blockchain.snapshot();
-
     let correct_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID, &keys);
     Blockchain::check_tx(&snapshot, &correct_tx).expect("Correct transaction");
 
     let incorrect_tx = Transaction::AddValue(1).sign(TEST_SERVICE_ID + 1, &keys);
+    let unknown_msg = "Cannot dispatch transaction to unknown service with ID 1";
     assert_eq!(
-        Blockchain::check_tx(&snapshot, &incorrect_tx).expect_err("Incorrect transaction"),
+        Blockchain::check_tx(&snapshot, &incorrect_tx).unwrap_err(),
         ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing(unknown_msg)
     );
 
     // Stop service instance to make correct_tx incorrect.
@@ -656,14 +640,16 @@ fn test_check_tx() {
 
     // Check that previously correct transaction become incorrect.
     let snapshot = blockchain.snapshot();
+    let not_active_msg = "Cannot dispatch transaction to non-active service";
     assert_eq!(
         Blockchain::check_tx(&snapshot, &correct_tx).unwrap_err(),
         ErrorMatch::from_fail(&CoreError::ServiceNotActive)
+            .with_description_containing(not_active_msg)
     );
 }
 
 #[test]
-#[should_panic(expected = "already used")]
+#[should_panic(expected = "Service with name `sample_instance` already exists")]
 fn finalize_duplicate_services() {
     let artifact = RuntimeInspector::default_artifact_id();
     let instance = InstanceInitParams::new(
@@ -677,7 +663,7 @@ fn finalize_duplicate_services() {
 }
 
 #[test]
-#[should_panic(expected = "already used")]
+#[should_panic(expected = "Service with name `sample_instance` already exists")]
 fn finalize_services_with_duplicate_names() {
     let artifact = RuntimeInspector::default_artifact_id();
 
@@ -700,7 +686,7 @@ fn finalize_services_with_duplicate_names() {
 }
 
 #[test]
-#[should_panic(expected = "already used")]
+#[should_panic(expected = "Service with numeric ID 10 already exists")]
 fn finalize_services_with_duplicate_ids() {
     let artifact = RuntimeInspector::default_artifact_id();
 
@@ -762,12 +748,7 @@ fn blockchain_height() {
     assert_eq!(schema.next_height(), Height(1));
 
     // Create one block.
-    let (_, patch) = blockchain.create_patch(
-        ValidatorId::zero(),
-        Height::zero(),
-        &[],
-        &mut BTreeMap::new(),
-    );
+    let (_, patch) = blockchain.create_patch(ValidatorId::zero(), Height::zero(), &[], &());
     blockchain.merge(patch).unwrap();
 
     // Check that height is 1.
@@ -779,7 +760,7 @@ fn blockchain_height() {
 
 #[test]
 fn state_aggregation() {
-    let keys = exonum_crypto::KeyPair::random();
+    let keys = KeyPair::random();
 
     let mut blockchain = create_blockchain(
         RuntimeInspector::default(),
@@ -804,4 +785,40 @@ fn state_aggregation() {
         .keys()
         .collect();
     assert_eq!(actual_indexes, expected_indexes);
+}
+
+#[test]
+fn no_data_race_for_transaction_pool() {
+    let keys = KeyPair::random();
+    let mut blockchain = create_blockchain(
+        RuntimeInspector::default(),
+        vec![InitAction::Noop.into_default_instance()],
+    );
+
+    let tx = Transaction::AddValue(10).sign(TEST_SERVICE_ID, &keys);
+    let tx_hash = tx.object_hash();
+    let mut tx_cache = BTreeMap::new();
+    tx_cache.insert(tx_hash, tx.clone());
+    let (block_hash, patch) =
+        blockchain.create_patch(ValidatorId(0), Height(1), &[tx_hash], &tx_cache);
+
+    let snapshot = blockchain.snapshot();
+    let is_known = PersistentPool::new(&snapshot, &tx_cache).contains_transaction(tx_hash);
+    assert!(is_known);
+    let schema = Schema::new(&snapshot);
+    let is_in_pool =
+        schema.transactions_pool().contains(&tx_hash) || tx_cache.contains_key(&tx_hash);
+    assert!(is_in_pool);
+
+    // Move transaction to persistent pool while the block is being accepted.
+    let fork = blockchain.fork();
+    Schema::new(&fork).add_transaction_into_pool(tx);
+    blockchain.merge(fork.into_patch()).unwrap();
+
+    // Accept the block and check that the core schema remains logically consistent.
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
+    let snapshot = blockchain.snapshot();
+    let schema = Schema::new(&snapshot);
+    assert_eq!(schema.transactions_len(), 1);
+    assert_eq!(schema.transactions_pool_len(), 0);
 }

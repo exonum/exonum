@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use chrono::{DateTime, Utc};
 use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
@@ -38,7 +39,7 @@ pub struct TxTime {
 }
 
 impl TxTime {
-    /// New TxTime transaction.
+    /// Creates a new transaction.
     pub fn new(time: DateTime<Utc>) -> Self {
         Self { time }
     }

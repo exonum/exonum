@@ -14,6 +14,7 @@
 
 //! Timestamping transactions.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
@@ -73,7 +74,7 @@ impl TimestampingInterface<ExecutionContext<'_>> for TimestampingService {
             Err(Error::HashAlreadyExists.into())
         } else {
             trace!("Timestamp added: {:?}", arg);
-            let entry = TimestampEntry::new(arg.clone(), tx_hash, time);
+            let entry = TimestampEntry::new(arg, tx_hash, time);
             schema.add_timestamp(entry);
             Ok(())
         }

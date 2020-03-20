@@ -1,11 +1,12 @@
 [package]
 name = "exonum-proto"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
 documentation = "https://docs.rs/exonum-proto"
+readme = "README.md"
 license = "Apache-2.0"
 keywords = ["protobuf", "exonum"]
 categories = ["development-tools"]
@@ -13,13 +14,13 @@ description = "Helper traits and macros for serialization structs in protobuf."
 links = "exonum_protobuf_common"
 
 [dependencies]
+anyhow = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
-failure = "0.1.5"
 protobuf = { version = "2.8.1", features = ["with-serde"] }
 bit-vec = "0.6.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"
-exonum-derive = { path = "../derive", version = "1.0.0-rc.1"}
+exonum-derive = { path = "../derive", version = "1.0.0-rc.2"}
 protobuf-convert = "0.3.0"
 
 [features]
@@ -27,4 +28,4 @@ default = ["with-serde"]
 with-serde = []
 
 [build-dependencies]
-exonum-build = { version = "1.0.0-rc.1", path = "../build" }
+exonum-build = { version = "1.0.0-rc.2", path = "../build" }

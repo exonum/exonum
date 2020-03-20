@@ -54,7 +54,7 @@ impl ConfigUpdaterService {
 }
 
 impl DefaultInstance for ConfigUpdaterService {
-    const INSTANCE_ID: InstanceId = ConfigUpdaterService::ID;
+    const INSTANCE_ID: InstanceId = Self::ID;
     const INSTANCE_NAME: &'static str = "config-updater";
 }
 
@@ -73,7 +73,7 @@ impl TxConfig {
         actual_from: Height,
         signer: &SecretKey,
     ) -> Verified<AnyTx> {
-        let msg = TxConfig {
+        let msg = Self {
             from,
             config: config.to_owned(),
             actual_from,

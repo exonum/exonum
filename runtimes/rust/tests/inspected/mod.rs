@@ -25,17 +25,20 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
+        oneshot,
         versioning::Version,
-        ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceStatus,
-        Mailbox, MethodId, Runtime, SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
+        ArtifactId, ExecutionContext, ExecutionError, InstanceId, InstanceSpec, InstanceState,
+        InstanceStatus, Mailbox, MethodId, Runtime, RuntimeFeature, SnapshotExt, WellKnownRuntime,
+        SUPERVISOR_INSTANCE_ID,
     },
 };
+use exonum_api::UpdateEndpoints;
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
-use futures::Future;
+use futures::{channel::mpsc, FutureExt, StreamExt};
 use serde_derive::*;
 
 use std::{
-    collections::BTreeMap,
+    collections::HashSet,
     sync::{Arc, Mutex},
 };
 
@@ -48,9 +51,7 @@ pub fn execute_transaction(
     let tx_hash = tx.object_hash();
 
     let (block_hash, patch) = create_block_with_transactions(blockchain, vec![tx]);
-    blockchain
-        .commit(patch, block_hash, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch, block_hash, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = CoreSchema::new(&snapshot);
@@ -69,12 +70,7 @@ pub fn create_block_with_transactions(
         CoreSchema::new(&snapshot).next_height()
     };
 
-    blockchain.create_patch(
-        ValidatorId::zero(),
-        height,
-        &tx_hashes,
-        &mut BTreeMap::new(),
-    )
+    blockchain.create_patch(ValidatorId::zero(), height, &tx_hashes, &())
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {
@@ -100,12 +96,32 @@ fn add_transactions_into_pool(
     txs.into_iter().map(|x| x.object_hash()).collect()
 }
 
+pub fn get_endpoint_paths(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) -> HashSet<String> {
+    let received = endpoints_rx
+        .next()
+        .now_or_never()
+        .expect("No endpoint update")
+        .expect("Node sender was dropped");
+    received.updated_paths().map(ToOwned::to_owned).collect()
+}
+
+pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoints>) {
+    let maybe_update = endpoints_rx.next().now_or_never().flatten();
+    if let Some(update) = maybe_update {
+        panic!(
+            "Unexpected endpoints update: {:?}",
+            update.updated_paths().collect::<Vec<_>>()
+        );
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum RuntimeEvent {
     InitializeRuntime,
     ResumeRuntime,
     BeforeTransactions(Height, InstanceId),
     DeployArtifact(ArtifactId, Vec<u8>),
+    UnloadArtifact(ArtifactId),
     StartAddingService(InstanceSpec, Vec<u8>),
     MigrateService(ArtifactId, Version),
     StartResumingService(InstanceSpec, Vec<u8>),
@@ -123,7 +139,6 @@ impl EventsHandle {
         self.0.lock().unwrap().push(event);
     }
 
-    #[must_use]
     pub fn take(&self) -> Vec<RuntimeEvent> {
         self.0.lock().unwrap().drain(..).collect()
     }
@@ -154,6 +169,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
         self.runtime.initialize(blockchain)
     }
 
+    fn is_supported(&self, feature: &RuntimeFeature) -> bool {
+        self.runtime.is_supported(feature)
+    }
+
     fn on_resume(&mut self) {
         self.events.push(RuntimeEvent::ResumeRuntime);
         self.runtime.on_resume()
@@ -163,7 +182,7 @@ impl<T: Runtime> Runtime for Inspected<T> {
         &mut self,
         test_service_artifact: ArtifactId,
         deploy_spec: Vec<u8>,
-    ) -> Box<dyn Future<Item = (), Error = ExecutionError>> {
+    ) -> oneshot::Receiver {
         self.events.push(RuntimeEvent::DeployArtifact(
             test_service_artifact.clone(),
             deploy_spec.clone(),
@@ -174,6 +193,12 @@ impl<T: Runtime> Runtime for Inspected<T> {
 
     fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
         self.runtime.is_artifact_deployed(id)
+    }
+
+    fn unload_artifact(&mut self, artifact: &ArtifactId) {
+        self.events
+            .push(RuntimeEvent::UnloadArtifact(artifact.to_owned()));
+        self.runtime.unload_artifact(artifact);
     }
 
     fn initiate_adding_service(
@@ -208,15 +233,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
             .initiate_resuming_service(context, artifact, parameters)
     }
 
-    fn update_service_status(
-        &mut self,
-        snapshot: &dyn Snapshot,
-        spec: &InstanceSpec,
-        status: &InstanceStatus,
-    ) {
+    fn update_service_status(&mut self, snapshot: &dyn Snapshot, state: &InstanceState) {
         snapshot
             .for_dispatcher()
-            .get_instance(spec.id)
+            .get_instance(state.spec.id)
             .expect("Service instance should exist");
 
         let core_schema = CoreSchema::new(snapshot);
@@ -224,10 +244,10 @@ impl<T: Runtime> Runtime for Inspected<T> {
 
         self.events.push(RuntimeEvent::CommitService(
             height,
-            spec.to_owned(),
-            status.to_owned(),
+            state.spec.to_owned(),
+            state.status.to_owned().unwrap(),
         ));
-        self.runtime.update_service_status(snapshot, spec, status)
+        self.runtime.update_service_status(snapshot, state)
     }
 
     fn migrate(
@@ -302,14 +322,7 @@ pub struct StartService {
 
 #[derive(Debug, Serialize, Deserialize, BinaryValue)]
 #[binary_value(codec = "bincode")]
-pub struct StopService {
-    pub instance_id: InstanceId,
-}
-
-#[derive(Debug, Serialize, Deserialize, BinaryValue)]
-#[binary_value(codec = "bincode")]
 pub struct ResumeService {
-    pub artifact: ArtifactId,
     pub instance_id: InstanceId,
     pub params: Vec<u8>,
 }
@@ -321,15 +334,26 @@ pub struct MigrateService {
     pub artifact: ArtifactId,
 }
 
+#[derive(Debug, Serialize, Deserialize, BinaryValue)]
+#[binary_value(codec = "bincode")]
+pub struct CommitMigration {
+    pub instance_name: String,
+    pub migration_hash: Hash,
+}
+
 #[exonum_interface(auto_ids)]
 pub trait ToySupervisor<Ctx> {
     type Output;
 
     fn deploy_artifact(&self, context: Ctx, request: DeployArtifact) -> Self::Output;
+    fn unload_artifact(&self, context: Ctx, artifact: ArtifactId) -> Self::Output;
     fn start_service(&self, context: Ctx, request: StartService) -> Self::Output;
-    fn stop_service(&self, context: Ctx, request: StopService) -> Self::Output;
+    fn stop_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
+    fn freeze_service(&self, context: Ctx, instance_id: InstanceId) -> Self::Output;
     fn resume_service(&self, context: Ctx, request: ResumeService) -> Self::Output;
     fn migrate_service(&self, context: Ctx, request: MigrateService) -> Self::Output;
+    fn commit_migration(&self, context: Ctx, request: CommitMigration) -> Self::Output;
+    fn flush_migration(&self, context: Ctx, instance_name: String) -> Self::Output;
 }
 
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
@@ -351,6 +375,14 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         Ok(())
     }
 
+    fn unload_artifact(
+        &self,
+        mut context: ExecutionContext<'_>,
+        artifact: ArtifactId,
+    ) -> Self::Output {
+        context.supervisor_extensions().unload_artifact(&artifact)
+    }
+
     fn start_service(
         &self,
         mut context: ExecutionContext<'_>,
@@ -364,11 +396,21 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
     fn stop_service(
         &self,
         mut context: ExecutionContext<'_>,
-        request: StopService,
+        instance_id: InstanceId,
     ) -> Self::Output {
         context
             .supervisor_extensions()
-            .initiate_stopping_service(request.instance_id)
+            .initiate_stopping_service(instance_id)
+    }
+
+    fn freeze_service(
+        &self,
+        mut context: ExecutionContext<'_>,
+        instance_id: InstanceId,
+    ) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .initiate_freezing_service(instance_id)
     }
 
     fn resume_service(
@@ -376,11 +418,9 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         mut context: ExecutionContext<'_>,
         request: ResumeService,
     ) -> Self::Output {
-        context.supervisor_extensions().initiate_resuming_service(
-            request.instance_id,
-            request.artifact,
-            request.params,
-        )
+        context
+            .supervisor_extensions()
+            .initiate_resuming_service(request.instance_id, request.params)
     }
 
     fn migrate_service(
@@ -391,6 +431,27 @@ impl ToySupervisor<ExecutionContext<'_>> for ToySupervisorService {
         context
             .supervisor_extensions()
             .initiate_migration(request.artifact, &request.instance_name)
+            .map(drop)
+    }
+
+    fn commit_migration(
+        &self,
+        mut context: ExecutionContext<'_>,
+        request: CommitMigration,
+    ) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .commit_migration(&request.instance_name, request.migration_hash)
+    }
+
+    fn flush_migration(
+        &self,
+        mut context: ExecutionContext<'_>,
+        instance_name: String,
+    ) -> Self::Output {
+        context
+            .supervisor_extensions()
+            .flush_migration(&instance_name)
     }
 }
 

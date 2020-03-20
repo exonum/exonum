@@ -14,8 +14,8 @@
 
 //! Module that contains Protobuf messages used by Exonum.
 
+use anyhow::{ensure, Error};
 use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
 
 use std::convert::TryFrom;
 
@@ -31,7 +31,7 @@ impl ProtobufConvert for Height {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Ok(Height(pb))
+        Ok(Self(pb))
     }
 }
 
@@ -43,7 +43,7 @@ impl ProtobufConvert for Round {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Ok(Round(pb))
+        Ok(Self(pb))
     }
 }
 
@@ -60,6 +60,6 @@ impl ProtobufConvert for ValidatorId {
             "{} is out of range for valid ValidatorId",
             pb
         );
-        Ok(ValidatorId(pb as u16))
+        Ok(Self(pb as u16))
     }
 }

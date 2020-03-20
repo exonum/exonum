@@ -14,27 +14,27 @@
 
 //! Standard Exonum CLI node configuration commands.
 
-pub mod finalize;
-pub mod generate_config;
-pub mod generate_template;
-pub mod maintenance;
-pub mod run;
-pub mod run_dev;
+pub use self::{
+    finalize::Finalize,
+    generate_config::GenerateConfig,
+    generate_template::GenerateTemplate,
+    maintenance::{Maintenance, MaintenanceAction},
+    run::{NodeRunConfig, Run},
+    run_dev::RunDev,
+};
 
-use failure::Error;
+mod finalize;
+mod generate_config;
+mod generate_template;
+mod maintenance;
+mod run;
+mod run_dev;
+
+use anyhow::Error;
 use serde_derive::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::path::PathBuf;
-
-use crate::command::{
-    finalize::Finalize,
-    generate_config::GenerateConfig,
-    generate_template::GenerateTemplate,
-    maintenance::{Action, Maintenance},
-    run::{NodeRunConfig, Run},
-    run_dev::RunDev,
-};
 
 /// Interface of standard Exonum Core configuration command.
 pub trait ExonumCommand {
@@ -45,23 +45,28 @@ pub trait ExonumCommand {
 /// Standard Exonum Core configuration command.
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[structopt(author, about)]
+#[non_exhaustive]
 pub enum Command {
     /// Generate common part of the nodes configuration.
     #[structopt(name = "generate-template")]
     GenerateTemplate(GenerateTemplate),
+
     /// Generate public and private configs of the node.
     #[structopt(name = "generate-config")]
     GenerateConfig(GenerateConfig),
-    /// Generate final node configuration using public configs
-    /// of other nodes in the network.
+
+    /// Generate final node configuration using public configs of other nodes in the network.
     #[structopt(name = "finalize")]
     Finalize(Finalize),
+
     /// Run the node with provided node config.
     #[structopt(name = "run")]
     Run(Run),
+
     /// Run the node with auto-generated config.
     #[structopt(name = "run-dev")]
     RunDev(RunDev),
+
     /// Perform different maintenance actions.
     #[structopt(name = "maintenance")]
     Maintenance(Maintenance),
@@ -77,24 +82,26 @@ impl Command {
 impl ExonumCommand for Command {
     fn execute(self) -> Result<StandardResult, Error> {
         match self {
-            Command::GenerateTemplate(command) => command.execute(),
-            Command::GenerateConfig(command) => command.execute(),
-            Command::Finalize(command) => command.execute(),
-            Command::Run(command) => command.execute(),
-            Command::RunDev(command) => command.execute(),
-            Command::Maintenance(command) => command.execute(),
+            Self::GenerateTemplate(command) => command.execute(),
+            Self::GenerateConfig(command) => command.execute(),
+            Self::Finalize(command) => command.execute(),
+            Self::Run(command) => command.execute(),
+            Self::RunDev(command) => command.execute(),
+            Self::Maintenance(command) => command.execute(),
         }
     }
 }
 
 /// Output of any of the standard Exonum Core configuration commands.
-#[allow(clippy::large_enum_variant)]
+#[derive(Debug)]
+#[non_exhaustive]
 pub enum StandardResult {
     /// `generate-template` command output.
     GenerateTemplate {
         /// Path to a generated common template file.
         template_config_path: PathBuf,
     },
+
     /// `generate-config` command output.
     GenerateConfig {
         /// Path to a generated public config of the node.
@@ -104,13 +111,16 @@ pub enum StandardResult {
         /// Path to a master key of the node.
         master_key_path: PathBuf,
     },
+
     /// `finalize` command output.
     Finalize {
         /// Path to a generated final node config.
         node_config_path: PathBuf,
     },
+
     /// `run` command output.
-    Run(NodeRunConfig),
+    Run(Box<NodeRunConfig>),
+
     /// `maintenance` command output.
     Maintenance {
         /// Path to a node configuration file.
@@ -118,6 +128,6 @@ pub enum StandardResult {
         /// Path to a database directory.
         db_path: PathBuf,
         /// Performed action.
-        performed_action: Action,
+        performed_action: MaintenanceAction,
     },
 }

@@ -2,32 +2,34 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
+![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
 
 `exonum-supervisor` is a main service of the [Exonum blockchain framework](https://exonum.com/).
 It is capable of deploying and starting new services,
-stopping existing services, and changing configuration of the started services.
+changing the state of existing services (such as stopping, freezing,
+or initiating a data migration), and changing configuration
+of the started services.
 
 ## Description
 
 Supervisor is an Exonum service capable of the following activities:
 
-- Service artifact deployment;
-- Service instances creation;
-- Changing consensus configuration;
-- Changing service instances configuration.
+- Deploying service artifacts and unloading unused artifacts
+- Instantiating services
+- Changing configuration of instantiated services
+- Changing a state of instantiated services: stopping, freezing, resuming,
+  and initiating data migrations
+- Changing consensus configuration
 
-More information on the artifact/service lifecycle can be found in the
-documentation for the Exonum [runtime module][runtime-docs].
+More information on the artifact / service lifecycle can be found in the
+documentation of [service lifecycle][docs:lifecycle] and the [supervisor][docs:supervisor].
 
 Supervisor service has two different operating modes: a "simple" mode and a
-"decentralized" mode.
+"decentralized" mode. The difference between modes is in the decision making approach:
 
-The difference between modes is in the decision making approach:
-
-- Within the decentralized mode, to deploy a service or apply a new
-  configuration, no less than (2/3)+1 validators should reach a consensus;
-- Within the simple mode, any decision is executed after a single validator
+- In the decentralized mode, to instantiate a service or apply a new
+  configuration, more than 2/3rds of validators should reach a consensus.
+- In the simple mode, any decision is executed after a single validator
   approval.
 
 The simple mode can be useful if one network administrator manages all the
@@ -52,30 +54,24 @@ by himself. An expected format of requests for those endpoints is a serialized
 Protobuf message.
 
 To deploy an artifact, one (within the "simple" mode) or majority (within the
-"decentralized" mode) of the nodes should receive a `DeployRequest` message
+"decentralized" mode) of the nodes should submit a `DeployRequest` message
 through API.
 
-To request a config change, one node should receive a `ConfigPropose` message
+To request a config change, one node should submit a `ConfigPropose` message
 through API.
-
-For the "simple" mode no more actions are required. For the "decentralized"
-mode the majority of the nodes should also receive `ConfigVote` messages
+For the "simple" mode, no more actions are required. For the "decentralized"
+mode, the majority of the nodes should also submit `ConfigVote` messages
 with a hash of the proposed configuration.
+The proposal initiator that sends the original `ConfigPropose` message
+should not vote for the configuration; the supervisor considers that the initiator
+has voted by submitting a proposal.
 
-The proposal initiator that receives the original `ConfigPropose` message
-must not vote for the configuration.
-
-This node votes for the configuration propose automatically.
-
-The operation of starting or resuming a service is treated similarly to a
-configuration change and follows the same rules.
-
-Consult [the crate docs](https://docs.rs/exonum-supervisor) for more details
-about the service API.
+Starting, resuming or freezing a service, or unloading an artifact
+are treated similarly to a configuration change and follow the same rules.
 
 ## HTTP API
 
-REST API of the service is documented in the crate docs.
+REST API of the service is documented in [the crate docs](https://docs.rs/exonum-supervisor).
 
 ## Usage
 
@@ -83,13 +79,18 @@ Include `exonum-supervisor` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "1.0.0-rc.1"
-exonum-supervisor = "1.0.0-rc.1"
+exonum = "1.0.0-rc.2"
+exonum-supervisor = "1.0.0-rc.2"
 ```
+
+Note that the supervisor service is added to the blockchain automatically
+by the [`exonum-cli`] crate, so no actions are required if you use this crate.
 
 ## License
 
 `exonum-supervisor` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
 
-[runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
+[docs:supervisor]: https://exonum.com/doc/version/latest/advanced/supervisor/
+[docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
+[`exonum-cli`]: https://crates.io/crates/exonum-cli

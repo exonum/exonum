@@ -19,15 +19,15 @@ use exonum::{
     merkledb::{access::Prefixed, BinaryValue, ObjectHash, Snapshot},
     runtime::{
         ArtifactId, BlockchainData, DispatcherAction, ExecutionContext, ExecutionError,
-        InstanceDescriptor, InstanceId, Mailbox, MethodId,
+        InstanceDescriptor, InstanceId, InstanceStatus, Mailbox, MethodId, SnapshotExt,
     },
 };
-use futures::{Future, IntoFuture};
-
-use std::{
-    borrow::Cow,
-    fmt::{self, Debug},
+use futures::{
+    executor::block_on,
+    future::{BoxFuture, FutureExt},
 };
+
+use std::fmt::{self, Debug};
 
 use super::{api::ServiceApiBuilder, ArtifactProtobufSpec, GenericCall, MethodDescriptor};
 
@@ -48,8 +48,15 @@ pub trait ServiceDispatcher: Send {
 
 /// Describes an Exonum service instance.
 ///
-/// That is, `Service` determines how a service instance responds to certain requests and events
+/// `Service` determines how a service instance responds to certain requests and events
 /// from the runtime.
+///
+/// # Implementation Requirements
+///
+/// Any changes of the storage state in the methods that can perform such changes (i.e., methods
+/// receiving `ExecutionContext`) must be the same for all nodes in the blockchain network.
+/// In other words, the service should only use data available in the provided context to perform
+/// such changes.
 pub trait Service: ServiceDispatcher + Debug + 'static {
     /// Initializes a new service instance with the given parameters. This method is called once
     /// after creating a new service instance.
@@ -74,8 +81,10 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The parameters passed to the method are not saved by the framework
     /// automatically, hence the user must do it manually, if needed.
     ///
-    /// **Warning:** please note that you should not change the service data layout,
-    /// as this may violate the migration process.
+    /// [Migration workflow] guarantees that the data layout is supported by the resumed
+    /// service version.
+    ///
+    /// [Migration workflow]: https://exonum.com/doc/version/latest/architecture/services/#data-migrations
     fn resume(
         &self,
         _context: ExecutionContext<'_>,
@@ -89,10 +98,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     ///
     /// The default implementation does nothing and returns `Ok(())`.
     ///
-    /// Any changes of the storage state will affect `state_hash`, which means this method must
-    /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `ExecutionContext`.
-    ///
     /// Services should not rely on a particular ordering of `Service::before_transactions`
     /// invocations among services.
     fn before_transactions(&self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
@@ -103,10 +108,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// in the block.
     ///
     /// The default implementation does nothing and returns `Ok(())`.
-    ///
-    /// Any changes of the storage state will affect `state_hash`, which means this method must
-    /// act similarly on different nodes. In other words, the service should only use data available
-    /// in the provided `ExecutionContext`.
     ///
     /// Note that if service was added in the genesis block, it will be activated immediately and
     /// thus `after_transactions` will be invoked for such a service after the genesis block creation.
@@ -145,8 +146,6 @@ pub trait Service: ServiceDispatcher + Debug + 'static {
     /// The request handlers are mounted on the `/api/services/{instance_name}` path at the
     /// listen address of every full node in the blockchain network.
     fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
-
-    // TODO: add other hooks such as "on node startup", etc. [ECR-3222]
 }
 
 /// Describes a service instance factory for the specific Rust artifact.
@@ -162,6 +161,7 @@ pub trait ServiceFactory: Send + Debug + 'static {
     fn create_instance(&self) -> Box<dyn Service>;
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<T> From<T> for Box<dyn ServiceFactory>
 where
     T: ServiceFactory,
@@ -192,9 +192,11 @@ pub struct AfterCommitContext<'a> {
     /// Read-only snapshot of the current blockchain state.
     snapshot: &'a dyn Snapshot,
     /// Transaction broadcaster.
-    broadcaster: Broadcaster<'a>,
+    broadcaster: Broadcaster,
     /// ID of the node as a validator.
     validator_id: Option<ValidatorId>,
+    /// Current status of the service.
+    status: InstanceStatus,
 }
 
 impl<'a> AfterCommitContext<'a> {
@@ -207,11 +209,20 @@ impl<'a> AfterCommitContext<'a> {
         tx_sender: &'a ApiSender,
         validator_id: Option<ValidatorId>,
     ) -> Self {
+        let status = snapshot
+            .for_dispatcher()
+            .get_instance(instance.id)
+            .unwrap_or_else(|| {
+                panic!("BUG: Cannot find instance state for service `{}`", instance);
+            })
+            .status
+            .expect("BUG: status for a service receiving `after_commit` hook cannot be `None`");
         Self {
             mailbox,
             snapshot,
             validator_id,
-            broadcaster: Broadcaster::new(instance, service_keypair, tx_sender),
+            broadcaster: Broadcaster::new(instance, service_keypair.clone(), tx_sender.clone()),
+            status,
         }
     }
 
@@ -241,15 +252,30 @@ impl<'a> AfterCommitContext<'a> {
         self.validator_id
     }
 
-    /// Returns a transaction broadcaster if the current node is a validator. If the node
-    /// is not a validator, returns `None`.
-    pub fn broadcaster(&self) -> Option<Broadcaster<'a>> {
-        self.validator_id?;
-        Some(self.broadcaster.clone())
+    /// Returns the current status of the service.
+    pub fn status(&self) -> &InstanceStatus {
+        &self.status
     }
 
-    /// Returns a transaction broadcaster regardless of the node status (validator or auditor).
-    pub fn generic_broadcaster(&self) -> Broadcaster<'a> {
+    /// Returns a transaction broadcaster if the current node is a validator and the service
+    /// is active (i.e., can process transactions). If these conditions do not hold, returns `None`.
+    pub fn broadcaster(&self) -> Option<Broadcaster> {
+        self.validator_id?;
+        if self.status.is_active() {
+            Some(self.broadcaster.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Returns a transaction broadcaster regardless of the node status (validator or auditor)
+    /// and the service status (active or not).
+    ///
+    /// # Safety
+    ///
+    /// Transactions for non-active services will not be broadcast successfully; they will be
+    /// filtered on the receiving nodes as ones that cannot (currently) be processed.
+    pub fn generic_broadcaster(&self) -> Broadcaster {
         self.broadcaster.clone()
     }
 
@@ -278,47 +304,82 @@ impl<'a> AfterCommitContext<'a> {
 /// from outside the blockchain and need to translate it to transactions. As an example,
 /// a time oracle service may broadcast local node time and build the blockchain-wide time
 /// by processing corresponding transactions.
+///
+/// # Examples
+///
+/// Using `Broadcaster` in service logic:
+///
+/// ```
+/// # use exonum_derive::*;
+/// use exonum::runtime::{ExecutionContext, ExecutionError};
+/// use exonum_rust_runtime::{AfterCommitContext, Service};
+///
+/// #[exonum_interface]
+/// trait MyInterface<Ctx> {
+///     type Output;
+///     #[interface_method(id = 0)]
+///     fn publish_string(&self, ctx: Ctx, value: String) -> Self::Output;
+/// }
+///
+/// #[derive(Debug, ServiceDispatcher, ServiceFactory)]
+/// #[service_dispatcher(implements("MyInterface"))]
+/// struct MyService;
+///
+/// impl MyInterface<ExecutionContext<'_>> for MyService {
+///     // implementation skipped...
+/// #   type Output = Result<(), ExecutionError>;
+/// #   fn publish_string(&self, ctx: ExecutionContext<'_>, value: String) -> Self::Output {
+/// #       Ok(())
+/// #   }
+/// }
+///
+/// impl Service for MyService {
+///     fn after_commit(&self, ctx: AfterCommitContext<'_>) {
+///         if let Some(broadcaster) = ctx.broadcaster() {
+///             // Broadcast a `do_something` transaction with
+///             // the specified payload. We swallow an error in this case
+///             // (in a more thorough setup, it could be logged).
+///             broadcaster.blocking().publish_string((), "!".to_owned()).ok();
+///         }
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone)]
-pub struct Broadcaster<'a> {
+pub struct Broadcaster {
     instance: InstanceDescriptor,
-    service_keypair: Cow<'a, KeyPair>,
-    tx_sender: Cow<'a, ApiSender>,
+    service_keypair: KeyPair,
+    tx_sender: ApiSender,
 }
 
-impl<'a> Broadcaster<'a> {
+impl Broadcaster {
     /// Creates a new broadcaster.
     pub(super) fn new(
         instance: InstanceDescriptor,
-        service_keypair: &'a KeyPair,
-        tx_sender: &'a ApiSender,
+        service_keypair: KeyPair,
+        tx_sender: ApiSender,
     ) -> Self {
         Self {
             instance,
-            service_keypair: Cow::Borrowed(service_keypair),
-            tx_sender: Cow::Borrowed(tx_sender),
+            service_keypair,
+            tx_sender,
         }
     }
 
+    /// Returns a synchronous broadcaster that blocks the current thread to broadcast transaction.
+    pub fn blocking(self) -> BlockingBroadcaster {
+        BlockingBroadcaster(self)
+    }
+
     pub(super) fn keypair(&self) -> &KeyPair {
-        self.service_keypair.as_ref()
+        &self.service_keypair
     }
 
     pub(super) fn instance(&self) -> &InstanceDescriptor {
         &self.instance
     }
-
-    /// Converts the broadcaster into the owned representation, which can be used to broadcast
-    /// transactions asynchronously.
-    pub fn into_owned(self) -> Broadcaster<'static> {
-        Broadcaster {
-            instance: self.instance,
-            service_keypair: Cow::Owned(self.service_keypair.into_owned()),
-            tx_sender: Cow::Owned(self.tx_sender.into_owned()),
-        }
-    }
 }
 
-/// Signs and broadcasts a transaction to the other nodes in the network.
+/// Signs and asynchronous broadcasts a transaction to the other nodes in the network.
 ///
 /// The transaction is signed by the service keypair of the node. The same input transaction
 /// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
@@ -328,18 +389,46 @@ impl<'a> Broadcaster<'a> {
 ///
 /// Returns the hash of the created transaction, or an error if the transaction cannot be
 /// broadcast. An error means that the node is being shut down.
-impl GenericCall<()> for Broadcaster<'_> {
-    type Output = Result<Hash, SendError>;
+impl GenericCall<()> for Broadcaster {
+    type Output = BoxFuture<'static, Result<Hash, SendError>>;
 
     fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
         let msg = self
             .service_keypair
+            .clone()
             .generic_call(self.instance().id, method, args);
         let tx_hash = msg.object_hash();
-        self.tx_sender
-            .broadcast_transaction(msg)
-            .wait()
-            .map(|()| tx_hash)
+
+        let tx_sender = self.tx_sender.clone();
+        async move {
+            tx_sender.broadcast_transaction(msg).await?;
+            Ok(tx_hash)
+        }
+        .boxed()
+    }
+}
+
+/// A wrapper around the [`Broadcaster`] to broadcast transactions synchronously.
+///
+/// [`Broadcaster`]: struct.Broadcaster.html
+#[derive(Debug, Clone)]
+pub struct BlockingBroadcaster(Broadcaster);
+
+/// Signs and synchronous broadcasts a transaction to the other nodes in the network.
+///
+/// The transaction is signed by the service keypair of the node. The same input transaction
+/// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
+/// field to the input transaction (e.g., a `u64`) and change it between the calls.
+///
+/// # Return value
+///
+/// Returns the hash of the created transaction, or an error if the transaction cannot be
+/// broadcast. An error means that the node is being shut down.
+impl GenericCall<()> for BlockingBroadcaster {
+    type Output = Result<Hash, SendError>;
+
+    fn generic_call(&self, _ctx: (), method: MethodDescriptor<'_>, args: Vec<u8>) -> Self::Output {
+        block_on(self.0.generic_call((), method, args))
     }
 }
 
@@ -352,19 +441,16 @@ pub struct SupervisorExtensions<'a> {
 impl SupervisorExtensions<'_> {
     /// Starts the deployment of an artifact. The provided callback is executed after
     /// the deployment is completed.
-    pub fn start_deploy<F>(
+    pub fn start_deploy(
         &mut self,
         artifact: ArtifactId,
         spec: impl BinaryValue,
-        then: impl FnOnce(Result<(), ExecutionError>) -> F + 'static + Send,
-    ) where
-        F: IntoFuture<Item = (), Error = ExecutionError>,
-        F::Future: 'static + Send,
-    {
+        then: impl FnOnce(Result<(), ExecutionError>) -> Result<(), ExecutionError> + Send + 'static,
+    ) {
         let action = DispatcherAction::StartDeploy {
             artifact,
             spec: spec.into_bytes(),
-            then: Box::new(|res| Box::new(then(res).into_future())),
+            then: Box::new(|res| then(res)),
         };
         self.mailbox.push(action);
     }

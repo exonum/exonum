@@ -33,8 +33,25 @@
 //! The provided `ProtobufConvert` implementation for Hash allows you to embed this field into your
 //! struct and generate `ProtobufConvert` for it using `#[derive(ProtobufConvert)]`, which will validate
 //! your struct based on the validation function for `Hash`.
-//!
-//TODO: revert the example
+
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc
+)]
 
 #[macro_use]
 extern crate serde_derive; // Required for Protobuf.
@@ -43,43 +60,39 @@ pub use protobuf_convert::*;
 
 pub mod proto;
 
+use anyhow::{ensure, format_err, Error};
 use chrono::{DateTime, TimeZone, Utc};
-use failure::{ensure, format_err, Error};
 use protobuf::well_known_types;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 
-use proto::bit_vec::BitVec;
+use crate::proto::bit_vec::BitVec;
 
-#[macro_use]
-mod macros;
 #[cfg(test)]
 mod tests;
 
-/// Used for establishing correspondence between rust struct
-/// and protobuf rust struct
+/// Used for establishing correspondence between a Rust struct and a type generated from Protobuf.
 pub trait ProtobufConvert: Sized {
-    /// Type of the protobuf clone of Self
+    /// Type generated from the Protobuf definition.
     type ProtoStruct;
 
-    /// Struct -> ProtoStruct
+    /// Performs conversion to the type generated from Protobuf.
     fn to_pb(&self) -> Self::ProtoStruct;
-
-    /// ProtoStruct -> Struct
+    /// Performs conversion from the type generated from Protobuf.
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error>;
 }
 
 impl ProtobufConvert for DateTime<Utc> {
     type ProtoStruct = well_known_types::Timestamp;
 
-    fn to_pb(&self) -> well_known_types::Timestamp {
-        let mut ts = well_known_types::Timestamp::new();
+    fn to_pb(&self) -> Self::ProtoStruct {
+        let mut ts = Self::ProtoStruct::new();
         ts.set_seconds(self.timestamp());
         ts.set_nanos(self.timestamp_subsec_nanos() as i32);
         ts
     }
 
-    fn from_pb(pb: well_known_types::Timestamp) -> Result<Self, Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         Utc.timestamp_opt(pb.get_seconds(), pb.get_nanos() as u32)
             .single()
             .ok_or_else(|| format_err!("Failed to convert timestamp from bytes"))
@@ -106,11 +119,7 @@ impl ProtobufConvert for u16 {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        ensure!(
-            pb <= u32::from(u16::max_value()),
-            "u32 is out of range for valid u16"
-        );
-        Ok(pb as u16)
+        u16::try_from(pb).map_err(|_| format_err!("Value is out of range"))
     }
 }
 
@@ -122,11 +131,7 @@ impl ProtobufConvert for i16 {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        ensure!(
-            pb >= i32::from(i16::min_value()) && pb <= i32::from(i16::max_value()),
-            "i32 is out of range for valid i16"
-        );
-        Ok(pb as i16)
+        i16::try_from(pb).map_err(|_| format_err!("Value is out of range"))
     }
 }
 
@@ -182,7 +187,7 @@ where
     fn to_pb(&self) -> Self::ProtoStruct {
         self.iter().map(|(k, v)| (k.clone(), v.to_pb())).collect()
     }
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
         pb.drain()
             .map(|(k, v)| ProtobufConvert::from_pb(v).map(|v| (k, v)))
             .collect::<Result<HashMap<_, _, _>, _>>()

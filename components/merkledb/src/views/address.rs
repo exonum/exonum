@@ -98,7 +98,7 @@ impl IndexAddress {
 
     /// Returns the bytes part of `IndexAddress`.
     pub fn id_in_group(&self) -> Option<&[u8]> {
-        self.id_in_group.as_ref().map(Vec::as_slice)
+        self.id_in_group.as_deref()
     }
 
     /// Prepends a name part to `IndexAddress`. The name is separated from the existing name

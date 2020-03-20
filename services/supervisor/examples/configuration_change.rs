@@ -21,7 +21,7 @@ use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess},
     Entry, ObjectHash,
 };
-use exonum_rust_runtime::{Service, ServiceFactory};
+use exonum_rust_runtime::{spec::Spec, Service};
 use exonum_testkit::{TestKit, TestKitBuilder};
 
 use exonum_supervisor::{ConfigPropose, ConfigVote, Configure, Supervisor, SupervisorInterface};
@@ -67,28 +67,20 @@ impl Configure for ConfigChangeService {
         params: Self::Params,
     ) -> Result<(), ExecutionError> {
         println!("Apply config called with params {}", params);
-        Schema::new(context.service_data())
-            .params
-            .set(params.clone());
+        Schema::new(context.service_data()).params.set(params);
 
         Ok(())
     }
 }
 
 fn main() {
-    let service = ConfigChangeService;
-    let artifact = service.artifact_id();
-
     // Create testkit instance with our test service and supervisor.
+    let service = Spec::new(ConfigChangeService).with_instance(SERVICE_ID, SERVICE_NAME, ());
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
         .with_validators(4)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::decentralized())
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(SERVICE_ID, SERVICE_NAME))
-        .with_rust_service(service)
+        .with(Supervisor::decentralized())
+        .with(service)
         .build();
 
     // Firstly, lets change consensus configuration and increase `min_propose_timeout`.
@@ -154,7 +146,7 @@ fn send_and_vote_for_propose(
         .map(|validator| {
             validator
                 .service_keypair()
-                .confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote { propose_hash })
+                .confirm_config_change(SUPERVISOR_INSTANCE_ID, ConfigVote::new(propose_hash))
         })
         .collect();
 

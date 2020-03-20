@@ -40,7 +40,7 @@ impl Height {
     /// assert_eq!(0, height.0);
     /// ```
     pub fn zero() -> Self {
-        Height(0)
+        Self(0)
     }
 
     /// Returns next value of the height.
@@ -55,7 +55,7 @@ impl Height {
     /// assert_eq!(11, next_height.0);
     /// ```
     pub fn next(self) -> Self {
-        Height(self.0 + 1)
+        Self(self.0 + 1)
     }
 
     /// Returns previous value of the height.
@@ -75,7 +75,7 @@ impl Height {
     /// ```
     pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
-        Height(self.0 - 1)
+        Self(self.0 - 1)
     }
 
     /// Increments the height value.
@@ -119,7 +119,7 @@ impl BinaryValue for Height {
         self.0.into_bytes()
     }
 
-    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let value = <u64 as BinaryValue>::from_bytes(value)?;
         Ok(Self(value))
     }
@@ -155,7 +155,7 @@ impl<'de> Deserialize<'de> for Height {
     where
         D: Deserializer<'de>,
     {
-        Ok(Height(u64::deserialize(deserializer)?))
+        Ok(Self(u64::deserialize(deserializer)?))
     }
 }
 
@@ -163,7 +163,7 @@ impl FromStr for Height {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> Result<Self, ParseIntError> {
-        u64::from_str(s).map(Height)
+        u64::from_str(s).map(Self)
     }
 }
 
@@ -184,7 +184,7 @@ impl Round {
     /// assert_eq!(0, round.0);
     /// ```
     pub fn zero() -> Self {
-        Round(0)
+        Self(0)
     }
 
     /// Returns first value of the round.
@@ -198,7 +198,7 @@ impl Round {
     /// assert_eq!(1, round.0);
     /// ```
     pub fn first() -> Self {
-        Round(1)
+        Self(1)
     }
 
     /// Returns next value of the round.
@@ -213,7 +213,7 @@ impl Round {
     /// assert_eq!(21, next_round.0);
     /// ```
     pub fn next(self) -> Self {
-        Round(self.0 + 1)
+        Self(self.0 + 1)
     }
 
     /// Returns previous value of the round.
@@ -233,7 +233,7 @@ impl Round {
     /// ```
     pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
-        Round(self.0 - 1)
+        Self(self.0 - 1)
     }
 
     /// Increments the round value.
@@ -285,7 +285,7 @@ impl Round {
     /// assert_eq!(None, iter.next());
     /// ```
     pub fn iter_to(self, to: Self) -> impl Iterator<Item = Self> {
-        (self.0..to.0).map(Round)
+        (self.0..to.0).map(Self)
     }
 }
 
@@ -294,7 +294,7 @@ impl BinaryValue for Round {
         self.0.into_bytes()
     }
 
-    fn from_bytes(value: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let value = <u32 as BinaryValue>::from_bytes(value)?;
         Ok(Self(value))
     }
@@ -314,7 +314,7 @@ impl From<Round> for u32 {
 
 impl From<Round> for u64 {
     fn from(val: Round) -> Self {
-        u64::from(val.0)
+        Self::from(val.0)
     }
 }
 
@@ -335,7 +335,7 @@ impl ValidatorId {
     /// assert_eq!(0, id.0);
     /// ```
     pub fn zero() -> Self {
-        ValidatorId(0)
+        Self(0)
     }
 }
 
@@ -344,8 +344,8 @@ impl BinaryValue for ValidatorId {
         self.0.to_bytes()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
-        u16::from_bytes(bytes).map(ValidatorId)
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
+        u16::from_bytes(bytes).map(Self)
     }
 }
 
@@ -363,6 +363,6 @@ impl From<ValidatorId> for u16 {
 
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
-        val.0 as usize
+        val.0 as Self
     }
 }

@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use failure::{bail, Error};
+use anyhow::bail;
 use serde::{de, ser};
 
 use std::{fmt, str::FromStr};
 
 /// CORS header specification.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum AllowOrigin {
     /// Allows access from any host.
     Any,
@@ -83,7 +84,7 @@ impl<'de> de::Deserialize<'de> for AllowOrigin {
 }
 
 impl FromStr for AllowOrigin {
-    type Err = Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s == "*" {

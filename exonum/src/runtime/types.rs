@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
+use anyhow::{bail, ensure, format_err};
 use exonum_crypto::{Hash, KeyPair, PublicKey, SecretKey, HASH_SIZE};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
@@ -21,7 +23,7 @@ use exonum_merkledb::{
     BinaryKey, BinaryValue, ObjectHash,
 };
 use exonum_proto::ProtobufConvert;
-use failure::{bail, ensure, format_err};
+use protobuf::well_known_types::Empty;
 use semver::Version;
 use serde_derive::{Deserialize, Serialize};
 
@@ -52,17 +54,13 @@ pub type MethodId = u32;
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "schema::base::CallInfo")]
+#[non_exhaustive]
 pub struct CallInfo {
     /// Unique service instance identifier. The dispatcher uses this identifier to find the
     /// runtime to execute a transaction.
     pub instance_id: InstanceId,
     /// Identifier of the method in the service interface required for the call.
     pub method_id: MethodId,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl CallInfo {
@@ -71,7 +69,6 @@ impl CallInfo {
         Self {
             instance_id,
             method_id,
-            non_exhaustive: (),
         }
     }
 }
@@ -105,16 +102,12 @@ impl CallInfo {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::base::AnyTx")]
+#[non_exhaustive]
 pub struct AnyTx {
     /// Information required for the call of the corresponding executor.
     pub call_info: CallInfo,
     /// Serialized transaction arguments.
     pub arguments: Vec<u8>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl AnyTx {
@@ -123,7 +116,6 @@ impl AnyTx {
         Self {
             call_info,
             arguments,
-            non_exhaustive: (),
         }
     }
 
@@ -138,7 +130,7 @@ impl AnyTx {
     }
 
     /// Parse transaction arguments as a specific type.
-    pub fn parse<T: BinaryValue>(&self) -> Result<T, failure::Error> {
+    pub fn parse<T: BinaryValue>(&self) -> anyhow::Result<T> {
         T::from_bytes(Cow::Borrowed(&self.arguments))
     }
 }
@@ -167,7 +159,7 @@ impl AnyTx {
 ///
 /// ```
 /// # use exonum::runtime::ArtifactId;
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// // Typical Rust artifact.
 /// let rust_artifact_id = "0:my-service:1.0.0".parse::<ArtifactId>()?;
 /// // Typical Java artifact.
@@ -179,6 +171,7 @@ impl AnyTx {
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "schema::base::ArtifactId")]
+#[non_exhaustive]
 pub struct ArtifactId {
     /// Runtime identifier.
     pub runtime_id: u32,
@@ -187,11 +180,6 @@ pub struct ArtifactId {
     /// Semantic version of the artifact.
     #[protobuf_convert(with = "crate::helpers::pb_version")]
     pub version: Version,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
@@ -202,7 +190,7 @@ impl ArtifactId {
         runtime_id: impl Into<u32>,
         name: impl Into<String>,
         version: Version,
-    ) -> Result<Self, failure::Error> {
+    ) -> anyhow::Result<Self> {
         let artifact = Self::from_raw_parts(runtime_id.into(), name.into(), version);
         artifact.validate()?;
         Ok(artifact)
@@ -221,7 +209,6 @@ impl ArtifactId {
             runtime_id,
             name,
             version,
-            non_exhaustive: (),
         }
     }
 
@@ -241,7 +228,7 @@ impl ArtifactId {
 }
 
 impl ValidateInput for ArtifactId {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     /// Checks that the artifact name contains only allowed characters and is not empty.
     fn validate(&self) -> Result<(), Self::Error> {
@@ -256,8 +243,7 @@ impl ValidateInput for ArtifactId {
         ensure!(!self.name.is_empty(), "Artifact name should not be empty");
         ensure!(
             is_valid_identifier(&self.name),
-            "Artifact name ({}) contains an illegal character, use only: `a-zA-Z0-9` and `/_.-`",
-            &self.name,
+            "Artifact name contains an illegal character, use only: `a-zA-Z0-9` and `/_.-`"
         );
         Ok(())
     }
@@ -276,7 +262,7 @@ impl Display for ArtifactId {
 }
 
 impl FromStr for ArtifactId {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let split = s.splitn(3, ':').collect::<Vec<_>>();
@@ -290,7 +276,7 @@ impl FromStr for ArtifactId {
                 artifact.validate()?;
                 Ok(artifact)
             }
-            _ => Err(failure::format_err!(
+            _ => Err(anyhow::format_err!(
                 "Wrong `ArtifactId` format, should be in form \"runtime_id:name:version\""
             )),
         }
@@ -302,16 +288,12 @@ impl FromStr for ArtifactId {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::base::ArtifactSpec")]
+#[non_exhaustive]
 pub struct ArtifactSpec {
     /// Information uniquely identifying the artifact.
     pub artifact: ArtifactId,
     /// Runtime-specific artifact payload.
     pub payload: Vec<u8>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl ArtifactSpec {
@@ -320,7 +302,6 @@ impl ArtifactSpec {
         Self {
             artifact,
             payload: deploy_spec.into_bytes(),
-            non_exhaustive: (),
         }
     }
 }
@@ -330,6 +311,7 @@ impl ArtifactSpec {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::base::InstanceSpec")]
+#[non_exhaustive]
 pub struct InstanceSpec {
     /// Unique numeric ID of the service instance.
     ///
@@ -347,11 +329,6 @@ pub struct InstanceSpec {
 
     /// Identifier of the corresponding artifact.
     pub artifact: ArtifactId,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl InstanceSpec {
@@ -361,7 +338,7 @@ impl InstanceSpec {
         id: InstanceId,
         name: impl Into<String>,
         artifact: impl AsRef<str>,
-    ) -> Result<Self, failure::Error> {
+    ) -> anyhow::Result<Self> {
         let spec = Self::from_raw_parts(id, name.into(), artifact.as_ref().parse()?);
         spec.validate()?;
         Ok(spec)
@@ -369,24 +346,16 @@ impl InstanceSpec {
 
     /// Creates a new instance specification from prepared parts without any checks.
     pub fn from_raw_parts(id: InstanceId, name: String, artifact: ArtifactId) -> Self {
-        Self {
-            id,
-            name,
-            artifact,
-            non_exhaustive: (),
-        }
+        Self { id, name, artifact }
     }
 
     /// Checks that the instance name contains only allowed characters and is not empty.
-    pub fn is_valid_name(name: impl AsRef<str>) -> Result<(), failure::Error> {
+    pub fn is_valid_name(name: impl AsRef<str>) -> anyhow::Result<()> {
         let name = name.as_ref();
-        ensure!(
-            !name.is_empty(),
-            "Service instance name should not be empty"
-        );
+        ensure!(!name.is_empty(), "Service name is empty");
         ensure!(
             is_valid_index_name_component(name),
-            "Service instance name ({}) contains illegal character, use only: a-zA-Z0-9 and one of _-", name
+            "Service name contains illegal character, use only: a-zA-Z0-9 and _-"
         );
         Ok(())
     }
@@ -398,7 +367,7 @@ impl InstanceSpec {
 }
 
 impl ValidateInput for InstanceSpec {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         self.artifact.validate()?;
@@ -413,19 +382,13 @@ impl Display for InstanceSpec {
 }
 
 /// Allows to query a service instance by either of the two identifiers.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
 pub enum InstanceQuery<'a> {
     /// Query by an instance ID.
     Id(InstanceId),
     /// Query by an instance name.
     Name(&'a str),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl From<InstanceId> for InstanceQuery<'_> {
@@ -441,27 +404,23 @@ impl<'a> From<&'a str> for InstanceQuery<'a> {
 }
 
 /// Status of an artifact deployment.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum ArtifactStatus {
+    /// The artifact is pending unload.
+    Unloading,
     /// The artifact is pending deployment.
-    Pending = 1,
+    Deploying,
     /// The artifact has been successfully deployed.
-    Active = 2,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
+    Active,
 }
 
 impl Display for ArtifactStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArtifactStatus::Active => f.write_str("active"),
-            ArtifactStatus::Pending => f.write_str("pending"),
-            ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
+            Self::Unloading => f.write_str("unloading"),
+            Self::Active => f.write_str("active"),
+            Self::Deploying => f.write_str("deploying"),
         }
     }
 }
@@ -470,20 +429,22 @@ impl ProtobufConvert for ArtifactStatus {
     type ProtoStruct = schema::lifecycle::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
+        use self::schema::lifecycle::ArtifactState_Status::*;
+
         match self {
-            ArtifactStatus::Active => schema::lifecycle::ArtifactState_Status::ACTIVE,
-            ArtifactStatus::Pending => schema::lifecycle::ArtifactState_Status::PENDING,
-            ArtifactStatus::__NonExhaustive => unreachable!("Never actually generated"),
+            Self::Unloading => UNLOADING,
+            Self::Active => ACTIVE,
+            Self::Deploying => DEPLOYING,
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
+        use self::schema::lifecycle::ArtifactState_Status::*;
+
         Ok(match pb {
-            schema::lifecycle::ArtifactState_Status::ACTIVE => ArtifactStatus::Active,
-            schema::lifecycle::ArtifactState_Status::PENDING => ArtifactStatus::Pending,
-            schema::lifecycle::ArtifactState_Status::NONE => {
-                bail!("Status `NONE` is reserved for the further usage.")
-            }
+            UNLOADING => Self::Unloading,
+            ACTIVE => Self::Active,
+            DEPLOYING => Self::Deploying,
         })
     }
 }
@@ -492,6 +453,7 @@ impl ProtobufConvert for ArtifactStatus {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceMigration")]
+#[non_exhaustive]
 pub struct InstanceMigration {
     /// Migration target to obtain migration scripts from. This artifact
     /// must be deployed on the blockchain.
@@ -509,11 +471,6 @@ pub struct InstanceMigration {
     #[protobuf_convert(with = "crate::helpers::pb_optional_hash")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_hash: Option<Hash>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl InstanceMigration {
@@ -530,7 +487,6 @@ impl InstanceMigration {
             target,
             end_version,
             completed_hash,
-            non_exhaustive: (),
         }
     }
 
@@ -542,47 +498,79 @@ impl InstanceMigration {
 }
 
 /// Status of a service instance.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[derive(BinaryValue)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum InstanceStatus {
     /// The service instance is active.
     Active,
     /// The service instance is stopped.
     Stopped,
+    /// The service instance is frozen; it can process read-only requests,
+    /// but not transactions and `before_transactions` / `after_transactions` hooks.
+    Frozen,
     /// The service instance is migrating to the specified artifact.
     Migrating(Box<InstanceMigration>),
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl InstanceStatus {
     pub(super) fn migrating(migration: InstanceMigration) -> Self {
-        InstanceStatus::Migrating(Box::new(migration))
+        Self::Migrating(Box::new(migration))
     }
 
     /// Indicates whether the service instance status is active.
     pub fn is_active(&self) -> bool {
-        *self == InstanceStatus::Active
+        *self == Self::Active
+    }
+
+    /// Returns `true` if a service with this status provides at least read access to its data.
+    pub fn provides_read_access(&self) -> bool {
+        match self {
+            // Migrations are non-destructive currently; i.e., the old service data is consistent
+            // during migration.
+            Self::Active | Self::Frozen | Self::Migrating(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be resumed.
+    pub fn can_be_resumed(&self) -> bool {
+        match self {
+            Self::Stopped | Self::Frozen => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be stopped.
+    pub fn can_be_stopped(&self) -> bool {
+        match self {
+            Self::Active | Self::Frozen => true,
+            _ => false,
+        }
+    }
+
+    /// Returns `true` if the service instance with this status can be frozen in all cases.
+    pub fn can_be_frozen(&self) -> bool {
+        match self {
+            Self::Active => true,
+            // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service
+            // may have a data version differing from the artifact recorded in service spec,
+            // or, more generally, from any of deployed artifacts.
+            _ => false,
+        }
     }
 
     pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
         match self {
-            InstanceStatus::Migrating(migration) if !migration.is_completed() => {
-                Some(&migration.target)
-            }
+            Self::Migrating(migration) if !migration.is_completed() => Some(&migration.target),
             _ => None,
         }
     }
 
     pub(super) fn completed_migration_hash(&self) -> Option<Hash> {
         match self {
-            InstanceStatus::Migrating(migration) => migration.completed_hash,
+            Self::Migrating(migration) => migration.completed_hash,
             _ => None,
         }
     }
@@ -591,10 +579,10 @@ impl InstanceStatus {
 impl Display for InstanceStatus {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
-            InstanceStatus::Active => "active",
-            InstanceStatus::Stopped => "stopped",
-            InstanceStatus::Migrating(..) => "migrating",
-            InstanceStatus::__NonExhaustive => unreachable!("Never actually constructed"),
+            Self::Active => "active",
+            Self::Stopped => "stopped",
+            Self::Frozen => "frozen",
+            Self::Migrating(..) => "migrating",
         })
     }
 }
@@ -612,28 +600,29 @@ impl InstanceStatus {
         let mut pb = schema::lifecycle::InstanceStatus::new();
         match status {
             None => pb.set_simple(NONE),
-            Some(InstanceStatus::Active) => pb.set_simple(ACTIVE),
-            Some(InstanceStatus::Stopped) => pb.set_simple(STOPPED),
-            Some(InstanceStatus::Migrating(migration)) => pb.set_migration(migration.to_pb()),
-            Some(InstanceStatus::__NonExhaustive) => unreachable!("Never actually constructed"),
+            Some(Self::Active) => pb.set_simple(ACTIVE),
+            Some(Self::Stopped) => pb.set_simple(STOPPED),
+            Some(Self::Frozen) => pb.set_simple(FROZEN),
+            Some(Self::Migrating(migration)) => pb.set_migration(migration.to_pb()),
         }
         pb
     }
 
     pub(super) fn from_pb(
         mut pb: schema::lifecycle::InstanceStatus,
-    ) -> Result<Option<Self>, failure::Error> {
+    ) -> anyhow::Result<Option<Self>> {
         use schema::lifecycle::InstanceStatus_Simple::*;
 
         if pb.has_simple() {
             Ok(match pb.get_simple() {
                 NONE => None,
-                ACTIVE => Some(InstanceStatus::Active),
-                STOPPED => Some(InstanceStatus::Stopped),
+                ACTIVE => Some(Self::Active),
+                STOPPED => Some(Self::Stopped),
+                FROZEN => Some(Self::Frozen),
             })
         } else if pb.has_migration() {
             InstanceMigration::from_pb(pb.take_migration())
-                .map(|migration| Some(InstanceStatus::migrating(migration)))
+                .map(|migration| Some(Self::migrating(migration)))
         } else {
             Err(format_err!("No variant specified for `InstanceStatus`"))
         }
@@ -647,7 +636,7 @@ impl ProtobufConvert for InstanceStatus {
         Self::create_pb(Some(self))
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let maybe_self = Self::from_pb(pb)?;
         maybe_self
             .ok_or_else(|| format_err!("Cannot create `InstanceStatus` from `None` serialization"))
@@ -659,16 +648,12 @@ impl ProtobufConvert for InstanceStatus {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::ArtifactState")]
+#[non_exhaustive]
 pub struct ArtifactState {
     /// Runtime-specific deployment specification.
     pub deploy_spec: Vec<u8>,
     /// Artifact deployment status.
     pub status: ArtifactStatus,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl ArtifactState {
@@ -677,7 +662,6 @@ impl ArtifactState {
         Self {
             deploy_spec,
             status,
-            non_exhaustive: (),
         }
     }
 }
@@ -687,6 +671,7 @@ impl ArtifactState {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceState")]
+#[non_exhaustive]
 pub struct InstanceState {
     /// Service instance specification.
     pub spec: InstanceSpec,
@@ -724,18 +709,13 @@ pub struct InstanceState {
     /// block will be committed.
     #[protobuf_convert(with = "InstanceStatus")]
     pub pending_status: Option<InstanceStatus>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 mod pb_optional_version {
     use super::*;
 
     #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
-    pub fn from_pb(pb: String) -> Result<Option<Version>, failure::Error> {
+    pub fn from_pb(pb: String) -> anyhow::Result<Option<Version>> {
         if pb.is_empty() {
             Ok(None)
         } else {
@@ -764,7 +744,6 @@ impl InstanceState {
             data_version,
             status,
             pending_status,
-            non_exhaustive: (),
         }
     }
 
@@ -778,12 +757,40 @@ impl InstanceState {
             .unwrap_or(&self.spec.artifact.version)
     }
 
+    /// Returns the artifact currently associated with the service; that is, one that understands
+    /// its data and is deployed on the blockchain.
+    ///
+    /// This method will return `None` if a service has been [migrated] because the migration
+    /// workflow does not guarantee that the resulting data version corresponds to a deployed
+    /// artifact.
+    ///
+    /// A [runtime] may use this method to determine how to treat service state updates.
+    ///
+    /// [migrated]: migrations/index.html
+    /// [runtime]: trait.Runtime.html
+    pub fn associated_artifact(&self) -> Option<&ArtifactId> {
+        if self.data_version.is_some() {
+            None
+        } else {
+            Some(&self.spec.artifact)
+        }
+    }
+
+    /// Returns true if a service with this state can have its data read.
+    pub(super) fn is_readable(&self) -> bool {
+        let status = self
+            .status
+            .as_ref()
+            .or_else(|| self.pending_status.as_ref());
+        status.map_or(false, InstanceStatus::provides_read_access)
+    }
+
     /// Sets next status as current and changes next status to `None`
     ///
     /// # Panics
     ///
     /// - If next status is already `None`.
-    pub(crate) fn commit_pending_status(&mut self) {
+    pub(super) fn commit_pending_status(&mut self) {
         assert!(
             self.pending_status.is_some(),
             "Next instance status should not be `None`"
@@ -797,6 +804,12 @@ impl InstanceState {
 #[derive(BinaryValue, ObjectHash)]
 pub struct MigrationStatus(pub Result<Hash, String>);
 
+impl From<Result<Hash, String>> for MigrationStatus {
+    fn from(res: Result<Hash, String>) -> Self {
+        Self(res)
+    }
+}
+
 impl ProtobufConvert for MigrationStatus {
     type ProtoStruct = schema::lifecycle::MigrationStatus;
 
@@ -809,7 +822,7 @@ impl ProtobufConvert for MigrationStatus {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let inner = if pb.has_hash() {
             Ok(Hash::from_pb(pb.take_hash())?)
         } else if pb.has_error() {
@@ -819,7 +832,7 @@ impl ProtobufConvert for MigrationStatus {
                 "Invalid Protobuf for `MigrationStatus`: neither of variants is specified"
             ));
         };
-        Ok(MigrationStatus(inner))
+        Ok(Self(inner))
     }
 }
 
@@ -843,11 +856,9 @@ impl ProtobufConvert for MigrationStatus {
 /// [`address()`](#method.address) method. Services may use this representation to compare
 /// or index callers without the necessity to care about all possible kinds of authorization
 /// supported by the framework.
-///
-/// This enum is not supposed to be exhaustively matched, so that new variants may be added to it
-/// without breaking semver compatibility.
 #[derive(Debug, PartialEq, Clone)]
 #[derive(BinaryValue, ObjectHash)]
+#[non_exhaustive]
 pub enum Caller {
     /// A usual transaction from the Exonum client authorized by its key pair.
     Transaction {
@@ -866,16 +877,12 @@ pub enum Caller {
     /// This kind of authorization is used for `before_transactions` / `after_transactions`
     /// calls to the service instances, and for initialization of the built-in services.
     Blockchain,
-
-    // Hidden variant to prevent exhaustive matching.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl Caller {
     /// Returns the author's public key, if it exists.
     pub fn author(&self) -> Option<PublicKey> {
-        if let Caller::Transaction { author } = self {
+        if let Self::Transaction { author } = self {
             Some(*author)
         } else {
             None
@@ -884,7 +891,7 @@ impl Caller {
 
     /// Tries to reinterpret the caller as a service.
     pub fn as_service(&self) -> Option<InstanceId> {
-        if let Caller::Service { instance_id } = self {
+        if let Self::Service { instance_id } = self {
             Some(*instance_id)
         } else {
             None
@@ -916,24 +923,23 @@ impl ProtobufConvert for Caller {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut pb = Self::ProtoStruct::new();
         match self {
-            Caller::Transaction { author } => pb.set_transaction_author(author.to_pb()),
-            Caller::Service { instance_id } => pb.set_instance_id(*instance_id),
-            Caller::Blockchain => pb.set_blockchain(Default::default()),
-            Caller::__NonExhaustive => unreachable!("variant is never constructed"),
+            Self::Transaction { author } => pb.set_transaction_author(author.to_pb()),
+            Self::Service { instance_id } => pb.set_instance_id(*instance_id),
+            Self::Blockchain => pb.set_blockchain(Empty::new()),
         }
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         Ok(if pb.has_transaction_author() {
             let author = PublicKey::from_pb(pb.take_transaction_author())?;
-            Caller::Transaction { author }
+            Self::Transaction { author }
         } else if pb.has_instance_id() {
-            Caller::Service {
+            Self::Service {
                 instance_id: pb.get_instance_id(),
             }
         } else if pb.has_blockchain() {
-            Caller::Blockchain
+            Self::Blockchain
         } else {
             bail!("No variant specified for `Caller`");
         })
@@ -988,8 +994,8 @@ impl ProtobufConvert for CallerAddress {
         self.0.to_pb()
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
-        Hash::from_pb(pb).map(CallerAddress)
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
+        Hash::from_pb(pb).map(Self)
     }
 }
 
@@ -1003,7 +1009,7 @@ impl BinaryKey for CallerAddress {
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        CallerAddress(Hash::read(buffer))
+        Self(Hash::read(buffer))
     }
 }
 
@@ -1080,11 +1086,11 @@ mod tests {
             ("ava:test:0.0.1", "invalid digit found in string"),
             (
                 "123:I am a service!:1.0.0",
-                "Artifact name (I am a service!) contains an illegal character",
+                "Artifact name contains an illegal character",
             ),
             (
                 "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}:1.0.0",
-                "Artifact name (\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}) contains an illegal character",
+                "Artifact name contains an illegal character",
             ),
             ("1:test:1", "Expected dot"),
             ("1:test:3.141593", "Expected dot"),
@@ -1116,18 +1122,18 @@ mod tests {
         let specs = [
             (
                 InstanceSpec::new(1, "", "0:my-service:1.0.0"),
-                "Service instance name should not be empty",
+                "Service name is empty",
             ),
             (
                 InstanceSpec::new(2,
                     "\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}",
                     "0:my-service:1.0.0"
                 ),
-                "Service instance name (\u{440}\u{443}\u{441}\u{441}\u{43a}\u{438}\u{439}_\u{441}\u{435}\u{440}\u{432}\u{438}\u{441}) contains illegal character",
+                "Service name contains illegal character",
             ),
             (
                 InstanceSpec::new(3, "space service", "1:java.runtime.service:1.0.0"),
-                "Service instance name (space service) contains illegal character",
+                "Service name contains illegal character",
             ),
             (
                 InstanceSpec::new(4, "foo_service", ""),
@@ -1135,7 +1141,7 @@ mod tests {
             ),
             (
                 InstanceSpec::new(5, "dot.service", "1:java.runtime.service:1.0.0"),
-                "Service instance name (dot.service) contains illegal character",
+                "Service name contains illegal character",
             ),
             (
                 InstanceSpec::new(6, "foo_service", ":test:1.0.0"),
