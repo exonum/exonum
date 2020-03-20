@@ -54,5 +54,5 @@ message CallProof {
   // of which is recorded in the block header as `error_hash`).
   proof.MapProof call_proof = 2;
   // Human-readable description of an error if the call status is erroneous.
-  string description = 3;
+  string error_description = 3;
 }

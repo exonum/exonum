@@ -402,22 +402,18 @@ impl ProtobufConvert for CallProof {
         let mut inner = Self::ProtoStruct::default();
         inner.set_block_proof(self.block_proof.to_pb());
         inner.set_call_proof(self.call_proof.to_pb());
-        if let Some(ref description) = self.error_description {
-            inner.set_description(description.clone());
-        } else {
-            inner.set_description(String::new());
-        }
+        inner.set_error_description(self.error_description.clone().unwrap_or_default());
         inner
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, anyhow::Error> {
         let block_proof = BlockProof::from_pb(pb.take_block_proof())?;
         let call_proof = MapProof::from_pb(pb.take_call_proof())?;
-        let description = pb.get_description();
-        let error_description = if description.is_empty() {
+        let error_description = pb.get_error_description();
+        let error_description = if error_description.is_empty() {
             None
         } else {
-            Some(description.to_owned())
+            Some(error_description.to_owned())
         };
         Ok(Self {
             block_proof,
