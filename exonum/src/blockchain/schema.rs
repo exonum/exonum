@@ -217,14 +217,14 @@ impl<T: Access> Schema<T> {
 
     /// Returns the recorded [block skip], if any.
     ///
-    /// [block skip]: enum.BlockContents#variant.Skip
+    /// [block skip]: enum.BlockContents.html#variant.Skip
     pub fn block_skip(&self) -> Option<Block> {
         self.block_skip_entry().get()
     }
 
     /// Returns the recorded [block skip] together with authenticating information.
     ///
-    /// [block skip]: enum.BlockContents#variant.Skip
+    /// [block skip]: enum.BlockContents.html#variant.Skip
     pub fn block_skip_and_precommits(&self) -> Option<BlockProof> {
         let block = self.block_skip_entry().get()?;
         let precommits = self.precommits(&block.object_hash()).iter().collect();
