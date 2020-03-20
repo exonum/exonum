@@ -104,7 +104,7 @@ impl ExonumCommand for RunDev {
 
         let generate_config = GenerateConfig {
             common_config: common_config_path,
-            output_dir: config_dir.clone(),
+            output_dir: config_dir,
             peer_address: "127.0.0.1:6200".parse().unwrap(),
             listen_address: None,
             no_password: true,
@@ -118,7 +118,7 @@ impl ExonumCommand for RunDev {
         let finalize = Finalize {
             private_config_path,
             output_config_path: node_config_path.clone(),
-            public_configs: vec![public_config_path.clone()],
+            public_configs: vec![public_config_path],
             public_api_address: Some(self.public_api_address),
             private_api_address: Some(self.private_api_address),
             public_allow_origin: Some(public_origins),
