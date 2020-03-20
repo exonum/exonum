@@ -7,7 +7,7 @@ from exonum_client import ExonumClient
 from exonum_client.crypto import KeyPair
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
-from exonum_launcher.explorer import ExecutionFailError
+from exonum_launcher.explorer import ExecutionFailError, NotCommittedError
 
 from suite import (
     run_dev_node,
@@ -50,7 +50,7 @@ class RegularDeployTest(unittest.TestCase):
 
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
     def test_deploy_regular_invalid_artifact_name(self):
@@ -70,7 +70,7 @@ class RegularDeployTest(unittest.TestCase):
             # invalid artifact should not be deployed
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, False)
 
     def test_deploy_regular_exceed_deadline_height(self):
@@ -84,13 +84,13 @@ class RegularDeployTest(unittest.TestCase):
         )
         with Launcher(cryptocurrency_advanced_config) as launcher:
             launcher.deploy_all()
-            with self.assertRaises(ExecutionFailError):
+            with self.assertRaises(NotCommittedError):
                 launcher.wait_for_deploy()
 
             # artifact should not be deployed because of exceeded deadline height
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, False)
 
     def test_deploy_regular_with_instance(self):
@@ -113,7 +113,7 @@ class RegularDeployTest(unittest.TestCase):
             self.wait_for_api_restart()
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
@@ -159,7 +159,7 @@ class RegularDeployTest(unittest.TestCase):
             self.wait_for_api_restart()
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
@@ -216,7 +216,7 @@ class RegularDeployTest(unittest.TestCase):
 
             self.wait_for_api_restart()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
@@ -328,7 +328,7 @@ class RegularDeployTest(unittest.TestCase):
 
             self.wait_for_api_restart()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
@@ -346,7 +346,7 @@ class RegularDeployTest(unittest.TestCase):
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
-            with self.assertRaises(ExecutionFailError):
+            with self.assertRaises(NotCommittedError):
                 launcher.wait_for_start()
 
     def test_deploy_regular_with_instance_resume_action_before_start(self):
@@ -384,11 +384,11 @@ class RegularDeployTest(unittest.TestCase):
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
-            with self.assertRaises(ExecutionFailError):
+            with self.assertRaises(NotCommittedError):
                 launcher.wait_for_start()
 
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
     def test_deploy_regular_with_invalid_action(self):
@@ -433,7 +433,7 @@ class DevDeployTest(unittest.TestCase):
             launcher.wait_for_deploy()
 
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
     def test_deploy_dev_with_instance(self):
@@ -456,7 +456,7 @@ class DevDeployTest(unittest.TestCase):
             launcher.wait_for_start()
 
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
