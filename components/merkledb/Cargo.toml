@@ -1,6 +1,6 @@
 [package]
 name = "exonum-merkledb"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -15,32 +15,33 @@ categories = ["cryptography", "database", "data-structures"]
 description = "Persistent storage implementation based on RocksDB which provides APIs to work with Merkelized data structures."
 
 [dependencies]
-exonum-crypto = { path = "../crypto", version = "1.0.0-rc.1", features = ["with-serde"]}
-exonum-proto = { path = "../proto", version = "1.0.0-rc.1", optional = true }
+exonum-crypto = { path = "../crypto", version = "1.0.0-rc.2", features = ["with-serde"]}
+exonum-proto = { path = "../proto", version = "1.0.0-rc.2", optional = true }
 
+anyhow = "1.0.26"
 byteorder = "1.3"
 chrono = "0.4.6"
 crossbeam = "0.7.3"
 enum-primitive-derive = "0.1"
-failure = "0.1"
 leb128 = "0.2"
 num-traits = "0.2"
 protobuf = { version = "2.8.1", features = ["with-serde"], optional = true }
 rocksdb = { version = "0.13", default-features = false }
-rust_decimal = "1.0, <1.1.0" # The 1.1.0 version requires Rust 1.39+
+rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 smallvec = "1.0"
 tempfile = "3.0"
+thiserror = "1.0"
 uuid = { version = "0.8", features = ["v4"] }
 
 [dev-dependencies]
-exonum-derive = { version = "1.0.0-rc.1", path = "../derive" }
+exonum-derive = { version = "1.0.0-rc.2", path = "../derive" }
 
 assert_matches = "1.3.0"
 bincode = "1.1"
 criterion = "0.3"
-hex = "0.4"
+hex = "0.4.0"
 modifier = "0.1"
 proptest = "0.9"
 pretty_assertions = "0.6"
@@ -73,4 +74,4 @@ long_benchmarks = []
 yolo = []
 
 [build-dependencies]
-exonum-build = { version = "1.0.0-rc.1", path = "../build" }
+exonum-build = { version = "1.0.0-rc.2", path = "../build" }

@@ -333,11 +333,7 @@ impl ExonumInterface {
     }
 
     fn interface_name(&self) -> &str {
-        self.attrs
-            .interface
-            .as_ref()
-            .map(String::as_str)
-            .unwrap_or_default()
+        self.attrs.interface.as_deref().unwrap_or_default()
     }
 
     fn mut_trait_name(&self) -> Ident {
@@ -418,11 +414,9 @@ impl ExonumInterface {
 
         let impl_method = |descriptor: &ServiceMethodDescriptor| {
             let ServiceMethodDescriptor { name, arg_type, id } = descriptor;
-            let name_string = name.to_string();
             let descriptor = quote! {
                 #cr::MethodDescriptor::new(
                     #interface_name,
-                    #name_string,
                     #id,
                 )
             };

@@ -18,9 +18,9 @@ use crate::{
     helpers::{Height, ValidateInput},
     merkledb::{access::Prefixed, BinaryValue, Fork},
     runtime::{
-        ArtifactId, BlockchainData, CallSite, CallType, Caller, CoreError, Dispatcher,
-        DispatcherSchema, ExecutionError, InstanceDescriptor, InstanceId, InstanceQuery,
-        InstanceSpec, InstanceStatus, MethodId, SUPERVISOR_INSTANCE_ID,
+        migrations::MigrationType, ArtifactId, BlockchainData, CallSite, CallType, Caller,
+        CoreError, Dispatcher, DispatcherSchema, ExecutionError, ExecutionFail, InstanceDescriptor,
+        InstanceId, InstanceQuery, InstanceSpec, MethodId, RuntimeFeature, SUPERVISOR_INSTANCE_ID,
     },
 };
 
@@ -348,7 +348,7 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
 #[derive(Debug)]
 pub struct SupervisorExtensions<'a>(pub(super) ExecutionContext<'a>);
 
-impl<'a> SupervisorExtensions<'a> {
+impl SupervisorExtensions<'_> {
     /// Marks an artifact as *committed*, i.e., one which service instances can be deployed from.
     ///
     /// If / when a block with this instruction is accepted, artifact deployment becomes
@@ -357,6 +357,19 @@ impl<'a> SupervisorExtensions<'a> {
     /// If a node cannot deploy the artifact, it panics.
     pub fn start_artifact_registration(&self, artifact: &ArtifactId, spec: Vec<u8>) {
         Dispatcher::commit_artifact(self.0.fork, artifact, spec);
+    }
+
+    /// Unloads the specified artifact, making it unavailable for service deployment and other
+    /// operations.
+    ///
+    /// Like other operations concerning services or artifacts, the artifact will be unloaded
+    /// only if / when the block with this instruction is committed.
+    ///
+    /// # Return value
+    ///
+    /// If the artifact cannot be unloaded, an error is returned.
+    pub fn unload_artifact(&self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        Dispatcher::unload_artifact(self.0.fork, artifact)
     }
 
     /// Initiates adding a service instance to the blockchain.
@@ -373,7 +386,7 @@ impl<'a> SupervisorExtensions<'a> {
             .initiate_adding_service(instance_spec, constructor)
     }
 
-    /// Initiates stopping an active service instance in the blockchain.
+    /// Initiates stopping an active or frozen service instance.
     ///
     /// The service is not immediately stopped; it stops if / when the block containing
     /// the stopping transaction is committed.
@@ -381,12 +394,20 @@ impl<'a> SupervisorExtensions<'a> {
         Dispatcher::initiate_stopping_service(self.0.fork, instance_id)
     }
 
-    /// Initiates resuming previously stopped service instance in the blockchain.
+    /// Initiates freezing an active service instance.
     ///
-    /// Provided artifact will be used in attempt to resume service. Artifact name should be equal to
-    /// the artifact name of the previously stopped instance.
-    /// Artifact version should be same as the `data_version` stored in the stopped service
-    /// instance.
+    /// The service is not immediately frozen; it freezes if / when the block containing
+    /// the stopping transaction is committed.
+    ///
+    /// Note that this method **cannot** be used to transition service to frozen
+    /// from the stopped state; this transition is not supported as of now.
+    pub fn initiate_freezing_service(&self, instance_id: InstanceId) -> Result<(), ExecutionError> {
+        self.0
+            .dispatcher
+            .initiate_freezing_service(self.0.fork, instance_id)
+    }
+
+    /// Initiates resuming previously stopped service instance in the blockchain.
     ///
     /// This method can be used to resume modified service after successful migration.
     ///
@@ -395,19 +416,27 @@ impl<'a> SupervisorExtensions<'a> {
     pub fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
-        artifact: ArtifactId,
         params: impl BinaryValue,
     ) -> Result<(), ExecutionError> {
         let state = DispatcherSchema::new(&*self.0.fork)
             .get_instance(instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        if state.status != Some(InstanceStatus::Stopped) {
-            return Err(CoreError::ServiceNotStopped.into());
+        // Check that the service can be resumed.
+        if let Some(data_version) = state.data_version {
+            let msg = format!(
+                "Cannot resume service `{}` because its data version ({}) does not match \
+                 the associated artifact `{}`. To solve, associate the service with the newer \
+                 artifact revision, for example, via fast-forward migration.",
+                state.spec.as_descriptor(),
+                data_version,
+                state.spec.artifact
+            );
+            return Err(CoreError::CannotResumeService.with_description(msg));
         }
 
-        let mut spec = state.spec;
-        spec.artifact = artifact;
+        let spec = state.spec;
+        DispatcherSchema::new(&*self.0.fork).initiate_resuming_service(instance_id)?;
 
         let runtime = self
             .0
@@ -426,11 +455,7 @@ impl<'a> SupervisorExtensions<'a> {
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
                 err
-            })?;
-
-        DispatcherSchema::new(&*self.0.fork)
-            .initiate_resuming_service(instance_id, spec.artifact)
-            .map_err(From::from)
+            })
     }
 
     /// Provides writeable access to core schema.
@@ -443,7 +468,7 @@ impl<'a> SupervisorExtensions<'a> {
         &self,
         new_artifact: ArtifactId,
         old_service: &str,
-    ) -> Result<(), ExecutionError> {
+    ) -> Result<MigrationType, ExecutionError> {
         self.0
             .dispatcher
             .initiate_migration(self.0.fork, new_artifact, old_service)
@@ -466,5 +491,21 @@ impl<'a> SupervisorExtensions<'a> {
     /// Flushes a committed migration.
     pub fn flush_migration(&mut self, service_name: &str) -> Result<(), ExecutionError> {
         Dispatcher::flush_migration(self.0.fork, service_name)
+    }
+
+    /// Checks if the runtime supports the specified optional feature.
+    ///
+    /// # Panics
+    ///
+    /// - Panics if the runtime with the given identifier does not exist. This will never happen
+    ///   if `runtime_id` is taken from a deployed artifact.
+    pub fn check_feature(&self, runtime_id: u32, feature: &RuntimeFeature) -> bool {
+        self.0
+            .dispatcher
+            .runtime_by_id(runtime_id)
+            .unwrap_or_else(|| {
+                panic!("Runtime with ID {} does not exist", runtime_id);
+            })
+            .is_supported(feature)
     }
 }

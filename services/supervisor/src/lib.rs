@@ -14,19 +14,21 @@
 
 //! Supervisor is an [Exonum][exonum] service capable of the following activities:
 //!
-//! - Service artifact deployment;
-//! - Service instances creation;
-//! - Changing consensus configuration;
-//! - Changing service instances configuration.
-//! - Migrating service data.
+//! - Deploying service artifacts and unloading unused artifacts
+//! - Instantiating services
+//! - Changing configuration of instantiated services
+//! - Changing a state of instantiated services: stopping, freezing, resuming,
+//!   and initiating data migrations
+//! - Changing consensus configuration
 //!
-//! More information on the artifact/service lifecycle can be found in the documentation for
-//! the Exonum [runtime module][runtime-docs].
+//! More information on the artifact / service lifecycle can be found in the
+//! documentation of [service lifecycle][docs:lifecycle] and the [supervisor][docs:supervisor].
 //!
 //! Supervisor service has two different operating modes: a "simple" mode and a "decentralized" mode.
 //! The difference between modes is in the decision making approach:
+//!
 //! - Within the decentralized mode, to deploy a service or apply a new configuration,
-//!  no less than (2/3)+1 validators should reach a consensus;
+//!   more than 2/3rds of validators should reach a consensus;
 //! - Within the simple mode, any decision is executed after a single validator approval.
 //!
 //! The simple mode can be useful if one network administrator manages all the validator nodes
@@ -42,19 +44,17 @@
 //!
 //! Key point here is that user **should not** send transactions to the supervisor by himself.
 //!
-//! An expected format of requests for those endpoints is a serialized Protobuf message.
-//!
 //! To deploy an artifact, one (within the "simple" mode) or majority (within the "decentralized" mode)
 //! of the nodes should receive a [`DeployRequest`] message through API.
 //!
-//! To request a config change, one node should receive a [`ConfigPropose`] message through API.
+//! To request a config change, one node should submit a [`ConfigPropose`] message through API.
 //! For the "simple" mode no more actions are required. For the "decentralized" mode the majority of the nodes
-//! should also receive [`ConfigVote`] messages with a hash of the proposed configuration.
+//! should also submit [`ConfigVote`] messages with a hash of the proposed configuration.
 //! The proposal initiator that receives the original [`ConfigPropose`] message must not vote for the configuration.
 //! This node votes for the configuration propose automatically.
 //!
-//! The operation of starting or resuming a service is treated similarly to a configuration change
-//! and follows the same rules.
+//! Starting, resuming or freezing a service, or unloading an artifact
+//! are treated similarly to a configuration change and follow the same rules.
 //!
 //! ## Migrations Management
 //!
@@ -67,17 +67,16 @@
 //!
 //! The following requirements should be satisfied in order to start a migration:
 //!
-//! - Target service instance should exist and be stopped.
+//! - Target service instance should exist and be stopped or frozen.
 //! - End artifact for a migration should be a superior version of the artifact of target instance.
 //! - New (end) version of artifact should be deployed.
-//! - Service should have all the migration scripts required to migrate to the end artifact version.
 //!
 //! Violation of any of requirements listed above will result in a request failure without
 //! actual start of migration.
 //!
 //! ## Migration Workflow
 //!
-//! Migration starts after the block with the request is committed, and performed asynchronously.
+//! Migration starts after the block with the request is committed and is performed asynchronously.
 //!
 //! After the local migration completion, validator nodes report the result of migration, which can
 //! be either successful or unsuccessful.
@@ -97,11 +96,10 @@
 //!
 //! If migration contains more than one migration script (e.g. if you need to migrate service from
 //! version 0.1 to version 0.3, and this will include execution of two migration scripts: 0.1 -> 0.2
-//! and 0.2 -> 0.3), supervisor will perform one migration script at the time.
+//! and 0.2 -> 0.3), supervisor will execute one migration script at the time.
 //!
 //! After the first migration request to version 0.3, migration will be performed for version 0.2,
-//! and you need to create the same migration request again (with different deadline height though).
-//!
+//! and you need to create the same migration request with a different deadline height.
 //! After the second migration request, the version will be updated to 0.3.
 //!
 //! To put it simply, you may need to perform the same migration request several times until every
@@ -109,26 +107,39 @@
 //!
 //! ### Incomplete Migrations
 //!
-//! Migrations require only the current and the last version of artifact to be deployed. If you will
-//! decide to stop migration until reaching the last version (e.g. you requested migration to version
-//! 0.3, but decided to go with version 0.2), you will have to deploy a corresponding artifact after
-//! you migrate to version 0.2, before you'll be able to start your service.
+//! Migrations require only the current and the last version of artifact to be deployed. If you
+//! decide to stop migration before reaching the last version (e.g. you requested migration to version
+//! 0.3, but decided to go with version 0.2), you will need to deploy the 0.2 artifact
+//! in order to resume the migrated service.
 //!
 //! # HTTP API
 //!
 //! REST API of the service is documented in the [`api` module](api/index.html).
 //!
 //! [exonum]: https://github.com/exonum/exonum
-//! [runtime-docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
+//! [docs:supervisor]: https://exonum.com/doc/version/latest/advanced/supervisor/
+//! [docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
 //! [`DeployRequest`]: struct.DeployRequest.html
 //! [`ConfigPropose`]: struct.ConfigPropose.html
 //! [`ConfigVote`]: struct.ConfigVote.html
 
-#![deny(
+#![warn(
     missing_debug_implementations,
     missing_docs,
     unsafe_code,
     bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
 pub use self::{
@@ -138,8 +149,8 @@ pub use self::{
     migration_state::MigrationState,
     proto_structures::{
         ConfigChange, ConfigProposalWithHash, ConfigPropose, ConfigVote, DeployRequest,
-        DeployResult, MigrationRequest, MigrationResult, ResumeService, ServiceConfig,
-        StartService, StopService, SupervisorConfig,
+        DeployResult, FreezeService, MigrationRequest, MigrationResult, ResumeService,
+        ServiceConfig, StartService, StopService, SupervisorConfig, UnloadArtifact,
     },
     schema::Schema,
     transactions::SupervisorInterface,
@@ -148,14 +159,13 @@ pub use self::{
 #[doc(hidden)] // Public for migration tests.
 pub use self::schema::SchemaImpl;
 
-use exonum::{
-    blockchain::config::InstanceInitParams,
-    runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID},
-};
+use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID};
 use exonum_derive::*;
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{
-    api::ServiceApiBuilder, AfterCommitContext, Broadcaster, Service, ServiceFactory as _,
+    api::ServiceApiBuilder,
+    spec::{Simple, Spec},
+    AfterCommitContext, Service,
 };
 
 use crate::{configure::ConfigureMut, mode::Mode};
@@ -188,7 +198,10 @@ fn update_configs(
     context: &mut ExecutionContext<'_>,
     changes: Vec<ConfigChange>,
 ) -> Result<(), ExecutionError> {
-    for change in changes.into_iter() {
+    const NO_SERVICE: &str =
+        "BUG: Instance with the specified ID is absent in the dispatcher schema";
+
+    for change in changes {
         match change {
             ConfigChange::Consensus(config) => {
                 log::trace!("Updating consensus configuration {:?}", config);
@@ -243,12 +256,10 @@ fn update_configs(
                     .data()
                     .for_dispatcher()
                     .get_instance(stop_service.instance_id)
-                    .expect(
-                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
-                    );
+                    .expect(NO_SERVICE);
 
                 log::trace!(
-                    "Request stop service with name {} from artifact {}",
+                    "Stopping service with name {} from artifact {}",
                     instance.spec.name,
                     instance.spec.artifact
                 );
@@ -258,27 +269,47 @@ fn update_configs(
                     .initiate_stopping_service(stop_service.instance_id)?;
             }
 
+            ConfigChange::FreezeService(freeze_service) => {
+                let instance = context
+                    .data()
+                    .for_dispatcher()
+                    .get_instance(freeze_service.instance_id)
+                    .expect(NO_SERVICE);
+
+                log::trace!(
+                    "Freezing service with name {} from artifact {}",
+                    instance.spec.name,
+                    instance.spec.artifact
+                );
+
+                context
+                    .supervisor_extensions()
+                    .initiate_freezing_service(freeze_service.instance_id)?;
+            }
+
             ConfigChange::ResumeService(resume_service) => {
                 let instance = context
                     .data()
                     .for_dispatcher()
                     .get_instance(resume_service.instance_id)
-                    .expect(
-                        "BUG: Instance with the specified ID is absent in the dispatcher schema.",
-                    );
+                    .expect(NO_SERVICE);
 
                 log::trace!(
-                    "Request resume service with name {} from artifact {} up to {}",
+                    "Resuming service with name {} with artifact {}",
                     instance.spec.name,
                     instance.spec.artifact,
-                    resume_service.artifact,
                 );
 
-                context.supervisor_extensions().initiate_resuming_service(
-                    resume_service.instance_id,
-                    resume_service.artifact,
-                    resume_service.params,
-                )?;
+                context
+                    .supervisor_extensions()
+                    .initiate_resuming_service(resume_service.instance_id, resume_service.params)?;
+            }
+
+            ConfigChange::UnloadArtifact(unload_artifact) => {
+                log::trace!("Unloading artifact `{}`", unload_artifact.artifact_id);
+                context
+                    .supervisor_extensions()
+                    .unload_artifact(&unload_artifact.artifact_id)?;
             }
         }
     }
@@ -289,33 +320,32 @@ fn update_configs(
 /// entry if needed.
 fn assign_instance_id(context: &ExecutionContext<'_>) -> InstanceId {
     let mut schema = SchemaImpl::new(context.service_data());
-    match schema.assign_instance_id() {
-        Some(id) => id,
-        None => {
-            // Instance ID entry is not initialized, do it now.
-            // We have to do it lazy, since dispatcher doesn't know the amount
-            // of builtin instances until the genesis block is committed, and
-            // `after_transactions` hook is not invoked for services at the genesis
-            // block.
+    if let Some(id) = schema.assign_instance_id() {
+        id
+    } else {
+        // Instance ID entry is not initialized, do it now.
+        // We have to do it lazy, since dispatcher doesn't know the amount
+        // of builtin instances until the genesis block is committed, and
+        // `after_transactions` hook is not invoked for services at the genesis
+        // block.
 
-            // ID for the new instance is next to the highest builtin ID to avoid
-            // overlap if builtin identifiers space is sparse.
-            let dispatcher_schema = context.data().for_dispatcher();
-            let builtin_instances = dispatcher_schema.service_instances();
+        // ID for the new instance is next to the highest builtin ID to avoid
+        // overlap if builtin identifiers space is sparse.
+        let dispatcher_schema = context.data().for_dispatcher();
+        let builtin_instances = dispatcher_schema.service_instances();
 
-            let new_instance_id = builtin_instances
-                .values()
-                .map(|state| state.spec.id)
-                .max()
-                .unwrap_or(SUPERVISOR_INSTANCE_ID)
-                + 1;
+        let new_instance_id = builtin_instances
+            .values()
+            .map(|state| state.spec.id)
+            .max()
+            .unwrap_or(SUPERVISOR_INSTANCE_ID)
+            + 1;
 
-            // We're going to use ID obtained above, so the vacant ID is next to it.
-            let vacant_instance_id = new_instance_id + 1;
-            schema.vacant_instance_id.set(vacant_instance_id);
+        // We're going to use ID obtained above, so the vacant ID is next to it.
+        let vacant_instance_id = new_instance_id + 1;
+        schema.vacant_instance_id.set(vacant_instance_id);
 
-            new_instance_id
-        }
+        new_instance_id
     }
 }
 
@@ -344,25 +374,22 @@ impl Supervisor {
         }
     }
 
-    /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
+    /// Creates a deploy spec for a builtin `Supervisor` instance with
     /// simple configuration.
-    pub fn simple() -> InstanceInitParams {
+    pub fn simple() -> Spec<Self, Simple> {
         Self::builtin_instance(Self::simple_config())
     }
 
     /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
     /// decentralized configuration.
-    pub fn decentralized() -> InstanceInitParams {
+    pub fn decentralized() -> Spec<Self, Simple> {
         Self::builtin_instance(Self::decentralized_config())
     }
 
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
-    pub fn builtin_instance(config: SupervisorConfig) -> InstanceInitParams {
-        Supervisor
-            .artifact_id()
-            .into_default_instance(SUPERVISOR_INSTANCE_ID, Self::NAME)
-            .with_constructor(config)
+    pub fn builtin_instance(config: SupervisorConfig) -> Spec<Self, Simple> {
+        Spec::new(Self).with_instance(SUPERVISOR_INSTANCE_ID, Self::NAME, config)
     }
 }
 
@@ -387,10 +414,10 @@ impl Service for Supervisor {
     }
 
     fn before_transactions(&self, mut context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
-        self.remove_outdated_deployments(&context);
-        self.remove_outdated_config_proposal(&context);
-        self.flush_completed_migrations(&mut context)?;
-        self.remove_outdated_migrations(&mut context)?;
+        Self::remove_outdated_deployments(&context);
+        Self::remove_outdated_config_proposal(&context);
+        Self::flush_completed_migrations(&mut context)?;
+        Self::remove_outdated_migrations(&mut context)?;
         Ok(())
     }
 
@@ -433,8 +460,8 @@ impl Service for Supervisor {
 
     /// Sends confirmation transaction for unconfirmed deployment requests.
     fn after_commit(&self, mut context: AfterCommitContext<'_>) {
-        self.process_unconfirmed_deployments(&mut context);
-        self.process_incomplete_migrations(&mut context);
+        Self::process_unconfirmed_deployments(&mut context);
+        Self::process_incomplete_migrations(&mut context);
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
@@ -444,7 +471,7 @@ impl Service for Supervisor {
 
 impl Supervisor {
     /// Removes deployments for which deadline height is already exceeded.
-    fn remove_outdated_deployments(&self, context: &ExecutionContext<'_>) {
+    fn remove_outdated_deployments(context: &ExecutionContext<'_>) {
         let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
@@ -467,7 +494,7 @@ impl Supervisor {
     }
 
     /// Removes pending config proposal if it's outdated.
-    fn remove_outdated_config_proposal(&self, context: &ExecutionContext<'_>) {
+    fn remove_outdated_config_proposal(context: &ExecutionContext<'_>) {
         let mut schema = SchemaImpl::new(context.service_data());
         let core_schema = context.data().for_core();
         let height = core_schema.height();
@@ -484,7 +511,7 @@ impl Supervisor {
 
     /// Goes through pending deployments, chooses ones that we're not confirmed by our node
     /// and starts the local deployment routine for them.
-    fn process_unconfirmed_deployments(&self, context: &mut AfterCommitContext<'_>) {
+    fn process_unconfirmed_deployments(context: &mut AfterCommitContext<'_>) {
         let service_key = context.service_key();
 
         let deployments: Vec<_> = {
@@ -493,12 +520,12 @@ impl Supervisor {
                 .pending_deployments
                 .values()
                 .filter(|request| {
-                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(&request) {
+                    if let Some(AsyncEventState::Pending) = schema.deploy_states.get(request) {
                         // From all pending requests we are interested only in ones not
                         // confirmed by us.
                         !schema
                             .deploy_confirmations
-                            .confirmed_by(&request, &service_key)
+                            .confirmed_by(request, &service_key)
                     } else {
                         false
                     }
@@ -509,7 +536,7 @@ impl Supervisor {
         for unconfirmed_request in deployments {
             let artifact = unconfirmed_request.artifact.clone();
             let spec = unconfirmed_request.spec.clone();
-            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
+            let tx_sender = context.broadcaster();
 
             let mut extensions = context.supervisor_extensions().expect(NOT_SUPERVISOR_MSG);
             // We should deploy the artifact for all nodes, but send confirmations only
@@ -518,9 +545,11 @@ impl Supervisor {
                 if let Some(tx_sender) = tx_sender {
                     log::trace!("Sending deployment result report {:?}", unconfirmed_request);
                     let confirmation = DeployResult::new(unconfirmed_request, result);
-                    if let Err(e) = tx_sender.report_deploy_result((), confirmation) {
+                    // TODO Investigate how to use async operations in the
+                    // `after_commit` hook [ECR-4295]
+                    if let Err(e) = tx_sender.blocking().report_deploy_result((), confirmation) {
                         log::error!("Cannot send `DeployResult`: {}", e);
-                    }
+                    };
                 }
                 Ok(())
             });
@@ -532,7 +561,6 @@ impl Supervisor {
     /// This has to be done in the block other than one in which migration was committed,
     /// so this method is invoked in `before_transactions` of the next block.
     fn flush_completed_migrations(
-        &self,
         context: &mut ExecutionContext<'_>,
     ) -> Result<(), ExecutionError> {
         let mut schema = SchemaImpl::new(context.service_data());
@@ -561,7 +589,7 @@ impl Supervisor {
 
             // Update the state of a migration.
             let mut state = schema.migration_state_unchecked(&request);
-            let instance = transactions::get_instance_by_name(&context, request.service.as_ref())
+            let instance = transactions::get_instance_by_name(context, request.service.as_ref())
                 .expect("BUG: Migration succeed, but there is no such instance in core");
             state.update(AsyncEventState::Succeed, instance.data_version().clone());
             schema.migration_states.put(&request, state);
@@ -572,7 +600,6 @@ impl Supervisor {
 
     /// Rollbacks and removes migrations for which deadline height is already exceeded.
     fn remove_outdated_migrations(
-        &self,
         context: &mut ExecutionContext<'_>,
     ) -> Result<(), ExecutionError> {
         let height = context.data().for_core().height();
@@ -613,7 +640,7 @@ impl Supervisor {
     }
 
     /// Goes through incomplete migrations, checking their statuses.
-    fn process_incomplete_migrations(&self, context: &mut AfterCommitContext<'_>) {
+    fn process_incomplete_migrations(context: &mut AfterCommitContext<'_>) {
         let service_key = context.service_key();
 
         // First of all, check all the new migrations and request core to start them.
@@ -651,14 +678,17 @@ impl Supervisor {
                 .for_dispatcher()
                 .local_migration_result(request.service.as_ref());
 
-            let tx_sender = context.broadcaster().map(Broadcaster::into_owned);
+            let tx_sender = context.broadcaster();
 
             if let Some(status) = local_migration_result {
                 // We've got a result, broadcast it if our node is a validator.
                 if let Some(tx_sender) = tx_sender {
                     let confirmation = MigrationResult { request, status };
 
-                    if let Err(e) = tx_sender.report_migration_result((), confirmation) {
+                    if let Err(e) = tx_sender
+                        .blocking()
+                        .report_migration_result((), confirmation)
+                    {
                         log::error!("Cannot send `MigrationResult`: {}", e);
                     }
                 }

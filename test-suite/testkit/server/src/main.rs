@@ -14,20 +14,19 @@
 
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 use exonum_explorer_service::ExplorerFactory;
-use exonum_rust_runtime::ServiceFactory;
+use exonum_rust_runtime::spec::Spec;
 use exonum_testkit::TestKitBuilder;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     exonum::helpers::init_logger().unwrap();
 
-    let artifact = CryptocurrencyService.artifact_id();
     TestKitBuilder::validator()
-        .with_default_rust_service(ExplorerFactory)
-        .with_artifact(artifact.clone())
-        .with_instance(artifact.into_default_instance(101, "cryptocurrency"))
-        .with_rust_service(CryptocurrencyService)
+        .with(Spec::new(ExplorerFactory).with_default_instance())
+        .with(Spec::new(CryptocurrencyService).with_instance(101, "cryptocurrency", ()))
         .serve(
             "0.0.0.0:8000".parse().unwrap(),
             "0.0.0.0:9000".parse().unwrap(),
-        );
+        )
+        .await;
 }

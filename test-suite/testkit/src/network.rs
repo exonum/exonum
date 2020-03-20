@@ -103,7 +103,7 @@ impl TestNetwork {
 
     /// Returns config encoding the network structure usable for creating the genesis block of
     /// a blockchain.
-    pub fn genesis_config(&self) -> ConsensusConfig {
+    pub fn consensus_config(&self) -> ConsensusConfig {
         let validator_keys = self
             .validators()
             .iter()
@@ -132,12 +132,13 @@ impl TestNetwork {
 
     /// Updates the test network with a new consensus configuration.
     // TODO Optimize O(n^2) [ECR-3222]
-    pub fn update_consensus_config(&mut self, config: ConsensusConfig) {
+    pub fn update_consensus_config(&mut self, config: &ConsensusConfig) {
         // Assign new node roles.
         for node in &mut self.nodes {
             node.validator_id = config
                 .find_validator(|keys| keys.consensus_key == node.consensus_keypair().public_key());
         }
+
         // Verify that all validator keys have been assigned.
         let validators_count = self
             .nodes
@@ -145,9 +146,10 @@ impl TestNetwork {
             .filter(|x| x.validator_id.is_some())
             .count();
         assert_eq!(validators_count, config.validator_keys.len());
+
         // Modify us.
-        self.us.validator_id = config
-            .find_validator(|keys| keys.consensus_key == self.us.consensus_keypair().public_key());
+        let our_key = self.us.consensus_keypair().public_key();
+        self.us.validator_id = config.find_validator(|keys| keys.consensus_key == our_key);
     }
 
     /// Returns service public key of the validator with given id.
@@ -169,13 +171,14 @@ impl TestNetwork {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct TestNode {
     keys: Keys,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     validator_id: Option<ValidatorId>,
 }
 
 impl TestNode {
     /// Creates a new auditor.
     pub fn new_auditor() -> Self {
-        TestNode {
+        Self {
             keys: Keys::random(),
             validator_id: None,
         }
@@ -183,7 +186,7 @@ impl TestNode {
 
     /// Creates a new validator with the given id.
     pub fn new_validator(validator_id: ValidatorId) -> Self {
-        TestNode {
+        Self {
             keys: Keys::random(),
             validator_id: Some(validator_id),
         }
@@ -194,8 +197,8 @@ impl TestNode {
         consensus_keys: impl Into<KeyPair>,
         service_keys: impl Into<KeyPair>,
         validator_id: Option<ValidatorId>,
-    ) -> TestNode {
-        TestNode {
+    ) -> Self {
+        Self {
             keys: Keys::from_keys(consensus_keys, service_keys),
             validator_id,
         }
@@ -220,7 +223,7 @@ impl TestNode {
                 SystemTime::now().into(),
             ),
             self.keys.consensus_pk(),
-            &self.keys.consensus_sk(),
+            self.keys.consensus_sk(),
         )
     }
 

@@ -1,5 +1,10 @@
 //! Migration utilities.
 //!
+//! # Stability
+//!
+//! The entirety of this module is considered unstable. While the supported functionality
+//! is unlikely to break, the implementation details may change in the following releases.
+//!
 //! # Migration workflow
 //!
 //! **Migration** refers to the ability to update data in indexes, remove indexes,
@@ -59,7 +64,8 @@
 //! # use exonum_merkledb::{access::{AccessExt, CopyAccessExt}, Database, SystemSchema, TemporaryDB};
 //! # use exonum_merkledb::migration::{flush_migration, Migration, MigrationHelper};
 //! # use std::sync::Arc;
-//! # fn main() -> Result<(), failure::Error> {
+//! #
+//! # fn main() -> anyhow::Result<()> {
 //! let db = Arc::new(TemporaryDB::new());
 //! // Create initial data in the database.
 //! let fork = db.fork();
@@ -122,7 +128,7 @@
 pub use self::persistent_iter::{PersistentIter, PersistentIters, PersistentKeys};
 
 use exonum_crypto::Hash;
-use failure::Fail;
+use thiserror::Error;
 
 use std::{
     fmt,
@@ -449,7 +455,7 @@ pub struct MigrationHelper {
 }
 
 impl fmt::Debug for MigrationHelper {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_tuple("MigrationHelper")
             .field(&self.namespace)
@@ -578,14 +584,14 @@ impl MigrationHelper {
 }
 
 /// Errors emitted by `MigrationHelper` methods.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum MigrationError {
     /// Failed to merge migration changes to database.
-    #[fail(display = "Failed to merge migration changes to database: {}", _0)]
-    Merge(#[fail(cause)] crate::Error),
+    #[error("Failed to merge migration changes to the database: {}", _0)]
+    Merge(#[source] crate::Error),
 
     /// Migration has been aborted.
-    #[fail(display = "Migration was aborted")]
+    #[error("Migration was aborted")]
     Aborted,
 }
 

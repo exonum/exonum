@@ -255,7 +255,7 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
         .collect()
 }
 
-fn do_bench(bencher: &mut Bencher, params: BenchParams, isolate: bool) {
+fn do_bench(bencher: &mut Bencher<'_>, params: BenchParams, isolate: bool) {
     let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
     bencher.iter_with_setup(TemporaryDB::new, |db| {
         for block in &blocks {

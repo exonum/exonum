@@ -28,6 +28,40 @@
 //!
 //! - [Submit transaction](#submit-transaction)
 //!
+//! # Transaction Processing
+//!
+//! This section describes how transactions are processed by the nodes and what the clients
+//! can expect when [submitting transactions](#submit-transaction) and
+//! [getting transactions](#transaction-by-hash) from the node.
+//!
+//! As per consensus finality, once a transaction appears in a block, it can never change its
+//! status. The "in-block" status is (eventually) shared among all nodes in the network;
+//! if an honest Exonum node considers a certain transaction committed, eventually all honest
+//! nodes will do the same.
+//!
+//! At the same time, nodes exhibit *eventual* consistency regarding non-committed transactions
+//! (that is, transactions not present in one of the blocks; they are also called *in-pool* transactions).
+//! This is true both for the network in general (one node may not know an in-pool transaction
+//! known to another node) and, less intuitively, for a single node. The latter means that
+//! getting a transaction may return an "not found" error for a small period after the transaction
+//! was submitted to the node (aka a *stale read*).
+//!
+//! The period during which stale reads may exhibit depends on
+//! the `mempool.flush_pool_strategy` parameter of the node configuration.
+//! This parameter can be adjusted by the nodes independently. With the default value,
+//! the coherence period is order of 20 ms.
+//!
+//! As a consequence of eventual consistency, clients using explorer endpoints **MUST NOT**
+//! expect immediate consistency after submitting a transaction. Clients should
+//! be prepared that the getter endpoint may return "not found" status after transaction submission.
+//! It is recommended that clients poll the getter endpoint with a delay comparable to the coherence
+//! period as described above, and poll the endpoint several times if necessary.
+//!
+//! Note that there may be reasons for such eventual consistency unrelated to node implementation.
+//! For example, several Exonum nodes may be placed behind a balancing reverse proxy;
+//! in this case, the getter endpoint may be processed by a different node than the one
+//! that received a transaction.
+//!
 //! # List Blocks
 //!
 //! | Property    | Value |
@@ -46,19 +80,20 @@
 //! ```
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlocksRange, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
-//! # fn main() -> Result<(), failure::Error> {
+//! # use exonum_testkit::{Spec, TestKitBuilder};
+//! #
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!     .with_default_rust_service(ExplorerFactory)
+//!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlocksRange = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/blocks?count=2"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/blocks?count=2");
+//! let response: BlocksRange = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.range, Height(4)..Height(6));
 //! // Blocks are returned in reverse order, from the latest
 //! // to the earliest.
@@ -85,19 +120,20 @@
 //! ```
 //! # use exonum::helpers::Height;
 //! # use exonum_explorer_service::{api::BlockInfo, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
-//! # fn main() -> Result<(), failure::Error> {
+//! # use exonum_testkit::{Spec, TestKitBuilder};
+//! #
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! # let mut testkit = TestKitBuilder::validator()
-//! #    .with_default_rust_service(ExplorerFactory)
+//! #    .with(Spec::new(ExplorerFactory).with_default_instance())
 //! #    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: BlockInfo = reqwest::Client::new()
-//!     .get(&api.public_url("api/explorer/v1/block?height=3"))
-//!     .send()?
+//! let url = api.public_url("api/explorer/v1/block?height=3");
+//! let response: BlockInfo = reqwest::get(&url).await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.block.height, Height(3));
 //! // Precommits and median precommit time are always returned.
 //! assert!(response.precommits.is_some());
@@ -117,6 +153,10 @@
 //!
 //! Searches for a transaction, either committed or uncommitted, by the hash.
 //!
+//! **Important.** See [*Transaction Processing*] section for details about how transactions
+//! are processed and which invariants are (not) held during processing.
+//!
+//! [*Transaction Processing*]: #transaction-processing
 //! [`TransactionQuery`]: struct.TransactionQuery.html
 //! [`TransactionInfo`]: enum.TransactionInfo.html
 //!
@@ -127,7 +167,7 @@
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionQuery, TransactionInfo}, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
@@ -150,10 +190,11 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(ExplorerFactory)
-//!    .with_default_rust_service(MyService)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
 //! testkit.create_block_with_transaction(tx.clone());
@@ -161,10 +202,10 @@
 //! let api = testkit.api();
 //! let response: TransactionInfo = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/transactions"))
-//!     .query(&TransactionQuery { hash: tx.object_hash() })
-//!     .send()?
+//!     .query(&TransactionQuery::new(tx.object_hash()))
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! let response = response.as_committed().unwrap();
 //! assert_eq!(response.location().block_height(), Height(1));
 //! # Ok(())
@@ -177,22 +218,23 @@
 //! |-------------|-------|
 //! | Path        | `/api/explorer/v1/call_status/transaction` |
 //! | Method      | GET   |
-//! | Query type  | [`TransactionQuery`] |
+//! | Query type  | [`TransactionStatusQuery`] |
 //! | Return type | [`CallStatusResponse`] |
 //!
 //! Returns call status of committed transaction.
 //!
-//! [`CallStatusResponse`]: struct.CallStatusResponse.html
+//! [`TransactionStatusQuery`]: struct.TransactionStatusQuery.html
+//! [`CallStatusResponse`]: enum.CallStatusResponse.html
 //!
 //! ```
 //! # use exonum::{
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
-//! #     runtime::{ExecutionError, ExecutionFail},
+//! #     runtime::{ExecutionError, ExecutionFail, ExecutionStatus},
 //! # };
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
-//! # use exonum_explorer_service::{api::{TransactionQuery, CallStatusResponse}, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_explorer_service::{api::TransactionStatusQuery, ExplorerFactory};
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
@@ -217,22 +259,23 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(MyService)
-//!    .with_default_rust_service(ExplorerFactory)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().cause_error(MyService::INSTANCE_ID, 0);
 //! testkit.create_block_with_transaction(tx.clone());
 //!
 //! let api = testkit.api();
-//! let response: CallStatusResponse = reqwest::Client::new()
+//! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/transaction"))
-//!     .query(&TransactionQuery { hash: tx.object_hash() })
-//!     .send()?
+//!     .query(&TransactionStatusQuery::new(tx.object_hash()))
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
-//! let err = response.status.0.unwrap_err();
+//!     .json().await?;
+//! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Error!");
 //! # Ok(())
 //! # }
@@ -256,12 +299,12 @@
 //! ```
 //! # use exonum::{
 //! #     crypto::gen_keypair, helpers::Height, merkledb::ObjectHash,
-//! #     runtime::{ExecutionError, ExecutionFail},
+//! #     runtime::{ExecutionError, ExecutionFail, ExecutionStatus},
 //! # };
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
-//! # use exonum_explorer_service::{api::{CallStatusQuery, CallStatusResponse}, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_explorer_service::{api::CallStatusQuery, ExplorerFactory};
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 //! # #[service_factory(artifact_name = "my-service")]
 //! struct MyService;
@@ -276,24 +319,22 @@
 //! #     }
 //! # }
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(MyService)
-//!    .with_default_rust_service(ExplorerFactory)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! testkit.create_blocks_until(Height(5));
 //!
 //! let api = testkit.api();
-//! let response: CallStatusResponse = reqwest::Client::new()
+//! let response: ExecutionStatus = reqwest::Client::new()
 //!     .get(&api.public_url("api/explorer/v1/call_status/before_transactions"))
-//!     .query(&CallStatusQuery {
-//!         height: Height(2),
-//!         service_id: MyService::INSTANCE_ID,
-//!     })
-//!     .send()?
+//!     .query(&CallStatusQuery::new(Height(2), MyService::INSTANCE_ID))
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
-//! let err = response.status.0.unwrap_err();
+//!     .json().await?;
+//! let err = response.0.unwrap_err();
 //! assert_eq!(err.description(), "Not a good start");
 //! # Ok(())
 //! # }
@@ -323,6 +364,9 @@
 //! Adds transaction into the pool of unconfirmed transactions if it is valid
 //! and returns an error otherwise.
 //!
+//! **Important.** See [*Transaction Processing*] section for details about how transactions
+//! are processed and which invariants are (not) held during processing.
+//!
 //! [`TransactionHex`]: struct.TransactionHex.html
 //! [`TransactionResponse`]: struct.TransactionResponse.html
 //!
@@ -334,7 +378,7 @@
 //! # use exonum_rust_runtime::{ExecutionContext, DefaultInstance, Service, ServiceFactory};
 //! # use exonum_derive::*;
 //! # use exonum_explorer_service::{api::{TransactionHex, TransactionResponse}, ExplorerFactory};
-//! # use exonum_testkit::TestKitBuilder;
+//! # use exonum_testkit::{Spec, TestKitBuilder};
 //! #[exonum_interface]
 //! trait ServiceInterface<Ctx> {
 //!     type Output;
@@ -357,21 +401,21 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
-//!    .with_default_rust_service(ExplorerFactory)
-//!    .with_default_rust_service(MyService)
+//!    .with(Spec::new(ExplorerFactory).with_default_instance())
+//!    .with(Spec::new(MyService).with_default_instance())
 //!    .build();
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
-//! let tx_body = hex::encode(tx.to_bytes());
 //!
 //! let api = testkit.api();
 //! let response: TransactionResponse = reqwest::Client::new()
 //!     .post(&api.public_url("api/explorer/v1/transactions"))
-//!     .json(&TransactionHex { tx_body })
-//!     .send()?
+//!     .json(&TransactionHex::new(&tx))
+//!     .send().await?
 //!     .error_for_status()?
-//!     .json()?;
+//!     .json().await?;
 //! assert_eq!(response.tx_hash, tx.object_hash());
 //! # Ok(())
 //! # }
@@ -383,7 +427,8 @@ pub use exonum_explorer::{
     },
     api::{
         BlockInfo, BlockQuery, BlocksQuery, BlocksRange, CallStatusQuery, CallStatusResponse,
-        TransactionHex, TransactionQuery, TransactionResponse, MAX_BLOCKS_PER_REQUEST,
+        TransactionHex, TransactionQuery, TransactionResponse, TransactionStatusQuery,
+        MAX_BLOCKS_PER_REQUEST,
     },
     TransactionInfo,
 };
@@ -395,9 +440,9 @@ use exonum::{
     messages::SignedMessage,
     runtime::ExecutionStatus,
 };
-use exonum_explorer::{median_precommits_time, BlockchainExplorer};
+use exonum_explorer::BlockchainExplorer;
 use exonum_rust_runtime::api::{self, ServiceApiScope};
-use futures::{Future, IntoFuture};
+use futures::{future, Future, FutureExt, TryFutureExt};
 use hex::FromHex;
 use serde_json::json;
 
@@ -417,7 +462,7 @@ impl ExplorerApi {
         Self { blockchain }
     }
 
-    fn blocks(schema: Schema<&dyn Snapshot>, query: BlocksQuery) -> api::Result<BlocksRange> {
+    fn blocks(schema: Schema<&dyn Snapshot>, query: &BlocksQuery) -> api::Result<BlocksRange> {
         let explorer = BlockchainExplorer::from_schema(schema);
         if query.count > MAX_BLOCKS_PER_REQUEST {
             return Err(api::Error::bad_request()
@@ -454,23 +499,7 @@ impl ExplorerApi {
             .rev()
             .filter(|block| !query.skip_empty_blocks || !block.is_empty())
             .take(query.count)
-            .map(|block| BlockInfo {
-                txs: None,
-
-                time: if query.add_blocks_time {
-                    Some(median_precommits_time(&block.precommits()))
-                } else {
-                    None
-                },
-
-                precommits: if query.add_precommits {
-                    Some(block.precommits().to_vec())
-                } else {
-                    None
-                },
-
-                block: block.into_header(),
-            })
+            .map(|block| BlockInfo::summary(block, query))
             .collect();
 
         let height = if blocks.len() < query.count {
@@ -479,19 +508,16 @@ impl ExplorerApi {
             blocks.last().map_or(Height(0), |info| info.block.height)
         };
 
-        Ok(BlocksRange {
-            range: height..upper.next(),
-            blocks,
-        })
+        Ok(BlocksRange::new(height..upper.next(), blocks))
     }
 
-    fn block(schema: Schema<&dyn Snapshot>, query: BlockQuery) -> api::Result<BlockInfo> {
+    fn block(schema: Schema<&dyn Snapshot>, query: &BlockQuery) -> api::Result<BlockInfo> {
         let explorer = BlockchainExplorer::from_schema(schema);
         explorer.block(query.height).map(From::from).ok_or_else(|| {
             api::Error::not_found()
                 .title("Failed to get block info")
                 .detail(format!(
-                    "Requested block height({}) exceeds the blockchain height ({})",
+                    "Requested block height ({}) exceeds the blockchain height ({})",
                     query.height,
                     explorer.height()
                 ))
@@ -500,7 +526,7 @@ impl ExplorerApi {
 
     fn transaction_info(
         schema: Schema<&dyn Snapshot>,
-        query: TransactionQuery,
+        query: &TransactionQuery,
     ) -> api::Result<TransactionInfo> {
         BlockchainExplorer::from_schema(schema)
             .transaction(&query.hash)
@@ -512,66 +538,73 @@ impl ExplorerApi {
             })
     }
 
-    fn transaction_status(
-        schema: Schema<&dyn Snapshot>,
-        query: TransactionQuery,
+    fn get_status(
+        schema: &Schema<&dyn Snapshot>,
+        block_height: Height,
+        call_in_block: CallInBlock,
+        with_proof: bool,
     ) -> api::Result<CallStatusResponse> {
-        let explorer = BlockchainExplorer::from_schema(schema);
-
-        let tx_info = explorer.transaction(&query.hash).ok_or_else(|| {
+        let records = schema.call_records(block_height).ok_or_else(|| {
             api::Error::not_found()
-                .title("Transaction not found")
-                .detail(format!("Unknown transaction hash ({})", query.hash))
+                .title("Block not found")
+                .detail(format!(
+                    "Block with height {} is not yet created",
+                    block_height
+                ))
         })?;
 
-        let tx_info = match tx_info {
-            TransactionInfo::Committed(info) => info,
-            TransactionInfo::InPool { .. } => {
-                let err = api::Error::not_found()
-                    .title("Transaction not found")
-                    .detail(format!(
-                        "Requested transaction ({}) is not executed yet",
-                        query.hash
-                    ));
-                return Err(err);
-            }
-        };
+        Ok(if with_proof {
+            let proof = records.get_proof(call_in_block);
+            CallStatusResponse::Proof(proof)
+        } else {
+            let status = ExecutionStatus(records.get(call_in_block));
+            CallStatusResponse::Simple(status)
+        })
+    }
 
-        let call_in_block = CallInBlock::transaction(tx_info.location().position_in_block());
-        let block_height = tx_info.location().block_height();
+    fn transaction_status(
+        schema: &Schema<&dyn Snapshot>,
+        query: &TransactionStatusQuery,
+    ) -> api::Result<CallStatusResponse> {
+        let tx_location = schema
+            .transactions_locations()
+            .get(&query.hash)
+            .ok_or_else(|| {
+                api::Error::not_found()
+                    .title("Transaction not committed")
+                    .detail(format!("Unknown transaction hash ({})", query.hash))
+            })?;
 
-        let status = ExecutionStatus(explorer.call_status(block_height, call_in_block));
-        Ok(CallStatusResponse { status })
+        let call_in_block = CallInBlock::transaction(tx_location.position_in_block());
+        let block_height = tx_location.block_height();
+        Self::get_status(schema, block_height, call_in_block, query.with_proof)
     }
 
     /// Returns call status of `before_transactions` hook.
     fn before_transactions_status(
-        schema: Schema<&dyn Snapshot>,
-        query: CallStatusQuery,
+        schema: &Schema<&dyn Snapshot>,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
-        let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::before_transactions(query.service_id);
-        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
-        Ok(CallStatusResponse { status })
+        Self::get_status(schema, query.height, call_in_block, query.with_proof)
     }
 
     /// Returns call status of `after_transactions` hook.
     fn after_transactions_status(
-        schema: Schema<&dyn Snapshot>,
-        query: CallStatusQuery,
+        schema: &Schema<&dyn Snapshot>,
+        query: &CallStatusQuery,
     ) -> api::Result<CallStatusResponse> {
-        let explorer = BlockchainExplorer::from_schema(schema);
         let call_in_block = CallInBlock::after_transactions(query.service_id);
-        let status = ExecutionStatus(explorer.call_status(query.height, call_in_block));
-        Ok(CallStatusResponse { status })
+        Self::get_status(schema, query.height, call_in_block, query.with_proof)
     }
 
     fn add_transaction(
         snapshot: &dyn Snapshot,
         sender: &ApiSender,
         query: TransactionHex,
-    ) -> api::FutureResult<TransactionResponse> {
-        let verify_message = |snapshot: &dyn Snapshot, hex: String| -> Result<_, failure::Error> {
+    ) -> impl Future<Output = api::Result<TransactionResponse>> {
+        // Synchronous part of message verification.
+        let verify_message = |snapshot: &dyn Snapshot, hex: String| -> anyhow::Result<_> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
             let verified = msg.into_verified()?;
@@ -579,46 +612,49 @@ impl ExplorerApi {
             Ok((verified, tx_hash))
         };
 
-        let sender = sender.clone();
-        let send_transaction = move |(verified, tx_hash)| {
-            sender
-                .broadcast_transaction(verified)
-                .map(move |_| TransactionResponse { tx_hash })
-                .map_err(|e| api::Error::internal(e).title("Failed to add transaction"))
+        let (verified, tx_hash) = match verify_message(snapshot, query.tx_body) {
+            Ok((verified, tx_hash)) => (verified, tx_hash),
+            Err(err) => {
+                let err = api::Error::bad_request()
+                    .title("Failed to add transaction to memory pool")
+                    .detail(err.to_string());
+                return future::err(err).left_future();
+            }
         };
 
-        Box::new(
-            verify_message(snapshot, query.tx_body)
-                .into_future()
-                .map_err(|e| {
-                    api::Error::bad_request()
-                        .title("Failed to add transaction to memory pool")
-                        .detail(e.to_string())
-                })
-                .and_then(send_transaction),
-        )
+        sender
+            .broadcast_transaction(verified)
+            .map_ok(move |_| TransactionResponse::new(tx_hash))
+            .map_err(|err| api::Error::internal(err).title("Failed to add transaction"))
+            .right_future()
     }
 
     /// Adds explorer API endpoints to the corresponding scope.
     pub fn wire_rest(&self, api_scope: &mut ServiceApiScope) -> &Self {
         api_scope
             .endpoint("v1/blocks", |state, query| {
-                Self::blocks(state.data().for_core(), query)
+                future::ready(Self::blocks(state.data().for_core(), &query))
             })
             .endpoint("v1/block", |state, query| {
-                Self::block(state.data().for_core(), query)
+                future::ready(Self::block(state.data().for_core(), &query))
             })
             .endpoint("v1/call_status/transaction", |state, query| {
-                Self::transaction_status(state.data().for_core(), query)
+                future::ready(Self::transaction_status(&state.data().for_core(), &query))
             })
             .endpoint("v1/call_status/after_transactions", |state, query| {
-                Self::after_transactions_status(state.data().for_core(), query)
+                future::ready(Self::after_transactions_status(
+                    &state.data().for_core(),
+                    &query,
+                ))
             })
             .endpoint("v1/call_status/before_transactions", |state, query| {
-                Self::before_transactions_status(state.data().for_core(), query)
+                future::ready(Self::before_transactions_status(
+                    &state.data().for_core(),
+                    &query,
+                ))
             })
             .endpoint("v1/transactions", |state, query| {
-                Self::transaction_info(state.data().for_core(), query)
+                future::ready(Self::transaction_info(state.data().for_core(), &query))
             });
 
         let tx_sender = self.blockchain.sender().to_owned();

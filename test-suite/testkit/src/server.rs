@@ -85,32 +85,27 @@ use actix::prelude::*;
 use exonum::{blockchain::ConsensusConfig, crypto::Hash, helpers::Height};
 use exonum_api::{self as api, ApiAggregator, ApiBuilder};
 use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
-use futures::{sync::oneshot, Future};
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
+use tokio::task::LocalSet;
 
-use std::thread::{self, JoinHandle};
-
-use super::TestKit;
+use crate::{TestKit, TestNode};
 
 #[derive(Debug)]
 pub(crate) struct TestKitActor(TestKit);
 
 impl TestKitActor {
-    pub(crate) fn spawn(mut testkit: TestKit) -> (ApiAggregator, JoinHandle<i32>) {
+    pub(crate) async fn spawn(mut testkit: TestKit) -> (ApiAggregator, LocalSet) {
         let mut api_aggregator = testkit.update_aggregator();
 
-        // Spawn the testkit actor on the new `actix` system.
-        let (actor_tx, actor_rx) = oneshot::channel();
-        let join_handle = thread::spawn(|| {
-            let system = System::new("testkit");
-            let testkit = Self(testkit).start();
-            actor_tx.send(testkit).unwrap();
-            system.run()
-        });
+        let local_set = LocalSet::new();
+        // `System` should be spawn before the testkit actor is added to it.
+        local_set.spawn_local(System::run_in_tokio("testkit", &local_set));
+        // Add the testkit actor to the system and retrieve a handle to it.
+        let testkit = local_set.run_until(async { Self(testkit).start() }).await;
 
-        let testkit = actor_rx.wait().expect("Failed spawning testkit server");
         api_aggregator.insert("testkit", Self::api(testkit));
-        (api_aggregator, join_handle)
+        (api_aggregator, local_set)
     }
 
     fn api(addr: Addr<Self>) -> ApiBuilder {
@@ -119,15 +114,16 @@ impl TestKitActor {
 
         let addr_ = addr.clone();
         api_scope.endpoint("v1/status", move |()| {
-            Box::new(addr_.send(GetStatus).then(flatten_err)) as api::FutureResult<_>
+            addr_.send(GetStatus).map(flatten_err)
         });
+
         let addr_ = addr.clone();
         api_scope.endpoint_mut("v1/blocks/rollback", move |height| {
-            Box::new(addr_.send(RollBack(height)).then(flatten_err)) as api::FutureResult<_>
+            addr_.send(RollBack(height)).map(flatten_err)
         });
-        let addr_ = addr.clone();
+
         api_scope.endpoint_mut("v1/blocks/create", move |query: CreateBlock| {
-            Box::new(addr_.send(query).then(flatten_err)) as api::FutureResult<_>
+            addr.send(query).map(flatten_err)
         });
         builder
     }
@@ -154,11 +150,14 @@ impl Message for GetStatus {
 
 /// Testkit status, returned by the corresponding API endpoint.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TestKitStatus {
     /// Current blockchain height.
     pub height: Height,
     /// Currently active network configuration.
     pub configuration: ConsensusConfig,
+    /// Nodes in the emulated blockchain network.
+    pub nodes: Vec<TestNode>,
 }
 
 impl Handler<GetStatus> for TestKitActor {
@@ -168,12 +167,14 @@ impl Handler<GetStatus> for TestKitActor {
         Ok(TestKitStatus {
             height: self.0.height(),
             configuration: self.0.consensus_config(),
+            nodes: self.0.network.nodes().to_vec(),
         })
     }
 }
 
 /// Block creation parameters for the testkit server.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct CreateBlock {
     /// List of transaction hashes to include in the block. Transactions should be
     /// present in the memory pool of the testkit.
@@ -182,6 +183,20 @@ pub struct CreateBlock {
     /// the server will create a block with all transactions from the memory pool.
     #[serde(default)]
     pub tx_hashes: Option<Vec<Hash>>,
+}
+
+impl CreateBlock {
+    /// Creates a block with the specified transaction hashes.
+    pub fn with_tx_hashes(tx_hashes: Vec<Hash>) -> Self {
+        Self {
+            tx_hashes: Some(tx_hashes),
+        }
+    }
+
+    /// Creates a block with all transactions from the memory pool.
+    pub fn with_all_transactions() -> Self {
+        Self { tx_hashes: None }
+    }
 }
 
 impl Message for CreateBlock {
@@ -246,15 +261,16 @@ impl Handler<RollBack> for TestKitActor {
 mod tests {
     use exonum::{
         crypto::{gen_keypair, Hash},
-        helpers::Height,
+        helpers::{Height, ValidatorId},
         messages::{AnyTx, Verified},
         runtime::{ExecutionContext, ExecutionError},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
     use exonum_explorer::BlockWithTransactions;
     use exonum_merkledb::ObjectHash;
-    use exonum_rust_runtime::{api, Service, ServiceFactory};
+    use exonum_rust_runtime::{api, spec::Spec, Service};
     use pretty_assertions::assert_eq;
+    use tokio::time::delay_for;
 
     use std::time::Duration;
 
@@ -291,42 +307,59 @@ mod tests {
 
     /// Initializes testkit, passes it into a handler, and creates the specified number
     /// of empty blocks in the testkit blockchain.
-    fn init_handler(height: Height) -> TestKitApi {
-        let service = SampleService;
-        let artifact = service.artifact_id();
+    async fn init_handler(height: Height) -> (TestKitApi, LocalSet) {
         let mut testkit = TestKitBuilder::validator()
-            .with_artifact(artifact.clone())
-            .with_instance(
-                artifact.into_default_instance(TIMESTAMP_SERVICE_ID, TIMESTAMP_SERVICE_NAME),
-            )
-            .with_rust_service(service)
+            .with(Spec::new(SampleService).with_instance(
+                TIMESTAMP_SERVICE_ID,
+                TIMESTAMP_SERVICE_NAME,
+                (),
+            ))
             .build();
         testkit.create_blocks_until(height);
+
         // Process incoming events in background.
-        let events = testkit.remove_events_stream();
-        thread::spawn(|| events.wait().ok());
+        tokio::spawn(testkit.remove_events_stream());
 
         let api_sender = testkit.api_sender.clone();
-        let (aggregator, _) = TestKitActor::spawn(testkit);
-        TestKitApi::from_raw_parts(aggregator, api_sender)
+        let (aggregator, actor_task) = TestKitActor::spawn(testkit).await;
+        let api = TestKitApi::from_raw_parts(aggregator, api_sender);
+        (api, actor_task)
     }
 
-    fn sleep() {
-        thread::sleep(Duration::from_millis(20));
+    async fn sleep() {
+        delay_for(Duration::from_millis(20)).await;
     }
 
-    #[test]
-    fn test_create_block_with_empty_body() {
-        let api = init_handler(Height(0));
+    async fn test_status(api: TestKitApi) {
+        let status: TestKitStatus = api.private("api/testkit").get("v1/status").await.unwrap();
+        assert_eq!(status.height, Height(0));
+        assert_eq!(status.nodes.len(), 1);
+
+        let our_node = &status.nodes[0];
+        assert_eq!(our_node.validator_id(), Some(ValidatorId(0)));
+        assert_eq!(
+            status.configuration.validator_keys,
+            [our_node.public_keys()]
+        );
+    }
+
+    #[tokio::test]
+    async fn status() {
+        let (api, local_set) = init_handler(Height(0)).await;
+        local_set.run_until(test_status(api)).await;
+    }
+
+    async fn test_create_block_with_empty_body(api: TestKitApi) {
         let tx = timestamp("foo");
-        api.send(tx.clone());
-        sleep();
+        api.send(tx.clone()).await;
+        sleep().await;
 
         // Test a bodiless request
         let block_info: BlockWithTransactions = api
             .private("api/testkit")
             .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
+            .await
             .unwrap();
 
         assert_eq!(block_info.header.height, Height(1));
@@ -337,29 +370,37 @@ mod tests {
             .private("api/testkit")
             .query(&Height(1))
             .post("v1/blocks/rollback")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(0));
-        api.send(tx.clone());
-        sleep();
+        api.send(tx.clone()).await;
+        sleep().await;
 
         let block_info: BlockWithTransactions = api
             .private("api/testkit")
             .query(&CreateBlock { tx_hashes: None })
             .post("v1/blocks/create")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].message(), &tx);
     }
 
-    #[test]
-    fn test_create_block_with_specified_transactions() {
-        let api = init_handler(Height(0));
+    #[tokio::test]
+    async fn create_block_with_empty_body() {
+        let (api, local_set) = init_handler(Height(0)).await;
+        local_set
+            .run_until(test_create_block_with_empty_body(api))
+            .await;
+    }
+
+    async fn test_create_block_with_specified_transactions(api: TestKitApi) {
         let tx_foo = timestamp("foo");
         let tx_bar = timestamp("bar");
-        api.send(tx_foo.clone());
-        api.send(tx_bar.clone());
-        sleep();
+        api.send(tx_foo.clone()).await;
+        api.send(tx_bar.clone()).await;
+        sleep().await;
 
         let body = CreateBlock {
             tx_hashes: Some(vec![tx_foo.object_hash()]),
@@ -368,6 +409,7 @@ mod tests {
             .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(1));
         assert_eq!(block_info.transactions.len(), 1);
@@ -380,16 +422,22 @@ mod tests {
             .private("api/testkit")
             .query(&body)
             .post("v1/blocks/create")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(2));
         assert_eq!(block_info.transactions.len(), 1);
         assert_eq!(block_info.transactions[0].message(), &tx_bar);
     }
 
-    #[test]
-    fn test_create_block_with_bogus_transaction() {
-        let api = init_handler(Height(0));
+    #[tokio::test]
+    async fn create_block_with_specified_transactions() {
+        let (api, local_set) = init_handler(Height(0)).await;
+        local_set
+            .run_until(test_create_block_with_specified_transactions(api))
+            .await;
+    }
 
+    async fn test_create_block_with_bogus_transaction(api: TestKitApi) {
         let body = CreateBlock {
             tx_hashes: Some(vec![Hash::zero()]),
         };
@@ -397,6 +445,7 @@ mod tests {
             .private("api/testkit")
             .query(&body)
             .post::<BlockWithTransactions>("v1/blocks/create")
+            .await
             .unwrap_err();
 
         assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
@@ -407,15 +456,21 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_rollback_normal() {
-        let api = init_handler(Height(0));
+    #[tokio::test]
+    async fn create_block_with_bogus_transaction() {
+        let (api, local_set) = init_handler(Height(0)).await;
+        local_set
+            .run_until(test_create_block_with_bogus_transaction(api))
+            .await;
+    }
 
+    async fn test_rollback_normal(api: TestKitApi) {
         for i in 0..4 {
             let block: BlockWithTransactions = api
                 .private("api/testkit")
                 .query(&CreateBlock { tx_hashes: None })
                 .post("v1/blocks/create")
+                .await
                 .unwrap();
             assert_eq!(block.height(), Height(i + 1));
         }
@@ -425,6 +480,7 @@ mod tests {
             .private("api/testkit")
             .query(&Height(10))
             .post("v1/blocks/rollback")
+            .await
             .unwrap();
         assert_eq!(block_info.header.height, Height(4));
 
@@ -434,6 +490,7 @@ mod tests {
                 .private("api/testkit")
                 .query(&Height(4))
                 .post("v1/blocks/rollback")
+                .await
                 .unwrap();
 
             assert_eq!(block_info.header.height, Height(3));
@@ -444,20 +501,32 @@ mod tests {
             .private("api/testkit")
             .query(&Height(1))
             .post::<BlockWithTransactions>("v1/blocks/rollback")
+            .await
             .unwrap();
         assert_eq!(block.header.height, Height(0));
     }
 
-    #[test]
-    fn test_rollback_past_genesis() {
-        let api = init_handler(Height(4));
+    #[tokio::test]
+    async fn rollback_normal() {
+        let (api, local_set) = init_handler(Height(0)).await;
+        local_set.run_until(test_rollback_normal(api)).await;
+    }
+
+    async fn test_rollback_past_genesis(api: TestKitApi) {
         let err = api
             .private("api/testkit")
             .query(&Height(0))
             .post::<BlockWithTransactions>("v1/blocks/rollback")
+            .await
             .unwrap_err();
 
         assert_eq!(err.http_code, api::HttpStatusCode::BAD_REQUEST);
         assert_eq!(err.body.title, "Cannot rollback past genesis block");
+    }
+
+    #[tokio::test]
+    async fn rollback_past_genesis() {
+        let (api, local_set) = init_handler(Height(4)).await;
+        local_set.run_until(test_rollback_past_genesis(api)).await;
     }
 }

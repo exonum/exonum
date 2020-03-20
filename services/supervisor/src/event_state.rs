@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::{
-    helpers::Height,
-    runtime::{ExecutionError, ExecutionErrorSerde},
-};
+use anyhow::format_err;
+use exonum::{helpers::Height, runtime::ExecutionError};
 use exonum_derive::*;
 use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
 use crate::proto as pb_supervisor;
@@ -28,6 +25,7 @@ use crate::proto as pb_supervisor;
 #[derive(Serialize, Deserialize)]
 #[derive(BinaryValue, ObjectHash)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum AsyncEventState {
     /// Deployment is in process.
     Pending,
@@ -38,7 +36,6 @@ pub enum AsyncEventState {
         /// Height on which error happened.
         height: Height,
         /// Occurred error.
-        #[serde(with = "ExecutionErrorSerde")]
         error: ExecutionError,
     },
     /// Deployment finished successfully.
@@ -49,7 +46,7 @@ impl AsyncEventState {
     /// Returns `true` if state of this deployment considered failed.
     pub fn is_failed(&self) -> bool {
         match self {
-            AsyncEventState::Timeout | AsyncEventState::Failed { .. } => true,
+            Self::Timeout | Self::Failed { .. } => true,
             _ => false,
         }
     }
@@ -58,7 +55,7 @@ impl AsyncEventState {
     /// Returns `None` if state is not `Failed`.
     pub fn height(&self) -> Option<Height> {
         match self {
-            AsyncEventState::Failed { height, .. } => Some(*height),
+            Self::Failed { height, .. } => Some(*height),
             _ => None,
         }
     }
@@ -67,7 +64,7 @@ impl AsyncEventState {
     /// Returns `None` if state is not `Failed`.
     pub fn execution_error(&self) -> Option<ExecutionError> {
         match self {
-            AsyncEventState::Failed { error, .. } => Some(error.clone()),
+            Self::Failed { error, .. } => Some(error.clone()),
             _ => None,
         }
     }
@@ -75,7 +72,7 @@ impl AsyncEventState {
     /// Returns `true` if current state is `AsyncEventState::Pending`.
     pub fn is_pending(&self) -> bool {
         match self {
-            AsyncEventState::Pending => true,
+            Self::Pending => true,
             _ => false,
         }
     }
@@ -83,7 +80,7 @@ impl AsyncEventState {
     /// Returns `true` if current state is `AsyncEventState::Succeed`.
     pub fn is_succeed(&self) -> bool {
         match self {
-            AsyncEventState::Succeed => true,
+            Self::Succeed => true,
             _ => false,
         }
     }
@@ -97,12 +94,11 @@ impl ProtobufConvert for AsyncEventState {
 
         let mut pb = Self::ProtoStruct::new();
         match self {
-            AsyncEventState::Pending => pb.set_state(PENDING),
-            AsyncEventState::Succeed => pb.set_state(SUCCESS),
-            AsyncEventState::Timeout => pb.set_state(TIMEOUT),
-            AsyncEventState::Failed { height, error } => {
+            Self::Pending => pb.set_state(PENDING),
+            Self::Succeed => pb.set_state(SUCCESS),
+            Self::Timeout => pb.set_state(TIMEOUT),
+            Self::Failed { height, error } => {
                 let mut pb_error = pb_supervisor::ErrorInfo::new();
-
                 pb_error.set_error(ProtobufConvert::to_pb(error));
                 pb_error.set_height(height.0);
 
@@ -113,12 +109,12 @@ impl ProtobufConvert for AsyncEventState {
         pb
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         use pb_supervisor::AsyncEventState_Type::*;
         let state = match pb.get_state() {
-            PENDING => AsyncEventState::Pending,
-            SUCCESS => AsyncEventState::Succeed,
-            TIMEOUT => AsyncEventState::Timeout,
+            PENDING => Self::Pending,
+            SUCCESS => Self::Succeed,
+            TIMEOUT => Self::Timeout,
             FAIL => {
                 if !pb.has_error() {
                     let error = format_err!(
@@ -130,7 +126,7 @@ impl ProtobufConvert for AsyncEventState {
                 let mut pb_error = pb.take_error();
                 let error = ExecutionError::from_pb(pb_error.take_error())?;
                 let height = Height(pb_error.get_height());
-                AsyncEventState::Failed { height, error }
+                Self::Failed { height, error }
             }
         };
 

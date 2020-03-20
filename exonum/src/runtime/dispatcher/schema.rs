@@ -14,6 +14,7 @@
 
 //! Information schema for the runtime dispatcher.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum_crypto::Hash;
 use exonum_derive::*;
 use exonum_merkledb::{
@@ -21,7 +22,6 @@ use exonum_merkledb::{
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
-use semver::Version;
 
 use crate::{
     proto::schema::{
@@ -29,8 +29,8 @@ use crate::{
     },
     runtime::{
         migrations::{InstanceMigration, MigrationStatus},
-        ArtifactId, ArtifactState, ArtifactStatus, CoreError, ExecutionError, InstanceId,
-        InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
+        ArtifactId, ArtifactState, ArtifactStatus, CoreError, ExecutionError, ExecutionFail,
+        InstanceId, InstanceQuery, InstanceSpec, InstanceState, InstanceStatus,
     },
 };
 
@@ -40,6 +40,12 @@ const INSTANCES: &str = "dispatcher_instances";
 const PENDING_INSTANCES: &str = "dispatcher_pending_instances";
 const LOCAL_MIGRATION_RESULTS: &str = "dispatcher_local_migration_results";
 const INSTANCE_IDS: &str = "dispatcher_instance_ids";
+
+#[derive(Debug)]
+pub(super) enum ArtifactAction {
+    Deploy(Vec<u8>),
+    Unload,
+}
 
 /// Information about a modified service instance.
 #[derive(Debug, ProtobufConvert, BinaryValue)]
@@ -62,19 +68,19 @@ impl MigrationTransition {
         use PbMigrationTransition::*;
         match value {
             None => NONE,
-            Some(MigrationTransition::Start) => START,
-            Some(MigrationTransition::Commit) => COMMIT,
-            Some(MigrationTransition::Rollback) => ROLLBACK,
+            Some(Self::Start) => START,
+            Some(Self::Commit) => COMMIT,
+            Some(Self::Rollback) => ROLLBACK,
         }
     }
 
-    fn from_pb(pb: PbMigrationTransition) -> Result<Option<Self>, failure::Error> {
+    fn from_pb(pb: PbMigrationTransition) -> anyhow::Result<Option<Self>> {
         use PbMigrationTransition::*;
         Ok(match pb {
             NONE => None,
-            START => Some(MigrationTransition::Start),
-            COMMIT => Some(MigrationTransition::Commit),
-            ROLLBACK => Some(MigrationTransition::Rollback),
+            START => Some(Self::Start),
+            COMMIT => Some(Self::Commit),
+            ROLLBACK => Some(Self::Rollback),
         })
     }
 }
@@ -85,11 +91,20 @@ enum MigrationOutcome {
     Commit(Hash),
 }
 
+impl MigrationOutcome {
+    fn as_verb(self) -> &'static str {
+        match self {
+            Self::Rollback => "rollback",
+            Self::Commit(_) => "commit",
+        }
+    }
+}
+
 impl From<MigrationOutcome> for MigrationTransition {
     fn from(value: MigrationOutcome) -> Self {
         match value {
-            MigrationOutcome::Rollback => MigrationTransition::Rollback,
-            MigrationOutcome::Commit(_) => MigrationTransition::Commit,
+            MigrationOutcome::Rollback => Self::Rollback,
+            MigrationOutcome::Commit(_) => Self::Commit,
         }
     }
 }
@@ -150,8 +165,6 @@ impl<T: Access> Schema<T> {
                 .and_then(|instance_name| instances.get(&instance_name)),
 
             InstanceQuery::Name(instance_name) => instances.get(instance_name),
-
-            InstanceQuery::__NonExhaustive => unreachable!("Never actually constructed"),
         }
     }
 
@@ -166,6 +179,65 @@ impl<T: Access> Schema<T> {
     /// and is cleared after the migration is flushed or rolled back.
     pub fn local_migration_result(&self, instance_name: &str) -> Option<MigrationStatus> {
         self.local_migration_results().get(instance_name)
+    }
+
+    /// Checks if the provided artifact can currently be unloaded. Returns an error if the unloading
+    /// is impossible.
+    pub fn check_unloading_artifact(&self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        self.do_check_unloading_artifact(artifact).map(drop)
+    }
+
+    fn do_check_unloading_artifact(
+        &self,
+        artifact: &ArtifactId,
+    ) -> Result<ArtifactState, ExecutionError> {
+        let state = self.artifacts().get(artifact).ok_or_else(|| {
+            let msg = format!(
+                "Requested to unload artifact `{}`, which is not deployed",
+                artifact
+            );
+            CoreError::ArtifactNotDeployed.with_description(msg)
+        })?;
+
+        if state.status != ArtifactStatus::Active {
+            let msg = format!(
+                "Requested to unload artifact `{}`, which has non-active status: {}",
+                artifact, state.status
+            );
+            return Err(CoreError::ArtifactNotDeployed.with_description(msg));
+        }
+
+        // Check that the artifact has no dependent services. A service is dependent on
+        // the artifact if it references it as the current artifact, or its migration target.
+        for instance in self.instances().values() {
+            if instance.associated_artifact() == Some(artifact) {
+                let msg = format!(
+                    "Cannot unload artifact `{}`: service `{}` references it \
+                     as the current artifact",
+                    artifact,
+                    instance.spec.as_descriptor()
+                );
+                return Err(CoreError::CannotUnloadArtifact.with_description(msg));
+            }
+
+            let status = instance
+                .pending_status
+                .as_ref()
+                .or_else(|| instance.status.as_ref());
+            if let Some(InstanceStatus::Migrating(migration)) = status {
+                if migration.target == *artifact {
+                    let msg = format!(
+                        "Cannot unload artifact `{}`: service `{}` references it \
+                         as the data migration target",
+                        artifact,
+                        instance.spec.as_descriptor()
+                    );
+                    return Err(CoreError::CannotUnloadArtifact.with_description(msg));
+                }
+            }
+        }
+
+        Ok(state)
     }
 }
 
@@ -191,14 +263,43 @@ impl Schema<&Fork> {
     ) -> Result<(), ExecutionError> {
         // Check that the artifact is absent among the deployed artifacts.
         if self.artifacts().contains(artifact) {
-            return Err(CoreError::ArtifactAlreadyDeployed.into());
+            let msg = format!("Cannot deploy artifact `{}` twice", artifact);
+            return Err(CoreError::ArtifactAlreadyDeployed.with_description(msg));
         }
         // Add artifact to registry with pending status.
         self.artifacts().put(
             artifact,
-            ArtifactState::new(deploy_spec, ArtifactStatus::Pending),
+            ArtifactState::new(deploy_spec, ArtifactStatus::Deploying),
         );
         // Add artifact to pending artifacts queue.
+        self.pending_artifacts().insert(artifact);
+        Ok(())
+    }
+
+    /// Adds artifact specification to the set of the active artifacts.
+    pub(super) fn add_active_artifact(
+        &mut self,
+        artifact: &ArtifactId,
+        deploy_spec: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        // Check that the artifact is absent among the deployed artifacts.
+        if self.artifacts().contains(artifact) {
+            let msg = format!("Cannot deploy artifact `{}` twice", artifact);
+            return Err(CoreError::ArtifactAlreadyDeployed.with_description(msg));
+        }
+
+        self.artifacts().put(
+            artifact,
+            ArtifactState::new(deploy_spec, ArtifactStatus::Active),
+        );
+        Ok(())
+    }
+
+    /// Unloads the provided artifact.
+    pub(super) fn unload_artifact(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
+        let mut state = self.do_check_unloading_artifact(artifact)?;
+        state.status = ArtifactStatus::Unloading;
+        self.artifacts().put(artifact, state);
         self.pending_artifacts().insert(artifact);
         Ok(())
     }
@@ -208,37 +309,70 @@ impl Schema<&Fork> {
         &self,
         new_artifact: &ArtifactId,
         old_service: &str,
-    ) -> Result<InstanceState, CoreError> {
+    ) -> Result<InstanceState, ExecutionError> {
         // The service should exist.
-        let instance_state = self
-            .instances()
-            .get(old_service)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        let instance_state = self.instances().get(old_service).ok_or_else(|| {
+            let msg = format!(
+                "Cannot initiate migration for non-existing service `{}`",
+                old_service
+            );
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
 
-        // The service should be stopped. Note that this also checks that
-        // the service is not being migrated.
-        if instance_state.status != Some(InstanceStatus::Stopped) {
-            return Err(CoreError::ServiceNotStopped);
+        // The service should be stopped or frozen. Note that this also checks that
+        // the service is not being currently migrated.
+        if instance_state.status != Some(InstanceStatus::Stopped)
+            && instance_state.status != Some(InstanceStatus::Frozen)
+        {
+            let msg = format!(
+                "Data migration cannot be initiated for service `{}` because is not stopped \
+                 or frozen",
+                instance_state.spec.as_descriptor()
+            );
+            return Err(CoreError::InvalidServiceTransition.with_description(msg));
         }
+
         // There should be no pending status for the service.
-        if instance_state.pending_status.is_some() {
-            return Err(CoreError::ServicePending);
+        if let Some(pending_status) = instance_state.pending_status {
+            let msg = format!(
+                "Cannot initiate migration for service `{}` because it has \
+                 another state transition in progress ({})",
+                old_service, pending_status
+            );
+            return Err(CoreError::ServicePending.with_description(msg));
         }
 
         // The new artifact should exist.
-        let artifact_state = self
-            .artifacts()
-            .get(&new_artifact)
-            .ok_or(CoreError::UnknownArtifactId)?;
+        let artifact_state = self.artifacts().get(new_artifact).ok_or_else(|| {
+            let msg = format!(
+                "The target artifact `{}` for data migration of service `{}` is not deployed",
+                new_artifact,
+                instance_state.spec.as_descriptor()
+            );
+            CoreError::UnknownArtifactId.with_description(msg)
+        })?;
         // The new artifact should be deployed.
         if artifact_state.status != ArtifactStatus::Active {
-            return Err(CoreError::ArtifactNotDeployed);
+            let msg = format!(
+                "The target artifact `{}` for data migration of service `{}` is not active",
+                new_artifact,
+                instance_state.spec.as_descriptor()
+            );
+            return Err(CoreError::ArtifactNotDeployed.with_description(msg));
         }
 
         // The new artifact should refer a newer version of the service artifact.
         if !new_artifact.is_upgrade_of(&instance_state.spec.artifact) {
-            return Err(CoreError::CannotUpgradeService);
+            let msg = format!(
+                "The target artifact `{}` for data migration of service `{}` is not an upgrade \
+                 of its current artifact `{}`",
+                new_artifact,
+                instance_state.spec.as_descriptor(),
+                instance_state.spec.artifact
+            );
+            return Err(CoreError::CannotUpgradeService.with_description(msg));
         }
+
         Ok(instance_state)
     }
 
@@ -261,17 +395,25 @@ impl Schema<&Fork> {
     }
 
     /// Fast-forwards data migration by bumping the recorded service version.
-    /// The entire migration workflow is skipped in this case; the service remains
-    /// with the `Stopped` status and no pending status is added.
+    /// The entire migration workflow is skipped in this case; the service transitions to
+    /// the `Stopped` status and no pending status is added.
+    /// The runtime will be notified about the service state when the block is accepted.
     pub(super) fn fast_forward_migration(
         &mut self,
         mut instance_state: InstanceState,
-        new_version: Version,
+        new_artifact: ArtifactId,
     ) {
-        debug_assert!(*instance_state.data_version() < new_version);
-        instance_state.data_version = Some(new_version);
+        debug_assert!(*instance_state.data_version() <= new_artifact.version);
+        instance_state.status = Some(InstanceStatus::Stopped);
+        instance_state.data_version = None;
+        instance_state.spec.artifact = new_artifact;
         let instance_name = instance_state.spec.name.clone();
         self.instances().put(&instance_name, instance_state);
+
+        let modified_info = ModifiedInstanceInfo {
+            migration_transition: None,
+        };
+        self.modified_instances().put(&instance_name, modified_info);
     }
 
     fn add_pending_status(
@@ -297,17 +439,31 @@ impl Schema<&Fork> {
         &mut self,
         instance_name: &str,
         outcome: MigrationOutcome,
-    ) -> Result<(), CoreError> {
-        let instance_state = self
-            .instances()
-            .get(instance_name)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+    ) -> Result<(), ExecutionError> {
+        let instance_state = self.instances().get(instance_name).ok_or_else(|| {
+            let msg = format!(
+                "Cannot {} migration for unknown service `{}`",
+                outcome.as_verb(),
+                instance_name
+            );
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
+
         let migration = match instance_state.status {
             Some(InstanceStatus::Migrating(ref migration)) if !migration.is_completed() => {
                 migration
             }
-            _ => return Err(CoreError::NoMigration),
+            _ => {
+                let msg = format!(
+                    "Cannot {} migration for service `{}` because it has \
+                     no ongoing migration",
+                    outcome.as_verb(),
+                    instance_state.spec.as_descriptor()
+                );
+                return Err(CoreError::NoMigration.with_description(msg));
+            }
         };
+
         let new_status = match outcome {
             MigrationOutcome::Rollback => InstanceStatus::Stopped,
             MigrationOutcome::Commit(hash) => {
@@ -323,7 +479,10 @@ impl Schema<&Fork> {
 
     /// Saves migration rollback to the database. Returns an error if the rollback breaks
     /// invariants imposed by the migration workflow.
-    pub(super) fn add_migration_rollback(&mut self, instance_name: &str) -> Result<(), CoreError> {
+    pub(super) fn add_migration_rollback(
+        &mut self,
+        instance_name: &str,
+    ) -> Result<(), ExecutionError> {
         self.resolve_ongoing_migration(instance_name, MigrationOutcome::Rollback)?;
         self.local_migration_results().remove(instance_name);
         Ok(())
@@ -336,7 +495,7 @@ impl Schema<&Fork> {
         &mut self,
         instance_name: &str,
         hash: Hash,
-    ) -> Result<(), CoreError> {
+    ) -> Result<(), ExecutionError> {
         self.resolve_ongoing_migration(instance_name, MigrationOutcome::Commit(hash))
     }
 
@@ -350,46 +509,92 @@ impl Schema<&Fork> {
     }
 
     /// Adds information about a pending service instance to the schema.
-    pub(crate) fn initiate_adding_service(&mut self, spec: InstanceSpec) -> Result<(), CoreError> {
-        self.artifacts()
-            .get(&spec.artifact)
-            .ok_or(CoreError::ArtifactNotDeployed)?;
+    pub(crate) fn initiate_adding_service(
+        &mut self,
+        spec: InstanceSpec,
+    ) -> Result<(), ExecutionError> {
+        let artifact_state = self.artifacts().get(&spec.artifact).ok_or_else(|| {
+            let msg = format!(
+                "Cannot instantiate service `{}` from unknown artifact `{}`",
+                spec.as_descriptor(),
+                spec.artifact
+            );
+            CoreError::ArtifactNotDeployed.with_description(msg)
+        })?;
 
-        // Check that instance name doesn't exist.
-        if self.instances().contains(&spec.name) {
-            return Err(CoreError::ServiceNameExists);
+        if artifact_state.status != ArtifactStatus::Active {
+            let msg = format!(
+                "Cannot instantiate service `{}` from non-active artifact `{}` \
+                 (artifact status: {})",
+                spec.as_descriptor(),
+                spec.artifact,
+                artifact_state.status
+            );
+            return Err(CoreError::ArtifactNotDeployed.with_description(msg));
         }
-        // Check that instance identifier doesn't exist.
+
+        // Check that the instance name doesn't exist.
+        if self.instances().contains(&spec.name) {
+            let msg = format!("Service with name `{}` already exists", spec.name);
+            return Err(CoreError::ServiceNameExists.with_description(msg));
+        }
+        // Check that the instance identifier doesn't exist.
         // TODO: revise dispatcher integrity checks [ECR-3743]
         let mut instance_ids = self.instance_ids();
         if instance_ids.contains(&spec.id) {
-            return Err(CoreError::ServiceIdExists);
+            let msg = format!("Service with numeric ID {} already exists", spec.id);
+            return Err(CoreError::ServiceIdExists.with_description(msg));
         }
         instance_ids.put(&spec.id, spec.name.clone());
 
         let new_instance = InstanceState::from_raw_parts(spec, None, None, None);
         self.add_pending_status(new_instance, InstanceStatus::Active, None)
+            .map_err(From::from)
     }
 
     /// Adds information about stopping service instance to the schema.
-    pub(crate) fn initiate_stopping_service(
+    pub(crate) fn initiate_simple_service_transition(
         &mut self,
         instance_id: InstanceId,
-    ) -> Result<(), CoreError> {
-        let instance_name = self
-            .instance_ids()
-            .get(&instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+        new_status: InstanceStatus,
+    ) -> Result<(), ExecutionError> {
+        let verb = match new_status {
+            InstanceStatus::Stopped => "stop",
+            InstanceStatus::Frozen => "freeze",
+            _ => unreachable!(),
+        };
+
+        let instance_name = self.instance_ids().get(&instance_id).ok_or_else(|| {
+            let msg = format!("Cannot {} unknown service with ID {}", verb, instance_id);
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
 
         let state = self
             .instances()
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
 
-        if state.status == Some(InstanceStatus::Active) {
-            self.add_pending_status(state, InstanceStatus::Stopped, None)
+        let check = match new_status {
+            InstanceStatus::Stopped => InstanceStatus::can_be_stopped,
+            InstanceStatus::Frozen => InstanceStatus::can_be_frozen,
+            _ => unreachable!(),
+        };
+
+        let current_status = state.status.as_ref();
+        if current_status.map_or(false, check) {
+            self.add_pending_status(state, new_status, None)
+                .map_err(From::from)
         } else {
-            Err(CoreError::ServiceNotActive)
+            let current_status =
+                current_status.map_or_else(|| "none".to_owned(), ToString::to_string);
+            let msg = format!(
+                "Cannot {} service `{}` because the transition is precluded by the current \
+                 service status ({})",
+                verb,
+                state.spec.as_descriptor(),
+                current_status
+            );
+            Err(CoreError::InvalidServiceTransition.with_description(msg))
         }
     }
 
@@ -397,30 +602,43 @@ impl Schema<&Fork> {
     pub(crate) fn initiate_resuming_service(
         &mut self,
         instance_id: InstanceId,
-        artifact: ArtifactId,
-    ) -> Result<(), CoreError> {
-        let instance_name = self
-            .instance_ids()
-            .get(&instance_id)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+    ) -> Result<(), ExecutionError> {
+        let instance_name = self.instance_ids().get(&instance_id).ok_or_else(|| {
+            let msg = format!("Cannot resume service with unknown ID {}", instance_id);
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
 
         let mut state = self
             .instances()
             .get(&instance_name)
             .expect("BUG: Instance identifier exists but the corresponding instance is missing.");
 
-        if state.spec.artifact.name != artifact.name {
-            return Err(CoreError::CannotResumeService);
-        }
-        if state.data_version() != &artifact.version {
-            return Err(CoreError::CannotResumeService);
+        if *state.data_version() != state.spec.artifact.version {
+            let msg = format!(
+                "Service `{}` has data version ({}) differing from its artifact version (`{}`) \
+                 and thus cannot be resumed",
+                state.spec.name,
+                state.data_version(),
+                state.spec.artifact
+            );
+            return Err(CoreError::CannotResumeService.with_description(msg));
         }
 
-        if state.status == Some(InstanceStatus::Stopped) {
-            state.spec.artifact = artifact;
+        let current_status = state.status.as_ref();
+        if current_status.map_or(false, InstanceStatus::can_be_resumed) {
+            state.data_version = None;
             self.add_pending_status(state, InstanceStatus::Active, None)
+                .map_err(From::from)
         } else {
-            Err(CoreError::ServiceNotStopped)
+            let current_status =
+                current_status.map_or_else(|| "none".to_owned(), ToString::to_string);
+            let msg = format!(
+                "Cannot resume service `{}` because the transition is precluded by the current \
+                 service status ({})",
+                state.spec.as_descriptor(),
+                current_status
+            );
+            Err(CoreError::InvalidServiceTransition.with_description(msg))
         }
     }
 
@@ -432,8 +650,17 @@ impl Schema<&Fork> {
             let mut state = artifacts
                 .get(&artifact)
                 .expect("Artifact marked as pending is not saved in `artifacts`");
-            state.status = ArtifactStatus::Active;
-            artifacts.put(&artifact, state);
+
+            match state.status {
+                ArtifactStatus::Deploying => {
+                    state.status = ArtifactStatus::Active;
+                    artifacts.put(&artifact, state);
+                }
+                ArtifactStatus::Unloading => {
+                    artifacts.remove(&artifact);
+                }
+                _ => { /* should be unreachable */ }
+            }
         }
 
         // Commit new statuses for pending instances.
@@ -442,23 +669,27 @@ impl Schema<&Fork> {
             let mut state = instances
                 .get(&instance)
                 .expect("BUG: Instance marked as modified is not saved in `instances`");
-            state.commit_pending_status();
-            instances.put(&instance, state);
+            if state.pending_status.is_some() {
+                state.commit_pending_status();
+                instances.put(&instance, state);
+            }
         }
     }
 
     /// Takes pending artifacts from queue.
-    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, Vec<u8>)> {
+    pub(super) fn take_pending_artifacts(&mut self) -> Vec<(ArtifactId, ArtifactAction)> {
         let mut index = self.pending_artifacts();
         let artifacts = self.artifacts();
         let pending_artifacts = index
             .iter()
             .map(|artifact| {
-                let deploy_spec = artifacts
-                    .get(&artifact)
-                    .expect("Artifact marked as pending is not saved in `artifacts`")
-                    .deploy_spec;
-                (artifact, deploy_spec)
+                let action = if let Some(state) = artifacts.get(&artifact) {
+                    debug_assert_eq!(state.status, ArtifactStatus::Active);
+                    ArtifactAction::Deploy(state.deploy_spec)
+                } else {
+                    ArtifactAction::Unload
+                };
+                (artifact, action)
             })
             .collect();
         index.clear();
@@ -487,22 +718,34 @@ impl Schema<&Fork> {
 
     /// Marks a service migration as completed. This sets the service status from `Migrating`
     /// to `Stopped`, bumps its artifact version and removes the local migration result.
-    pub(super) fn complete_migration(&mut self, instance_name: &str) -> Result<(), CoreError> {
-        let mut instance_state = self
-            .instances()
-            .get(instance_name)
-            .ok_or(CoreError::IncorrectInstanceId)?;
+    pub(super) fn complete_migration(&mut self, instance_name: &str) -> Result<(), ExecutionError> {
+        let mut instance_state = self.instances().get(instance_name).ok_or_else(|| {
+            let msg = format!(
+                "Cannot complete migration for unknown service `{}`",
+                instance_name
+            );
+            CoreError::IncorrectInstanceId.with_description(msg)
+        })?;
+
         let end_version = match instance_state.status {
             Some(InstanceStatus::Migrating(ref migration)) if migration.is_completed() => {
                 migration.end_version.clone()
             }
-            _ => return Err(CoreError::NoMigration),
+            _ => {
+                let msg = format!(
+                    "Cannot complete migration for service `{}` because it has no migration \
+                     with committed outcome",
+                    instance_name
+                );
+                return Err(CoreError::NoMigration.with_description(msg));
+            }
         };
 
         self.local_migration_results().remove(instance_name);
         debug_assert!(*instance_state.data_version() < end_version);
         instance_state.data_version = Some(end_version);
         self.add_pending_status(instance_state, InstanceStatus::Stopped, None)
+            .map_err(From::from)
     }
 }
 

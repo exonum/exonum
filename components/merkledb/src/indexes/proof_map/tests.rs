@@ -1369,7 +1369,7 @@ where
     }
 
     for key in nonexisting_keys {
-        if !table.contains(&key) {
+        if !table.contains(key) {
             // The check is largely redundant, but better be here anyway
             let proof = table.get_proof(key.to_owned());
             check_map_proof(&proof, None, &table);
@@ -1604,9 +1604,10 @@ fn restore_after_no_op_initialization() {
 
 #[test]
 fn test_tree_with_hashed_key() {
+    use anyhow::ensure;
     use byteorder::{ByteOrder, LittleEndian};
     use exonum_crypto::Hash;
-    use failure::{self, ensure};
+
     use std::{borrow::Cow, iter::FromIterator};
 
     #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -1646,7 +1647,7 @@ fn test_tree_with_hashed_key() {
             buf
         }
 
-        fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+        fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
             let bytes = bytes.as_ref();
             ensure!(
                 bytes.len() == 4,
@@ -1665,7 +1666,7 @@ fn test_tree_with_hashed_key() {
     }
 
     fn hash_isolated_node(key: &ProofPath, h: &Hash) -> Hash {
-        HashTag::hash_map_node(HashTag::hash_single_entry_map(&key, &h))
+        HashTag::hash_map_node(HashTag::hash_single_entry_map(key, h))
     }
 
     let db = TemporaryDB::default();

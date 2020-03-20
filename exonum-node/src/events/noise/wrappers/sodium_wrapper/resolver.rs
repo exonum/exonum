@@ -144,7 +144,7 @@ impl Dh for SodiumDh25519 {
     }
 
     fn privkey(&self) -> &[u8] {
-        &self.privkey.as_ref()
+        self.privkey.as_ref()
     }
 
     fn dh(&self, pubkey: &[u8], out: &mut [u8]) -> Result<(), ()> {
@@ -234,7 +234,7 @@ impl Cipher for SodiumChaChaPoly {
 
         match result {
             Ok(ref buf) => {
-                out[..buf.len()].copy_from_slice(&buf);
+                out[..buf.len()].copy_from_slice(buf);
                 Ok(buf.len())
             }
             Err(_) => Err(()),
@@ -307,15 +307,15 @@ mod tests {
     }
 
     impl Default for MockRandom {
-        fn default() -> MockRandom {
-            MockRandom(0)
+        fn default() -> Self {
+            Self(0)
         }
     }
 
     #[test]
     fn test_curve25519() {
         // Values are cited from RFC-7748: 5.2.  Test Vectors.
-        let mut keypair: SodiumDh25519 = Default::default();
+        let mut keypair = SodiumDh25519::default();
         let scalar =
             Vec::<u8>::from_hex("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4")
                 .unwrap();

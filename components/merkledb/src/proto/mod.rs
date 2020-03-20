@@ -14,14 +14,13 @@
 
 //! Module of the rust-protobuf generated files.
 
-// For protobuf generated files.
-#![allow(bare_trait_objects)]
+#![allow(clippy::pedantic, clippy::nursery)] // used in generated code
 
 pub use self::{list_proof::*, map_proof::*};
 
+use anyhow::{ensure, Error};
 use exonum_crypto::{proto::*, HASH_SIZE};
 use exonum_proto::ProtobufConvert;
-use failure::{ensure, Error};
 use protobuf::{well_known_types::Empty, RepeatedField};
 
 use std::borrow::Cow;
@@ -103,12 +102,12 @@ where
         map_proof
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let proof = pb
             .take_proof()
             .into_iter()
             .map(parse_map_proof_entry)
-            .collect::<Result<Vec<_>, Error>>()?;
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         let entries = pb
             .take_entries()

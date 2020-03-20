@@ -44,7 +44,7 @@ message DeployResult {
   exonum.runtime.ExecutionStatus result = 2;
 }
 
-// Request for the start service instance.
+// Request to start a new service instance.
 message StartService {
   // Artifact identifier.
   exonum.runtime.ArtifactId artifact = 1;
@@ -54,8 +54,14 @@ message StartService {
   bytes config = 3;
 }
 
-// Request for the stop existing service instance.
+// Request to stop an existing service instance.
 message StopService {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+}
+
+// Request to freeze an existing service instance.
+message FreezeService {
   // Corresponding service instance ID.
   uint32 instance_id = 1;
 }
@@ -72,10 +78,14 @@ message ServiceConfig {
 message ResumeService {
   // Corresponding service instance ID.
   uint32 instance_id = 1;
-  // Updated artifact ID.
-  exonum.runtime.ArtifactId artifact = 2;
   // Raw bytes representation of service resume parameters.
   bytes params = 3;
+}
+
+// Request to unload an unused artifact.
+message UnloadArtifact {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact_id = 1;
 }
 
 // This message contains one atomic configuration change.
@@ -91,6 +101,10 @@ message ConfigChange {
     StopService stop_service = 4;
     // Request to resume a previously stopped service instance.
     ResumeService resume_service = 5;
+    // Request to freeze an existing service instance.
+    FreezeService freeze_service = 6;
+    // Request to unload an unused artifact.
+    UnloadArtifact unload_artifact = 7;
   }
 }
 

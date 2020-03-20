@@ -20,7 +20,7 @@ use exonum_merkledb::{
 
 use super::{
     versioning::{ArtifactReqError, RequireArtifact},
-    DispatcherSchema, InstanceQuery, InstanceSpec, InstanceStatus,
+    DispatcherSchema, InstanceQuery, InstanceSpec, InstanceState,
 };
 use crate::blockchain::{IndexProof, Schema as CoreSchema};
 
@@ -130,6 +130,7 @@ impl BlockchainData<&dyn Snapshot> {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl<'a, T> BlockchainData<T>
 where
     T: Into<GenericRawAccess<'a>>,
@@ -146,10 +147,7 @@ fn mount_point_for_service<'q, T: RawAccess>(
 ) -> Option<(Prefixed<T>, InstanceSpec)> {
     let state = DispatcherSchema::new(access.clone())
         .get_instance(id)
-        .filter(|state| match (&state.status, &state.pending_status) {
-            (Some(InstanceStatus::Active), _) | (None, Some(InstanceStatus::Active)) => true,
-            _ => false,
-        })?;
+        .filter(InstanceState::is_readable)?;
     Some((Prefixed::new(state.spec.name.clone(), access), state.spec))
 }
 

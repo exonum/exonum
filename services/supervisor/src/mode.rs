@@ -21,19 +21,20 @@
 //! - Decentralized mode. Within decentralized mode, deploy requests
 //!   and config proposals should be approved by at least (2/3+1) validators.
 
+use anyhow::format_err;
 use exonum::{crypto::Hash, helpers::byzantine_quorum};
 use exonum_merkledb::access::Access;
 use exonum_proto::ProtobufConvert;
-use failure::{self, format_err};
 use serde_derive::{Deserialize, Serialize};
 
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use super::{multisig::MultisigIndex, proto, DeployRequest, MigrationRequest};
 
 /// Supervisor operating mode.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Mode {
     /// Simple supervisor mode: to deploy service one have to send
     /// one request to any of the validators.
@@ -49,17 +50,16 @@ impl ProtobufConvert for Mode {
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
-            Mode::Simple => proto::SupervisorMode::SIMPLE,
-            Mode::Decentralized => proto::SupervisorMode::DECENTRALIZED,
+            Self::Simple => proto::SupervisorMode::SIMPLE,
+            Self::Decentralized => proto::SupervisorMode::DECENTRALIZED,
         }
     }
 
-    fn from_pb(pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let result = match pb {
-            proto::SupervisorMode::SIMPLE => Mode::Simple,
-            proto::SupervisorMode::DECENTRALIZED => Mode::Decentralized,
+            proto::SupervisorMode::SIMPLE => Self::Simple,
+            proto::SupervisorMode::DECENTRALIZED => Self::Decentralized,
         };
-
         Ok(result)
     }
 }
@@ -73,13 +73,13 @@ impl Mode {
         validators: usize,
     ) -> bool {
         match self {
-            Mode::Simple => {
+            Self::Simple => {
                 // For simple supervisor request from 1 validator is enough.
                 deploy_requests.confirmations(deploy) >= 1
             }
-            Mode::Decentralized => {
+            Self::Decentralized => {
                 // Approve deploy if 2/3+1 validators confirmed it.
-                let confirmations = deploy_requests.confirmations(&deploy);
+                let confirmations = deploy_requests.confirmations(deploy);
                 confirmations >= byzantine_quorum(validators)
             }
         }
@@ -93,13 +93,13 @@ impl Mode {
         validators: usize,
     ) -> bool {
         match self {
-            Mode::Simple => {
+            Self::Simple => {
                 // For simple supervisor one confirmation (from us) is enough.
-                config_confirms.confirmations(&config_hash) >= 1
+                config_confirms.confirmations(config_hash) >= 1
             }
-            Mode::Decentralized => {
+            Self::Decentralized => {
                 // Apply pending config if 2/3+1 validators voted for it.
-                let confirmations = config_confirms.confirmations(&config_hash);
+                let confirmations = config_confirms.confirmations(config_hash);
                 confirmations >= byzantine_quorum(validators)
             }
         }
@@ -113,28 +113,37 @@ impl Mode {
         validators: usize,
     ) -> bool {
         match self {
-            Mode::Simple => {
+            Self::Simple => {
                 // For simple supervisor request from 1 validator is enough.
                 migration_requests.confirmations(request) >= 1
             }
-            Mode::Decentralized => {
+            Self::Decentralized => {
                 // Approve migration if 2/3+1 validators confirmed it.
-                let confirmations = migration_requests.confirmations(&request);
+                let confirmations = migration_requests.confirmations(request);
                 confirmations >= byzantine_quorum(validators)
             }
         }
     }
 }
 
+impl fmt::Display for Mode {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Simple => "simple",
+            Self::Decentralized => "decentralized",
+        })
+    }
+}
+
 impl FromStr for Mode {
-    type Err = failure::Error;
+    type Err = anyhow::Error;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
         match input {
-            "simple" => Ok(Mode::Simple),
-            "decentralized" => Ok(Mode::Decentralized),
+            "simple" => Ok(Self::Simple),
+            "decentralized" => Ok(Self::Decentralized),
             _ => Err(format_err!(
-                "Invalid supervisor mode: {}. Could be 'simple' or 'decentralized'",
+                "Invalid supervisor mode: {}. Should be 'simple' or 'decentralized'",
                 input
             )),
         }

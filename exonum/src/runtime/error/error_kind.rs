@@ -14,7 +14,7 @@
 
 //! Internal raw error representation.
 
-use failure::ensure;
+use anyhow::ensure;
 
 use std::fmt::Display;
 
@@ -81,14 +81,12 @@ use crate::proto::schema::errors as errors_proto;
 /// continuing node operation is impossible. A panic will not be caught and will lead
 /// to the node termination.
 ///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-///
 /// [`ExecutionError`]: struct.ExecutionError.html
 /// [`catch_unwind`]: https://doc.rust-lang.org/std/panic/fn.catch_unwind.html
 /// [`CoreError`]: enum.CoreError.html
 /// [`CommonError`]: enum.CommonError.html
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// An unexpected error that has occurred in the service code.
     ///
@@ -126,38 +124,31 @@ pub enum ErrorKind {
         /// Error codes can have different meanings for different services.
         code: u8,
     },
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 impl ErrorKind {
     pub(super) fn into_raw(self) -> (errors_proto::ErrorKind, u8) {
         match self {
-            ErrorKind::Unexpected => (errors_proto::ErrorKind::UNEXPECTED, 0),
-            ErrorKind::Common { code } => (errors_proto::ErrorKind::COMMON, code),
-            ErrorKind::Core { code } => (errors_proto::ErrorKind::CORE, code),
-            ErrorKind::Runtime { code } => (errors_proto::ErrorKind::RUNTIME, code),
-            ErrorKind::Service { code } => (errors_proto::ErrorKind::SERVICE, code),
-            ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
+            Self::Unexpected => (errors_proto::ErrorKind::UNEXPECTED, 0),
+            Self::Common { code } => (errors_proto::ErrorKind::COMMON, code),
+            Self::Core { code } => (errors_proto::ErrorKind::CORE, code),
+            Self::Runtime { code } => (errors_proto::ErrorKind::RUNTIME, code),
+            Self::Service { code } => (errors_proto::ErrorKind::SERVICE, code),
         }
     }
 
-    pub(super) fn from_raw(
-        kind: errors_proto::ErrorKind,
-        code: u8,
-    ) -> Result<Self, failure::Error> {
+    pub(super) fn from_raw(kind: errors_proto::ErrorKind, code: u8) -> anyhow::Result<Self> {
         use errors_proto::ErrorKind::*;
+
         let kind = match kind {
             UNEXPECTED => {
                 ensure!(code == 0, "Error code for panic should be zero");
-                ErrorKind::Unexpected
+                Self::Unexpected
             }
-            COMMON => ErrorKind::Common { code },
-            CORE => ErrorKind::Core { code },
-            RUNTIME => ErrorKind::Runtime { code },
-            SERVICE => ErrorKind::Service { code },
+            COMMON => Self::Common { code },
+            CORE => Self::Core { code },
+            RUNTIME => Self::Runtime { code },
+            SERVICE => Self::Service { code },
         };
         Ok(kind)
     }
@@ -166,12 +157,11 @@ impl ErrorKind {
 impl Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ErrorKind::Unexpected => f.write_str("unexpected"),
-            ErrorKind::Common { code } => write!(f, "common:{}", code),
-            ErrorKind::Core { code } => write!(f, "core:{}", code),
-            ErrorKind::Runtime { code } => write!(f, "runtime:{}", code),
-            ErrorKind::Service { code } => write!(f, "service:{}", code),
-            ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
+            Self::Unexpected => f.write_str("unexpected"),
+            Self::Common { code } => write!(f, "common:{}", code),
+            Self::Core { code } => write!(f, "core:{}", code),
+            Self::Runtime { code } => write!(f, "runtime:{}", code),
+            Self::Service { code } => write!(f, "service:{}", code),
         }
     }
 }

@@ -121,8 +121,38 @@ impl RocksDB {
             .map_err(Into::into)
     }
 
-    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
+    }
+
+    /// Clears the column family completely, removing all keys from it.
+    pub(super) fn clear_column_family(
+        &self,
+        batch: &mut WriteBatch,
+        cf: &ColumnFamily,
+    ) -> crate::Result<()> {
+        /// Some lexicographically large key.
+        const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
+
+        let db_reader = self.get_lock_guard();
+        let mut iter = db_reader.raw_iterator_cf(cf)?;
+        iter.seek_to_last();
+        if iter.valid() {
+            if let Some(key) = iter.key() {
+                // For some reason, removing a range to a very large key is
+                // significantly faster than removing the exact range.
+                // This is specific to the debug mode, but since `TemporaryDB`
+                // is mostly used for testing, this optimization leads to practical
+                // performance improvement.
+                if key.len() < LARGER_KEY.len() {
+                    batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY)?;
+                } else {
+                    batch.delete_range_cf::<&[u8]>(cf, &[], key)?;
+                    batch.delete_cf(cf, &key)?;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
@@ -172,20 +202,21 @@ impl RocksDB {
             .map_err(Into::into)
     }
 
-    /// Removes all keys with a specified prefix from a column family.
+    /// Removes all keys with the specified prefix from a column family.
     fn clear_prefix(
         &self,
         batch: &mut WriteBatch,
         cf: &ColumnFamily,
         resolved: &ResolvedAddress,
     ) -> crate::Result<()> {
-        let snapshot = self.rocksdb_snapshot();
-        let mut iterator = snapshot.rocksdb_iter(resolved, &[]);
-        while iterator.next().is_some() {
-            // The ID prefix is already included to the keys yielded by the iterator.
-            batch.delete_cf(cf, iterator.key.as_ref().unwrap())?;
+        if let Some(id_bytes) = resolved.id_to_bytes() {
+            let next_bytes = next_id_bytes(id_bytes);
+            batch
+                .delete_range_cf(cf, id_bytes, next_bytes)
+                .map_err(Into::into)
+        } else {
+            self.clear_column_family(batch, cf)
         }
-        Ok(())
     }
 
     #[allow(unsafe_code)]
@@ -193,8 +224,11 @@ impl RocksDB {
         RocksDBSnapshot {
             // SAFETY:
             // The snapshot carries an `Arc` to the database to make sure that database
-            // is not dropped before the snapshot. We don't care about changes in the database
-            // after taking a snapshot which could occur from another threads.
+            // is not dropped before the snapshot. Additionally, the pointer to `rocksdb::DB`
+            // is stable within `Arc<ShardedLock<rocksdb::DB>>` and its part used in dropping
+            // the snapshot (`*mut ffi::rocksdb_t`) is never changed, i.e., not affected
+            // by potential incoherence if the `ShardedLock` is being concurrently written to.
+            // FIXME: Investigate changing `rocksdb::Snapshot` / `DB` to remove `unsafe` (ECR-4273).
             snapshot: unsafe { mem::transmute(self.get_lock_guard().snapshot()) },
             db: Arc::clone(&self.db),
         }
@@ -202,7 +236,7 @@ impl RocksDB {
 }
 
 impl RocksDBSnapshot {
-    fn get_lock_guard(&self) -> ShardedLockReadGuard<rocksdb::DB> {
+    fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
     }
 
@@ -320,4 +354,43 @@ impl fmt::Debug for RocksDBSnapshot {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RocksDBSnapshot").finish()
     }
+}
+
+/// Generates the sequence of bytes lexicographically following the provided one. Assumes that
+/// the provided sequence is less than `[u8::max_value(); ID_SIZE]`.
+fn next_id_bytes(id_bytes: [u8; ID_SIZE]) -> [u8; ID_SIZE] {
+    let mut next_id_bytes = id_bytes;
+    for byte in next_id_bytes.iter_mut().rev() {
+        if *byte == u8::max_value() {
+            *byte = 0;
+        } else {
+            *byte += 1;
+            break;
+        }
+    }
+    next_id_bytes
+}
+
+#[test]
+fn test_next_id_bytes() {
+    assert_eq!(
+        next_id_bytes([1, 0, 0, 0, 0, 0, 0, 0]),
+        [1, 0, 0, 0, 0, 0, 0, 1]
+    );
+    assert_eq!(
+        next_id_bytes([1, 2, 3, 4, 5, 6, 7, 8]),
+        [1, 2, 3, 4, 5, 6, 7, 9]
+    );
+    assert_eq!(
+        next_id_bytes([1, 0, 0, 0, 0, 0, 0, 254]),
+        [1, 0, 0, 0, 0, 0, 0, 255]
+    );
+    assert_eq!(
+        next_id_bytes([1, 0, 0, 0, 0, 0, 41, 255]),
+        [1, 0, 0, 0, 0, 0, 42, 0]
+    );
+    assert_eq!(
+        next_id_bytes([1, 2, 3, 4, 5, 255, 255, 255]),
+        [1, 2, 3, 4, 6, 0, 0, 0]
+    );
 }

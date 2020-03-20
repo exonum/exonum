@@ -189,7 +189,7 @@ struct BalanceQuery {
 /// Shortcut to get data on wallets.
 impl CryptocurrencyApi {
     /// Endpoint for retrieving a single wallet.
-    fn balance(state: &ServiceApiState<'_>, query: BalanceQuery) -> api::Result<u64> {
+    async fn balance(state: ServiceApiState, query: BalanceQuery) -> api::Result<u64> {
         let snapshot = state.data();
         let schema = CurrencySchema::new(snapshot.for_executing_service());
         schema

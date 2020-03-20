@@ -779,8 +779,8 @@ where
 
 #[cfg(feature = "with-protobuf")]
 mod proto {
+    use anyhow::ensure;
     use exonum_proto::ProtobufConvert;
-    use failure::{ensure, Error};
     use protobuf::RepeatedField;
 
     use std::borrow::Cow;
@@ -804,7 +804,7 @@ mod proto {
             key
         }
 
-        fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
+        fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
             let index = pb.get_index();
             let height = pb.get_height();
 
@@ -812,7 +812,7 @@ mod proto {
             ensure!(index <= MAX_INDEX, "index is out of range");
             ensure!(u64::from(height) <= HEIGHT_SHIFT, "height is out of range");
 
-            Ok(ProofListKey::new(height as u8, index))
+            Ok(Self::new(height as u8, index))
         }
     }
 
@@ -863,12 +863,12 @@ mod proto {
             list_proof
         }
 
-        fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, Error> {
+        fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
             let proof = pb
                 .take_proof()
                 .into_iter()
                 .map(HashedEntry::from_pb)
-                .collect::<Result<_, Error>>()?;
+                .collect::<anyhow::Result<_>>()?;
 
             let entries = pb
                 .get_entries()
@@ -879,9 +879,9 @@ mod proto {
                         V::from_bytes(Cow::Borrowed(entry.get_value()))?,
                     ))
                 })
-                .collect::<Result<Vec<(u64, V)>, Error>>()?;
+                .collect::<anyhow::Result<_>>()?;
 
-            Ok(ListProof::from_raw_parts(proof, entries, pb.get_length()))
+            Ok(Self::from_raw_parts(proof, entries, pb.get_length()))
         }
     }
 }

@@ -172,10 +172,10 @@ enum StringMatch {
 impl fmt::Debug for StringMatch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StringMatch::Any => formatter.write_str("Any"),
-            StringMatch::Exact(s) => formatter.debug_tuple("Exact").field(s).finish(),
-            StringMatch::Contains(s) => formatter.debug_tuple("Contains").field(s).finish(),
-            StringMatch::Generic(_) => formatter.debug_tuple("Generic").field(&"_").finish(),
+            Self::Any => formatter.write_str("Any"),
+            Self::Exact(s) => formatter.debug_tuple("Exact").field(s).finish(),
+            Self::Contains(s) => formatter.debug_tuple("Contains").field(s).finish(),
+            Self::Generic(_) => formatter.debug_tuple("Generic").field(&"_").finish(),
         }
     }
 }
@@ -183,10 +183,10 @@ impl fmt::Debug for StringMatch {
 impl StringMatch {
     pub(super) fn matches(&self, s: &str) -> bool {
         match self {
-            StringMatch::Any => true,
-            StringMatch::Exact(ref_str) => ref_str == s,
-            StringMatch::Contains(needle) => s.contains(needle),
-            StringMatch::Generic(match_fn) => match_fn(s),
+            Self::Any => true,
+            Self::Exact(ref_str) => ref_str == s,
+            Self::Contains(needle) => s.contains(needle),
+            Self::Generic(match_fn) => match_fn(s),
         }
     }
 }

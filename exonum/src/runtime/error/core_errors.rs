@@ -16,18 +16,16 @@
 
 use exonum_derive::ExecutionFail;
 
-use crate::runtime::{ErrorKind, ExecutionError};
+use crate::runtime::{ExecutionError, ExecutionFail};
 
 /// List of possible core errors.
 ///
 /// Note that in most cases you don't need to spawn a core error, unless your service is
 /// providing some wrapper for core logic and should behave just like core.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[derive(ExecutionFail)]
 #[execution_fail(crate = "crate", kind = "core")]
+#[non_exhaustive]
 pub enum CoreError {
     /// Runtime identifier is incorrect in this context.
     IncorrectRuntime = 0,
@@ -49,8 +47,8 @@ pub enum CoreError {
     StackOverflow = 8,
     /// Service instance is already transitioning to a new status.
     ServicePending = 9,
-    /// Migrated service is not stopped.
-    ServiceNotStopped = 10,
+    /// Requested service transition is invalid given the current service status.
+    InvalidServiceTransition = 10,
     /// The artifact to migrate the service to is not a newer version of the current
     /// service artifact.
     CannotUpgradeService = 11,
@@ -61,10 +59,8 @@ pub enum CoreError {
     CannotResumeService = 13,
     /// Incorrect call handler: an inner call has returned an error, but it was not propagated.
     IncorrectCall = 14,
-
-    /// Never actually generated.
-    #[doc(hidden)]
-    __NonExhaustive = 255,
+    /// Cannot unload artifact.
+    CannotUnloadArtifact = 15,
 }
 
 impl CoreError {
@@ -73,11 +69,6 @@ impl CoreError {
             "Maximum depth of call stack ({}) has been reached.",
             max_depth
         );
-        ExecutionError::new(
-            ErrorKind::Core {
-                code: CoreError::StackOverflow as u8,
-            },
-            description,
-        )
+        Self::StackOverflow.with_description(description)
     }
 }

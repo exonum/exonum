@@ -18,9 +18,9 @@ use exonum::runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId,
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{GenericCallMut, Interface, MethodDescriptor};
 
-/// Fully qualified name of the ['Configure`] interface.
+/// Fully qualified name of the [`Configure`] interface.
 ///
-/// ['Configure`]: trait.Configure.html
+/// [`Configure`]: trait.Configure.html
 pub const CONFIGURE_INTERFACE_NAME: &str = "exonum.Configure";
 
 /// Identifier of the [`Configure::verify_config`] method.
@@ -119,13 +119,13 @@ impl ConfigureMut<InstanceId> for ExecutionContext<'_> {
 
     fn verify_config(&mut self, instance_id: InstanceId, params: Vec<u8>) -> Self::Output {
         const METHOD_DESCRIPTOR: MethodDescriptor<'static> =
-            MethodDescriptor::new(CONFIGURE_INTERFACE_NAME, "verify_config", 0);
+            MethodDescriptor::new(CONFIGURE_INTERFACE_NAME, 0);
         self.generic_call_mut(instance_id, METHOD_DESCRIPTOR, params)
     }
 
     fn apply_config(&mut self, instance_id: InstanceId, params: Vec<u8>) -> Self::Output {
         const METHOD_DESCRIPTOR: MethodDescriptor<'static> =
-            MethodDescriptor::new(CONFIGURE_INTERFACE_NAME, "apply_config", 1);
+            MethodDescriptor::new(CONFIGURE_INTERFACE_NAME, 1);
         self.generic_call_mut(instance_id, METHOD_DESCRIPTOR, params)
     }
 }

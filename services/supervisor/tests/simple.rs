@@ -27,7 +27,10 @@ use exonum::{
     },
 };
 use exonum_derive::*;
-use exonum_rust_runtime::{DefaultInstance, Service, ServiceFactory as _};
+use exonum_rust_runtime::{
+    spec::{JustFactory, Spec},
+    DefaultInstance, Service, ServiceFactory as _,
+};
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
@@ -127,9 +130,7 @@ fn change_consensus_config_with_one_confirmation() {
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
 
     let cfg_change_height = Height(5);
@@ -176,10 +177,8 @@ fn change_consensus_config_with_one_confirmation() {
 fn service_config_change() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
-        .with_default_rust_service(ConfigChangeService)
+        .with(Supervisor::simple())
+        .with(Spec::new(ConfigChangeService).with_default_instance())
         .build();
 
     let cfg_change_height = Height(5);
@@ -209,10 +208,8 @@ fn service_config_change() {
 fn incorrect_actual_from_field() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
-        .with_default_rust_service(ConfigChangeService)
+        .with(Supervisor::simple())
+        .with(Spec::new(ConfigChangeService).with_default_instance())
         .build();
 
     let cfg_change_height = Height(5);
@@ -221,7 +218,7 @@ fn incorrect_actual_from_field() {
     testkit.create_blocks_until(cfg_change_height);
 
     let config_propose = ConfigPropose::new(0, cfg_change_height)
-        .service_config(ConfigChangeService::INSTANCE_ID, params.clone());
+        .service_config(ConfigChangeService::INSTANCE_ID, params);
 
     testkit
         .create_block_with_transaction(sign_config_propose_transaction_by_us(
@@ -238,9 +235,7 @@ fn incorrect_actual_from_field() {
 fn discard_config_propose_from_auditor() {
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(2)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
 
     let cfg_change_height = Height(5);
@@ -255,8 +250,7 @@ fn discard_config_propose_from_auditor() {
     let old_validators = testkit.network().validators();
 
     // Sign request by an auditor.
-    let propose =
-        ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config.clone());
+    let propose = ConfigPropose::new(0, cfg_change_height).consensus_config(new_consensus_config);
     let keys = testkit.us().service_keypair();
     let propose = keys.propose_config_change(SUPERVISOR_INSTANCE_ID, propose);
     let block = testkit.create_block_with_transaction(propose);
@@ -275,13 +269,11 @@ fn discard_config_propose_from_auditor() {
 }
 
 /// Checks that config proposal sent through api is executed correctly.
-#[test]
-fn test_send_proposal_with_api() {
+#[tokio::test]
+async fn test_send_proposal_with_api() {
     let mut testkit = TestKitBuilder::validator()
         .with_validators(2)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
 
     let old_validators = testkit.network().validators();
@@ -303,6 +295,7 @@ fn test_send_proposal_with_api() {
         .private(ApiKind::Service("supervisor"))
         .query(&config_propose)
         .post("propose-config")
+        .await
         .unwrap();
     let block = testkit.create_block();
     block[hash].status().unwrap();
@@ -325,23 +318,16 @@ fn test_send_proposal_with_api() {
 }
 
 /// Tests that deploy request with only one approval (initial) is executed successfully.
-#[test]
-fn deploy_service() {
+#[tokio::test]
+async fn deploy_service() {
     let mut testkit = TestKitBuilder::validator()
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
-        .with_rust_service(DeployableService)
+        .with(Supervisor::simple())
+        .with(JustFactory::new(DeployableService))
         .build();
 
     let deadline_height = Height(5);
-
     let artifact = DeployableService.artifact_id();
-    let deploy_request = DeployRequest {
-        artifact: artifact.clone(),
-        spec: Vec::new(),
-        deadline_height,
-    };
+    let deploy_request = DeployRequest::new(artifact.clone(), deadline_height);
 
     // Create deploy request
     let hash: Hash = testkit
@@ -349,6 +335,7 @@ fn deploy_service() {
         .private(ApiKind::Service("supervisor"))
         .query(&deploy_request)
         .post("deploy-artifact")
+        .await
         .unwrap();
     let block = testkit.create_block();
     // Check that request was executed.
@@ -365,16 +352,14 @@ fn deploy_service() {
 
 /// Attempts to change config without `actual_from` height set.
 /// When `actual_from` is not set, it is expected to be treated as the next height.
-#[test]
-fn actual_from_is_zero() {
+#[tokio::test]
+async fn actual_from_is_zero() {
     let initial_validator_count = 4;
     let expected_new_validator_number = initial_validator_count;
 
     let mut testkit = TestKitBuilder::auditor()
         .with_validators(initial_validator_count)
-        .with_rust_service(Supervisor)
-        .with_artifact(Supervisor.artifact_id())
-        .with_instance(Supervisor::simple())
+        .with(Supervisor::simple())
         .build();
 
     // Change height set to 0

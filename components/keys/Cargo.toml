@@ -1,6 +1,6 @@
 [package]
 name = "exonum-keys"
-version = "1.0.0-rc.1"
+version = "1.0.0-rc.2"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -13,16 +13,23 @@ categories = ["cryptography", "hashing"]
 description = "Exonum node keys management."
 
 [dependencies]
+anyhow = "1.0.26"
 rand = "0.7"
-failure = "0.1.5"
-pwbox = "0.2.1"
+pwbox = "0.3.0"
 secret-tree = "0.2.0"
-serde = "1.0.10"
-serde_derive = "1.0.64"
+serde = "1.0"
+serde_derive = "1.0"
+structopt = "0.3"
 toml = "0.5.0"
 
-exonum-crypto = { version = "1.0.0-rc.1", path = "../crypto" }
+exonum-crypto = { version = "1.0.0-rc.2", path = "../crypto" }
 
 [dev-dependencies]
+hex = "0.4.0"
+serde_json = "1.0"
 tempdir = "0.3.7"
-hex = "0.4"
+
+[[example]]
+name = "key-generator"
+path = "examples/key_generator.rs"
+test = true

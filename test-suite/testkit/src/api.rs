@@ -16,30 +16,25 @@
 
 pub use exonum_api::ApiAccess;
 
-use actix::{Addr, System};
-use actix_net::server::{Server, StopServer};
 use actix_web::{
-    server::{HttpServer, IntoHttpHandler},
-    App,
+    test::{self, TestServer},
+    web, App,
 };
 use exonum::{
     blockchain::ApiSender,
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
-use futures::Future;
 use log::{info, trace};
 use reqwest::{
-    Client, ClientBuilder, RedirectPolicy, RequestBuilder as ReqwestBuilder, Response, StatusCode,
+    redirect::Policy as RedirectPolicy, Client, ClientBuilder, RequestBuilder as ReqwestBuilder,
+    Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{
     collections::HashMap,
     fmt::{self, Display},
-    net,
-    sync::mpsc,
-    thread::{self, JoinHandle},
 };
 
 use crate::TestKit;
@@ -50,6 +45,7 @@ use crate::TestKit;
 ///
 /// [`TestKitApi`]: struct.TestKitApi.html
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum ApiKind {
     /// `api/system` endpoints of the system API node plugin. To access endpoints, the plugin
     /// must be attached to the testkit.
@@ -66,30 +62,55 @@ pub enum ApiKind {
 impl fmt::Display for ApiKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ApiKind::System => write!(formatter, "api/system"),
-            ApiKind::Explorer => write!(formatter, "api/explorer"),
-            ApiKind::RustRuntime => write!(formatter, "api/runtimes/rust"),
-            ApiKind::Service(name) => write!(formatter, "api/services/{}", name),
+            Self::System => write!(formatter, "api/system"),
+            Self::Explorer => write!(formatter, "api/explorer"),
+            Self::RustRuntime => write!(formatter, "api/runtimes/rust"),
+            Self::Service(name) => write!(formatter, "api/services/{}", name),
         }
     }
 }
 
-/// API encapsulation for the testkit. Allows to execute and synchronously retrieve results
+/// API encapsulation for the testkit. Allows to execute and asynchronously retrieve results
 /// for REST-ful endpoints of services.
 ///
 /// Note that `TestKitApi` instantiation spawns a new HTTP server. Hence, it is advised to reuse
 /// existing instances unless it is impossible. The latter may be the case if changes
 /// to the testkit modify the set of its HTTP endpoints, for example, if a new service is
 /// instantiated.
+///
+/// The HTTP server uses `actix` under the hood, so in order to execute asynchronous methods,
+/// the user should use this API inside the `actix_rt` or `tokio` runtime.
+/// The easiest way to do that is to use `#[tokio::test]` or `#[actix_rt::test]` instead of
+/// `#[test]`.
+///
+/// # Example
+///
+/// ```
+/// #[tokio::test]
+/// async fn test_api() {
+///     let testkit = TestKitBuilder::validator().build();
+///     let api = testkit.api();
+///
+///     // By default we only have Rust runtime endpoints.
+///     use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
+///
+///     let proto_sources: Vec<ProtoSourceFile> = api
+///         .public(ApiKind::RustRuntime)
+///         .query(&ProtoSourcesQuery::Core)
+///         .get("proto-sources")
+///         .await
+///         .expect("Request to the valid endpoint failed");
+/// }
+/// ```
 pub struct TestKitApi {
-    test_server: TestServer,
-    test_client: Client,
+    _test_server_handle: TestServer,
+    test_client: TestKitApiClient,
     api_sender: ApiSender,
 }
 
 impl fmt::Debug for TestKitApi {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        f.debug_struct("TestKitApi").finish()
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        formatter.debug_struct("TestKitApi").finish()
     }
 }
 
@@ -102,38 +123,87 @@ impl TestKitApi {
     pub(crate) fn from_raw_parts(aggregator: ApiAggregator, api_sender: ApiSender) -> Self {
         // Testkit is intended for manual testing, so we don't want `reqwest` to handle redirects
         // automatically.
-        let test_client = ClientBuilder::new()
+        let inner = ClientBuilder::new()
             .redirect(RedirectPolicy::none())
             .build()
             .unwrap();
-        TestKitApi {
-            test_server: create_test_server(aggregator),
+
+        let test_server = create_test_server(aggregator);
+        let test_client = TestKitApiClient {
+            test_server_url: test_server.url(""),
+            inner,
+        };
+
+        Self {
+            _test_server_handle: test_server,
             test_client,
             api_sender,
         }
     }
 
-    /// Returns the resolved URL for the public API.
-    pub fn public_url(&self, url: &str) -> String {
-        self.test_server.url(&format!("public/{}", url))
-    }
-
     /// Sends a transaction to the node.
-    pub fn send<T>(&self, transaction: T)
+    pub async fn send<T>(&self, transaction: T)
     where
         T: Into<Verified<AnyTx>>,
     {
         self.api_sender
             .broadcast_transaction(transaction.into())
-            .wait()
+            .await
             .expect("Cannot broadcast transaction");
+    }
+
+    /// Returns the resolved URL for the public API.
+    pub fn public_url(&self, url: &str) -> String {
+        self.test_client.public_url(url)
+    }
+
+    /// Returns the resolved URL for the private API.
+    pub fn private_url(&self, url: &str) -> String {
+        self.test_client.private_url(url)
     }
 
     /// Creates a requests builder for the public API scope.
     pub fn public(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
+        self.test_client.public(kind)
+    }
+
+    /// Creates a requests builder for the private API scope.
+    pub fn private(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
+        self.test_client.private(kind)
+    }
+
+    /// Return reference to the underlying API client.
+    pub fn client(&self) -> &TestKitApiClient {
+        &self.test_client
+    }
+}
+
+/// An asynchronous API client to make Requests with.
+///
+/// This client is a wrapper around the `reqwest::Client` to provide more convenient
+/// way to test API.
+#[derive(Debug, Clone)]
+pub struct TestKitApiClient {
+    test_server_url: String,
+    inner: Client,
+}
+
+impl TestKitApiClient {
+    /// Returns the resolved URL for the public API.
+    pub fn public_url(&self, url: &str) -> String {
+        [&self.test_server_url, "public/", url].concat()
+    }
+
+    /// Returns the resolved URL for the private API.
+    pub fn private_url(&self, url: &str) -> String {
+        [&self.test_server_url, "private/", url].concat()
+    }
+
+    /// Creates a request builder for the public API scope.
+    pub fn public(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
-            self.test_server.url(""),
-            &self.test_client,
+            &self.test_server_url,
+            &self.inner,
             ApiAccess::Public,
             kind.to_string(),
         )
@@ -142,20 +212,25 @@ impl TestKitApi {
     /// Creates a requests builder for the private API scope.
     pub fn private(&self, kind: impl Display) -> RequestBuilder<'_, '_> {
         RequestBuilder::new(
-            self.test_server.url(""),
-            &self.test_client,
+            &self.test_server_url,
+            &self.inner,
             ApiAccess::Private,
             kind.to_string(),
         )
     }
+
+    /// Return reference to the inner Reqwest client.
+    pub fn inner(&self) -> &Client {
+        &self.inner
+    }
 }
 
-type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + 'b>;
+type ReqwestModifier<'b> = Box<dyn FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b>;
 
 /// An HTTP requests builder. This type can be used to send requests to
 /// the appropriate `TestKitApi` handlers.
 pub struct RequestBuilder<'a, 'b, Q = ()> {
-    test_server_url: String,
+    test_server_url: &'a str,
     test_client: &'a Client,
     access: ApiAccess,
     prefix: String,
@@ -182,7 +257,7 @@ where
     Q: 'b + Serialize,
 {
     fn new(
-        test_server_url: String,
+        test_server_url: &'a str,
         test_client: &'a Client,
         access: ApiAccess,
         prefix: String,
@@ -217,7 +292,7 @@ where
     /// Allows to modify a request before sending it by executing a provided closure.
     pub fn with<F>(self, f: F) -> Self
     where
-        F: Fn(ReqwestBuilder) -> ReqwestBuilder + 'b,
+        F: FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b,
     {
         Self {
             modifier: Some(Box::new(f)),
@@ -239,7 +314,7 @@ where
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a query string parameters.
-    pub fn get<R>(self, endpoint: &str) -> api::Result<R>
+    pub async fn get<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -268,16 +343,16 @@ where
         if let Some(modifier) = self.modifier {
             builder = modifier(builder);
         }
-        let response = builder.send().expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result(response)
+        let response = builder.send().await.expect("Unable to send request");
+        Self::verify_headers(&self.expected_headers, &response);
+        Self::response_to_api_result(response).await
     }
 
     /// Sends a post request to the testing API endpoint and decodes response as
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a JSON in the request body.
-    pub fn post<R>(self, endpoint: &str) -> api::Result<R>
+    pub async fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
@@ -292,7 +367,7 @@ where
         trace!("POST {}", url);
 
         let builder = self.test_client.post(&url);
-        let mut builder = if let Some(ref query) = self.query.as_ref() {
+        let mut builder = if let Some(query) = self.query.as_ref() {
             trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
             builder.json(query)
         } else {
@@ -301,15 +376,15 @@ where
         if let Some(modifier) = self.modifier {
             builder = modifier(builder);
         }
-        let response = builder.send().expect("Unable to send request");
-        Self::verify_headers(self.expected_headers, &response);
-        Self::response_to_api_result(response)
+        let response = builder.send().await.expect("Unable to send request");
+        Self::verify_headers(&self.expected_headers, &response);
+        Self::response_to_api_result(response).await
     }
 
     // Checks that response contains headers expected by the request author.
-    fn verify_headers(expected_headers: HashMap<String, String>, response: &Response) {
+    fn verify_headers(expected_headers: &HashMap<String, String>, response: &Response) {
         let headers = response.headers();
-        for (header, expected_value) in expected_headers.iter() {
+        for (header, expected_value) in expected_headers {
             let header_value = headers.get(header).unwrap_or_else(|| {
                 panic!(
                     "Response {:?} was expected to have header {}, but it isn't present",
@@ -326,12 +401,12 @@ where
     }
 
     /// Converts reqwest Response to `api::ApiResult`.
-    fn response_to_api_result<R>(mut response: Response) -> api::Result<R>
+    async fn response_to_api_result<R>(response: Response) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
     {
         let code = response.status();
-        let body = response.text().expect("Unable to get response text");
+        let body = response.text().await.expect("Unable to get response text");
         trace!("Body: {}", body);
         if code == StatusCode::OK {
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");
@@ -345,88 +420,35 @@ where
 
 /// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
-    let server = TestServer::with_factory(move || {
-        App::new()
-            .scope("public/api", |scope| {
-                trace!("Create public/api");
-                aggregator.extend_backend(ApiAccess::Public, scope)
-            })
-            .scope("private/api", |scope| {
-                trace!("Create private/api");
-                aggregator.extend_backend(ApiAccess::Private, scope)
-            })
+    let server = test::start(move || {
+        let public_apis = aggregator.extend_backend(ApiAccess::Public, web::scope("public/api"));
+        let private_apis = aggregator.extend_backend(ApiAccess::Private, web::scope("private/api"));
+        App::new().service(public_apis).service(private_apis)
     });
 
     info!("Test server created on {}", server.addr());
     server
 }
 
-/// The custom implementation of the test server, because there is an error in the default
-/// implementation. It does not wait for the http server thread to complete during drop.
-struct TestServer {
-    addr: net::SocketAddr,
-    backend: Addr<Server>,
-    system: System,
-    handle: Option<JoinHandle<()>>,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TestKitBuilder;
 
-impl TestServer {
-    /// Start new test server with application factory
-    fn with_factory<F, H>(factory: F) -> Self
-    where
-        F: Fn() -> H + Send + Clone + 'static,
-        H: IntoHttpHandler + 'static,
-    {
-        let (tx, rx) = mpsc::channel();
+    fn assert_send<T: Send>(_object: &T) {}
 
-        // run server in separate thread
-        let handle = thread::spawn(move || {
-            let sys = System::new("actix-test-server");
-            let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
-            let local_addr = tcp.local_addr().unwrap();
-
-            let srv = HttpServer::new(factory)
-                .disable_signals()
-                .listen(tcp)
-                .keep_alive(5)
-                .workers(1)
-                .start();
-
-            tx.send((System::current(), local_addr, srv)).unwrap();
-            sys.run();
-        });
-
-        let (system, addr, backend) = rx.recv().unwrap();
-
-        Self {
-            addr,
-            backend,
-            handle: Some(handle),
-            system,
-        }
+    #[test]
+    fn assert_send_for_testkit_api() {
+        let mut testkit = TestKitBuilder::validator().build();
+        let api = testkit.api();
+        assert_send(&api.public(ApiKind::Explorer).get::<()>("v1/transactions"));
+        assert_send(&api.public(ApiKind::Explorer).post::<()>("v1/transactions"));
     }
 
-    /// Construct test server url.
-    fn url(&self, uri: &str) -> String {
-        if uri.starts_with('/') {
-            format!("http://localhost:{}{}", self.addr.port(), uri)
-        } else {
-            format!("http://localhost:{}/{}", self.addr.port(), uri)
-        }
-    }
-
-    /// Construct test server url.
-    fn addr(&self) -> net::SocketAddr {
-        self.addr
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        // Stop http server gracefully.
-        let _ = self.backend.send(StopServer { graceful: true }).wait();
-        self.system.stop();
-        // Wait server thread.
-        let _ = self.handle.take().unwrap().join();
+    #[test]
+    fn assert_send_for_testkit_client() {
+        let api = TestKitBuilder::validator().build().api();
+        let client = api.client().clone();
+        assert_send(&client.public(ApiKind::Explorer).get::<()>("ping"));
     }
 }

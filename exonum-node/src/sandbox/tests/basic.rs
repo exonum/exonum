@@ -30,7 +30,7 @@ use std::collections::BTreeMap;
 use crate::sandbox::{
     sandbox_tests_helper::*,
     timestamping::{TimestampingTxGenerator, DATA_SIZE},
-    timestamping_sandbox, timestamping_sandbox_builder,
+    timestamping_sandbox, timestamping_sandbox_builder, Sandbox,
 };
 
 /// idea of the test is to verify that at certain periodic rounds we (`validator_0`) become a leader
@@ -68,7 +68,7 @@ fn test_check_leader() {
     add_round_with_transactions(&sandbox, &sandbox_state, &[tx.object_hash()]);
 
     // Status timeout is equal to peers timeout in sandbox' ConsensusConfig.
-    sandbox.broadcast(&sandbox.create_status(
+    sandbox.broadcast(&Sandbox::create_status(
         sandbox.public_key(ValidatorId(0)),
         Height(1),
         sandbox.last_block().object_hash(),
@@ -277,7 +277,7 @@ fn test_store_txs_positions() {
     let snapshot = sandbox.blockchain().snapshot();
     let schema = snapshot.for_core();
     let locations = schema.transactions_locations();
-    for (expected_idx, hash) in (0u32..).zip(&hashes) {
+    for (expected_idx, hash) in (0_u32..).zip(&hashes) {
         let location = locations.get(hash).unwrap();
         assert_eq!(expected_idx, location.position_in_block());
         assert_eq!(committed_height, location.block_height());

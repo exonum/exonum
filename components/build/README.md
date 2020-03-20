@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.36.0+ required](https://img.shields.io/badge/rust-1.36.0+-blue.svg?label=Required%20Rust)
+![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
 
 This crate simplifies writing build scripts for Exonum and Exonum services.
 
@@ -44,7 +44,7 @@ Include `exonum-build` as a dependency in your `Cargo.toml`:
 
 ```toml
 [build-dependencies]
-exonum-build = "1.0.0-rc.1"
+exonum-build = "1.0.0-rc.2"
 ```
 
 ## Known Issues

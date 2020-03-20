@@ -17,37 +17,31 @@
 //! [Actix-web](https://github.com/actix/actix-web) is an asynchronous backend
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
-pub use actix_web::middleware::cors::Cors;
+pub use actix_cors::{Cors, CorsFactory};
+pub use actix_web::{web::Payload, HttpRequest};
 
-use actix::{Actor, System};
 use actix_web::{
-    error::ResponseError, http::header, AsyncResponder, FromRequest, HttpMessage, HttpResponse,
-    Query,
+    body::Body,
+    error::ResponseError,
+    http::header,
+    web::{self, scope, Json, Query},
+    FromRequest, HttpResponse,
 };
-use failure::{ensure, format_err, Error};
-use futures::{future::Either, sync::mpsc, Future, IntoFuture, Stream};
+use futures::future::{Future, FutureExt, LocalBoxFuture};
 use serde::{de::DeserializeOwned, Serialize};
 
-use std::{
-    fmt,
-    sync::Arc,
-    thread::{self, JoinHandle},
-};
+use std::{fmt, sync::Arc};
 
 use crate::{
-    manager::{ApiManager, WebServerConfig},
-    Actuality, AllowOrigin, ApiAccess, ApiAggregator, ApiBackend, ApiScope, EndpointMutability,
-    Error as ApiError, ExtendApiBackend, FutureResult, NamedWith,
+    Actuality, AllowOrigin, ApiBackend, ApiScope, EndpointMutability, Error as ApiError,
+    ExtendApiBackend, NamedWith,
 };
 
-/// Type alias for the concrete `actix-web` HTTP response.
-pub type FutureResponse = actix_web::FutureResponse<HttpResponse, actix_web::Error>;
-/// Type alias for the concrete `actix-web` HTTP request.
-pub type HttpRequest = actix_web::HttpRequest<()>;
 /// Type alias for the inner `actix-web` HTTP requests handler.
-pub type RawHandler = dyn Fn(HttpRequest) -> FutureResponse + 'static + Send + Sync;
-/// Type alias for the `actix-web::App`.
-pub type App = actix_web::App<()>;
+pub type RawHandler = dyn Fn(HttpRequest, Payload) -> LocalBoxFuture<'static, Result<HttpResponse, actix_web::Error>>
+    + 'static
+    + Send
+    + Sync;
 
 /// Raw `actix-web` backend requests handler.
 #[derive(Clone)]
@@ -84,7 +78,7 @@ impl ApiBuilder {
 
 impl ApiBackend for ApiBuilder {
     type Handler = RequestHandler;
-    type Backend = actix_web::Scope<()>;
+    type Backend = actix_web::Scope;
 
     fn raw_handler(&mut self, handler: Self::Handler) -> &mut Self {
         self.handlers.push(handler);
@@ -94,21 +88,23 @@ impl ApiBackend for ApiBuilder {
     fn wire(&self, mut output: Self::Backend) -> Self::Backend {
         for handler in self.handlers.clone() {
             let inner = handler.inner;
-            output = output.route(&handler.name, handler.method.clone(), move |request| {
-                inner(request)
-            });
+            output = output.route(
+                &handler.name,
+                web::method(handler.method.clone())
+                    .to(move |request, payload| inner(request, payload)),
+            );
         }
         output
     }
 }
 
-impl ExtendApiBackend for actix_web::Scope<()> {
+impl ExtendApiBackend for actix_web::Scope {
     fn extend<'a, I>(mut self, items: I) -> Self
     where
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>,
     {
         for item in items {
-            self = self.nested(&item.0, move |scope| item.1.actix_backend.wire(scope))
+            self = self.service(item.1.actix_backend.wire(scope(&item.0)))
         }
         self
     }
@@ -118,7 +114,7 @@ impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         let body = serde_json::to_value(&self.body).unwrap();
         let body = if body == serde_json::json!({}) {
-            actix_web::Body::Empty
+            Body::Empty
         } else {
             serde_json::to_string(&self.body).unwrap().into()
         };
@@ -127,7 +123,9 @@ impl ResponseError for ApiError {
             .header(header::CONTENT_TYPE, "application/problem+json")
             .body(body);
 
-        response.headers_mut().extend(self.headers.clone());
+        for (key, value) in self.headers.iter() {
+            response.headers_mut().append(key.clone(), value.clone());
+        }
         response
     }
 }
@@ -194,72 +192,51 @@ impl From<EndpointMutability> for actix_web::http::Method {
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, crate::Result<I>, F>> for RequestHandler
-where
-    F: Fn(Q) -> crate::Result<I> + 'static + Send + Sync + Clone,
-    Q: DeserializeOwned + 'static,
-    I: Serialize + 'static,
-{
-    fn from(f: NamedWith<Q, I, crate::Result<I>, F>) -> Self {
-        // Convert handler that returns a `Result` into handler that will return `FutureResult`.
-        let handler = f.inner.handler;
-        let future_endpoint = move |query| -> Box<dyn Future<Item = I, Error = ApiError>> {
-            let future = handler(query).into_future();
-            Box::new(future)
-        };
-        let named_with_future = NamedWith::new(f.name, future_endpoint, f.mutability);
-
-        // Then we can create a `RequestHandler` with the `From` specialization for future result.
-        RequestHandler::from(named_with_future)
-    }
-}
-
 /// Takes `HttpRequest` as a parameter and extracts query:
 /// - If request is immutable, the query is parsed from query string,
 /// - If request is mutable, the query is parsed from the request body as JSON.
-fn extract_query<Q>(
+async fn extract_query<Q>(
     request: HttpRequest,
+    payload: Payload,
     mutability: EndpointMutability,
-) -> impl Future<Item = Q, Error = actix_web::error::Error>
+) -> Result<Q, actix_web::error::Error>
 where
     Q: DeserializeOwned + 'static,
 {
     match mutability {
-        EndpointMutability::Immutable => {
-            let future = Query::from_request(&request, &Default::default())
-                .map(Query::into_inner)
-                .map_err(From::from)
-                .into_future();
+        EndpointMutability::Immutable => Query::extract(&request)
+            .await
+            .map(Query::into_inner)
+            .map_err(From::from),
 
-            Either::A(future)
-        }
-        EndpointMutability::Mutable => {
-            let future = request.json().from_err();
-            Either::B(future)
-        }
+        EndpointMutability::Mutable => Json::from_request(&request, &mut payload.into_inner())
+            .await
+            .map(Json::into_inner)
+            .map_err(From::from),
     }
 }
 
-impl<Q, I, F> From<NamedWith<Q, I, FutureResult<I>, F>> for RequestHandler
+impl<Q, I, F, R> From<NamedWith<Q, I, R, F>> for RequestHandler
 where
-    F: Fn(Q) -> FutureResult<I> + 'static + Clone + Send + Sync,
+    F: Fn(Q) -> R + 'static + Clone + Send + Sync,
     Q: DeserializeOwned + 'static,
     I: Serialize + 'static,
+    R: Future<Output = Result<I, crate::Error>>,
 {
-    fn from(f: NamedWith<Q, I, FutureResult<I>, F>) -> Self {
+    fn from(f: NamedWith<Q, I, R, F>) -> Self {
         let handler = f.inner.handler;
         let actuality = f.inner.actuality;
         let mutability = f.mutability;
-        let index = move |request: HttpRequest| -> FutureResponse {
+        let index = move |request: HttpRequest, payload: Payload| {
             let handler = handler.clone();
             let actuality = actuality.clone();
-            extract_query(request, mutability)
-                .and_then(move |query| {
-                    handler(query)
-                        .map(|value| json_response(actuality, value))
-                        .map_err(From::from)
-                })
-                .responder()
+
+            async move {
+                let query = extract_query(request, payload, mutability).await?;
+                let response = handler(query).await.map_err(actix_web::Error::from)?;
+                Ok(json_response(actuality, response))
+            }
+            .boxed_local()
         };
 
         Self {
@@ -270,87 +247,14 @@ where
     }
 }
 
-/// Creates `actix_web::App` for the given aggregator and runtime configuration.
-pub(crate) fn create_app(
-    aggregator: &ApiAggregator,
-    access: ApiAccess,
-    runtime_config: &WebServerConfig,
-) -> App {
-    let mut app = App::new();
-    app = app.scope("api", |scope| aggregator.extend_backend(access, scope));
-    if let Some(ref allow_origin) = runtime_config.allow_origin {
-        let cors = Cors::from(allow_origin);
-        app = app.middleware(cors);
-    }
-    app
-}
-
-/// Actix system runtime handle.
-pub struct SystemRuntime {
-    system_thread: JoinHandle<Result<(), Error>>,
-    system: System,
-}
-
-impl SystemRuntime {
-    /// Starts actix system runtime along with all web runtimes.
-    pub fn start(manager: ApiManager) -> Result<Self, Error> {
-        // Creates a system thread.
-        let (system_tx, system_rx) = mpsc::unbounded();
-        let system_thread = thread::spawn(move || -> Result<(), Error> {
-            let system = System::new("http-server");
-            system_tx.unbounded_send(System::current())?;
-            manager.start();
-
-            // Starts actix-web runtime.
-            let code = system.run();
-            log::trace!("Actix runtime finished with code {}", code);
-            ensure!(
-                code == 0,
-                "Actix runtime finished with the non zero error code: {}",
-                code
-            );
-            Ok(())
-        });
-
-        // Receives addresses of runtime items.
-        let system = system_rx
-            .wait()
-            .next()
-            .ok_or_else(|| format_err!("Unable to receive actix system handle"))?
-            .map_err(|()| format_err!("Unable to receive actix system handle"))?;
-        Ok(SystemRuntime {
-            system_thread,
-            system,
-        })
-    }
-
-    /// Stops the actix system runtime along with all web runtimes.
-    pub fn stop(self) -> Result<(), Error> {
-        // Stop actix system runtime.
-        self.system.stop();
-        self.system_thread.join().map_err(|e| {
-            format_err!(
-                "Unable to join actix web api thread, an error occurred: {:?}",
-                e
-            )
-        })?
-    }
-}
-
-impl fmt::Debug for SystemRuntime {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("SystemRuntime").finish()
-    }
-}
-
-impl From<&AllowOrigin> for Cors {
+impl From<&AllowOrigin> for CorsFactory {
     fn from(origin: &AllowOrigin) -> Self {
         match *origin {
-            AllowOrigin::Any => Self::build().finish(),
+            AllowOrigin::Any => Cors::new().finish(),
             AllowOrigin::Whitelist(ref hosts) => {
-                let mut builder = Self::build();
+                let mut builder = Cors::new();
                 for host in hosts {
-                    builder.allowed_origin(host);
+                    builder = builder.allowed_origin(host);
                 }
                 builder.finish()
             }
@@ -358,7 +262,7 @@ impl From<&AllowOrigin> for Cors {
     }
 }
 
-impl From<AllowOrigin> for Cors {
+impl From<AllowOrigin> for CorsFactory {
     fn from(origin: AllowOrigin) -> Self {
         Self::from(&origin)
     }
@@ -372,8 +276,11 @@ mod tests {
 
     fn assert_responses_eq(left: HttpResponse, right: HttpResponse) {
         assert_eq!(left.status(), right.status());
-        assert_eq!(left.headers(), right.headers());
-        assert_eq!(left.body(), right.body());
+        assert_eq!(
+            left.headers().iter().collect::<Vec<_>>(),
+            right.headers().iter().collect::<Vec<_>>()
+        );
+        assert_eq!(left.body().as_ref(), right.body().as_ref());
     }
 
     #[test]
@@ -398,8 +305,7 @@ mod tests {
             },
             123,
         );
-        let expected_warning_text =
-            "Deprecated API: This endpoint is deprecated, \
+        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
              Currently there is no specific date for disabling this endpoint.";
         let expected_warning = create_warning_header(expected_warning_text);
@@ -418,8 +324,7 @@ mod tests {
             },
             123,
         );
-        let expected_warning_text =
-            "Deprecated API: This endpoint is deprecated, \
+        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
              Currently there is no specific date for disabling this endpoint. \
              Additional information: Docs can be found on docs.rs.";
@@ -440,8 +345,7 @@ mod tests {
             },
             123,
         );
-        let expected_warning_text =
-            "Deprecated API: This endpoint is deprecated, \
+        let expected_warning_text = "Deprecated API: This endpoint is deprecated, \
              see the service documentation to find an alternative. \
              The old API is maintained until Thu, 31 Dec 2020 23:59:59 GMT.";
         let expected_warning = create_warning_header(expected_warning_text);

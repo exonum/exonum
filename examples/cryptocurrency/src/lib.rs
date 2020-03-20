@@ -39,6 +39,7 @@ mod tx_tests;
 
 /// Persistent data.
 pub mod schema {
+    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
     use exonum::{
         crypto::PublicKey,
         merkledb::{
@@ -96,15 +97,14 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
-    ///
-    /// Note that the schema is fully private; it is exposed to the clients via service HTTP API.
     #[derive(Debug, FromAccess)]
-    pub(crate) struct CurrencySchema<T: Access> {
+    pub struct CurrencySchema<T: Access> {
         /// Correspondence of public keys of users to the account information.
         pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 
     impl<T: Access> CurrencySchema<T> {
+        /// Creates a new schema.
         pub fn new(access: T) -> Self {
             Self::from_root(access).unwrap()
         }
@@ -113,6 +113,7 @@ pub mod schema {
 
 /// Transactions.
 pub mod transactions {
+    use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
     use exonum::crypto::PublicKey;
     use exonum_derive::{BinaryValue, ObjectHash};
     use exonum_proto::ProtobufConvert;
@@ -305,7 +306,7 @@ pub mod api {
 
     impl CryptocurrencyApi {
         /// Endpoint for getting a single wallet.
-        pub fn get_wallet(state: &ServiceApiState<'_>, query: WalletQuery) -> api::Result<Wallet> {
+        pub async fn get_wallet(state: ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
             let schema = CurrencySchema::new(state.service_data());
             schema
                 .wallets
@@ -314,7 +315,7 @@ pub mod api {
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(state: &ServiceApiState<'_>, _query: ()) -> api::Result<Vec<Wallet>> {
+        pub async fn get_wallets(state: ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
             let schema = CurrencySchema::new(state.service_data());
             Ok(schema.wallets.values().collect())
         }

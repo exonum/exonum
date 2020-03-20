@@ -35,11 +35,32 @@
 
 // spell-checker:ignore cors
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
+
 pub use crate::{
     connect_list::{ConnectInfo, ConnectListConfig},
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
+use actix_rt::System;
+use anyhow::{ensure, format_err};
 use exonum::{
     blockchain::{
         config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
@@ -53,20 +74,20 @@ use exonum::{
     runtime::RuntimeInstance,
 };
 use exonum_api::{
-    backends::actix::SystemRuntime, AllowOrigin, ApiAccess, ApiAggregator, ApiManager,
-    ApiManagerConfig, UpdateEndpoints, WebServerConfig,
+    AllowOrigin, ApiAccess, ApiAggregator, ApiManager, ApiManagerConfig, UpdateEndpoints,
+    WebServerConfig,
 };
-use failure::{ensure, format_err, Error};
-use futures::{sync::mpsc, Future, Sink};
+use futures::{
+    channel::{mpsc, oneshot},
+    FutureExt,
+};
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio_core::reactor::Core;
-use tokio_threadpool::Builder as ThreadPoolBuilder;
 
 use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
-    fmt,
+    fmt, io,
     net::SocketAddr,
     sync::Arc,
     thread,
@@ -76,10 +97,8 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        error::{into_failure, LogError},
-        noise::HandshakeParams,
-        EventHandler, HandlerPart, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
-        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+        noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart, InternalRequest,
+        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
     schema::NodeSchema,
@@ -111,12 +130,8 @@ pub mod _bench_types {
 }
 
 /// External messages sent to the node.
-///
-/// # Stability
-///
-/// This enum is not intended to be exhaustively matched. New variants may be added to it
-/// without breaking semver compatibility.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ExternalMessage {
     /// Add a new connection.
     PeerAdd(ConnectInfo),
@@ -124,8 +139,6 @@ pub enum ExternalMessage {
     Enable(bool),
     /// Shutdown the node.
     Shutdown,
-    #[doc(hidden)]
-    __NonExhaustive,
 }
 
 /// Node timeout types.
@@ -143,6 +156,8 @@ pub(crate) enum NodeTimeout {
     UpdateApiState,
     /// Exchange peers timeout.
     PeerExchange,
+    /// Flush uncommitted transactions into the database.
+    FlushPool,
 }
 
 /// A helper trait that provides the node with information about the state of the system such
@@ -218,7 +233,7 @@ impl Default for NodeApiConfig {
             private_api_address: None,
             public_allow_origin: None,
             private_allow_origin: None,
-            server_restart: Default::default(),
+            server_restart: ServerRestartPolicy::default(),
         }
     }
 }
@@ -300,13 +315,69 @@ impl Default for EventsPoolCapacity {
 
 /// Memory pool configuration parameters.
 ///
-/// The internal structure of this type is an implementation detail. For most applications,
-/// you should use the value returned by `Default::default()`.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+/// # Examples
+///
+/// For most applications, you should use the value returned by `MemoryPoolConfig::default()`, maybe
+/// overwriting some fields afterwards:
+///
+/// ```
+/// # use exonum_node::{FlushPoolStrategy, MemoryPoolConfig};
+/// let mut pool_config = MemoryPoolConfig::default();
+/// // Increase flush pool interval to 100 milliseconds.
+/// pool_config.flush_pool_strategy = FlushPoolStrategy::Timeout {
+///     timeout: 100,
+/// };
+/// // Use the config somewhere...
+/// ```
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
     /// notification channel before a send will fail.
-    events_pool_capacity: EventsPoolCapacity,
+    pub events_pool_capacity: EventsPoolCapacity,
+
+    /// Interval in milliseconds between flushing the transaction cache to the persistent pool.
+    ///
+    /// This value influences how fast transactions appear in the persistent pool after they
+    /// have been initially processed by the node. With `Never` setting, transactions will not
+    /// be persisted at all before appearing in a block, which may negatively influence
+    /// some applications (e.g., the `GET transactions` endpoint of the explorer service).
+    /// On the other hand of the spectrum, there is `Immediate`, which flushes each transaction
+    /// separately after its initial processing. In the middle, there is `Timeout`, which
+    /// allows to specify the coherence interval for the pool.
+    #[serde(default)]
+    pub flush_pool_strategy: FlushPoolStrategy,
+}
+
+/// Strategy to flush transactions into the pool.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum FlushPoolStrategy {
+    /// Never flush the transactions to the persistent pool.
+    ///
+    /// This setting is best for performance, but may harm the availability of some APIs of the node
+    /// (e.g., the `GET transactions` endpoint of the explorer service).
+    Never,
+
+    /// Flush transactions on the specified timeout in milliseconds.
+    ///
+    /// The recommended values are order of 20ms.
+    Timeout {
+        /// Timeout value in milliseconds.
+        timeout: Milliseconds,
+    },
+
+    /// Flush each transaction after receiving it.
+    ///
+    /// Beware that this setting can harm performance of the node under high load.
+    Immediate,
+}
+
+impl Default for FlushPoolStrategy {
+    fn default() -> Self {
+        Self::Timeout { timeout: 20 }
+    }
 }
 
 /// Configuration for the `Node`.
@@ -331,7 +402,7 @@ pub struct NodeConfig {
 }
 
 impl ValidateInput for NodeConfig {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         let capacity = &self.mempool.events_pool_capacity;
@@ -416,23 +487,23 @@ pub(crate) enum NodeRole {
 
 impl Default for NodeRole {
     fn default() -> Self {
-        NodeRole::Auditor
+        Self::Auditor
     }
 }
 
 impl NodeRole {
-    /// Constructs new NodeRole from `validator_id`.
+    /// Constructs new `NodeRole` from `validator_id`.
     pub fn new(validator_id: Option<ValidatorId>) -> Self {
         match validator_id {
-            Some(validator_id) => NodeRole::Validator(validator_id),
-            None => NodeRole::Auditor,
+            Some(validator_id) => Self::Validator(validator_id),
+            None => Self::Auditor,
         }
     }
 
     /// Checks if node is validator.
     pub fn is_validator(self) -> bool {
         match self {
-            NodeRole::Validator(_) => true,
+            Self::Validator(_) => true,
             _ => false,
         }
     }
@@ -449,48 +520,32 @@ impl NodeHandler {
         api_state: SharedNodeState,
         config_manager: Option<Box<dyn ConfigManager>>,
     ) -> Self {
-        let (last_hash, last_height) = {
-            let block = blockchain.as_ref().last_block();
-            (block.object_hash(), block.height.next())
-        };
-
+        let last_block = blockchain.as_ref().last_block();
         let snapshot = blockchain.snapshot();
         let consensus_config = Schema::new(&snapshot).consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
-        let validator_id = consensus_config
-            .validator_keys
-            .iter()
-            .position(|pk| pk.consensus_key == config.keys.consensus_pk())
-            .map(|id| ValidatorId(id as u16));
-        info!("Validator id = '{:?}'", validator_id);
-        let connect = Verified::from_value(
-            Connect::new(
-                external_address,
-                system_state.current_time().into(),
-                &user_agent(),
-            ),
-            config.keys.consensus_pk(),
-            &config.keys.consensus_sk(),
+        let connect = Connect::new(
+            external_address,
+            system_state.current_time().into(),
+            &user_agent(),
         );
-
-        let connect_list = config.connect_list;
         let peers = NodeSchema::new(&blockchain.snapshot())
             .peers_cache()
             .iter()
             .collect();
+        let peer_discovery = config.peer_discovery.clone();
+
         let state = State::new(
-            validator_id,
-            connect_list,
+            config,
             consensus_config,
             connect,
             peers,
-            last_hash,
-            last_height,
+            &last_block,
             system_state.current_time(),
-            config.keys,
         );
 
+        let validator_id = state.validator_id();
         let node_role = NodeRole::new(validator_id);
         let is_enabled = api_state.is_enabled();
         api_state.set_node_role(node_role);
@@ -502,7 +557,7 @@ impl NodeHandler {
             system_state,
             state,
             channel: sender,
-            peer_discovery: config.peer_discovery,
+            peer_discovery,
             is_enabled,
             node_role,
             config_manager,
@@ -625,13 +680,14 @@ impl NodeHandler {
         self.add_status_timeout();
         self.add_peer_exchange_timeout();
         self.add_update_api_state_timeout();
+        self.maybe_add_flush_pool_timeout();
     }
 
     /// Sends the given message to a peer by its public key.
     fn send_to_peer<T: Into<SignedMessage>>(&mut self, public_key: PublicKey, message: T) {
         let message = message.into();
         let request = NetworkRequest::SendMessage(public_key, message);
-        self.channel.network_requests.send(request).log_error();
+        self.channel.network_requests.send(request);
     }
 
     /// Broadcasts given message to all peers.
@@ -663,10 +719,7 @@ impl NodeHandler {
     /// Adds a timeout request.
     fn add_timeout(&mut self, timeout: NodeTimeout, time: SystemTime) {
         let request = TimeoutRequest(time, timeout);
-        self.channel
-            .internal_requests
-            .send(request.into())
-            .log_error();
+        self.channel.internal_requests.send(request.into());
     }
 
     /// Adds request timeout if it isn't already requested.
@@ -753,6 +806,13 @@ impl NodeHandler {
         self.add_timeout(NodeTimeout::UpdateApiState, time);
     }
 
+    fn maybe_add_flush_pool_timeout(&mut self) {
+        if let Some(timeout) = self.state().flush_pool_timeout() {
+            let time = self.system_state.current_time() + timeout;
+            self.add_timeout(NodeTimeout::FlushPool, time);
+        }
+    }
+
     /// Returns hash of the last block.
     fn last_block_hash(&self) -> Hash {
         self.blockchain.as_ref().last_block().object_hash()
@@ -801,8 +861,8 @@ impl ShutdownHandle {
     /// # Return value
     ///
     /// The failure means that the node is already being shut down.
-    pub fn shutdown(self) -> impl Future<Item = (), Error = SendError> {
-        self.inner.send_message(ExternalMessage::Shutdown)
+    pub async fn shutdown(mut self) -> Result<(), SendError> {
+        self.inner.send_message(ExternalMessage::Shutdown).await
     }
 }
 
@@ -917,10 +977,10 @@ impl NodeChannel {
     /// Returns the channel for sending timeouts, networks and API requests.
     fn node_sender(&self) -> NodeSender {
         NodeSender {
-            internal_requests: self.internal_requests.0.clone().wait(),
-            network_requests: self.network_requests.0.clone().wait(),
-            transactions: self.transactions.0.clone().wait(),
-            api_requests: self.api_requests.0.clone().wait(),
+            internal_requests: SyncSender::new(self.internal_requests.0.clone()),
+            network_requests: SyncSender::new(self.network_requests.0.clone()),
+            transactions: SyncSender::new(self.transactions.0.clone()),
+            api_requests: SyncSender::new(self.api_requests.0.clone()),
         }
     }
 }
@@ -1062,17 +1122,13 @@ impl Node {
 
         let mut servers = HashMap::new();
         if let Some(listen_address) = api_cfg.public_api_address {
-            let server_config = WebServerConfig {
-                listen_address,
-                allow_origin: api_cfg.public_allow_origin.clone(),
-            };
+            let mut server_config = WebServerConfig::new(listen_address);
+            server_config.allow_origin = api_cfg.public_allow_origin.clone();
             servers.insert(ApiAccess::Public, server_config);
         }
         if let Some(listen_address) = api_cfg.private_api_address {
-            let server_config = WebServerConfig {
-                listen_address,
-                allow_origin: api_cfg.private_allow_origin.clone(),
-            };
+            let mut server_config = WebServerConfig::new(listen_address);
+            server_config.allow_origin = api_cfg.private_allow_origin.clone();
             servers.insert(ApiAccess::Private, server_config);
         }
 
@@ -1107,86 +1163,24 @@ impl Node {
 
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
-    fn run_handler(mut self, handshake_params: &HandshakeParams) -> Result<(), Error> {
+    async fn run_handler(mut self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
         self.handler.initialize();
-
-        let pool_size = self.thread_pool_size;
-        let (handler_part, network_part, internal_part) = self.into_reactor();
-        let handshake_params = handshake_params.clone();
-
-        let network_thread = thread::spawn(move || {
-            let mut core = Core::new().map_err(into_failure)?;
-            let handle = core.handle();
-
-            let mut pool_builder = ThreadPoolBuilder::new();
-            if let Some(pool_size) = pool_size {
-                pool_builder.pool_size(pool_size as usize);
-            }
-            let thread_pool = pool_builder.build();
-            let executor = thread_pool.sender().clone();
-
-            core.handle().spawn(internal_part.run(handle, executor));
-
-            let network_handler = network_part.run(&core.handle(), &handshake_params);
-            core.run(network_handler)
-                .map(drop)
-                .map_err(|e| format_err!("An error in the `Network` thread occurred: {}", e))
-        });
-
-        let mut core = Core::new().map_err(into_failure)?;
-        core.run(handler_part.run())
-            .map_err(|_| format_err!("An error in the `Handler` thread occurred"))?;
-
-        network_thread.join().unwrap()
+        Reactor::new(self).run(handshake_params).await
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
     /// depending on the provided `NodeConfig`.
-    pub fn run(self) -> Result<(), failure::Error> {
+    pub async fn run(self) -> anyhow::Result<()> {
         trace!("Running node.");
 
         // Runs NodeHandler.
         let handshake_params = HandshakeParams::new(
             &self.state().keys().consensus,
-            self.state().connect_list().clone(),
+            self.state().connect_list(),
             self.state().our_connect_message().clone(),
             self.max_message_len,
         );
-        self.run_handler(&handshake_params)?;
-        Ok(())
-    }
-
-    fn into_reactor(self) -> (HandlerPart<impl EventHandler>, NetworkPart, InternalPart) {
-        let connect_message = self.state().our_connect_message().clone();
-        let connect_list = self.state().connect_list().clone();
-        let api_manager = ApiManager::new(self.api_manager_config, self.channel.endpoints.1);
-        SystemRuntime::start(api_manager).expect("Failed to start api_runtime.");
-        let (network_tx, network_rx) = self.channel.network_events;
-        let internal_requests_rx = self.channel.internal_requests.1;
-        let network_part = NetworkPart {
-            our_connect_message: connect_message,
-            listen_address: self.handler.system_state.listen_address(),
-            network_requests: self.channel.network_requests,
-            network_tx,
-            network_config: self.network_config,
-            max_message_len: self.max_message_len,
-            connect_list,
-        };
-
-        let (internal_tx, internal_rx) = self.channel.internal_events;
-        let handler_part = HandlerPart {
-            handler: self.handler,
-            internal_rx,
-            network_rx,
-            transactions_rx: self.channel.transactions.1,
-            api_rx: self.channel.api_requests.1,
-        };
-
-        let internal_part = InternalPart {
-            internal_tx,
-            internal_requests_rx,
-        };
-        (handler_part, network_part, internal_part)
+        self.run_handler(handshake_params).await
     }
 
     /// Returns `State` of the node.
@@ -1206,6 +1200,92 @@ impl Node {
     pub fn shutdown_handle(&self) -> ShutdownHandle {
         ShutdownHandle {
             inner: ApiSender::new(self.channel.api_requests.0.clone()),
+        }
+    }
+}
+
+struct Reactor {
+    handler_part: HandlerPart<NodeHandler>,
+    network_part: NetworkPart,
+    internal_part: InternalPart,
+    api_part: oneshot::Receiver<io::Result<()>>,
+}
+
+impl Reactor {
+    fn new(node: Node) -> Self {
+        let connect_message = node.state().our_connect_message().clone();
+        let connect_list = node.state().connect_list();
+
+        let api_manager = ApiManager::new(node.api_manager_config);
+        let endpoints = node.channel.endpoints.1;
+        let api_task = api_manager.run(endpoints);
+        let (api_part_tx, api_part) = oneshot::channel();
+
+        // Creating a separate thread here seems easier than making `Node::run()` return
+        // a non-`Send` future (which, e.g., precludes running nodes with `tokio::spawn`).
+        thread::spawn(|| {
+            let res = System::new("exonum-node").block_on(api_task);
+            if let Err(ref err) = res {
+                log::error!("Error in actix thread: {}", err);
+            }
+            api_part_tx.send(res).ok();
+        });
+
+        let (network_tx, network_rx) = node.channel.network_events;
+        let internal_requests_rx = node.channel.internal_requests.1;
+        let network_part = NetworkPart {
+            our_connect_message: connect_message,
+            listen_address: node.handler.system_state.listen_address(),
+            network_requests: node.channel.network_requests.1,
+            network_tx,
+            network_config: node.network_config,
+            max_message_len: node.max_message_len,
+            connect_list,
+        };
+
+        let (internal_tx, internal_rx) = node.channel.internal_events;
+        let handler_part = HandlerPart {
+            handler: node.handler,
+            internal_rx,
+            network_rx,
+            transactions_rx: node.channel.transactions.1,
+            api_rx: node.channel.api_requests.1,
+        };
+
+        let internal_part = InternalPart {
+            internal_tx,
+            internal_requests_rx,
+        };
+
+        Self {
+            handler_part,
+            network_part,
+            internal_part,
+            api_part,
+        }
+    }
+
+    #[allow(clippy::mut_mut)] // occurs in the `select!` macro
+    async fn run(self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
+        let internal_task = self.internal_part.run().fuse();
+        futures::pin_mut!(internal_task);
+        let network_task = self.network_part.run(handshake_params).fuse();
+        futures::pin_mut!(network_task);
+        let handler_task = self.handler_part.run().fuse();
+        futures::pin_mut!(handler_task);
+        let mut api_task = self.api_part.fuse();
+
+        // The remaining tasks are dropped after the first task is terminated,
+        // which should free all associated resources.
+        futures::select! {
+            () = internal_task => Ok(()),
+            () = network_task => Ok(()),
+            () = handler_task => Ok(()),
+
+            res = api_task => match res {
+                Err(_) => Err(format_err!("Actix thread panicked")),
+                Ok(res) => res.map_err(From::from),
+            },
         }
     }
 }
@@ -1231,15 +1311,15 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, 
             let config = NodeConfig {
                 listen_address: peers[idx].parse().unwrap(),
                 external_address: peers[idx].clone(),
-                network: Default::default(),
+                network: NetworkConfiguration::default(),
                 consensus: consensus.clone(),
                 connect_list: ConnectListConfig::from_validator_keys(
                     &consensus.validator_keys,
                     &peers,
                 ),
-                api: Default::default(),
-                mempool: Default::default(),
-                thread_pool_size: Default::default(),
+                api: NodeApiConfig::default(),
+                mempool: MemoryPoolConfig::default(),
+                thread_pool_size: None,
             };
             (config, keys)
         })
@@ -1309,5 +1389,28 @@ mod tests {
             .events_pool_capacity
             .network_requests_capacity = accidental_large_value;
         NodeBuilder::new(db, node_cfg, node_keys);
+    }
+
+    #[test]
+    fn flush_pool_strategy_is_serializable() {
+        let mut mempool_config = MemoryPoolConfig::default();
+        let s = toml::to_string(&mempool_config).unwrap();
+        let restored: MemoryPoolConfig = toml::from_str(&s).unwrap();
+        assert_eq!(restored, mempool_config);
+
+        mempool_config.flush_pool_strategy = FlushPoolStrategy::Never;
+        let s = toml::to_string(&mempool_config).unwrap();
+        let restored: MemoryPoolConfig = toml::from_str(&s).unwrap();
+        assert_eq!(restored, mempool_config);
+
+        let config_without_strategy = r#"
+            [events_pool_capacity]
+            network_requests_capacity = 512
+            network_events_capacity = 512
+            internal_events_capacity = 128
+            api_requests_capacity = 1024
+        "#;
+        let restored: MemoryPoolConfig = toml::from_str(config_without_strategy).unwrap();
+        assert_eq!(restored, MemoryPoolConfig::default());
     }
 }

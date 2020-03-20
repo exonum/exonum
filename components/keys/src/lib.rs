@@ -24,7 +24,7 @@
 //! use exonum_keys::{generate_keys, read_keys_from_file};
 //! use tempdir::TempDir;
 //!
-//! # fn main() -> Result<(), failure::Error> {
+//! # fn main() -> anyhow::Result<()> {
 //! let dir = TempDir::new("test_keys")?;
 //! let file_path = dir.path().join("private_key.toml");
 //! let pass_phrase = b"super_secret_passphrase";
@@ -41,24 +41,21 @@
     unsafe_code,
     bare_trait_objects
 )]
-#![warn(clippy::pedantic)]
+#![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
     // Next `cast_*` lints don't give alternatives.
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // `filter(..).map(..)` often looks more shorter and readable.
-    clippy::filter_map,
     // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names,
-    // Variant name ends with the enum name. Similar behavior to similar_names.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
     clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
-    clippy::use_self,
-    clippy::default_trait_access,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
+use anyhow::format_err;
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
-use failure::format_err;
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
 use secret_tree::{Name, SecretTree};
@@ -85,13 +82,12 @@ fn validate_file_mode(mode: u32) -> Result<(), Error> {
 
 /// Container for all key pairs held by an Exonum node.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Keys {
     /// Consensus keypair.
     pub consensus: KeyPair,
     /// Service keypair.
     pub service: KeyPair,
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl Keys {
@@ -101,7 +97,6 @@ impl Keys {
         Self {
             consensus: KeyPair::random(),
             service: KeyPair::random(),
-            non_exhaustive: (),
         }
     }
 
@@ -119,7 +114,6 @@ impl Keys {
         Self {
             consensus: consensus_keys.into(),
             service: service_keys.into(),
-            non_exhaustive: (),
         }
     }
 }
@@ -132,7 +126,7 @@ impl Keys {
 
     /// Consensus private key.
     pub fn consensus_sk(&self) -> &SecretKey {
-        &self.consensus.secret_key()
+        self.consensus.secret_key()
     }
 
     /// Service public key.
@@ -142,18 +136,16 @@ impl Keys {
 
     /// Service secret key.
     pub fn service_sk(&self) -> &SecretKey {
-        &self.service.secret_key()
+        self.service.secret_key()
     }
 }
 
-fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
+fn save_master_key<P: AsRef<Path>>(
     path: P,
-    pass_phrase: W,
-    key: &secret_tree::Seed,
+    encrypted_key: &EncryptedMasterKey,
 ) -> Result<(), Error> {
-    let encrypted_key = EncryptedMasterKey::encrypt(key, pass_phrase)?;
     let file_content =
-        toml::to_string_pretty(&encrypted_key).map_err(|e| Error::new(ErrorKind::Other, e))?;
+        toml::to_string_pretty(encrypted_key).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let mut open_options = OpenOptions::new();
     open_options.create(true).write(true);
     // By agreement we use the same permissions as for SSH private keys.
@@ -165,16 +157,14 @@ fn save_master_key<P: AsRef<Path>, W: AsRef<[u8]>>(
     Ok(())
 }
 
-#[derive(Serialize, Deserialize)]
-struct EncryptedMasterKey {
+/// Encrypted master key.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct EncryptedMasterKey {
     key: ErasedPwBox,
 }
 
 impl EncryptedMasterKey {
-    fn encrypt(
-        key: &secret_tree::Seed,
-        pass_phrase: impl AsRef<[u8]>,
-    ) -> Result<EncryptedMasterKey, Error> {
+    fn encrypt(key: &secret_tree::Seed, pass_phrase: impl AsRef<[u8]>) -> Result<Self, Error> {
         let mut rng = thread_rng();
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
@@ -185,7 +175,7 @@ impl EncryptedMasterKey {
             .erase(&pwbox)
             .map_err(|_| Error::new(ErrorKind::Other, "Couldn't convert a pw box"))?;
 
-        Ok(EncryptedMasterKey { key: encrypted_key })
+        Ok(Self { key: encrypted_key })
     }
 
     fn decrypt(self, pass_phrase: impl AsRef<[u8]>) -> Result<SensitiveData, Error> {
@@ -203,32 +193,46 @@ impl EncryptedMasterKey {
 }
 
 /// Creates a TOML file that contains encrypted master and returns `Keys` derived from it.
-pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> Result<Keys, failure::Error> {
+pub fn generate_keys<P: AsRef<Path>>(path: P, passphrase: &[u8]) -> anyhow::Result<Keys> {
     let tree = SecretTree::new(&mut thread_rng());
-    save_master_key(path, passphrase, tree.seed())?;
-    generate_keys_from_master_password(&tree)
-        .ok_or_else(|| format_err!("Error deriving keys from master key."))
+    let encrypted_key = EncryptedMasterKey::encrypt(tree.seed(), passphrase)?;
+    save_master_key(path, &encrypted_key)?;
+
+    Ok(generate_keys_from_master_password(&tree))
 }
 
-fn generate_keys_from_master_password(tree: &SecretTree) -> Option<Keys> {
+/// Creates a TOML file from seed that contains encrypted master and returns `Keys` derived from it.
+pub fn generate_keys_from_seed(
+    passphrase: &[u8],
+    seed: &[u8],
+) -> anyhow::Result<(Keys, EncryptedMasterKey)> {
+    let tree = SecretTree::from_seed(seed)
+        .ok_or_else(|| format_err!("Error creating SecretTree from seed"))?;
+    let encrypted_key = EncryptedMasterKey::encrypt(tree.seed(), passphrase)?;
+    let keys = generate_keys_from_master_password(&tree);
+
+    Ok((keys, encrypted_key))
+}
+
+fn generate_keys_from_master_password(tree: &SecretTree) -> Keys {
     let mut buffer = [0_u8; 32];
 
     tree.child(Name::new("consensus")).fill(&mut buffer);
-    let seed = Seed::from_slice(&buffer)?;
+    let seed = Seed::new(buffer);
     let consensus_keys = KeyPair::from_seed(&seed);
 
     tree.child(Name::new("service")).fill(&mut buffer);
-    let seed = Seed::from_slice(&buffer)?;
+    let seed = Seed::new(buffer);
     let service_keys = KeyPair::from_seed(&seed);
 
-    Some(Keys::from_keys(consensus_keys, service_keys))
+    Keys::from_keys(consensus_keys, service_keys)
 }
 
 /// Reads encrypted master key from file and generate validator keys from it.
 pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     path: P,
     pass_phrase: W,
-) -> Result<Keys, failure::Error> {
+) -> anyhow::Result<Keys> {
     let mut key_file = File::open(path)?;
 
     #[cfg(unix)]
@@ -239,10 +243,9 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let keys: EncryptedMasterKey =
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let seed = keys.decrypt(pass_phrase)?;
-
     let tree = SecretTree::from_seed(&seed).expect("Error creating secret tree from seed.");
-    generate_keys_from_master_password(&tree)
-        .ok_or_else(|| format_err!("Error deriving keys from master key"))
+
+    Ok(generate_keys_from_master_password(&tree))
 }
 
 #[cfg(test)]
@@ -266,7 +269,7 @@ mod tests {
         let tree = SecretTree::new(&mut thread_rng());
         let seed = tree.seed();
         let key =
-            EncryptedMasterKey::encrypt(&seed, pass_phrase).expect("Couldn't encrypt master key");
+            EncryptedMasterKey::encrypt(seed, pass_phrase).expect("Couldn't encrypt master key");
 
         let decrypted_seed = key
             .decrypt(pass_phrase)

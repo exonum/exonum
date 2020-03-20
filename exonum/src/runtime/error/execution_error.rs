@@ -16,27 +16,25 @@
 
 use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
-use exonum_merkledb::{BinaryValue, ObjectHash};
+use anyhow::bail;
 use exonum_proto::ProtobufConvert;
-use failure::bail;
+use protobuf::well_known_types::Empty;
 
 use std::{
     any::Any,
     convert::TryFrom,
     fmt::{self, Display},
+    mem,
 };
 
-use super::{execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError};
+use super::{
+    execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError,
+    ExecutionErrorAux,
+};
 use crate::{
-    crypto::{self, Hash},
     proto::schema,
     runtime::{CallSite, RuntimeIdentifier},
 };
-
-/// Custom `serde` implementation for `ExecutionError`.
-#[doc(hidden)]
-#[derive(Debug)]
-pub struct ExecutionErrorSerde;
 
 impl ExecutionError {
     /// Creates a new execution error instance with the specified error kind
@@ -65,8 +63,8 @@ impl ExecutionError {
         } else if let Some(s) = any.downcast_ref::<String>() {
             s.clone()
         } else if let Some(error) = any.downcast_ref::<Box<(dyn std::error::Error + Send)>>() {
-            error.description().to_string()
-        } else if let Some(error) = any.downcast_ref::<failure::Error>() {
+            error.to_string()
+        } else if let Some(error) = any.downcast_ref::<anyhow::Error>() {
             error.to_string()
         } else {
             // Unknown error kind; keep its description empty.
@@ -120,6 +118,19 @@ impl ExecutionError {
         }
         self
     }
+
+    /// Splits auxiliary information off this error.
+    pub(crate) fn split_aux(&mut self) -> ExecutionErrorAux {
+        ExecutionErrorAux {
+            description: mem::take(&mut self.description),
+        }
+    }
+
+    /// Combines this error with the provided auxiliary information.
+    pub(crate) fn recombine_with_aux(&mut self, aux: ExecutionErrorAux) {
+        debug_assert!(self.description.is_empty());
+        self.description = aux.description;
+    }
 }
 
 impl Display for ExecutionError {
@@ -136,9 +147,10 @@ impl Display for ExecutionError {
                 formatter,
                 "Execution error with code `{kind}` occurred in {runtime}",
                 kind = self.kind,
-                runtime = match RuntimeIdentifier::transform(runtime_id) {
-                    Ok(runtime) => runtime.to_string(),
-                    Err(_) => format!("Non-default runtime with id {}", runtime_id),
+                runtime = if let Ok(runtime) = RuntimeIdentifier::transform(runtime_id) {
+                    runtime.to_string()
+                } else {
+                    format!("Non-default runtime with id {}", runtime_id)
                 }
             )?;
         } else {
@@ -169,18 +181,18 @@ impl ProtobufConvert for ExecutionError {
         if let Some(runtime_id) = self.runtime_id {
             inner.set_runtime_id(runtime_id);
         } else {
-            inner.set_no_runtime_id(Default::default());
+            inner.set_no_runtime_id(Empty::new());
         }
 
         if let Some(ref call_site) = self.call_site {
             inner.set_call_site(call_site.to_pb());
         } else {
-            inner.set_no_call_site(Default::default());
+            inner.set_no_call_site(Empty::new());
         }
         inner
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let kind = pb.get_kind();
         let code = u8::try_from(pb.get_code())?;
 
@@ -211,32 +223,19 @@ impl ProtobufConvert for ExecutionError {
     }
 }
 
-// String content (`ExecutionError::description`) is intentionally excluded from the hash
-// calculation because user can be tempted to use error description from a third-party libraries
-// which aren't stable across the versions.
-impl ObjectHash for ExecutionError {
-    fn object_hash(&self) -> Hash {
-        let error_with_empty_description = Self {
-            kind: self.kind,
-            description: String::new(),
-            runtime_id: self.runtime_id,
-            call_site: self.call_site.clone(),
-        };
-        crypto::hash(&error_with_empty_description.into_bytes())
-    }
-}
-
-impl ExecutionErrorSerde {
-    pub fn serialize<S>(inner: &ExecutionError, serializer: S) -> Result<S::Ok, S::Error>
+impl Serialize for ExecutionError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        ExecutionStatus::from(Err(inner)).serialize(serializer)
+        ExecutionStatus::from(Err(self)).serialize(serializer)
     }
+}
 
-    pub fn deserialize<'a, D>(deserializer: D) -> Result<ExecutionError, D::Error>
+impl<'de> Deserialize<'de> for ExecutionError {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'a>,
+        D: Deserializer<'de>,
     {
         ExecutionStatus::deserialize(deserializer).and_then(|status| {
             status

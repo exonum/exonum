@@ -29,14 +29,35 @@
 //! [`BlockWithTransactions`]: struct.BlockWithTransactions.html
 //! [testkit]: https://docs.rs/exonum-testkit/latest/exonum_testkit/struct.TestKit.html
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc,
+    // False positive: WebSocket
+    clippy::doc_markdown
+)]
+
 use chrono::{DateTime, Utc};
 use exonum::{
-    blockchain::{Block, CallInBlock, Schema, TxLocation},
+    blockchain::{Block, CallInBlock, CallProof, Schema, TxLocation},
     crypto::Hash,
     helpers::Height,
-    merkledb::{ListProof, MapProof, ObjectHash, Snapshot},
+    merkledb::{ListProof, ObjectHash, Snapshot},
     messages::{AnyTx, Precommit, Verified},
-    runtime::{ExecutionError, ExecutionErrorSerde, ExecutionStatus},
+    runtime::{ExecutionError, ExecutionStatus},
 };
 use serde::{Serialize, Serializer};
 use serde_derive::*;
@@ -171,10 +192,11 @@ impl<'a> BlockInfo<'a> {
     /// proof will not contain entries. To distinguish between two cases, one can inspect
     /// the number of transactions in the block or IDs of the active services when the block
     /// was executed.
-    pub fn error_proof(&self, call_location: CallInBlock) -> MapProof<CallInBlock, ExecutionError> {
+    pub fn call_proof(&self, call_location: CallInBlock) -> CallProof {
         self.explorer
             .schema
-            .call_errors(self.header.height)
+            .call_records(self.header.height)
+            .unwrap() // safe: we know that the block exists
             .get_proof(call_location)
     }
 
@@ -201,11 +223,13 @@ impl<'a> BlockInfo<'a> {
             .iter()
             .map(|tx_hash| explorer.committed_transaction(tx_hash, None))
             .collect();
-        let errors: Vec<_> = self
+        let errors = self
             .explorer
             .schema
-            .call_errors(header.height)
-            .iter()
+            .call_records(header.height)
+            .expect("No call record for a committed block");
+        let errors: Vec<_> = errors
+            .errors()
             .map(|(location, error)| ErrorWithLocation { location, error })
             .collect();
 
@@ -263,6 +287,7 @@ impl<'a, 'r: 'a> IntoIterator for &'r BlockInfo<'a> {
 
 /// Information about a block in the blockchain with info on transactions eagerly loaded.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct BlockWithTransactions {
     /// Block header as recorded in the blockchain.
     #[serde(rename = "block")]
@@ -277,11 +302,11 @@ pub struct BlockWithTransactions {
 
 /// Execution error together with its location within the block.
 #[derive(Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct ErrorWithLocation {
     /// Location of the error.
     pub location: CallInBlock,
     /// Error data.
-    #[serde(with = "ExecutionErrorSerde")]
     pub error: ExecutionError,
 }
 
@@ -515,7 +540,6 @@ impl CommittedTransaction {
 ///     fn create_wallet(&self, ctx: Ctx, username: String) -> Self::Output;
 /// }
 ///
-/// # fn main() {
 /// // Create a signed transaction.
 /// let keypair = KeyPair::random();
 /// const SERVICE_ID: InstanceId = 100;
@@ -527,10 +551,10 @@ impl CommittedTransaction {
 /// });
 /// let parsed: TransactionInfo = serde_json::from_value(json).unwrap();
 /// assert!(parsed.is_in_pool());
-/// # }
 /// ```
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum TransactionInfo {
     /// Transaction is in the memory pool, but not yet committed to the blockchain.
     InPool {
@@ -625,9 +649,9 @@ impl<'a> BlockchainExplorer<'a> {
         block_height: Height,
         call_location: CallInBlock,
     ) -> Result<(), ExecutionError> {
-        match self.schema.call_errors(block_height).get(&call_location) {
+        match self.schema.call_records(block_height) {
+            Some(errors) => errors.get(call_location),
             None => Ok(()),
-            Some(e) => Err(e),
         }
     }
 
@@ -706,18 +730,18 @@ impl<'a> BlockchainExplorer<'a> {
     /// if there is no such block.
     pub fn block_with_txs(&self, height: Height) -> Option<BlockWithTransactions> {
         let txs_table = self.schema.block_transactions(height);
-        let block_proof = self.schema.block_and_precommits(height);
-        let errors = self.schema.call_errors(height);
+        let block_proof = self.schema.block_and_precommits(height)?;
+        let errors = self.schema.call_records(height)?;
 
-        block_proof.map(|proof| BlockWithTransactions {
-            header: proof.block,
-            precommits: proof.precommits,
+        Some(BlockWithTransactions {
+            header: block_proof.block,
+            precommits: block_proof.precommits,
             transactions: txs_table
                 .iter()
                 .map(|tx_hash| self.committed_transaction(&tx_hash, None))
                 .collect(),
             errors: errors
-                .iter()
+                .errors()
                 .map(|(location, error)| ErrorWithLocation { location, error })
                 .collect(),
         })
@@ -809,7 +833,7 @@ pub fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Ut
     if precommits.is_empty() {
         UNIX_EPOCH.into()
     } else {
-        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time()).collect();
+        let mut times: Vec<_> = precommits.iter().map(|p| p.payload().time).collect();
         times.sort();
         times[times.len() / 2]
     }

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
-use exonum_testkit::{ApiKind, TestKit, TestKitApi, TestKitBuilder};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder};
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
 
@@ -29,18 +29,19 @@ mod tests;
 pub fn testkit_with_rust_service() -> (TestKit, TestKitApi) {
     let mut testkit = TestKitBuilder::validator()
         .with_logger()
-        .with_default_rust_service(TestRuntimeApiService)
+        .with(Spec::new(TestRuntimeApiService).with_default_instance())
         .build();
     let api = testkit.api();
     (testkit, api)
 }
 
 /// Validates a list of proto descriptions retrieved from the rust-runtime API.
-pub fn assert_exonum_core_protos(api: &TestKitApi) {
+pub async fn assert_exonum_core_protos(api: &TestKitApi) {
     let response: HashSet<String> = api
         .public(ApiKind::RustRuntime)
         .query(&ProtoSourcesQuery::Core)
         .get::<Vec<ProtoSourceFile>>("proto-sources")
+        .await
         .expect("Rust runtime Api unexpectedly failed")
         .into_iter()
         .map(|proto_source| proto_source.name)
@@ -65,68 +66,4 @@ pub fn assert_exonum_core_protos(api: &TestKitApi) {
     .collect();
 
     assert_eq!(response, expected_files);
-}
-
-#[test]
-fn core_protos_with_service() {
-    let (_, api) = testkit_with_rust_service();
-    assert_exonum_core_protos(&api);
-}
-
-#[test]
-#[should_panic] // TODO: Remove `should_panic` after fix (ECR-3948)
-fn core_protos_without_services() {
-    let mut testkit = TestKitBuilder::validator().build();
-    assert_exonum_core_protos(&testkit.api());
-}
-
-/// Rust-runtime api returns correct source files of the specified artifact.
-#[test]
-fn service_protos_with_service() {
-    let (_, api) = testkit_with_rust_service();
-
-    let proto_files: Vec<ProtoSourceFile> = api
-        .public(ApiKind::RustRuntime)
-        .query(&ProtoSourcesQuery::Artifact {
-            name: "test-runtime-api".to_owned(),
-            version: "0.0.1".parse().unwrap(),
-        })
-        .get("proto-sources")
-        .expect("Rust runtime Api unexpectedly failed");
-
-    const EXPECTED_CONTENT: &str = include_str!("proto/tests.proto");
-
-    assert_eq!(proto_files.len(), 1);
-    assert_eq!(proto_files[0].name, "tests.proto".to_string());
-    assert_eq!(proto_files[0].content, EXPECTED_CONTENT.to_string());
-}
-
-/// Rust-runtime API should return error in case of an incorrect artifact.
-#[test]
-fn service_protos_with_incorrect_service() {
-    use exonum::runtime::{ArtifactId, RuntimeIdentifier};
-
-    let (_, api) = testkit_with_rust_service();
-
-    let artifact_id = ArtifactId::new(
-        RuntimeIdentifier::Rust,
-        "invalid-service",
-        "0.0.1".parse().unwrap(),
-    )
-    .unwrap();
-    let artifact_query = ProtoSourcesQuery::Artifact {
-        name: artifact_id.name.clone(),
-        version: artifact_id.version.clone(),
-    };
-    let error = api
-        .public(ApiKind::RustRuntime)
-        .query(&artifact_query)
-        .get::<Vec<ProtoSourceFile>>("proto-sources")
-        .expect_err("Rust runtime Api returns a fake source!");
-
-    assert_eq!(&error.body.title, "Artifact sources not found");
-    assert_eq!(
-        error.body.detail,
-        format!("Unable to find sources for artifact {}", artifact_id)
-    );
 }

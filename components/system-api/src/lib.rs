@@ -18,7 +18,6 @@
 //!
 //! REST API of the service is documented in the corresponding modules:
 //!
-//! - [public API](public/index.html)
 //! - [private API](private/index.html)
 //!
 //! # Examples
@@ -34,6 +33,7 @@
 //! use exonum_node::{NodeBuilder, NodeConfig};
 //! use exonum_system_api::SystemApiPlugin;
 //!
+//! # async fn run_node() -> anyhow::Result<()> {
 //! let node_config: NodeConfig = // ...
 //! #    unimplemented!();
 //! let node_keys = Keys::random();
@@ -45,41 +45,60 @@
 //!     .with_plugin(SystemApiPlugin)
 //!     // Add runtimes etc...
 //!     .build();
-//! node.run().unwrap();
+//! node.run().await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! Use with the testkit:
 //!
 //! ```
-//! use exonum_system_api::{private::NodeInfo, SystemApiPlugin};
+//! use exonum_system_api::{private::{ConsensusStatus, NodeInfo}, SystemApiPlugin};
 //! use exonum_testkit::{ApiKind, TestKitBuilder};
 //!
+//! # #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with_plugin(SystemApiPlugin)
 //!     .build();
 //! let api = testkit.api();
-//! let info: NodeInfo = api.private(ApiKind::System).get("v1/network").unwrap();
-//! assert!(info.core_version.is_some());
+//! let info: NodeInfo = api.private(ApiKind::System)
+//!     .get("v1/info")
+//!     .await?;
+//! assert_eq!(info.consensus_status, ConsensusStatus::Enabled);
+//! Ok(())
+//! # }
 //! ```
 //!
 //! Note that the testkit does not emulate the functionality of the node completely; it does
 //! not update the `SharedNodeState`.
 
-#![deny(
-    unsafe_code,
-    bare_trait_objects,
+#![warn(
+    missing_debug_implementations,
     missing_docs,
-    missing_debug_implementations
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc
 )]
 
 pub mod private;
-pub mod public;
 
 use exonum::blockchain::{ApiSender, Blockchain};
 use exonum_api::ApiBuilder;
 use exonum_node::{ExternalMessage, NodePlugin, PluginApiContext, SharedNodeState};
 
-use crate::{private::SystemApi as PrivateSystemApi, public::SystemApi};
+use crate::private::SystemApi;
 
 fn system_api(
     blockchain: Blockchain,
@@ -87,8 +106,7 @@ fn system_api(
     shared_api_state: SharedNodeState,
 ) -> ApiBuilder {
     let mut builder = ApiBuilder::new();
-    PrivateSystemApi::new(sender, shared_api_state.clone()).wire(builder.private_scope());
-    SystemApi::new(blockchain, shared_api_state).wire(builder.public_scope());
+    SystemApi::new(blockchain, sender, shared_api_state).wire(builder.private_scope());
     builder
 }
 

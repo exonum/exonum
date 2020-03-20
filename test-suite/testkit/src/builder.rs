@@ -15,19 +15,19 @@
 //! Testkit builder.
 
 use exonum::{
-    blockchain::config::{GenesisConfigBuilder, InstanceInitParams},
+    blockchain::config::GenesisConfigBuilder,
     crypto,
     helpers::ValidatorId,
     keys::Keys,
-    merkledb::{BinaryValue, TemporaryDB},
-    runtime::{migrations::MigrateData, ArtifactId, RuntimeInstance, WellKnownRuntime},
+    merkledb::TemporaryDB,
+    runtime::{RuntimeInstance, WellKnownRuntime},
 };
 #[cfg(feature = "exonum-node")]
 use exonum_node::NodePlugin;
-use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder, ServiceFactory};
-use futures::sync::mpsc;
+use exonum_rust_runtime::{spec::Deploy, RustRuntime, RustRuntimeBuilder};
+use futures::channel::mpsc;
 
-use std::{collections::HashMap, net::SocketAddr};
+use std::net::SocketAddr;
 
 use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 
@@ -38,7 +38,7 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// ```
 /// # use exonum::{crypto::Hash, merkledb::Snapshot, runtime::BlockchainData};
 /// # use exonum_derive::{exonum_interface, ServiceFactory, ServiceDispatcher};
-/// # use exonum_testkit::TestKitBuilder;
+/// # use exonum_testkit::{Spec, TestKitBuilder};
 /// # use exonum_rust_runtime::{Service, ServiceFactory};
 /// #
 /// # const SERVICE_ID: u32 = 1;
@@ -51,18 +51,13 @@ use crate::{ApiNotifierChannel, TestKit, TestNetwork};
 /// # pub struct ExampleService;
 /// # impl Service for ExampleService {}
 /// #
-/// # fn main() {
-/// let service = ExampleService;
-/// let artifact = service.artifact_id();
+/// let service = Spec::new(ExampleService).with_instance(SERVICE_ID, "example", ());
 /// let mut testkit = TestKitBuilder::validator()
-///     .with_artifact(artifact.clone())
-///     .with_instance(artifact.into_default_instance(SERVICE_ID, "example"))
-///     .with_rust_service(service)
+///     .with(service)
 ///     .with_validators(4)
 ///     .build();
 /// testkit.create_block();
 /// // Other test code
-/// # }
 /// ```
 #[derive(Debug)]
 pub struct TestKitBuilder {
@@ -74,8 +69,7 @@ pub struct TestKitBuilder {
     additional_runtimes: Vec<RuntimeInstance>,
     #[cfg(feature = "exonum-node")]
     plugins: Vec<Box<dyn NodePlugin>>,
-    instances: Vec<InstanceInitParams>,
-    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    genesis_config: GenesisConfigBuilder,
 }
 
 impl TestKitBuilder {
@@ -117,46 +111,11 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds a Rust service to the testkit.
-    pub fn with_rust_service(mut self, service: impl ServiceFactory) -> Self {
-        self.rust_runtime = self.rust_runtime.with_factory(service);
+    /// Adds a deploy spec to this builder. The spec may contain artifacts and service instances
+    /// to deploy at the blockchain start.
+    pub fn with(mut self, spec: impl Deploy) -> Self {
+        spec.deploy(&mut self.genesis_config, &mut self.rust_runtime);
         self
-    }
-
-    /// Adds a Rust service with support of migrations to the testkit.
-    ///
-    /// # Stability
-    ///
-    /// This method is unstable because of instability of migration interfaces in the core crate.
-    pub fn with_migrating_rust_service<S>(mut self, service: S) -> Self
-    where
-        S: ServiceFactory + MigrateData,
-    {
-        self.rust_runtime = self.rust_runtime.with_migrating_factory(service);
-        self
-    }
-
-    /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
-    /// artifact and default instance are added implicitly.
-    pub fn with_default_rust_service(self, service: impl DefaultInstance) -> Self {
-        self.with_artifact(service.artifact_id())
-            .with_instance(service.default_instance())
-            .with_rust_service(service)
-    }
-
-    /// Adds a Rust service that has default instance configuration to the testkit. Corresponding
-    /// artifact and default instance are added implicitly.
-    ///
-    /// # Stability
-    ///
-    /// This method is unstable because of instability of migration interfaces in the core crate.
-    pub fn with_default_migrating_rust_service<S>(self, service: S) -> Self
-    where
-        S: DefaultInstance + MigrateData,
-    {
-        self.with_artifact(service.artifact_id())
-            .with_instance(service.default_instance())
-            .with_migrating_rust_service(service)
     }
 
     /// Adds a node plugin to the testkit.
@@ -195,33 +154,6 @@ impl TestKitBuilder {
         self
     }
 
-    /// Adds instances descriptions to the testkit that will be used for specification of builtin
-    /// services of testing blockchain.
-    pub fn with_instance(mut self, instance: impl Into<InstanceInitParams>) -> Self {
-        self.instances.push(instance.into());
-        self
-    }
-
-    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
-    /// already added.
-    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
-        self.with_parametric_artifact(artifact, ())
-    }
-
-    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
-    /// given id is already added.
-    pub fn with_parametric_artifact(
-        mut self,
-        artifact: impl Into<ArtifactId>,
-        payload: impl BinaryValue,
-    ) -> Self {
-        let artifact = artifact.into();
-        self.artifacts
-            .entry(artifact)
-            .or_insert_with(|| payload.into_bytes());
-        self
-    }
-
     /// Creates the testkit.
     pub fn build(mut self) -> TestKit {
         if self.logger {
@@ -233,23 +165,11 @@ impl TestKitBuilder {
         let network = self
             .test_network
             .unwrap_or_else(|| TestNetwork::with_our_role(our_validator_id, 1));
-        let genesis = network.genesis_config();
 
         let rust_runtime = self.rust_runtime.build(self.api_notifier_channel.0.clone());
         self.additional_runtimes.push(rust_runtime.into());
-
-        let genesis_config_builder = self.instances.into_iter().fold(
-            GenesisConfigBuilder::with_consensus_config(genesis),
-            |builder, instance| builder.with_instance(instance),
-        );
-
-        let genesis_config = self
-            .artifacts
-            .into_iter()
-            .fold(genesis_config_builder, |builder, (artifact, payload)| {
-                builder.with_parametric_artifact(artifact, payload)
-            })
-            .build();
+        let mut genesis_config = self.genesis_config.build();
+        genesis_config.consensus_config = network.consensus_config();
 
         #[cfg(feature = "exonum-node")]
         {
@@ -284,9 +204,9 @@ impl TestKitBuilder {
     /// transactions is thus to use the testkit API.
     ///
     /// See [`server` module](server/index.html) for the description of testkit server API.
-    pub fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
+    pub async fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let testkit = self.build();
-        testkit.run(public_api_address, private_api_address);
+        testkit.run(public_api_address, private_api_address).await
     }
 
     // Creates testkit for validator or auditor node.
@@ -301,8 +221,7 @@ impl TestKitBuilder {
             additional_runtimes: vec![],
             #[cfg(feature = "exonum-node")]
             plugins: vec![],
-            instances: vec![],
-            artifacts: HashMap::new(),
+            genesis_config: GenesisConfigBuilder::default(),
         }
     }
 }

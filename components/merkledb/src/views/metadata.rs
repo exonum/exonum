@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::{ensure, format_err};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
 use exonum_crypto::Hash;
-use failure::{self, ensure, format_err};
 use num_traits::FromPrimitive;
 use serde_derive::{Deserialize, Serialize};
 
@@ -67,7 +67,7 @@ impl IndexType {
     /// Checks if the index of this type is Merkelized.
     pub fn is_merkelized(self) -> bool {
         match self {
-            IndexType::ProofList | IndexType::ProofMap | IndexType::ProofEntry => true,
+            Self::ProofList | Self::ProofMap | Self::ProofEntry => true,
             _ => false,
         }
     }
@@ -99,6 +99,7 @@ impl BinaryAttribute for () {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl BinaryAttribute for u64 {
     fn size(&self) -> usize {
         mem::size_of_val(self)
@@ -123,7 +124,7 @@ impl BinaryAttribute for Hash {
     }
 
     fn read(buffer: &[u8]) -> Result<Self, Error> {
-        Hash::from_slice(buffer).ok_or_else(|| {
+        Self::from_slice(buffer).ok_or_else(|| {
             Error::new(
                 std::io::ErrorKind::InvalidInput,
                 format!(
@@ -153,7 +154,7 @@ impl BinaryAttribute for Vec<u8> {
 
 impl Default for IndexType {
     fn default() -> Self {
-        IndexType::Unknown
+        Self::Unknown
     }
 }
 
@@ -196,7 +197,7 @@ where
         buf
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut bytes = bytes.as_ref();
 
         let identifier = NonZeroU64::new(bytes.read_u64::<LittleEndian>()?)
@@ -244,11 +245,13 @@ impl<V> IndexMetadata<V> {
     /// MerkleDB assigns a unique numeric ID for each fully-qualified index name.
     ///
     /// MerkleDB never re-uses the identifiers.
+    #[allow(clippy::doc_markdown)] // Ticks around MerkleDB in this context is redundant.
     pub fn identifier(&self) -> NonZeroU64 {
         self.identifier
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl IndexMetadata {
     fn convert<V: BinaryAttribute>(self) -> IndexMetadata<V> {
         let index_type = self.index_type;

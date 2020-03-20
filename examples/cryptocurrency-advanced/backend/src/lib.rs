@@ -23,6 +23,7 @@ extern crate serde_derive; // Required for Protobuf.
 pub use crate::{schema::Schema, transactions::CryptocurrencyInterface};
 
 pub mod api;
+pub mod migrations;
 pub mod proto;
 pub mod schema;
 pub mod transactions;
@@ -40,7 +41,7 @@ pub const INITIAL_BALANCE: u64 = 100;
 /// Cryptocurrency service implementation.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
 #[service_dispatcher(implements("CryptocurrencyInterface"))]
-#[service_factory(proto_sources = "proto")]
+#[service_factory(artifact_name = "exonum-cryptocurrency", proto_sources = "proto")]
 pub struct CryptocurrencyService;
 
 impl Service for CryptocurrencyService {

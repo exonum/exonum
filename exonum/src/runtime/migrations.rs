@@ -44,10 +44,30 @@
 //! Similar to other service lifecycle events, data migrations are managed by the [dispatcher],
 //! but are controlled by the [supervisor service].
 //!
-//! # Migration Workflow
+//! # Migration Types
 //!
-//! For a migration to start, the targeted service must be stopped, and a newer version of
+//! Exonum recognizes two kinds of migrations:
+//!
+//! - **Fast-forward migrations** synchronously change the version
+//!   of the artifact associated with the service. A fast-forward migration is performed
+//!   if the updated artifact signals that it is compatible with the old service data
+//!   by returning `Ok(None)` from [`Runtime::migrate()`].
+//! - Migrations that require changing data layout via [`MigrationScript`]s are referred to
+//!   as **async migrations**.
+//!
+//! For a migration to start, the targeted service must be stopped or frozen, and a newer version of
 //! the service artifact needs to be deployed across the network.
+//!
+//! # Fast-Forward Migration Workflow
+//!
+//! Fast-forward migrations do not require any special workflow to agree migration
+//! outcome among nodes; indeed, the outcome is agreed upon via the consensus algorithm.
+//! The artifact associated with the service instance is changed instantly.
+//! The service status is changed to stopped, regardless of the status before
+//! the migration. This is because a new artifact might want to prepare service data
+//! before the artifact can use it.
+//!
+//! # Async Migration Workflow
 //!
 //! 1. Migration is *initiated* by a call from a supervisor. Once a block with this call is merged,
 //!   all nodes in the network retrieve the migration script via [`Runtime::migrate()`]
@@ -94,6 +114,7 @@
 //! has reported an error during migration or there is divergence among reported migration results.
 //!
 //! [`Runtime`]: ../trait.Runtime.html
+//! [`Runtime::migrate()`]: ../trait.Runtime.html#method.migrate
 //! [dispatcher]: ../index.html
 //! [supervisor service]: ../index.html#supervisor-service
 //! [`MigrationScript`]: struct.MigrationScript.html
@@ -107,8 +128,8 @@
 pub use super::types::{InstanceMigration, MigrationStatus};
 
 use exonum_merkledb::migration::{self as db_migration, MigrationHelper};
-use failure::Fail;
 use semver::Version;
+use thiserror::Error;
 
 use std::{collections::BTreeMap, fmt};
 
@@ -116,38 +137,43 @@ use crate::runtime::{CoreError, ExecutionError, ExecutionFail, InstanceSpec};
 
 type MigrationLogic = dyn FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send;
 
+/// Types of data migrations.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum MigrationType {
+    /// Fast-forward migration, that is, migration that does not actually change the data layout
+    /// of a service.
+    FastForward,
+    /// Asynchronous data migration that can change the data layout of a service.
+    Async,
+}
+
 /// Errors that can occur in a migration script.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum MigrationError {
     /// Error has occurred in the helper code, due to either a database-level failure (e.g.,
     /// we've run out of disc space) or the migration script getting aborted.
     ///
     /// Scripts should not instantiate errors of this kind.
-    #[fail(display = "{}", _0)]
-    Helper(#[fail(cause)] db_migration::MigrationError),
+    #[error("{}", _0)]
+    Helper(#[source] db_migration::MigrationError),
 
     /// Custom error signalling that the migration cannot be completed.
-    #[fail(display = "{}", _0)]
+    #[error("{}", _0)]
     Custom(String),
-
-    #[doc(hidden)]
-    #[fail(display = "")] // Never actually generated.
-    __NonExhaustive,
 }
 
 impl MigrationError {
     /// Creates a new migration error.
     pub fn new(cause: impl fmt::Display) -> Self {
-        MigrationError::Custom(cause.to_string())
+        Self::Custom(cause.to_string())
     }
 }
 
 impl From<db_migration::MigrationError> for MigrationError {
     fn from(err: db_migration::MigrationError) -> Self {
-        MigrationError::Helper(err)
+        Self::Helper(err)
     }
 }
 
@@ -236,6 +262,7 @@ impl MigrationScript {
 
 /// Context of a migration.
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct MigrationContext {
     /// The migration helper allowing to access service data and prepare migrated data.
     pub helper: MigrationHelper,
@@ -254,9 +281,6 @@ pub struct MigrationContext {
     /// [`MigrationScript`]: struct.MigrationScript.html
     /// [`MigrateData`]: trait.MigrateData.html
     pub data_version: Version,
-
-    /// No-op field for forward compatibility.
-    non_exhaustive: (),
 }
 
 impl MigrationContext {
@@ -271,7 +295,6 @@ impl MigrationContext {
             helper,
             instance_spec,
             data_version,
-            non_exhaustive: (),
         }
     }
 }
@@ -313,15 +336,12 @@ pub trait MigrateData {
 
 /// Errors that can occur when initiating a data migration. This error indicates that the migration
 /// cannot be started.
-///
-/// This type is not intended to be exhaustively matched. It can be extended in the future
-/// without breaking the semver compatibility.
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum InitMigrationError {
     /// The start version is too far in the past.
-    #[fail(
-        display = "The provided start version is too far in the past; \
-                   the minimum supported version is {}",
+    #[error(
+        "The provided start version is too far in the past; the minimum supported version is {}",
         min_supported_version
     )]
     OldStartVersion {
@@ -330,8 +350,8 @@ pub enum InitMigrationError {
     },
 
     /// The start version is in the future.
-    #[fail(
-        display = "The provided start version is greater than the maximum supported version ({})",
+    #[error(
+        "The provided start version is greater than the maximum supported version ({})",
         max_supported_version
     )]
     FutureStartVersion {
@@ -341,16 +361,12 @@ pub enum InitMigrationError {
 
     /// The start version falls in the supported lower / upper bounds on versions,
     /// but is not supported itself. This can be the case, e.g., for pre-releases.
-    #[fail(display = "Start version is not supported: {}", _0)]
+    #[error("Start version is not supported: {}", _0)]
     UnsupportedStart(String),
 
     /// Data migrations are not supported by the artifact.
-    #[fail(display = "Data migrations are not supported by the artifact")]
+    #[error("Data migrations are not supported by the artifact")]
     NotSupported,
-
-    #[doc(hidden)]
-    #[fail(display = "")] // Never actually generated.
-    __NonExhaustive,
 }
 
 impl From<InitMigrationError> for ExecutionError {
@@ -459,7 +475,7 @@ impl From<InitMigrationError> for ExecutionError {
 /// }
 ///
 /// // Check that the migration scripts are selected properly.
-/// # fn main() -> Result<(), failure::Error> {
+/// # fn main() -> anyhow::Result<()> {
 /// let scripts = TokenService.migration_scripts(&Version::new(0, 3, 0))?;
 /// assert_eq!(scripts.len(), 2);
 /// assert_eq!(*scripts[0].end_version(), Version::new(0, 4, 0));

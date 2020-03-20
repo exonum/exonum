@@ -48,7 +48,6 @@ impl TimeProvider for SystemTimeProvider {
 /// use exonum_testkit::TestKit;
 /// use exonum_time::{MockTimeProvider, TimeSchema, TimeServiceFactory};
 ///
-/// # fn main() {
 /// let service_name = "time";
 /// let service_id = 12;
 ///
@@ -69,7 +68,6 @@ impl TimeProvider for SystemTimeProvider {
 ///     Utc.timestamp(15, 0),
 ///     schema.time.get().unwrap()
 /// );
-/// # }
 /// ```
 ///
 /// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
@@ -119,14 +117,16 @@ impl TimeProvider for MockTimeProvider {
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl From<MockTimeProvider> for Arc<dyn TimeProvider> {
     fn from(time_provider: MockTimeProvider) -> Self {
-        Arc::new(time_provider) as Arc<dyn TimeProvider>
+        Arc::new(time_provider)
     }
 }
 
+#[allow(clippy::use_self)] // false positive
 impl From<SystemTimeProvider> for Arc<dyn TimeProvider> {
     fn from(time_provider: SystemTimeProvider) -> Self {
-        Arc::new(time_provider) as Arc<dyn TimeProvider>
+        Arc::new(time_provider)
     }
 }

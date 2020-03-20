@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Shows how to provide database data migration with the `MigrationHelper`.
+//! This example shows how to provide database data migration with the `MigrationHelper`.
 //! `MigrationHelper` provides methods to get access to the old
 //! and new versions of the data, and to merge changes, so we don't need to do it manually.
 //!
-//! The main logic of this example is described in the `migration_with_helper`
-//! and `migrate_wallets` functions.
+//! The main logic is described in the `migration_with_helper` and `migrate_wallets` functions.
 //!
 //! The main points of this example are:
 //!
-//! - We are creating `MigrationHelper` for the DB that allows us to get access
-//!   to the old and new data.
-//! - We are using `MigrationHelper::finish` to merge the changes to the database.
-//! - Data migration is performed by direct access to old and new schemas.
+//! - We create `MigrationHelper` for the DB that allows us to access
+//!   old and new data in a structured way.
+//! - We use `MigrationHelper::finish()` to merge the changes to the database.
 //!
 //! For the description of the common migration scenario, see the `migration` module docs.
 
@@ -32,15 +30,14 @@ use exonum_merkledb::{migration::MigrationHelper, Database, ObjectHash};
 
 use std::sync::Arc;
 
-use migration::{perform_migration, v1, v2};
-
+use crate::migration::{perform_migration, v1, v2};
 mod migration;
 
-/// Provides migration of wallets with schema and `MigrationHelper`.
+/// Migrates wallets using `MigrationHelper`.
 ///
-/// `Wallet::public_key` field will be removed.
-/// `Wallet::history_hash` field will be added.
-/// Wallets and history from username Eve will be removed.
+/// - `Wallet.public_key` field is removed.
+/// - `Wallet.history_hash` field is added.
+/// - Wallets and wallet history belonging to the users named "Eve' are dropped.
 fn migrate_wallets(helper: &MigrationHelper) {
     let old_schema = v1::Schema::new(helper.old_data());
     let mut new_schema = v2::Schema::new(helper.new_data());
@@ -77,10 +74,9 @@ fn migration_with_helper(db: Arc<dyn Database>) {
     let helper = MigrationHelper::new(db.clone(), "test");
 
     {
-        let new_data = helper.new_data();
         let old_data = helper.old_data();
-
         let old_schema = v1::Schema::new(old_data);
+        let new_data = helper.new_data();
         let mut new_schema = v2::Schema::new(new_data.clone());
 
         // Move `ticker` and `divisibility` to `config`.
@@ -94,12 +90,7 @@ fn migration_with_helper(db: Arc<dyn Database>) {
         new_data.create_tombstone("divisibility");
     }
 
-    // Migrate wallets using schema:
-    // `Wallet::public_key` field will be removed.
-    // `Wallet::history_hash` field will be added.
-    // Wallets and history from username Eve will be removed.
     migrate_wallets(&helper);
-
     // Call `MigrationHelper::finish` to merge changes to the database.
     helper.finish().expect("Migration finish failed.");
 }

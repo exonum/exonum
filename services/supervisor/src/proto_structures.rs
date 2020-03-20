@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum::{
     blockchain::ConsensusConfig,
     crypto::Hash,
@@ -33,14 +34,23 @@ use super::{mode::Mode, proto};
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Config")]
+#[non_exhaustive]
 pub struct SupervisorConfig {
     /// Supervisor operating mode.
     pub mode: Mode,
 }
 
+impl SupervisorConfig {
+    /// Creates a new configuration with the specified supervisor mode.
+    pub fn new(mode: Mode) -> Self {
+        Self { mode }
+    }
+}
+
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::DeployRequest")]
+#[non_exhaustive]
 pub struct DeployRequest {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -50,10 +60,28 @@ pub struct DeployRequest {
     pub deadline_height: Height,
 }
 
+impl DeployRequest {
+    /// Creates a deploy request with an empty artifact specification.
+    pub fn new(artifact: ArtifactId, deadline_height: Height) -> Self {
+        Self {
+            artifact,
+            deadline_height,
+            spec: Vec::new(),
+        }
+    }
+
+    /// Sets the artifact specification for this request.
+    pub fn with_spec(mut self, spec: Vec<u8>) -> Self {
+        self.spec = spec;
+        self
+    }
+}
+
 /// Confirmation that artifact deployment has ended for a validator.
 /// Result can be either successful or unsuccessful.
 #[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "proto::DeployResult")]
+#[non_exhaustive]
 pub struct DeployResult {
     /// Corresponding request.
     pub request: DeployRequest,
@@ -61,10 +89,11 @@ pub struct DeployResult {
     pub result: ExecutionStatus,
 }
 
-/// Request for the start service instance.
+/// Request to start a new service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::StartService")]
+#[non_exhaustive]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
@@ -72,28 +101,6 @@ pub struct StartService {
     pub name: String,
     /// Instance configuration.
     pub config: Vec<u8>,
-}
-
-/// Request for the stop existing service instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::StopService")]
-pub struct StopService {
-    /// Corresponding service instance ID.
-    pub instance_id: InstanceId,
-}
-
-/// Request for the resume previously stopped service instance.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::ResumeService")]
-pub struct ResumeService {
-    /// Corresponding service instance ID.
-    pub instance_id: InstanceId,
-    /// Updated artifact ID.
-    pub artifact: ArtifactId,
-    /// Raw bytes representation of service resume parameters.
-    pub params: Vec<u8>,
 }
 
 impl StartService {
@@ -106,11 +113,53 @@ impl StartService {
     }
 }
 
+/// Request to stop an existing service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::StopService")]
+#[non_exhaustive]
+pub struct StopService {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+}
+
+/// Request to freeze an existing service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::FreezeService")]
+#[non_exhaustive]
+pub struct FreezeService {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+}
+
+/// Request to resume a previously stopped service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::ResumeService")]
+#[non_exhaustive]
+pub struct ResumeService {
+    /// Corresponding service instance ID.
+    pub instance_id: InstanceId,
+    /// Raw bytes representation of service resume parameters.
+    pub params: Vec<u8>,
+}
+
+/// Request to unload an unused artifact.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::UnloadArtifact")]
+pub struct UnloadArtifact {
+    /// Artifact identifier.
+    pub artifact_id: ArtifactId,
+}
+
 /// Configuration parameters of the certain service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ServiceConfig")]
+#[non_exhaustive]
 pub struct ServiceConfig {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
@@ -118,11 +167,22 @@ pub struct ServiceConfig {
     pub params: Vec<u8>,
 }
 
+impl ServiceConfig {
+    /// Creates a new configuration request.
+    pub fn new(instance_id: InstanceId, params: impl BinaryValue) -> Self {
+        Self {
+            instance_id,
+            params: params.into_bytes(),
+        }
+    }
+}
+
 /// Atomic configuration change.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigChange", rename(case = "snake_case"))]
+#[non_exhaustive]
 pub enum ConfigChange {
     /// New consensus config.
     Consensus(ConsensusConfig),
@@ -134,12 +194,17 @@ pub enum ConfigChange {
     StopService(StopService),
     /// Request to resume a previously stopped service instance.
     ResumeService(ResumeService),
+    /// Request to freeze an existing service instance.
+    FreezeService(FreezeService),
+    /// Request to unload an unused artifact.
+    UnloadArtifact(UnloadArtifact),
 }
 
 /// Request for the configuration change
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigPropose")]
+#[non_exhaustive]
 pub struct ConfigPropose {
     /// The height until which the update configuration procedure should be completed.
     pub actual_from: Height,
@@ -179,7 +244,7 @@ impl ConfigPropose {
         self
     }
 
-    /// Adds service start request to this proposal.
+    /// Adds a service start request to this proposal.
     pub fn start_service(
         mut self,
         artifact: ArtifactId,
@@ -196,36 +261,52 @@ impl ConfigPropose {
         self
     }
 
-    /// Adds service stop request to this proposal.
+    /// Adds a service stop request to this proposal.
     pub fn stop_service(mut self, instance_id: InstanceId) -> Self {
         self.changes
             .push(ConfigChange::StopService(StopService { instance_id }));
         self
     }
 
-    /// Adds service resume request to this proposal.
-    pub fn resume_service(
-        mut self,
-        instance_id: InstanceId,
-        artifact: ArtifactId,
-        params: impl BinaryValue,
-    ) -> Self {
+    /// Adds a service freeze request to this proposal.
+    pub fn freeze_service(mut self, instance_id: InstanceId) -> Self {
+        self.changes
+            .push(ConfigChange::FreezeService(FreezeService { instance_id }));
+        self
+    }
+
+    /// Adds a service resume request to this proposal.
+    pub fn resume_service(mut self, instance_id: InstanceId, params: impl BinaryValue) -> Self {
         self.changes
             .push(ConfigChange::ResumeService(ResumeService {
                 instance_id,
-                artifact,
                 params: params.into_bytes(),
             }));
         self
     }
+
+    /// Adds an artifact unloading request to this proposal.
+    pub fn unload_artifact(mut self, artifact_id: ArtifactId) -> Self {
+        self.changes
+            .push(ConfigChange::UnloadArtifact(UnloadArtifact { artifact_id }));
+        self
+    }
 }
 
-/// Confirmation vote for the configuration change
+/// Confirmation vote for the configuration change.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigVote")]
+#[non_exhaustive]
 pub struct ConfigVote {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,
+}
+
+impl ConfigVote {
+    /// Creates a vote for the proposal with the specified hash.
+    pub fn new(propose_hash: Hash) -> Self {
+        Self { propose_hash }
+    }
 }
 
 /// Request for the service data migration.
@@ -244,6 +325,7 @@ pub struct MigrationRequest {
 /// Result can be either successful or unsuccessful.
 #[derive(Debug, Clone, BinaryValue, ObjectHash, ProtobufConvert)]
 #[protobuf_convert(source = "proto::MigrationResult")]
+#[non_exhaustive]
 pub struct MigrationResult {
     /// Corresponding request.
     pub request: MigrationRequest,
@@ -251,11 +333,22 @@ pub struct MigrationResult {
     pub status: MigrationStatus,
 }
 
+impl MigrationResult {
+    /// Creates a migration result.
+    pub fn new(request: MigrationRequest, result: impl Into<MigrationStatus>) -> Self {
+        Self {
+            request,
+            status: result.into(),
+        }
+    }
+}
+
 /// Pending config change proposal entry
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigProposalWithHash")]
+#[non_exhaustive]
 pub struct ConfigProposalWithHash {
     /// Hash of configuration proposition.
     pub propose_hash: Hash,
@@ -268,6 +361,7 @@ impl_binary_key_for_binary_value! { DeployResult }
 impl_binary_key_for_binary_value! { StartService }
 impl_binary_key_for_binary_value! { StopService }
 impl_binary_key_for_binary_value! { ResumeService }
+impl_binary_key_for_binary_value! { UnloadArtifact }
 impl_binary_key_for_binary_value! { ConfigPropose }
 impl_binary_key_for_binary_value! { ConfigVote }
 impl_binary_key_for_binary_value! { MigrationRequest }
@@ -276,7 +370,9 @@ impl_serde_hex_for_binary_value! { DeployRequest }
 impl_serde_hex_for_binary_value! { DeployResult }
 impl_serde_hex_for_binary_value! { StartService }
 impl_serde_hex_for_binary_value! { StopService }
+impl_serde_hex_for_binary_value! { FreezeService }
 impl_serde_hex_for_binary_value! { ResumeService }
+impl_serde_hex_for_binary_value! { UnloadArtifact }
 impl_serde_hex_for_binary_value! { ConfigPropose }
 impl_serde_hex_for_binary_value! { ConfigVote }
 impl_serde_hex_for_binary_value! { MigrationRequest }

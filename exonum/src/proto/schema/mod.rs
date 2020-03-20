@@ -15,7 +15,7 @@
 //! Module with protobuf generated files from `schema/exonum`.
 
 // For rust-protobuf generated files.
-#![allow(bare_trait_objects, clippy::pedantic)]
+#![allow(bare_trait_objects, clippy::pedantic, clippy::nursery)]
 
 use crate::crypto::proto::*;
 use crate::merkledb::proto::*;

@@ -40,7 +40,7 @@ use syn::{Attribute, NestedMeta};
 /// - Protobuf serialization (used by default) via `exonum-proto` crate and its `ProtobufConvert`
 ///   trait.
 /// - `bincode` serialization via the eponymous crate. Switched on by the
-///   `#[binary_value(codec = "bincode")` attribute. Beware that `bincode` format is not as
+///   `#[binary_value(codec = "bincode")]` attribute. Beware that `bincode` format is not as
 ///   forward / backward compatible as Protobuf; hence, this codec is better suited for tests
 ///   than for production code.
 ///
@@ -105,7 +105,10 @@ pub fn binary_value(input: TokenStream) -> TokenStream {
 ///     pub balance: u64,
 /// }
 ///
-/// let wallet = Wallet::new();
+/// let wallet = Wallet {
+///     pub_key: KeyPair::random().public_key(),
+///     balance: 100,
+/// };
 /// let hash = wallet.object_hash();
 /// ```
 #[proc_macro_derive(ObjectHash)]
@@ -113,7 +116,7 @@ pub fn object_hash(input: TokenStream) -> TokenStream {
     db_traits::impl_object_hash(input)
 }
 
-/// Derive `FromAccess` trait.
+/// Derives `FromAccess` trait.
 ///
 /// This macro can be applied only to `struct`s, each field of which implements `FromAccess`
 /// itself (e.g., indexes, `Group`s, or `Lazy` indexes). The macro instantiates each field
@@ -180,7 +183,7 @@ pub fn service_dispatcher(input: TokenStream) -> TokenStream {
     service_dispatcher::impl_service_dispatcher(input)
 }
 
-/// Derive `ServiceFactory` trait.
+/// Derives `ServiceFactory` trait.
 ///
 /// # Container Attributes
 ///

@@ -20,8 +20,6 @@
 // As a result, this version is somewhat simplified and does not test big/random data sets,
 // but focuses more on different migration scenarios.
 
-// cspell:ignore Trillian, Vogon
-
 use exonum::{
     merkledb::{
         access::{Access, FromAccess},
@@ -145,7 +143,7 @@ pub struct MigrationServiceV05;
 impl Service for MigrationServiceV05 {}
 
 /// Service with mixed migrations (data migrations 0.1.0 -> 0.2.0, 0.2.0 -> 0.5.0, and
-/// fast-forward migration 0.5.0 -> 0.5.1)
+/// fast-forward migration 0.5.0 -> 0.5.1).
 #[derive(Debug, ServiceFactory, ServiceDispatcher)]
 #[service_factory(artifact_name = "exonum.test.Migration", artifact_version = "0.5.1")]
 pub struct MigrationServiceV05_1;

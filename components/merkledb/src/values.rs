@@ -16,9 +16,9 @@
 
 use std::{borrow::Cow, io::Read};
 
+use anyhow::{self, ensure, format_err};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use chrono::{DateTime, NaiveDateTime, Utc};
-use failure::{self, ensure, format_err};
 use rust_decimal::Decimal;
 use uuid::Uuid;
 
@@ -38,7 +38,6 @@ use super::ObjectHash;
 /// ```
 /// use std::{borrow::Cow, io::{Read, Write}};
 /// use byteorder::{LittleEndian, ReadBytesExt, ByteOrder};
-/// use failure;
 /// use exonum_merkledb::BinaryValue;
 ///
 /// #[derive(Clone)]
@@ -55,7 +54,7 @@ use super::ObjectHash;
 ///         buf
 ///     }
 ///
-///     fn from_bytes(bytes: Cow<[u8]>) -> Result<Self, failure::Error> {
+///     fn from_bytes(bytes: Cow<[u8]>) -> anyhow::Result<Self> {
 ///         let mut buf = bytes.as_ref();
 ///         let a = buf.read_i16::<LittleEndian>()?;
 ///         let b = buf.read_u32::<LittleEndian>()?;
@@ -66,14 +65,16 @@ use super::ObjectHash;
 pub trait BinaryValue: Sized {
     /// Serializes the given value to the vector of bytes.
     fn to_bytes(&self) -> Vec<u8>;
+
     /// Consumes and serializes the given value to the vector of bytes.
     /// This method is faster with the wrapped values,
     /// thus if you wouldn't use value after serialization use it.
     fn into_bytes(self) -> Vec<u8> {
         self.to_bytes()
     }
+
     /// Deserializes the value from the given bytes array.
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error>;
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self>;
 }
 
 impl_object_hash_for_binary_value! { (), bool, Vec<u8>, String, PublicKey, DateTime<Utc>, Uuid, Decimal }
@@ -86,7 +87,7 @@ macro_rules! impl_binary_value_scalar {
                 vec![*self as u8]
             }
 
-            fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+            fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
                 use byteorder::ReadBytesExt;
                 bytes.as_ref().$read().map_err(From::from)
             }
@@ -95,6 +96,7 @@ macro_rules! impl_binary_value_scalar {
         impl_object_hash_for_binary_value! { $type }
     };
     ($type:tt, $write:ident, $read:ident, $len:expr) => {
+        #[allow(clippy::use_self)]
         impl BinaryValue for $type {
             fn to_bytes(&self) -> Vec<u8> {
                 let mut v = vec![0; $len];
@@ -102,7 +104,7 @@ macro_rules! impl_binary_value_scalar {
                 v
             }
 
-            fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+            fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
                 use byteorder::ReadBytesExt;
                 bytes.as_ref().$read::<LittleEndian>().map_err(From::from)
             }
@@ -131,17 +133,18 @@ impl BinaryValue for () {
         Vec::default()
     }
 
-    fn from_bytes(_bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(_bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         Ok(())
     }
 }
 
+#[allow(clippy::use_self)] // false positives
 impl BinaryValue for bool {
     fn to_bytes(&self) -> Vec<u8> {
         vec![*self as u8]
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let value = bytes.as_ref();
         assert_eq!(value.len(), 1);
 
@@ -158,7 +161,7 @@ impl BinaryValue for Vec<u8> {
         self.clone()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         Ok(bytes.into_owned())
     }
 }
@@ -168,7 +171,7 @@ impl BinaryValue for String {
         self.as_bytes().to_owned()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         Self::from_utf8(bytes.into_owned()).map_err(From::from)
     }
 }
@@ -178,7 +181,7 @@ impl BinaryValue for Hash {
         self.as_ref().to_vec()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         Self::from_slice(bytes.as_ref()).ok_or_else(|| {
             format_err!("Unable to decode Hash from bytes: buffer size does not match")
         })
@@ -190,7 +193,7 @@ impl BinaryValue for PublicKey {
         self.as_ref().to_vec()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         Self::from_slice(bytes.as_ref()).ok_or_else(|| {
             format_err!("Unable to decode PublicKey from bytes: buffer size does not match")
         })
@@ -210,7 +213,7 @@ impl BinaryValue for DateTime<Utc> {
         buffer
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut value = bytes.as_ref();
         let secs = value.read_i64::<LittleEndian>()?;
         let nanos = value.read_u32::<LittleEndian>()?;
@@ -226,7 +229,7 @@ impl BinaryValue for Uuid {
         self.as_bytes().to_vec()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         Self::from_slice(bytes.as_ref()).map_err(From::from)
     }
 }
@@ -236,7 +239,7 @@ impl BinaryValue for Decimal {
         self.serialize().to_vec()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut value = bytes.as_ref();
         let mut buf: [u8; 16] = [0; 16];
         value.read_exact(&mut buf)?;
@@ -249,7 +252,7 @@ impl BinaryValue for [u8; HASH_SIZE] {
         self.to_vec()
     }
 
-    fn from_bytes(bytes: Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let bytes = bytes.as_ref();
         ensure!(
             bytes.len() == HASH_SIZE,

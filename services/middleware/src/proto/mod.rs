@@ -14,7 +14,7 @@
 
 //! Module of the rust-protobuf generated files.
 
-#![allow(bare_trait_objects)]
+#![allow(bare_trait_objects, clippy::pedantic, clippy::nursery)]
 
 pub use self::service::*;
 

@@ -12,14 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::ensure;
 use exonum_derive::*;
-use exonum_merkledb::ObjectHash;
 use exonum_proto::ProtobufConvert;
-use failure::ensure;
-
-use crate::{crypto::Hash, proto::schema::errors as errors_proto};
 
 use super::ExecutionError;
+use crate::proto::schema::errors as errors_proto;
 
 /// Status of a call execution in a way it is stored in the blockchain.
 /// This result may be either an empty unit type, in case of success,
@@ -58,7 +56,7 @@ impl ProtobufConvert for ExecutionStatus {
         inner
     }
 
-    fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, failure::Error> {
+    fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         let inner = if pb.has_error() {
             ensure!(!pb.has_ok(), "ExecutionStatus has both of variants.");
             Err(ExecutionError::from_pb(pb.take_error())?)
@@ -66,15 +64,6 @@ impl ProtobufConvert for ExecutionStatus {
             Ok(())
         };
         Ok(Self(inner))
-    }
-}
-
-impl ObjectHash for ExecutionStatus {
-    fn object_hash(&self) -> Hash {
-        match &self.0 {
-            Err(e) => e.object_hash(),
-            Ok(_) => Hash::zero(),
-        }
     }
 }
 
@@ -121,10 +110,9 @@ pub mod serde {
                     ErrorKind::Core { code } => (ExecutionType::CoreError, Some(code)),
                     ErrorKind::Runtime { code } => (ExecutionType::RuntimeError, Some(code)),
                     ErrorKind::Service { code } => (ExecutionType::ServiceError, Some(code)),
-                    ErrorKind::__NonExhaustive => unreachable!("Never actually constructed"),
                 };
 
-                ExecutionStatus {
+                Self {
                     typ,
                     description: err.description.clone(),
                     code,
@@ -132,7 +120,7 @@ pub mod serde {
                     call_site: err.call_site.clone(),
                 }
             } else {
-                ExecutionStatus {
+                Self {
                     typ: ExecutionType::Success,
                     description: String::new(),
                     code: None,

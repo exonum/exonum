@@ -13,7 +13,12 @@
 // limitations under the License.
 
 //! A special service which generates transactions on `after_commit` events.
-use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId};
+
+use exonum::runtime::{
+    migrations::{InitMigrationError, MigrateData, MigrationScript},
+    versioning::Version,
+    ExecutionContext, ExecutionError, InstanceId,
+};
 use exonum_derive::*;
 use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
 
@@ -73,14 +78,16 @@ impl Service for AfterCommitService {
         let counter = self.counter.fetch_add(1, Ordering::SeqCst);
 
         // Test both validator-specific and generic sending.
+        let height = context.height().0;
         if counter < 10_000 {
             if let Some(broadcast) = context.broadcaster() {
-                broadcast.after_commit((), context.height().0).ok();
+                broadcast.blocking().after_commit((), height).ok();
             }
         } else {
             context
                 .generic_broadcaster()
-                .after_commit((), context.height().0)
+                .blocking()
+                .after_commit((), height)
                 .ok();
         }
     }
@@ -89,4 +96,40 @@ impl Service for AfterCommitService {
 impl DefaultInstance for AfterCommitService {
     const INSTANCE_ID: u32 = SERVICE_ID;
     const INSTANCE_NAME: &'static str = SERVICE_NAME;
+}
+
+#[derive(Debug, Clone, Copy, ServiceFactory, ServiceDispatcher)]
+#[service_factory(artifact_name = "after-commit", artifact_version = "2.0.0")]
+#[service_dispatcher(implements("AfterCommitInterface"))]
+pub struct AfterCommitServiceV2;
+
+impl AfterCommitInterface<ExecutionContext<'_>> for AfterCommitServiceV2 {
+    type Output = Result<(), ExecutionError>;
+
+    fn after_commit(&self, _ctx: ExecutionContext<'_>, _height: u64) -> Self::Output {
+        Ok(())
+    }
+}
+
+impl Service for AfterCommitServiceV2 {
+    fn after_commit(&self, context: AfterCommitContext<'_>) {
+        if let Some(broadcast) = context.broadcaster() {
+            let height = context.height().0;
+            broadcast.blocking().after_commit((), height).ok();
+        }
+    }
+}
+
+impl MigrateData for AfterCommitServiceV2 {
+    fn migration_scripts(
+        &self,
+        start_version: &Version,
+    ) -> Result<Vec<MigrationScript>, InitMigrationError> {
+        if *start_version == Version::new(1, 0, 0) {
+            let script = MigrationScript::new(|_context| Ok(()), Version::new(2, 0, 0));
+            Ok(vec![script])
+        } else {
+            Err(InitMigrationError::NotSupported)
+        }
+    }
 }

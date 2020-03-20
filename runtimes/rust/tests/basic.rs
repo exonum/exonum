@@ -28,17 +28,15 @@ use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFac
 use pretty_assertions::assert_eq;
 use serde_derive::*;
 
-use std::collections::BTreeMap;
-
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 
 use self::inspected::{
     create_block_with_transactions, create_genesis_config_builder, execute_transaction,
-    DeployArtifact, EventsHandle, Inspected, RuntimeEvent, StartService, StopService,
+    DeployArtifact, EventsHandle, Inspected, ResumeService, RuntimeEvent, StartService,
     ToySupervisor, ToySupervisorService,
 };
 
-mod inspected;
+pub mod inspected;
 
 #[derive(Debug, Clone, Serialize, Deserialize, BinaryValue)]
 #[binary_value(codec = "bincode")]
@@ -257,10 +255,10 @@ fn basic_runtime_workflow() {
             RuntimeEvent::CommitService(
                 Height(0),
                 supervisor.instance_spec.clone(),
-                InstanceStatus::Active
+                InstanceStatus::Active,
             ),
             RuntimeEvent::AfterTransactions(Height(0), ToySupervisorService::INSTANCE_ID),
-            RuntimeEvent::AfterCommit(Height(1))
+            RuntimeEvent::AfterCommit(Height(1)),
         ]
     );
 
@@ -390,9 +388,7 @@ fn basic_runtime_workflow() {
         &mut blockchain,
         keypair.stop_service(
             ToySupervisorService::INSTANCE_ID,
-            StopService {
-                instance_id: TestServiceImpl::INSTANCE_ID,
-            },
+            TestServiceImpl::INSTANCE_ID,
         ),
     )
     .unwrap();
@@ -514,7 +510,7 @@ fn runtime_restart() {
             ToySupervisorService::INSTANCE_ID,
             StartService {
                 spec: test_instance.instance_spec.clone(),
-                constructor: test_instance.constructor.clone(),
+                constructor: test_instance.constructor,
             },
         ),
     )
@@ -642,7 +638,7 @@ fn conflicting_service_instances() {
         keypair.deploy_artifact(
             ToySupervisorService::INSTANCE_ID,
             DeployArtifact {
-                test_service_artifact: test_service_artifact.clone(),
+                test_service_artifact,
                 spec: vec![],
             },
         ),
@@ -702,16 +698,14 @@ fn conflicting_service_instances() {
     );
 
     // Commit first fork.
-    blockchain
-        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
 
     assert_eq!(
         events_handle.take(),
         vec![
             RuntimeEvent::CommitService(
                 Height(3),
-                init_params.instance_spec.clone(),
+                init_params.instance_spec,
                 InstanceStatus::Active
             ),
             RuntimeEvent::AfterCommit(Height(3)),
@@ -730,7 +724,11 @@ fn conflicting_service_instances() {
     )
     .unwrap_err();
     // Alternative instance was discarded.
-    assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId)
+            .with_description_containing("unknown service with ID 3")
+    );
 }
 
 #[test]
@@ -814,7 +812,7 @@ fn dependent_service_with_no_dependency() {
             ToySupervisorService::INSTANCE_ID,
             StartService {
                 spec: dep_instance.instance_spec.clone(),
-                constructor: dep_instance.constructor.clone(),
+                constructor: dep_instance.constructor,
             },
         ),
     )
@@ -860,9 +858,7 @@ fn dependent_service_in_same_block() {
             ),
         ],
     );
-    blockchain
-        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
 
     // Start both services in the same block.
     let patch = create_block_with_transactions(
@@ -884,9 +880,7 @@ fn dependent_service_in_same_block() {
             ),
         ],
     );
-    blockchain
-        .commit(patch.1, patch.0, vec![], &mut BTreeMap::new())
-        .unwrap();
+    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = snapshot.for_dispatcher();
@@ -932,7 +926,7 @@ fn dependent_service_in_successive_block() {
             ToySupervisorService::INSTANCE_ID,
             StartService {
                 spec: dep_service.instance_spec.clone(),
-                constructor: dep_service.constructor.clone(),
+                constructor: dep_service.constructor,
             },
         ),
     )
@@ -947,5 +941,155 @@ fn dependent_service_in_successive_block() {
             .status
             .unwrap(),
         InstanceStatus::Active
+    );
+}
+
+#[test]
+fn service_freezing() {
+    let (mut blockchain, events) = create_runtime(
+        Blockchain::build_for_tests(),
+        create_genesis_config_builder()
+            .with_artifact(ToySupervisorService.artifact_id())
+            .with_instance(ToySupervisorService.default_instance())
+            .with_artifact(TestServiceImpl.artifact_id())
+            .with_instance(TestServiceImpl.default_instance())
+            .build(),
+    );
+    let keypair = blockchain.as_ref().service_keypair().clone();
+    drop(events.take());
+
+    execute_transaction(
+        &mut blockchain,
+        keypair.freeze_service(
+            ToySupervisorService::INSTANCE_ID,
+            TestServiceImpl::INSTANCE_ID,
+        ),
+    )
+    .unwrap();
+    let test_service = TestServiceImpl.default_instance().instance_spec;
+    assert_eq!(
+        events.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(1), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(1), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(1), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(1), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::CommitService(Height(2), test_service.clone(), InstanceStatus::Frozen),
+            RuntimeEvent::AfterCommit(Height(2)),
+        ]
+    );
+
+    let snapshot = blockchain.snapshot();
+    let schema = snapshot.for_dispatcher();
+    assert_eq!(
+        schema
+            .get_instance(TestServiceImpl::INSTANCE_NAME)
+            .unwrap()
+            .status
+            .unwrap(),
+        InstanceStatus::Frozen
+    );
+
+    execute_transaction(
+        &mut blockchain,
+        keypair.resume_service(
+            ToySupervisorService::INSTANCE_ID,
+            ResumeService {
+                instance_id: test_service.id,
+                params: vec![],
+            },
+        ),
+    )
+    .unwrap();
+
+    // Check that the service does not receive hooks in this block.
+    assert_eq!(
+        events.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::StartResumingService(test_service.clone(), vec![]),
+            RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::CommitService(Height(3), test_service, InstanceStatus::Active),
+            RuntimeEvent::AfterCommit(Height(3)),
+        ]
+    );
+
+    // ...but receives them again once it is resumed.
+    execute_transaction(
+        &mut blockchain,
+        keypair.method_b(TestServiceImpl::INSTANCE_ID, 42),
+    )
+    .expect("Cannot process transaction in resumed service");
+
+    assert_eq!(
+        events.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::BeforeTransactions(Height(3), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(3), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(3), TestServiceImpl::INSTANCE_ID),
+            RuntimeEvent::AfterCommit(Height(4)),
+        ]
+    );
+}
+
+#[test]
+fn unloading_artifact() {
+    let genesis_config = create_genesis_config_with_supervisor();
+    let (mut blockchain, events_handle) =
+        create_runtime(Blockchain::build_for_tests(), genesis_config.clone());
+    drop(events_handle.take());
+
+    // Deploy test service artifact.
+    let test_service_artifact = TestServiceImpl.artifact_id();
+    let keypair = blockchain.as_ref().service_keypair().clone();
+    execute_transaction(
+        &mut blockchain,
+        keypair.deploy_artifact(
+            ToySupervisorService::INSTANCE_ID,
+            DeployArtifact {
+                test_service_artifact: test_service_artifact.clone(),
+                spec: vec![],
+            },
+        ),
+    )
+    .unwrap();
+    drop(events_handle.take());
+
+    // Unload test service artifact.
+    execute_transaction(
+        &mut blockchain,
+        keypair.unload_artifact(
+            ToySupervisorService::INSTANCE_ID,
+            test_service_artifact.clone(),
+        ),
+    )
+    .unwrap();
+
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::BeforeTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::AfterTransactions(Height(2), ToySupervisorService::INSTANCE_ID),
+            RuntimeEvent::UnloadArtifact(test_service_artifact),
+            RuntimeEvent::AfterCommit(Height(3)),
+        ]
+    );
+
+    // Emulate node restart and check that the service artifact is not requested to be deployed.
+    let (_, events_handle) = create_runtime(blockchain.as_ref().clone(), genesis_config);
+
+    assert_eq!(
+        events_handle.take(),
+        vec![
+            RuntimeEvent::InitializeRuntime,
+            RuntimeEvent::DeployArtifact(ToySupervisorService.artifact_id(), vec![]),
+            RuntimeEvent::CommitService(
+                Height(3),
+                ToySupervisorService.default_instance().instance_spec,
+                InstanceStatus::Active,
+            ),
+            RuntimeEvent::ResumeRuntime,
+        ]
     );
 }

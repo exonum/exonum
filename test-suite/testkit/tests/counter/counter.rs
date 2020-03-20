@@ -15,7 +15,8 @@
 //! Sample counter service.
 use actix_web::{http::Method, HttpResponse};
 use exonum::{
-    blockchain::{IndexProof, ValidatorKeys},
+    blockchain::IndexProof,
+    crypto::PublicKey,
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
 use exonum_api::{
@@ -32,11 +33,11 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
-use futures::{Future, IntoFuture};
+use futures::{FutureExt, TryFutureExt};
 use log::trace;
 use serde_derive::{Deserialize, Serialize};
 
-use std::{collections::HashSet, sync::Arc};
+use std::sync::Arc;
 
 pub const SERVICE_NAME: &str = "counter";
 pub const SERVICE_ID: InstanceId = 2;
@@ -122,41 +123,17 @@ pub struct CounterWithProof {
 
 impl CounterWithProof {
     /// Verifies the proof against the known set of validators. Panics on an error.
-    pub fn verify(&self, validators: &[ValidatorKeys]) -> Option<u64> {
-        let block_hash = self.proof.block_proof.block.object_hash();
-
-        // Check precommits.
-        let mut validator_ids = HashSet::new();
-        for precommit in &self.proof.block_proof.precommits {
-            assert_eq!(*precommit.payload().block_hash(), block_hash);
-            let validator_id = validators
-                .iter()
-                .position(|keys| precommit.author() == keys.consensus_key)
-                .expect("Precommit not from a validator");
-            validator_ids.insert(validator_id);
-        }
-        assert!(
-            validator_ids.len() > 2 * validators.len() / 3,
-            "Insufficient number of precommits"
-        );
-
-        let state_hash = self.proof.block_proof.block.state_hash;
-        let index_proof = self
-            .proof
-            .index_proof
-            .check_against_hash(state_hash)
-            .expect("`index_proof` is invalid");
-        let (key, value_hash) = index_proof
-            .entries()
-            .next()
-            .expect("`index_proof` does not contain entries");
+    pub fn verify(&self, validator_keys: &[PublicKey]) -> Option<u64> {
+        let (index_name, index_hash) = self.proof.verify(validator_keys).unwrap_or_else(|err| {
+            panic!("Proof verification failed: {}", err);
+        });
         assert_eq!(
-            *key,
+            index_name,
             format!("{}.counter", SERVICE_NAME),
-            "Invalid index name in proof"
+            "Invalid counter index in proof"
         );
         assert_eq!(
-            *value_hash,
+            index_hash,
             self.counter
                 .as_ref()
                 .map(ObjectHash::object_hash)
@@ -181,13 +158,14 @@ impl CounterWithProof {
 struct CounterApi;
 
 impl CounterApi {
-    fn increment(state: &ServiceApiState<'_>, value: u64) -> api::Result<TransactionResponse> {
+    async fn increment(state: ServiceApiState, value: u64) -> api::Result<TransactionResponse> {
         trace!("received increment tx");
         let tx_hash = state
             .generic_broadcaster()
             .increment((), value)
+            .await
             .map_err(|e| api::Error::internal(e).title("Failed to increment counter"))?;
-        Ok(TransactionResponse { tx_hash })
+        Ok(TransactionResponse::new(tx_hash))
     }
 
     fn count(snapshot: impl Access) -> api::Result<u64> {
@@ -195,7 +173,7 @@ impl CounterApi {
         Ok(schema.counter.get().unwrap_or_default())
     }
 
-    fn count_with_proof(state: &ServiceApiState<'_>) -> api::Result<CounterWithProof> {
+    async fn count_with_proof(state: ServiceApiState) -> api::Result<CounterWithProof> {
         let proof = state
             .data()
             .proof_for_service_index("counter")
@@ -207,27 +185,30 @@ impl CounterApi {
         })
     }
 
-    fn reset(state: &ServiceApiState<'_>) -> api::Result<TransactionResponse> {
+    async fn reset(state: ServiceApiState) -> api::Result<TransactionResponse> {
         trace!("received reset tx");
         // The first `()` is the empty context, the second one is the `reset` arg.
         let tx_hash = state
             .generic_broadcaster()
             .reset((), ())
+            .await
             .map_err(|e| api::Error::internal(e).title("Failed to reset counter"))?;
-        Ok(TransactionResponse { tx_hash })
+        Ok(TransactionResponse::new(tx_hash))
     }
 
     fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .private_scope()
             .endpoint("count", |state, _query: ()| {
-                Self::count(state.service_data())
+                let count = Self::count(state.service_data());
+                async move { count }
             })
             .endpoint_mut("reset", |state, _query: ()| Self::reset(state));
         builder
             .public_scope()
             .endpoint("count", |state, _query: ()| {
-                Self::count(state.service_data())
+                let count = Self::count(state.service_data());
+                async move { count }
             })
             .endpoint_mut("count", Self::increment);
         builder
@@ -237,11 +218,27 @@ impl CounterApi {
             })
             .endpoint_mut("count", Self::increment);
 
+        // Check sending incorrect transactions via `ApiSender`. Testkit should not include
+        // such transactions to the transaction pool.
+        let api_sender = builder.blockchain().sender().to_owned();
+        let service_keys = builder.blockchain().service_keypair().to_owned();
+        builder.public_scope().endpoint_mut(
+            "incorrect-tx",
+            move |_state: ServiceApiState, by: u64| {
+                let incorrect_tx = service_keys.increment(SERVICE_ID + 1, by);
+                let hash = incorrect_tx.object_hash();
+                api_sender
+                    .broadcast_transaction(incorrect_tx)
+                    .map_ok(move |_| hash)
+                    .map_err(api::Error::internal)
+            },
+        );
+
         // Check processing of custom HTTP headers. We test this using simple authorization
         // with a fixed bearer token; for practical apps, the tokens might
         // be [JSON Web Tokens](https://jwt.io/).
         let blockchain = builder.blockchain().clone();
-        let handler = move |request: HttpRequest| -> api::Result<u64> {
+        let handler = move |request: HttpRequest| {
             let auth_header = request
                 .headers()
                 .get("Authorization")
@@ -255,13 +252,9 @@ impl CounterApi {
             let snapshot = blockchain.snapshot();
             Self::count(snapshot.as_ref())
         };
-        let handler: Arc<RawHandler> = Arc::new(move |request| {
-            Box::new(
-                handler(request)
-                    .into_future()
-                    .from_err()
-                    .map(|v| HttpResponse::Ok().json(v)),
-            )
+        let handler: Arc<RawHandler> = Arc::new(move |request, _payload| {
+            let result = handler(request).map(|v| HttpResponse::Ok().json(v));
+            async move { result.map_err(From::from) }.boxed_local()
         });
 
         builder

@@ -194,7 +194,7 @@ impl CallAny<ExecutionContext<'_>> for AnyCallService {
     fn call_any(&self, mut ctx: ExecutionContext<'_>, tx: AnyCall) -> Self::Output {
         let call_info = tx.inner.call_info;
         let args = tx.inner.arguments;
-        let method = MethodDescriptor::new(&tx.interface_name, "", call_info.method_id);
+        let method = MethodDescriptor::new(&tx.interface_name, call_info.method_id);
 
         if tx.fallthrough_auth {
             FallthroughAuth(ctx).generic_call_mut(call_info.instance_id, method, args)

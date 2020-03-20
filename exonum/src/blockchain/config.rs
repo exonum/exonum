@@ -18,9 +18,10 @@
 //! The configuration includes the public keys of validators, consensus related parameters,
 //! and built-in services (services deployed at the blockchain start).
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
+use anyhow::{bail, ensure};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use failure::{bail, ensure};
 use log::warn;
 
 use std::collections::{HashMap, HashSet};
@@ -42,16 +43,12 @@ use crate::{
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "schema::blockchain::ValidatorKeys")]
+#[non_exhaustive]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
     /// Service key is used to sign transactions broadcast by the services.
     pub service_key: PublicKey,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl ValidatorKeys {
@@ -65,13 +62,12 @@ impl ValidatorKeys {
         Self {
             consensus_key,
             service_key,
-            non_exhaustive: (),
         }
     }
 }
 
 impl ValidateInput for ValidatorKeys {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         if self.consensus_key == self.service_key {
@@ -98,6 +94,7 @@ impl ValidateInput for ValidatorKeys {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[non_exhaustive]
 pub struct ConsensusConfig {
     /// List of validators public keys.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -138,11 +135,6 @@ pub struct ConsensusConfig {
     /// in a block if the transaction pool is almost empty, and create blocks faster when there are
     /// enough transactions in the pool.
     pub propose_timeout_threshold: u32,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl Default for ConsensusConfig {
@@ -157,7 +149,6 @@ impl Default for ConsensusConfig {
             min_propose_timeout: 10,
             max_propose_timeout: 200,
             propose_timeout_threshold: 500,
-            non_exhaustive: (),
         }
     }
 }
@@ -196,14 +187,14 @@ impl ConsensusConfig {
             .collect();
         let config = Self {
             validator_keys,
-            ..Default::default()
+            ..Self::default()
         };
         (config, node_keys.unwrap())
     }
 
     /// Check that validator keys is correct. Configuration should have at least
     /// a single validator key. And each key should meet only once.
-    fn validate_keys(&self) -> Result<(), failure::Error> {
+    fn validate_keys(&self) -> anyhow::Result<()> {
         ensure!(
             !self.validator_keys.is_empty(),
             "Consensus configuration must have at least one validator."
@@ -236,26 +227,24 @@ impl ConsensusConfig {
     ///     helpers::ValidatorId,
     /// };
     ///
-    /// fn main() {
-    ///     let config = ConsensusConfig::default()
-    ///         .with_validator_keys(
-    ///             (0..4)
-    ///                 .map(|_| ValidatorKeys::new(
-    ///                     crypto::gen_keypair().0,
-    ///                     crypto::gen_keypair().0,
-    ///                 ))
-    ///                 .collect(),
-    ///         );
-    ///
-    ///     let some_validator_consensus_key = config.validator_keys[2].consensus_key;
-    ///     // Try to find validator ID for this key.
-    ///     assert_eq!(
-    ///         config.find_validator(|validator_keys| {
-    ///             validator_keys.consensus_key == some_validator_consensus_key
-    ///         }),
-    ///         Some(ValidatorId(2)),
+    /// let config = ConsensusConfig::default()
+    ///     .with_validator_keys(
+    ///         (0..4)
+    ///             .map(|_| ValidatorKeys::new(
+    ///                 crypto::gen_keypair().0,
+    ///                 crypto::gen_keypair().0,
+    ///             ))
+    ///             .collect(),
     ///     );
-    /// }
+    ///
+    /// let some_validator_consensus_key = config.validator_keys[2].consensus_key;
+    /// // Try to find validator ID for this key.
+    /// assert_eq!(
+    ///     config.find_validator(|validator_keys| {
+    ///         validator_keys.consensus_key == some_validator_consensus_key
+    ///     }),
+    ///     Some(ValidatorId(2)),
+    /// );
     /// ```
     pub fn find_validator(
         &self,
@@ -429,7 +418,7 @@ impl ConsensusConfigBuilder {
 }
 
 impl ValidateInput for ConsensusConfig {
-    type Error = failure::Error;
+    type Error = anyhow::Error;
 
     fn validate(&self) -> Result<(), Self::Error> {
         const MINIMAL_BODY_SIZE: usize = 256;
@@ -483,6 +472,7 @@ impl ValidateInput for ConsensusConfig {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::GenesisConfig")]
+#[non_exhaustive]
 pub struct GenesisConfig {
     /// Blockchain configuration used to create the genesis block.
     pub consensus_config: ConsensusConfig,
@@ -493,11 +483,6 @@ pub struct GenesisConfig {
     /// List of services with their configuration parameters that are created directly
     /// in the genesis block.
     pub builtin_instances: Vec<InstanceInitParams>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 /// Data that is required for initialization of a service instance.
@@ -505,16 +490,12 @@ pub struct GenesisConfig {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceInitParams")]
+#[non_exhaustive]
 pub struct InstanceInitParams {
     /// Instance specification.
     pub instance_spec: InstanceSpec,
     /// Constructor argument for the instance.
     pub constructor: Vec<u8>,
-
-    /// No-op field for forward compatibility.
-    #[protobuf_convert(skip)]
-    #[serde(default, skip)]
-    non_exhaustive: (),
 }
 
 impl InstanceInitParams {
@@ -525,35 +506,32 @@ impl InstanceInitParams {
         artifact: ArtifactId,
         constructor: impl BinaryValue,
     ) -> Self {
-        InstanceInitParams {
+        Self {
             instance_spec: InstanceSpec::from_raw_parts(id, name.into(), artifact),
             constructor: constructor.into_bytes(),
-            non_exhaustive: (),
         }
     }
 
     /// Converts into `InstanceInitParams` with specific constructor.
-    pub fn with_constructor(self, constructor: impl BinaryValue) -> InstanceInitParams {
-        InstanceInitParams {
+    pub fn with_constructor(self, constructor: impl BinaryValue) -> Self {
+        Self {
             instance_spec: self.instance_spec,
             constructor: constructor.into_bytes(),
-            non_exhaustive: (),
         }
     }
 }
 
 impl From<InstanceSpec> for InstanceInitParams {
-    fn from(instance_spec: InstanceSpec) -> InstanceInitParams {
+    fn from(instance_spec: InstanceSpec) -> Self {
         Self {
             instance_spec,
             constructor: Vec::new(),
-            non_exhaustive: (),
         }
     }
 }
 
 /// Creates `GenesisConfig` from components.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct GenesisConfigBuilder {
     /// Consensus config.
     consensus_config: ConsensusConfig,
@@ -610,7 +588,6 @@ impl GenesisConfigBuilder {
             consensus_config: self.consensus_config,
             artifacts,
             builtin_instances: self.builtin_instances,
-            non_exhaustive: (),
         }
     }
 }

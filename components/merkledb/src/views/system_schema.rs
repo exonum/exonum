@@ -72,7 +72,7 @@ pub struct SystemSchema<T>(T);
 impl<T: RawAccess> SystemSchema<T> {
     /// Creates an instance based on the specified `access`.
     pub fn new(access: T) -> Self {
-        SystemSchema(access)
+        Self(access)
     }
 
     /// Returns the state hash of the database. The state hash is up to date for `Snapshot`s
