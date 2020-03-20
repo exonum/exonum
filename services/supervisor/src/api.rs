@@ -253,11 +253,11 @@
 //! // Migration request creation skipped...
 //! let migration_request = // Migration of some service.
 //! #     // Request migration of supervisor for simplicity.
-//! #     MigrationRequest {
-//! #         new_artifact: Supervisor.artifact_id(),
-//! #         service: Supervisor::NAME.to_owned(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     MigrationRequest::new(
+//! #         Supervisor.artifact_id(),
+//! #         Supervisor::NAME,
+//! #         Height(10),
+//! #     );
 //!
 //! // `migration_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
@@ -580,11 +580,11 @@
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
-//! #     MigrationRequest {
-//! #         new_artifact: Supervisor.artifact_id(),
-//! #         service: Supervisor::NAME.to_owned(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     MigrationRequest::new(
+//! #         Supervisor.artifact_id(),
+//! #         Supervisor::NAME,
+//! #         Height(10),
+//! #     );
 //! # // Request migration. It will fail, but we'll be able to request its state.
 //! # let _hash: Hash = testkit
 //! #     .api()
