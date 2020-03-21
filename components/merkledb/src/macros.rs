@@ -185,7 +185,7 @@ macro_rules! binary_value_tuple_impls {
                 $crate::concat_buffers(&mut [$(inner.$idx.to_bytes()),+])
             }
 
-            fn from_bytes(bytes: ::std::borrow::Cow<'_, [u8]>) -> Result<Self, failure::Error> {
+            fn from_bytes(bytes: ::std::borrow::Cow<'_, [u8]>) -> anyhow::Result<Self> {
                 use ::std::borrow::Cow;
                 let parts = $crate::split_buffer_into_sized_parts(&bytes, $crate::binary_value_tuple_impls!(@COUNT $($t)+))?;
 

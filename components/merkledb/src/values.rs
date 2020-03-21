@@ -286,7 +286,7 @@ pub fn concat_buffers(buffers: &mut [Vec<u8>]) -> Vec<u8> {
 pub fn split_buffer_into_sized_parts(
     bytes: &[u8],
     qty: usize,
-) -> Result<Vec<Cow<'_, [u8]>>, failure::Error> {
+) -> anyhow::Result<Vec<Cow<'_, [u8]>>> {
     use std::mem::size_of;
 
     let mut pos = 0;
