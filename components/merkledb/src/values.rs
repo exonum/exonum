@@ -266,11 +266,16 @@ impl BinaryValue for [u8; HASH_SIZE] {
 
 /// Concatenates buffer slices, prepends each slice with its size.
 pub fn concat_buffers(buffers: &mut [Vec<u8>]) -> Vec<u8> {
-    use std::convert::TryFrom;
+    use std::mem;
 
-    let mut res_buf = Vec::new();
+    let mut res_buf = {
+        let capacity = buffers.iter().map(|buffer| buffer.len() + mem::size_of::<u32>()).sum();
+        Vec::with_capacity(capacity)
+    };
+
     for mut buf in buffers {
-        let size = u32::try_from(buf.len()).unwrap_or_else(|_| panic!("Too large buffer"));
+        let size = buf.len() as u32;
+        assert_eq!(size as usize, buf.len());
         res_buf.append(&mut size.to_bytes());
         res_buf.append(&mut buf);
     }
@@ -278,10 +283,10 @@ pub fn concat_buffers(buffers: &mut [Vec<u8>]) -> Vec<u8> {
 }
 
 /// Splits single byte buffer into vector of separate buffers according to its size
-pub fn split_buffer_into_sized_parts<'a>(
-    bytes: &'a Cow<[u8]>,
+pub fn split_buffer_into_sized_parts(
+    bytes: &[u8],
     qty: usize,
-) -> Result<Vec<Cow<'a, [u8]>>, failure::Error> {
+) -> Result<Vec<Cow<'_, [u8]>>, failure::Error> {
     use std::mem::size_of;
 
     let mut pos = 0;
