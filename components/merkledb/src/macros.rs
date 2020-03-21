@@ -150,11 +150,22 @@ macro_rules! impl_serde_hex_for_binary_value {
     };
 }
 
-/// Implements `BinaryValue` traint for tuples cross single member generic tuple struct.
-/// If expression begins with for keyword it creates implementation for existend structure
-/// supposing it meets requirements, mentioned above. Otherwise it creates new structure
-/// according to supplied meta attributes, visibility, name and type constraint for generic type.
-/// Target tuple types must be listed in curly braces.
+/// Implements [BinaryValue](values/trait.BinaryValue.html) trait for tuples with size up to 12
+/// by newtype.
+/// If expression begins with for keyword it creates implementation for existent structure that
+/// meets the requirements mentioned above. Otherwise it creates new structure according to
+/// supplied meta attributes, visibility, name. Target tuple types must be listed in curly braces.
+///
+/// # Example:
+/// ``` ignore
+/// binary_value_tuple_impls! {
+///     #[derive(Debug)]
+///     pub MyTuple {
+///         (i32, String, Vec<u8>),
+///         (i64, DateTime<Utc>),
+///     }
+/// }
+/// ```
 #[macro_export]
 macro_rules! binary_value_tuple_impls {
     () => ();
