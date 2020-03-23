@@ -194,10 +194,10 @@ impl NodeHandler {
 
         // Handle message from future epoch / height.
         if peer_state.blockchain_height > block_height {
-            // Request a block with the larger height.
+            // Request a block with the next height.
             self.request(RequestData::Block(block_height), peer);
         } else if peer_state.epoch > epoch {
-            // Request a block with the larger height or a block skip with a larger epoch.
+            // Request a block with the next height or a block skip with a larger epoch.
             let data = RequestData::BlockOrEpoch {
                 block_height,
                 epoch,

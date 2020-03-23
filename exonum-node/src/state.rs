@@ -88,6 +88,8 @@ impl AdvancedPeers {
     /// Forms a message to send to a connected peer to query a (pseudo-)block with
     /// a larger height / epoch.
     pub fn send_message(&self, state: &State) -> Option<(PublicKey, RequestData)> {
+        // If there are any peers with known greater blockchain height, sent a request
+        // to one of them.
         let block_height = state.blockchain_height();
         for peer in &self.peers_with_greater_height {
             if state.peers().contains_key(peer) {
@@ -95,6 +97,8 @@ impl AdvancedPeers {
             }
         }
 
+        // If there are no peers at the greater height, but there are peers with a greater epoch,
+        // send a request to one of them.
         let data = RequestData::BlockOrEpoch {
             block_height,
             epoch: state.epoch(),
@@ -191,7 +195,8 @@ pub(crate) enum RequestData {
     Prevotes(Round, Hash),
     /// Represents `BlockRequest` message.
     Block(Height),
-    /// Represents `BlockRequest` message with `epoch` field set.
+    /// Represents `BlockRequest` message with `epoch` field set. This is used to request
+    /// a block at the next height or a block skip with a successive epoch.
     BlockOrEpoch { block_height: Height, epoch: Height },
 }
 

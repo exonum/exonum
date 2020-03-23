@@ -486,11 +486,21 @@ impl PeersRequest {
 ///
 /// ### Validation
 ///
-/// The message is ignored if its `height` is bigger than the node's one.
+/// The message is ignored if its `height` is bigger than the node's one and any of these conditions
+/// hold:
+///
+/// - Message `epoch` is set to 0.
+/// - Message `epoch` is lesser than the epoch of the node.
 ///
 /// ### Processing
 ///
-/// `BlockResponse` message is sent as the response.
+/// `BlockResponse` message is sent as the response. Which block or block skip is sent, depends
+/// on the following rules:
+///
+/// - If the `epoch` is set to 0, it is a block at the specified `height`.
+/// - If the `epoch != 0`, it is a block at the specified `height` (if it is known to the node),
+///   or the latest block skip with the epoch greater or equal to the `epoch` mentioned
+///   in the message.
 ///
 /// ### Generation
 ///
