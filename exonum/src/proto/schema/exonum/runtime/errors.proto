@@ -79,6 +79,13 @@ message ExecutionError {
   }
 }
 
+// Additional details about an `ExecutionError` that do not influence
+// blockchain state hash.
+message ExecutionErrorAux {
+  // Human-readable error description.
+  string description = 1;
+}
+
 // Call site associated with an error.
 message CallSite {
   enum Type {

@@ -16,6 +16,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `supervisor_name` method was removed. Use `Supervisor::NAME` instead. (#1823)
 
+#### exonum-cli
+
+- `run-dev` command has been reworked. It now does not clear database files
+  after the launch. `artifacts-dir` parameter has been renamed to
+  `blockchain-path`. Configuration files are now stored inside `config`
+  subdirectory. (#1822)
+
 ### New Features
 
 #### exonum-cli

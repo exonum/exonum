@@ -57,7 +57,7 @@ use std::{
 };
 
 use super::{CallInfo, InstanceId, MethodId};
-use crate::proto::schema::{details, errors as errors_proto};
+use crate::proto::schema::errors as errors_proto;
 
 /// Trait representing an error type defined in the service or runtime code.
 ///
@@ -125,7 +125,7 @@ pub struct ExecutionError {
 
 /// Additional details about an `ExecutionError` that do not influence blockchain state hash.
 #[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
-#[protobuf_convert(source = "details::ExecutionErrorAux")]
+#[protobuf_convert(source = "errors_proto::ExecutionErrorAux")]
 pub(crate) struct ExecutionErrorAux {
     /// Human-readable error description.
     pub description: String,
