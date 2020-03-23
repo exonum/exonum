@@ -17,13 +17,12 @@ use exonum::{
     blockchain::ConsensusConfig,
     crypto::Hash,
     helpers::Height,
-    merkledb::{
-        impl_binary_key_for_binary_value, impl_serde_hex_for_binary_value, BinaryValue, ObjectHash,
-    },
+    merkledb::{impl_binary_key_for_binary_value, BinaryValue, ObjectHash},
     runtime::{ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, MigrationStatus},
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use hex_buffer_serde::{Hex as _, HexForm};
 use serde_derive::{Deserialize, Serialize};
 
 use super::{mode::Mode, proto};
@@ -49,15 +48,23 @@ impl SupervisorConfig {
 
 /// Request for the artifact deployment.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::DeployRequest")]
 #[non_exhaustive]
 pub struct DeployRequest {
     /// Artifact identifier.
     pub artifact: ArtifactId,
-    /// Additional information for Runtime to deploy.
+
+    /// Additional information for the runtime necessary to deploy the artifact.
+    #[serde(with = "HexForm")]
     pub spec: Vec<u8>,
+
     /// The height until which the deployment procedure should be completed.
     pub deadline_height: Height,
+
+    /// Seed to allow several deployments with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl DeployRequest {
@@ -67,6 +74,7 @@ impl DeployRequest {
             artifact,
             deadline_height,
             spec: Vec::new(),
+            seed: 0,
         }
     }
 
@@ -89,17 +97,38 @@ pub struct DeployResult {
     pub result: ExecutionStatus,
 }
 
+impl DeployResult {
+    /// Creates a new `DeployRequest` object with a positive result.
+    pub fn ok(request: DeployRequest) -> Self {
+        Self {
+            request,
+            result: Ok(()).into(),
+        }
+    }
+
+    /// Creates a new `DeployRequest` object.
+    pub fn new<R: Into<ExecutionStatus>>(request: DeployRequest, result: R) -> Self {
+        Self {
+            request,
+            result: result.into(),
+        }
+    }
+}
+
 /// Request to start a new service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::StartService")]
 #[non_exhaustive]
 pub struct StartService {
     /// Artifact identifier.
     pub artifact: ArtifactId,
+
     /// Instance name.
     pub name: String,
+
     /// Instance configuration.
+    #[serde(with = "HexForm")]
     pub config: Vec<u8>,
 }
 
@@ -115,7 +144,7 @@ impl StartService {
 
 /// Request to stop an existing service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::StopService")]
 #[non_exhaustive]
 pub struct StopService {
@@ -125,7 +154,7 @@ pub struct StopService {
 
 /// Request to freeze an existing service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::FreezeService")]
 #[non_exhaustive]
 pub struct FreezeService {
@@ -135,19 +164,21 @@ pub struct FreezeService {
 
 /// Request to resume a previously stopped service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::ResumeService")]
 #[non_exhaustive]
 pub struct ResumeService {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
+
     /// Raw bytes representation of service resume parameters.
+    #[serde(with = "HexForm")]
     pub params: Vec<u8>,
 }
 
 /// Request to unload an unused artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::UnloadArtifact")]
 pub struct UnloadArtifact {
     /// Artifact identifier.
@@ -156,14 +187,15 @@ pub struct UnloadArtifact {
 
 /// Configuration parameters of the certain service instance.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(Serialize, Deserialize)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::ServiceConfig")]
 #[non_exhaustive]
 pub struct ServiceConfig {
     /// Corresponding service instance ID.
     pub instance_id: InstanceId,
-    /// Raw bytes representation of service configuration parameters.
+
+    /// Raw bytes representation of the service configuration parameters.
+    #[serde(with = "HexForm")]
     pub params: Vec<u8>,
 }
 
@@ -182,6 +214,7 @@ impl ServiceConfig {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigChange", rename(case = "snake_case"))]
+#[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ConfigChange {
     /// New consensus config.
@@ -202,7 +235,7 @@ pub enum ConfigChange {
 
 /// Request for the configuration change
 #[derive(Debug, Clone, Eq, PartialEq)]
-#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash, Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::ConfigPropose")]
 #[non_exhaustive]
 pub struct ConfigPropose {
@@ -295,6 +328,7 @@ impl ConfigPropose {
 
 /// Confirmation vote for the configuration change.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::ConfigVote")]
 #[non_exhaustive]
 pub struct ConfigVote {
@@ -309,16 +343,48 @@ impl ConfigVote {
     }
 }
 
+impl From<ConfigPropose> for ConfigVote {
+    fn from(propose: ConfigPropose) -> Self {
+        Self {
+            propose_hash: propose.object_hash(),
+        }
+    }
+}
+
 /// Request for the service data migration.
 #[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::MigrationRequest")]
+#[non_exhaustive]
 pub struct MigrationRequest {
     /// New artifact identifier.
     pub new_artifact: ArtifactId,
+
     /// Name of service for a migration.
     pub service: String,
+
     /// The height until which the migration procedure should be completed.
     pub deadline_height: Height,
+
+    /// Seed to allow several migrations with the same params.
+    #[serde(default)]
+    pub seed: u64,
+}
+
+impl MigrationRequest {
+    /// Creates a new migration request.
+    pub fn new(
+        new_artifact: ArtifactId,
+        service: impl Into<String>,
+        deadline_height: Height,
+    ) -> Self {
+        Self {
+            new_artifact,
+            service: service.into(),
+            deadline_height,
+            seed: 0,
+        }
+    }
 }
 
 /// Confirmation that migration has ended for a validator.
@@ -357,48 +423,4 @@ pub struct ConfigProposalWithHash {
 }
 
 impl_binary_key_for_binary_value! { DeployRequest }
-impl_binary_key_for_binary_value! { DeployResult }
-impl_binary_key_for_binary_value! { StartService }
-impl_binary_key_for_binary_value! { StopService }
-impl_binary_key_for_binary_value! { ResumeService }
-impl_binary_key_for_binary_value! { UnloadArtifact }
-impl_binary_key_for_binary_value! { ConfigPropose }
-impl_binary_key_for_binary_value! { ConfigVote }
 impl_binary_key_for_binary_value! { MigrationRequest }
-
-impl_serde_hex_for_binary_value! { DeployRequest }
-impl_serde_hex_for_binary_value! { DeployResult }
-impl_serde_hex_for_binary_value! { StartService }
-impl_serde_hex_for_binary_value! { StopService }
-impl_serde_hex_for_binary_value! { FreezeService }
-impl_serde_hex_for_binary_value! { ResumeService }
-impl_serde_hex_for_binary_value! { UnloadArtifact }
-impl_serde_hex_for_binary_value! { ConfigPropose }
-impl_serde_hex_for_binary_value! { ConfigVote }
-impl_serde_hex_for_binary_value! { MigrationRequest }
-
-impl DeployResult {
-    /// Creates a new `DeployRequest` object with a positive result.
-    pub fn ok(request: DeployRequest) -> Self {
-        Self {
-            request,
-            result: Ok(()).into(),
-        }
-    }
-
-    /// Creates a new `DeployRequest` object.
-    pub fn new<R: Into<ExecutionStatus>>(request: DeployRequest, result: R) -> Self {
-        Self {
-            request,
-            result: result.into(),
-        }
-    }
-}
-
-impl From<ConfigPropose> for ConfigVote {
-    fn from(v: ConfigPropose) -> Self {
-        Self {
-            propose_hash: v.object_hash(),
-        }
-    }
-}

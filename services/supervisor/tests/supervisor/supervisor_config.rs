@@ -19,14 +19,14 @@
 use exonum::runtime::{SnapshotExt, SUPERVISOR_INSTANCE_ID};
 use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 
-use exonum_supervisor::{supervisor_name, ConfigPropose, Schema, Supervisor, SupervisorConfig};
+use exonum_supervisor::{ConfigPropose, Schema, Supervisor, SupervisorConfig};
 
 use crate::{config_api::create_proposal, utils::CFG_CHANGE_HEIGHT};
 
 /// Asserts that current supervisor configuration equals to the provided one.
 fn assert_supervisor_config(testkit: &TestKit, config: SupervisorConfig) {
     let snapshot = testkit.snapshot();
-    let schema: Schema<_> = snapshot.service_schema(supervisor_name()).unwrap();
+    let schema: Schema<_> = snapshot.service_schema(Supervisor::NAME).unwrap();
     let current_config = schema.configuration.get().unwrap();
     assert_eq!(current_config, config);
 }
