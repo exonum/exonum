@@ -5,11 +5,34 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### exonum-supervisor
+
+- `MigrationRequest` was made non-exhaustive. (#1823)
+
+- `POST` endpoints now expect JSON-encoded input rather than
+  hex-encoded Protobuf. (#1823)
+
+- `supervisor_name` method was removed. Use `Supervisor::NAME` instead. (#1823)
+
+#### exonum-cli
+
+- `run-dev` command has been reworked. It now does not clear database files
+  after the launch. `artifacts-dir` parameter has been renamed to
+  `blockchain-path`. Configuration files are now stored inside `config`
+  subdirectory. (#1822)
+
 ### New Features
 
 #### exonum-cli
 
 - Several constants in the `command` module became public. (#1821)
+
+#### exonum-supervisor
+
+- `DeployRequest` and `MigrationRequest` now have cryptographic seeds
+  to retry the same request multiple times. (#1823)
 
 ## 1.0.0-rc.2 - 2020-03-13
 
