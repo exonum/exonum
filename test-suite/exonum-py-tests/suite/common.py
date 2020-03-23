@@ -9,7 +9,7 @@ from exonum_client import ExonumClient
 from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 from requests.exceptions import ConnectionError
 
-RETRIES_AMOUNT = 20
+RETRIES_AMOUNT = 50
 ARTIFACT_NAME = "exonum-cryptocurrency"
 ARTIFACT_VERSION = "0.2.0"
 
@@ -18,6 +18,7 @@ MIN_API_PORT = 8080
 # Range of ports to use. Since each test requires 4 peer ports and 8 API ports,
 # not restricting the port range can easily enumerate hundreds of ports.
 PORT_RANGE = 32
+
 
 def run_dev_node(application: str) -> ExonumNetwork:
     """Starts a single node in the run-dev mode and returns
@@ -32,8 +33,10 @@ def run_dev_node(application: str) -> ExonumNetwork:
 
     return network
 
+
 available_peer_port = MIN_PEER_PORT
 available_api_port = MIN_API_PORT
+
 
 def run_n_nodes(application: str, nodes_amount: int) -> ExonumNetwork:
     """Creates and runs a network with N validators and return an
@@ -87,7 +90,7 @@ def run_4_nodes(application: str) -> ExonumNetwork:
 
 
 def assert_processes_exited_successfully(
-    test: unittest.TestCase, outputs: List[ProcessOutput]
+        test: unittest.TestCase, outputs: List[ProcessOutput]
 ) -> None:
     """Asserts that all the processes exited successfully."""
     for output in outputs:
@@ -130,7 +133,8 @@ def wait_for_block(network: ExonumNetwork, height: int = 1) -> None:
         for _ in range(RETRIES_AMOUNT):
             try:
                 block = client.public_api.get_block(height)
-                if block.status_code == 200: break
+                if block.status_code == 200:
+                    break
             except ConnectionError:
                 pass
             time.sleep(0.5)
@@ -155,12 +159,12 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
 
 
 def generate_config(
-    network: ExonumNetwork,
-    deadline_height: int = 10000,
-    consensus: dict = None,
-    artifact_name: str = ARTIFACT_NAME,
-    instances: dict = None,
-    deploy: bool = True
+        network: ExonumNetwork,
+        deadline_height: int = 10000,
+        consensus: dict = None,
+        artifact_name: str = ARTIFACT_NAME,
+        instances: dict = None,
+        artifact_action: str = "deploy"
 ) -> dict:
     if instances is None:
         instances = {}
@@ -173,7 +177,7 @@ def generate_config(
                 "runtime": "rust",
                 "name": artifact_name,
                 "version": ARTIFACT_VERSION,
-                "deploy": deploy
+                "action": artifact_action
             }
         },
         "instances": instances,

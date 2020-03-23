@@ -133,8 +133,7 @@ class ExonumNetwork:
         shutdown_endpoint = "http://{}/api/system/v1/shutdown"
         for private_address in self._private_api_addresses.values():
             url = shutdown_endpoint.format(private_address)
-            data = "null"
-            requests.post(url, data=data, headers={"content-type": "application/json"})
+            requests.post(url, headers={"content-type": "application/json"})
 
         # Join every process and collect outputs.
         outputs = []

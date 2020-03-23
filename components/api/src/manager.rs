@@ -26,6 +26,8 @@ use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
 
 use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
+const SHUTDOWN_TIMEOUT: u64 = 2; // timeout before shut down in seconds
+
 /// Configuration parameters for a single web server.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
@@ -174,9 +176,9 @@ impl ApiManager {
     }
 
     async fn stop_servers(&mut self) {
-        log::trace!("Servers stop requested.");
+        log::info!("Servers stop requested.");
 
-        join_all(self.servers.drain(..).map(|server| server.stop(false))).await;
+        join_all(self.servers.drain(..).map(|server| server.stop(true))).await;
     }
 
     /// Starts API manager actor with the specified endpoints update stream.
@@ -216,7 +218,7 @@ impl ApiManager {
                 .wrap(server_config.cors_factory())
                 .service(aggregator.extend_backend(access, web::scope("api")))
         })
-        .disable_signals()
+        .shutdown_timeout(SHUTDOWN_TIMEOUT)
         .bind(listen_address)?
         .run();
         Ok(server)
