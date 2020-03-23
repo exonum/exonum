@@ -20,9 +20,9 @@
 //!
 //! - Public API:
 //!
-//!     - [Obtaining consensus configuration](#obtaining-consensus-configuration)
-//!     - [Obtaining pending configuration proposal](#obtaining-pending-configuration-proposal)
-//!     - [Obtaining deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
+//!     - [Obtain consensus configuration](#obtain-consensus-configuration)
+//!     - [Obtain pending configuration proposal](#obtain-pending-configuration-proposal)
+//!     - [Obtain deployed artifacts and services](#obtain-deployed-artifacts-and-services)
 //!
 //! - Private API:
 //!
@@ -31,13 +31,13 @@
 //!     - [Request to accept new configuration](#request-to-accept-new-configuration)
 //!     - [Vote for configuration proposal](#vote-for-configuration-proposal)
 //!     - [Obtain current configuration number](#obtain-current-configuration-number)
-//!     - [Obtain current supervisor operating mode](#obtain-current-supervisor-operating-mode)
-//!     - [Check the deployment status](#check-deployment-status)
-//!     - [Check the migration status](#check-migration-status)
+//!     - [Obtain supervisor configuration](#obtain-supervisor-configuration)
+//!     - [Check deployment status](#check-deployment-status)
+//!     - [Check migration status](#check-migration-status)
 //!
 //! # Public API
 //!
-//! ## Obtaining Consensus Configuration
+//! ## Obtain Consensus Configuration
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -71,7 +71,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Pending Configuration Proposal
+//! ## Obtain Pending Configuration Proposal
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -107,7 +107,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Deployed Artifacts And Services
+//! ## Obtain Deployed Artifacts And Services
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -253,11 +253,11 @@
 //! // Migration request creation skipped...
 //! let migration_request = // Migration of some service.
 //! #     // Request migration of supervisor for simplicity.
-//! #     MigrationRequest {
-//! #         new_artifact: Supervisor.artifact_id(),
-//! #         service: Supervisor::NAME.to_owned(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     MigrationRequest::new(
+//! #         Supervisor.artifact_id(),
+//! #         Supervisor::NAME,
+//! #         Height(10),
+//! #     );
 //!
 //! // `migration_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
@@ -458,7 +458,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Supervisor Configuration
+//! ## Obtain Supervisor Configuration
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -492,7 +492,7 @@
 //! # }
 //! ```
 //!
-//! ## Check the Deployment Status
+//! ## Check Deployment Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -553,7 +553,7 @@
 //! # }
 //! ```
 //!
-//! ## Check the Migration Status
+//! ## Check Migration Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -580,11 +580,11 @@
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
-//! #     MigrationRequest {
-//! #         new_artifact: Supervisor.artifact_id(),
-//! #         service: Supervisor::NAME.to_owned(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     MigrationRequest::new(
+//! #         Supervisor.artifact_id(),
+//! #         Supervisor::NAME,
+//! #         Height(10),
+//! #     );
 //! # // Request migration. It will fail, but we'll be able to request its state.
 //! # let _hash: Hash = testkit
 //! #     .api()
@@ -637,6 +637,9 @@ pub struct DeployInfoQuery {
     pub spec: String,
     /// Deadline height.
     pub deadline_height: u64,
+    /// Seed to distinguish among deploys with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl TryFrom<DeployInfoQuery> for DeployRequest {
@@ -659,6 +662,7 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
             artifact,
             spec,
             deadline_height,
+            seed: query.seed,
         };
 
         Ok(request)
@@ -675,6 +679,7 @@ impl From<DeployRequest> for DeployInfoQuery {
             artifact,
             spec,
             deadline_height,
+            seed: request.seed,
         }
     }
 }
@@ -691,6 +696,9 @@ pub struct MigrationInfoQuery {
     pub service: String,
     /// Deadline height.
     pub deadline_height: u64,
+    /// Seed to allow several migrations with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl TryFrom<MigrationInfoQuery> for MigrationRequest {
@@ -708,6 +716,7 @@ impl TryFrom<MigrationInfoQuery> for MigrationRequest {
             new_artifact,
             service: query.service,
             deadline_height,
+            seed: query.seed,
         };
 
         Ok(request)
@@ -723,6 +732,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
             new_artifact,
             service: request.service,
             deadline_height,
+            seed: request.seed,
         }
     }
 }
@@ -792,10 +802,10 @@ impl PrivateApi {
     /// by the current node, and returns its hash.
     async fn deploy_artifact(
         state: ServiceApiState,
-        artifact: DeployRequest,
+        request: DeployRequest,
     ) -> Result<Hash, api::Error> {
         Self::broadcaster(&state)?
-            .request_artifact_deploy((), artifact)
+            .request_artifact_deploy((), request)
             .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }

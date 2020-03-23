@@ -167,11 +167,11 @@ fn test_with_full_lifecycle() {
     assert!(block.errors.is_empty());
 
     // Then, we can launch the migration.
-    let migration_req = MigrationRequest {
-        new_artifact: CryptocurrencyService.artifact_id(),
-        service: OldService::INSTANCE_NAME.to_owned(),
-        deadline_height: Height(100),
-    };
+    let mut migration_req = MigrationRequest::new(
+        CryptocurrencyService.artifact_id(),
+        OldService::INSTANCE_NAME,
+        Height(100),
+    );
     let migration = admin_keys.request_migration(SUPERVISOR_ID, migration_req.clone());
     let block = testkit.create_block_with_transaction(migration);
     assert!(block.errors.is_empty());
@@ -192,10 +192,7 @@ fn test_with_full_lifecycle() {
     assert_eq!(*service_state.data_version(), new_version);
 
     // Reassign the service artifact and resume it.
-    let migration_req = MigrationRequest {
-        deadline_height: testkit.height(),
-        ..migration_req
-    };
+    migration_req.deadline_height = testkit.height();
     let resume_service = ConfigPropose::immediate(1).resume_service(SERVICE_ID, ());
     let block = testkit.create_block_with_transactions(vec![
         admin_keys.request_migration(SUPERVISOR_ID, migration_req),
