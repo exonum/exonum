@@ -83,6 +83,7 @@ use futures::{
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
+use tokio::time::delay_for;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -1164,8 +1165,24 @@ impl Node {
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
     async fn run_handler(mut self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
+        // Stop timeout sufficient to prevent undefined behavior in RocksDB destructor code
+        // (see below).
+        const STOP_TIMEOUT: Duration = Duration::from_millis(50);
+
         self.handler.initialize();
-        Reactor::new(self).run(handshake_params).await
+        let res = Reactor::new(self).run(handshake_params).await;
+
+        // Wait for a little bit to prevent undefined behavior with RocksDB, when it is dropped
+        // concurrently with the process exiting. By delaying, we give time for
+        // the `actix` servers to exit (these servers contain the bulk of `Arc` pointers to RocksDB).
+        // The exit happens once the node infrastructure (in particular, the sender of endpoints to
+        // `exonum_api::ApiManager`) is dropped, i.e., before this point.
+        //
+        // We assume that waiting `STOP_TIMEOUT` is acceptable for typical use cases;
+        // even if the process does not terminate with the node exit,
+        // running a node is generally understood as a long-term task.
+        delay_for(STOP_TIMEOUT).await;
+        res
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,
