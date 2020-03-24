@@ -147,7 +147,7 @@ impl Status {
 pub struct Propose {
     /// The validator id.
     pub validator: ValidatorId,
-    /// The height to which the message is related.
+    /// The epoch to which the message is related.
     pub epoch: Height,
     /// The round to which the message is related.
     pub round: Round,
@@ -216,7 +216,7 @@ impl Propose {
 pub struct Prevote {
     /// The validator id.
     pub validator: ValidatorId,
-    /// The height to which the message is related.
+    /// The epoch to which the message is related.
     pub epoch: Height,
     /// The round to which the message is related.
     pub round: Round,
