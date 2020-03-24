@@ -214,7 +214,7 @@ impl ServiceConfig {
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::ConfigChange", rename(case = "snake_case"))]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ConfigChange {
     /// New consensus config.
