@@ -321,6 +321,27 @@ impl ProtobufBase64 {
         }
     }
 
+    /// Decodes bytes from any of four base64 variations supported as per Protobuf spec
+    /// (standard or URL-safe alphabet, with or without padding).
+    pub fn decode(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
+        // Remove padding if any.
+        let value_without_padding = if value.ends_with("==") {
+            &value[..value.len() - 2]
+        } else if value.ends_with('=') {
+            &value[..value.len() - 1]
+        } else {
+            value
+        };
+
+        let is_url_safe = value_without_padding.contains(|ch: char| ch == '-' || ch == '_');
+        let config = if is_url_safe {
+            base64::URL_SAFE_NO_PAD
+        } else {
+            base64::STANDARD_NO_PAD
+        };
+        base64::decode_config(value_without_padding, config)
+    }
+
     /// Deserializes `Vec<u8>` using the provided serializer.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
     where
@@ -338,22 +359,7 @@ impl ProtobufBase64 {
             }
 
             fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
-                // Remove padding if any.
-                let value_without_padding = if value.ends_with("==") {
-                    &value[..value.len() - 2]
-                } else if value.ends_with('=') {
-                    &value[..value.len() - 1]
-                } else {
-                    value
-                };
-
-                let is_url_safe = value_without_padding.contains(|ch: char| ch == '-' || ch == '_');
-                let config = if is_url_safe {
-                    base64::URL_SAFE_NO_PAD
-                } else {
-                    base64::STANDARD_NO_PAD
-                };
-                base64::decode_config(value_without_padding, config).map_err(E::custom)
+                ProtobufBase64::decode(value).map_err(E::custom)
             }
 
             // Needed to guard against non-obvious serialization of flattened fields in `serde`.
