@@ -889,14 +889,14 @@ impl PrivateApi {
     }
 }
 
-/// Wires Supervisor API endpoints.
+/// Wires supervisor API endpoints.
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
-        .endpoint_mut("migrate", PrivateApi::migrate)
-        .endpoint_mut("propose-config", PrivateApi::propose_config)
-        .endpoint_mut("confirm-config", PrivateApi::confirm_config)
+        .pb_endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
+        .pb_endpoint_mut("migrate", PrivateApi::migrate)
+        .pb_endpoint_mut("propose-config", PrivateApi::propose_config)
+        .pb_endpoint_mut("confirm-config", PrivateApi::confirm_config)
         .endpoint("configuration-number", PrivateApi::configuration_number)
         .endpoint("supervisor-config", PrivateApi::supervisor_config)
         .endpoint("deploy-status", PrivateApi::deploy_status)
