@@ -33,13 +33,16 @@ use crate::proto::consensus;
 /// Connect to a node.
 ///
 /// ### Validation
+///
 /// The message is ignored if its time is earlier than in the previous
 /// `Connect` message received from the same peer.
 ///
 /// ### Processing
+///
 /// Connect to the peer.
 ///
 /// ### Generation
+///
 /// A node sends `Connect` message to all known addresses during
 /// initialization. Additionally, the node responds by its own `Connect`
 /// message after receiving `node::Event::Connected`.
@@ -87,17 +90,21 @@ impl Connect {
 /// Current node status.
 ///
 /// ### Validation
-/// The message is ignored if its signature is incorrect or its `height` is
-/// lower than a node's height.
+///
+/// The message is ignored if its signature is incorrect or its `epoch` / `blockchain_height` is
+/// lower than the corresponding characteristics of the receiver.
 ///
 /// ### Processing
-/// If the message's `height` number is bigger than a node's one, then
-/// `BlockRequest` with current node's height is sent in reply.
+///
+/// - If `blockchain_height` is greater or equal to the current blockchain height of the node,
+///   then `BlockRequest` with the current height is sent in reply.
+/// - Otherwise, if `epoch` is greater or equal to the current epoch of the node,
+///   then `BlockRequest` with the current height and the current epoch is sent in reply.
 ///
 /// ### Generation
+///
 /// `Status` message is broadcast regularly with the timeout controlled by
-/// `blockchain::ConsensusConfig::status_timeout`. Also, it is broadcast
-/// after accepting a new block.
+/// `ConsensusConfig::status_timeout`. Also, it is broadcast after accepting a new block.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::Status")]
 pub struct Status {
@@ -127,17 +134,20 @@ impl Status {
 ///
 /// ### Validation
 ///
-/// The message is ignored if it
-///     * contains incorrect `prev_hash`
-///     * is sent by non-leader
-///     * contains already committed transactions
-///     * is already known
+/// The message is ignored if it:
+///
+/// - contains incorrect `prev_hash`
+/// - is sent by non-leader
+/// - contains already committed transactions
+/// - is already known
 ///
 /// ### Processing
+///
 /// If the message contains unknown transactions, then `TransactionsRequest`
-/// is sent in reply.  Otherwise `Prevote` is broadcast.
+/// is sent in reply.  Otherwise, a `Prevote` is broadcast.
 ///
 /// ### Generation
+///
 /// A node broadcasts `Propose` if it is a leader and is not locked for a
 /// different proposal. Also `Propose` can be sent as response to
 /// `ProposeRequest`.
@@ -199,13 +209,13 @@ impl Propose {
 ///
 /// ### Processing
 ///
-/// Pre-vote is added to the list of known votes for the same proposal.  If
-/// `locked_round` number from the message is bigger than in a node state,
-/// then a node replies with `PrevotesRequest`.  If there are unknown
+/// `Prevote` is added to the list of known votes for the same proposal.  If
+/// `locked_round` number from the message is greater than in the node state,
+/// then the node replies with `PrevotesRequest`.  If there are unknown
 /// transactions in the propose specified by `propose_hash`,
 /// `TransactionsRequest` is sent in reply.  Otherwise if all transactions
 /// are known and there are +2/3 pre-votes, then a node is locked to that
-/// proposal and `Precommit` is broadcast.
+/// proposal and a `Precommit` is broadcast.
 ///
 /// ### Generation
 ///
@@ -293,9 +303,10 @@ impl BlockResponse {
 ///
 /// ### Validation
 ///
-/// The message is ignored if
-///     * its `to` field corresponds to a different node
-///     * the `transactions` field cannot be parsed or verified
+/// The message is ignored if:
+///
+/// - its `to` field corresponds to a different node
+/// - the `transactions` field cannot be parsed or verified
 ///
 /// ### Processing
 ///
@@ -327,8 +338,7 @@ impl TransactionsResponse {
 ///
 /// ### Validation
 ///
-/// The message is ignored if its `height` is not equal to the node's
-/// height.
+/// The message is ignored if its `epoch` is not equal to the node epoch.
 ///
 /// ### Processing
 ///
@@ -336,8 +346,7 @@ impl TransactionsResponse {
 ///
 /// ### Generation
 ///
-/// A node can send `ProposeRequest` during `Precommit` and `Prevote`
-/// handling.
+/// A node can send `ProposeRequest` during `Precommit` and `Prevote` handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::ProposeRequest")]
 pub struct ProposeRequest {
@@ -414,13 +423,15 @@ impl PoolTransactionsRequest {
 /// Request for pre-votes.
 ///
 /// ### Validation
-/// The message is ignored if its `height` is not equal to the node's
-/// height.
+///
+/// The message is ignored if its `epoch` is not equal to the node epoch.
 ///
 /// ### Processing
+///
 /// The requested pre-votes are sent to the recipient.
 ///
 /// ### Generation
+///
 /// This message can be sent during `Prevote` and `Precommit` handling.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::PrevotesRequest")]
@@ -459,15 +470,18 @@ impl PrevotesRequest {
 /// Request connected peers from a node.
 ///
 /// ### Validation
+///
 /// Request is considered valid if the sender of the message on the network
 /// level corresponds to the `from` field.
 ///
 /// ### Processing
+///
 /// Peer `Connect` messages are sent to the recipient.
 ///
 /// ### Generation
+///
 /// `PeersRequest` message is sent regularly with the timeout controlled by
-/// `blockchain::ConsensusConfig::peers_timeout`.
+/// `ConsensusConfig::peers_timeout`.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug, ProtobufConvert)]
 #[protobuf_convert(source = "consensus::PeersRequest")]
 pub struct PeersRequest {
@@ -482,11 +496,11 @@ impl PeersRequest {
     }
 }
 
-/// Request for the block with the given `height`.
+/// Request for the block with the given height or the latest block skip at the previous height.
 ///
 /// ### Validation
 ///
-/// The message is ignored if its `height` is bigger than the node's one and any of these conditions
+/// The message is ignored if its `height` is greater than the node's one and any of these conditions
 /// hold:
 ///
 /// - Message `epoch` is set to 0.
@@ -512,7 +526,7 @@ pub struct BlockRequest {
     pub to: PublicKey,
     /// The blockchain height to retrieve.
     pub height: Height,
-    /// The epoch to retrieve if the blockchain height is not reached by the node.
+    /// The epoch to retrieve if the specified blockchain height is not reached by the node.
     /// This value is set to `Height(0)` to signal to skip this stage of message processing.
     pub epoch: Height,
 }
@@ -543,8 +557,8 @@ impl BlockRequest {
     }
 }
 
-/// This type describes all possible types of Exonum messages
-/// which are used in p2p communications.
+/// Enumeration of all possible types of Exonum messages which are used in P2P communication
+/// between nodes.
 #[derive(Clone, PartialEq, Eq, Ord, PartialOrd, Debug)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(
