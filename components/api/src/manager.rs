@@ -157,7 +157,7 @@ impl ServerHandle {
     }
 }
 
-/// Actor responsible for API management. The actor encapsulates endpoint handlers and
+/// Component responsible for API management. The `ApiManager` encapsulates endpoint handlers and
 /// is capable of updating them via `UpdateEndpoints`.
 #[derive(Debug)]
 pub struct ApiManager {
