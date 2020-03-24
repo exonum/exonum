@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// cspell:ignore AQIDBA
+
 use bit_vec::BitVec;
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_json::json;
