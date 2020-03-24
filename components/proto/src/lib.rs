@@ -269,10 +269,46 @@ impl_protobuf_convert_fixed_byte_array! {
     160, 256, 512, 1024, 2048
 }
 
+/// Marker type for use with `#[serde(with)]`, which provides Protobuf-compatible base64 encoding
+/// and decoding. For now, works only on `Vec<u8>` fields.
+///
+/// The encoder uses the standard base64 alphabet (i.e., `0..9A..Za..z+/`) with no padding.
+/// The decoder accepts any of the 4 possible combinations: the standard or the URL-safe alphabet
+/// with or without padding.
+///
+/// If the (de)serializer is not human-readable (e.g., CBOR or `bincode`), the bytes will be
+/// (de)serialized without base64 transform, directly as a byte slice.
+///
+/// # Examples
+///
+/// ```
+/// use exonum_proto::ProtobufBase64;
+/// # use serde_derive::*;
+/// # use serde_json::json;
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     /// Corresponds to a `bytes buffer = ...` field in Protobuf.
+///     #[serde(with = "ProtobufBase64")]
+///     buffer: Vec<u8>,
+///     // other fields...
+/// }
+///
+/// # fn main() -> anyhow::Result<()> {
+/// let test = Test {
+///     buffer: b"Hello!".to_vec(),
+///     // ...
+/// };
+/// let obj = serde_json::to_value(&test)?;
+/// assert_eq!(obj, json!({ "buffer": "SGVsbG8h", /* ... */ }));
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct ProtobufBase64(());
 
 impl ProtobufBase64 {
+    /// Serializes the provided `bytes` with the `serializer`.
     pub fn serialize<S, T>(bytes: &T, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -285,6 +321,7 @@ impl ProtobufBase64 {
         }
     }
 
+    /// Deserializes `Vec<u8>` using the provided serializer.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
     where
         D: Deserializer<'de>,
