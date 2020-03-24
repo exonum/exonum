@@ -68,9 +68,9 @@ pub struct ApiManagerConfig {
     /// affected by `UpdateEndpoints` messages.
     pub api_aggregator: ApiAggregator,
     /// The interval in milliseconds between attempts of restarting HTTP-server in case
-    /// the server failed to restart
+    /// the server failed to restart.
     pub server_restart_retry_timeout: u64,
-    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    /// The attempts counts of restarting HTTP-server in case the server failed to restart.
     pub server_restart_max_retries: u16,
 }
 
@@ -150,7 +150,9 @@ impl ServerHandle {
         // by `actix` afterwards and is not freed by it before. That is, it relies
         // on the incorrect behavior of external libraries (`actix` *should* free the socket
         // on its side). Not a good guarantee, but it works with current `actix-web` (2.0.0,
-        // with actual deps as of 2020-03-24).
+        // with actual dependencies as of 2020-03-24).
+        //
+        // See actix/actix-web#1249 for details on the issue.
         let _socket = unsafe { TcpListener::from_raw_socket(self.raw_socket) };
     }
 }
