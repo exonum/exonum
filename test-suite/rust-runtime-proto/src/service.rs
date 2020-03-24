@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum_derive::*;
+use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
+use serde_derive::*;
 
 /// Define the service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
@@ -24,8 +27,20 @@ use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 )]
 pub struct TestRuntimeApiService;
 
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue)]
+#[protobuf_convert(source = "crate::proto::Transfer")]
+pub struct Transfer {
+    pub message: String,
+    pub seed: u64,
+}
+
 impl Service for TestRuntimeApiService {
-    fn wire_api(&self, _builder: &mut ServiceApiBuilder) {}
+    fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+        builder
+            .public_scope()
+            .pb_endpoint_mut("transfer", |_, transfer: Transfer| async { Ok(transfer) });
+    }
 }
 
 impl DefaultInstance for TestRuntimeApiService {
