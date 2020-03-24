@@ -17,13 +17,17 @@ exonum-proto = { version = "1.0.0-rc.2", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0-rc.2", path = "../../runtimes/rust" }
 exonum-testkit = { version = "1.0.0-rc.2", path = "../../test-suite/testkit" }
 
+anyhow = "1.0.26"
 bit-vec = "0.6.1"
 chrono = { version = "0.4.6", features = ["serde"] }
 protobuf = "2.10.1"
 pretty_assertions = "0.6.1"
+serde = "1.0"
+serde_derive = "1.0"
 
 [dev-dependencies]
-anyhow = "1.0.26"
+exonum-api = { version = "1.0.0-rc.2", path = "../../components/api" }
+reqwest = "0.10.4"
 
 [dev-dependencies.tokio]
 version = "0.2.13"

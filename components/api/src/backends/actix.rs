@@ -18,14 +18,14 @@
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
 pub use actix_cors::{Cors, CorsFactory};
-pub use actix_web::{web::Payload, HttpRequest};
+pub use actix_web::{http::Method as HttpMethod, web::Payload, HttpRequest, HttpResponse};
 
 use actix_web::{
     body::Body,
     error::ResponseError,
     http::header,
     web::{self, scope, Json, Query},
-    FromRequest, HttpResponse,
+    FromRequest,
 };
 use futures::future::{Future, FutureExt, LocalBoxFuture};
 use serde::{de::DeserializeOwned, Serialize};

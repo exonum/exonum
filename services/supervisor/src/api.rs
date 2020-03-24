@@ -624,6 +624,7 @@ use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, AsyncEventState, ConfigProposalWithHash,
     ConfigPropose, ConfigVote, DeployRequest, MigrationRequest, MigrationState, SupervisorConfig,
 };
+use exonum_proto::ProtobufBase64;
 
 /// Query for retrieving information about deploy state.
 /// This is flattened version of `DeployRequest` which can be
@@ -633,7 +634,8 @@ use super::{
 pub struct DeployInfoQuery {
     /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2".
     pub artifact: String,
-    /// Artifact spec bytes as hexadecimal string.
+    /// Artifact spec bytes serialized as any of four base64 variations supported by Protobuf
+    /// (standard or URL-safe, with or without padding).
     pub spec: String,
     /// Deadline height.
     pub deadline_height: u64,
@@ -651,7 +653,7 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
                 .title("Invalid deploy request query")
                 .detail(err.to_string())
         })?;
-        let spec = hex::decode(query.spec).map_err(|err| {
+        let spec = ProtobufBase64::decode(&query.spec).map_err(|err| {
             api::Error::bad_request()
                 .title("Invalid deploy request query")
                 .detail(err.to_string())
@@ -672,7 +674,7 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
 impl From<DeployRequest> for DeployInfoQuery {
     fn from(request: DeployRequest) -> Self {
         let artifact = request.artifact.to_string();
-        let spec = hex::encode(&request.spec);
+        let spec = base64::encode_config(&request.spec, base64::URL_SAFE_NO_PAD);
         let deadline_height = request.deadline_height.0;
 
         Self {
@@ -887,14 +889,14 @@ impl PrivateApi {
     }
 }
 
-/// Wires Supervisor API endpoints.
+/// Wires supervisor API endpoints.
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
-        .endpoint_mut("migrate", PrivateApi::migrate)
-        .endpoint_mut("propose-config", PrivateApi::propose_config)
-        .endpoint_mut("confirm-config", PrivateApi::confirm_config)
+        .pb_endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
+        .pb_endpoint_mut("migrate", PrivateApi::migrate)
+        .pb_endpoint_mut("propose-config", PrivateApi::propose_config)
+        .pb_endpoint_mut("confirm-config", PrivateApi::confirm_config)
         .endpoint("configuration-number", PrivateApi::configuration_number)
         .endpoint("supervisor-config", PrivateApi::supervisor_config)
         .endpoint("deploy-status", PrivateApi::deploy_status)
