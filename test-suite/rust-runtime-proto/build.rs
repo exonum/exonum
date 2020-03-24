@@ -15,7 +15,7 @@
 use exonum_build::ProtobufGenerator;
 
 fn main() {
-    ProtobufGenerator::with_mod_name("test_runtime_proto_protobuf_mod.rs")
+    ProtobufGenerator::with_mod_name("proto_mod.rs")
         .with_input_dir("src/proto")
         .with_includes(&["src/proto".into()])
         .with_crypto()
