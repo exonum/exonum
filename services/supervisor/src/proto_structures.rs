@@ -21,8 +21,7 @@ use exonum::{
     runtime::{ArtifactId, ExecutionStatus, InstanceId, InstanceSpec, MigrationStatus},
 };
 use exonum_derive::{BinaryValue, ObjectHash};
-use exonum_proto::ProtobufConvert;
-use hex_buffer_serde::{Hex as _, HexForm};
+use exonum_proto::{ProtobufBase64, ProtobufConvert};
 use serde_derive::{Deserialize, Serialize};
 
 use super::{mode::Mode, proto};
@@ -56,7 +55,7 @@ pub struct DeployRequest {
     pub artifact: ArtifactId,
 
     /// Additional information for the runtime necessary to deploy the artifact.
-    #[serde(with = "HexForm")]
+    #[serde(with = "ProtobufBase64")]
     pub spec: Vec<u8>,
 
     /// The height until which the deployment procedure should be completed.
@@ -128,7 +127,7 @@ pub struct StartService {
     pub name: String,
 
     /// Instance configuration.
-    #[serde(with = "HexForm")]
+    #[serde(with = "ProtobufBase64")]
     pub config: Vec<u8>,
 }
 
@@ -172,7 +171,7 @@ pub struct ResumeService {
     pub instance_id: InstanceId,
 
     /// Raw bytes representation of service resume parameters.
-    #[serde(with = "HexForm")]
+    #[serde(with = "ProtobufBase64")]
     pub params: Vec<u8>,
 }
 
@@ -195,7 +194,7 @@ pub struct ServiceConfig {
     pub instance_id: InstanceId,
 
     /// Raw bytes representation of the service configuration parameters.
-    #[serde(with = "HexForm")]
+    #[serde(with = "ProtobufBase64")]
     pub params: Vec<u8>,
 }
 
