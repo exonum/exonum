@@ -63,8 +63,9 @@ pub mod proto;
 use anyhow::{ensure, format_err, Error};
 use chrono::{DateTime, TimeZone, Utc};
 use protobuf::well_known_types;
+use serde::{de::Visitor, Deserializer, Serializer};
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, fmt};
 
 use crate::proto::bit_vec::BitVec;
 
@@ -266,4 +267,82 @@ impl_protobuf_convert_fixed_byte_array! {
     8, 16, 24, 32, 40, 48, 56, 64,
     72, 80, 88, 96, 104, 112, 120, 128,
     160, 256, 512, 1024, 2048
+}
+
+#[derive(Debug)]
+pub struct ProtobufBase64(());
+
+impl ProtobufBase64 {
+    pub fn serialize<S, T>(bytes: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: AsRef<[u8]> + ?Sized,
+    {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode_config(bytes, base64::STANDARD_NO_PAD))
+        } else {
+            serializer.serialize_bytes(bytes.as_ref())
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error as DeError;
+
+        struct Base64Visitor;
+
+        impl<'de> Visitor<'de> for Base64Visitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("base64-encoded byte array")
+            }
+
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
+                // Remove padding if any.
+                let value_without_padding = if value.ends_with("==") {
+                    &value[..value.len() - 2]
+                } else if value.ends_with('=') {
+                    &value[..value.len() - 1]
+                } else {
+                    value
+                };
+
+                let is_url_safe = value_without_padding.contains(|ch: char| ch == '-' || ch == '_');
+                let config = if is_url_safe {
+                    base64::URL_SAFE_NO_PAD
+                } else {
+                    base64::STANDARD_NO_PAD
+                };
+                base64::decode_config(value_without_padding, config).map_err(E::custom)
+            }
+
+            // Needed to guard against non-obvious serialization of flattened fields in `serde`.
+            fn visit_bytes<E: DeError>(self, value: &[u8]) -> Result<Self::Value, E> {
+                Ok(value.to_vec())
+            }
+        }
+
+        struct BytesVisitor;
+
+        impl<'de> Visitor<'de> for BytesVisitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("byte array")
+            }
+
+            fn visit_bytes<E: DeError>(self, value: &[u8]) -> Result<Self::Value, E> {
+                Ok(value.to_vec())
+            }
+        }
+
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(Base64Visitor)
+        } else {
+            deserializer.deserialize_bytes(BytesVisitor)
+        }
+    }
 }
