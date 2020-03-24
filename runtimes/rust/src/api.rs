@@ -189,10 +189,44 @@ impl ServiceApiState {
 #[derive(Debug, Clone)]
 pub struct ServiceApiScope {
     inner: ApiScope,
+    data: ScopeData,
+}
+
+#[derive(Debug, Clone)]
+struct ScopeData {
     blockchain: Blockchain,
     descriptor: InstanceDescriptor,
     // Artifact associated with the service.
     artifact: ArtifactId,
+}
+
+impl ScopeData {
+    fn wrap<F, I, Q, R>(
+        &self,
+        name: &str,
+        handler: &F,
+        query: Q,
+    ) -> impl Future<Output = exonum_api::Result<I>>
+    where
+        F: Fn(ServiceApiState, Q) -> R + 'static,
+        R: Future<Output = exonum_api::Result<I>>,
+    {
+        let maybe_state = ServiceApiState::new(
+            &self.blockchain,
+            self.descriptor.clone(),
+            &self.artifact,
+            name,
+        );
+        let state = match maybe_state {
+            Ok(state) => state,
+            Err(err) => return future::err(err).left_future(),
+        };
+
+        let descriptor = self.descriptor.clone();
+        handler(state, query)
+            .map_err(move |err| err.source(descriptor.to_string()))
+            .right_future()
+    }
 }
 
 impl ServiceApiScope {
@@ -200,9 +234,11 @@ impl ServiceApiScope {
     fn new(blockchain: Blockchain, descriptor: InstanceDescriptor, artifact: ArtifactId) -> Self {
         Self {
             inner: ApiScope::new(),
-            blockchain,
-            descriptor,
-            artifact,
+            data: ScopeData {
+                blockchain,
+                descriptor,
+                artifact,
+            },
         }
     }
 
@@ -216,22 +252,9 @@ impl ServiceApiScope {
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = exonum_api::Result<I>>,
     {
-        let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
-        let artifact = self.artifact.clone();
-        self.inner.endpoint(name, move |query: Q| {
-            let maybe_state =
-                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-            let state = match maybe_state {
-                Ok(state) => state,
-                Err(err) => return future::err(err).left_future(),
-            };
-
-            let descriptor = descriptor.clone();
-            handler(state, query)
-                .map_err(move |err| err.source(descriptor.to_string()))
-                .right_future()
-        });
+        let data = self.data.clone();
+        self.inner
+            .endpoint(name, move |query: Q| data.wrap(name, &handler, query));
         self
     }
 
@@ -245,22 +268,9 @@ impl ServiceApiScope {
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = exonum_api::Result<I>>,
     {
-        let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
-        let artifact = self.artifact.clone();
-        self.inner.endpoint_mut(name, move |query: Q| {
-            let maybe_state =
-                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-            let state = match maybe_state {
-                Ok(state) => state,
-                Err(err) => return future::err(err).left_future(),
-            };
-
-            let descriptor = descriptor.clone();
-            handler(state, query)
-                .map_err(move |err| err.source(descriptor.to_string()))
-                .right_future()
-        });
+        let data = self.data.clone();
+        self.inner
+            .endpoint_mut(name, move |query: Q| data.wrap(name, &handler, query));
         self
     }
 
@@ -278,24 +288,10 @@ impl ServiceApiScope {
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = exonum_api::Result<I>>,
     {
-        let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
-        let artifact = self.artifact.clone();
+        let data = self.data.clone();
         let handler = deprecated.handler.clone();
 
-        let full_handler = move |query: Q| {
-            let maybe_state =
-                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-            let state = match maybe_state {
-                Ok(state) => state,
-                Err(err) => return future::err(err).left_future(),
-            };
-
-            let descriptor = descriptor.clone();
-            handler(state, query)
-                .map_err(move |err| err.source(descriptor.to_string()))
-                .right_future()
-        };
+        let full_handler = move |query: Q| data.wrap(name, &handler, query);
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(full_handler);
         self.inner.endpoint(name, handler);
@@ -316,24 +312,10 @@ impl ServiceApiScope {
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
         R: Future<Output = exonum_api::Result<I>>,
     {
-        let blockchain = self.blockchain.clone();
-        let descriptor = self.descriptor.clone();
-        let artifact = self.artifact.clone();
+        let data = self.data.clone();
         let handler = deprecated.handler.clone();
 
-        let full_handler = move |query: Q| {
-            let maybe_state =
-                ServiceApiState::new(&blockchain, descriptor.clone(), &artifact, name);
-            let state = match maybe_state {
-                Ok(state) => state,
-                Err(err) => return future::err(err).left_future(),
-            };
-
-            let descriptor = descriptor.clone();
-            handler(state, query)
-                .map_err(move |err| err.source(descriptor.to_string()))
-                .right_future()
-        };
+        let full_handler = move |query: Q| data.wrap(name, &handler, query);
         // Mark endpoint as deprecated.
         let handler = deprecated.with_different_handler(full_handler);
         self.inner.endpoint_mut(name, handler);
