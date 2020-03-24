@@ -16,6 +16,10 @@
 
 pub use exonum_api::{Deprecated, EndpointMutability, Error, HttpStatusCode, Result};
 
+use actix_web::{
+    web::{Bytes, Json},
+    FromRequest, HttpMessage,
+};
 use exonum::{
     blockchain::{Blockchain, Schema as CoreSchema},
     crypto::PublicKey,
@@ -24,11 +28,66 @@ use exonum::{
         ArtifactId, BlockchainData, InstanceDescriptor, InstanceState, InstanceStatus, SnapshotExt,
     },
 };
-use exonum_api::{backends::actix, ApiBuilder, ApiScope, MovedPermanentlyError};
+use exonum_api::{backends::actix, ApiBackend, ApiBuilder, ApiScope, MovedPermanentlyError};
+use exonum_proto::ProtobufConvert;
 use futures::prelude::*;
+use protobuf::Message;
 use serde::{de::DeserializeOwned, Serialize};
 
+use std::sync::Arc;
+
 use super::Broadcaster;
+
+/// Extracts request payload, which is encoded in either JSON or Protobuf.
+async fn extract_pb_request<Q>(request: actix::HttpRequest, payload: actix::Payload) -> Result<Q>
+where
+    Q: DeserializeOwned + ProtobufConvert + 'static,
+    Q::ProtoStruct: Message,
+{
+    match request.content_type() {
+        "application/json" => Json::from_request(&request, &mut payload.into_inner())
+            .await
+            .map(Json::into_inner)
+            .map_err(|err| {
+                Error::bad_request()
+                    .title("Cannot read JSON from request body")
+                    .detail(err.to_string())
+            }),
+
+        "application/octet-stream" => {
+            let bytes = Bytes::from_request(&request, &mut payload.into_inner())
+                .await
+                .map_err(|err| {
+                    Error::bad_request()
+                        .title("Cannot read Protobuf from request body")
+                        .detail(err.to_string())
+                })?;
+
+            let mut message = <Q::ProtoStruct as Message>::new();
+            message.merge_from_bytes(&bytes).map_err(|err| {
+                Error::bad_request()
+                    .title("Cannot parse Protobuf message")
+                    .detail(err.to_string())
+            })?;
+
+            Q::from_pb(message).map_err(|err| {
+                Error::bad_request()
+                    .title("Cannot convert Protobuf message")
+                    .detail(err.to_string())
+            })
+        }
+
+        other => {
+            let msg = format!(
+                "Invalid content type: {}. Use `application/json` or `application/octet-stream`",
+                other
+            );
+            Err(Error::bad_request()
+                .title("Invalid content type")
+                .detail(msg))
+        }
+    }
+}
 
 /// Provide the current blockchain state snapshot to API handlers.
 ///
@@ -271,6 +330,42 @@ impl ServiceApiScope {
         let data = self.data.clone();
         self.inner
             .endpoint_mut(name, move |query: Q| data.wrap(name, &handler, query));
+        self
+    }
+
+    /// Adds an endpoint handler to the service API scope.
+    ///
+    /// In HTTP backends this type of endpoint corresponds to `POST` requests.
+    /// Unlike [`endpoint_mut`], this method supports deserializing the payload both from JSON
+    /// (if `Content-Type` of the request is `application/json`) or from Protobuf
+    /// (if `Content-Type` is `application/octet-stream`). This comes at the cost
+    /// of more requirements to the response type.
+    pub fn pb_endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
+    where
+        Q: DeserializeOwned + ProtobufConvert + 'static,
+        Q::ProtoStruct: Message,
+        I: Serialize + 'static,
+        F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
+        R: Future<Output = exonum_api::Result<I>>,
+    {
+        let data = self.data.clone();
+        let raw_handler = move |http_request, payload| {
+            let data = data.clone();
+            let handler = handler.clone();
+
+            async move {
+                let query: Q = extract_pb_request(http_request, payload).await?;
+                let response = data.wrap(name, &handler, query).await?;
+                Ok(actix::HttpResponse::Ok().json(response))
+            }
+            .boxed_local()
+        };
+        let raw_handler = actix::RequestHandler {
+            name: name.to_owned(),
+            method: actix::HttpMethod::POST,
+            inner: Arc::new(raw_handler),
+        };
+        self.inner.web_backend().raw_handler(raw_handler);
         self
     }
 
