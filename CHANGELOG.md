@@ -34,6 +34,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - `DeployRequest` and `MigrationRequest` now have cryptographic seeds
   to retry the same request multiple times. (#1823)
 
+### Bug Fixes
+
+#### exonum-api
+
+- Introduced a workaround for the HTTP restart hanging up on Windows. (#1828)
+
 ## 1.0.0-rc.2 - 2020-03-13
 
 ### Breaking changes

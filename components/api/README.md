@@ -54,14 +54,6 @@ exonum-api = "1.0.0-rc.2"
 Note that the crate rarely needs to be imported directly; it is re-exported
 by the `exonum` crate.
 
-## Known Issues
-
-### Server Restart on Windows
-
-The server restart after the set of endpoints is updated seems to be broken
-in some Windows environments. The restart process hangs up,
-and the HTTP server becomes unresponsive.
-
 ## License
 
 `exonum-api` is licensed under the Apache License (Version 2.0).
