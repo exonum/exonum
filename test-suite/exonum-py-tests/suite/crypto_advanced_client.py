@@ -15,14 +15,10 @@ class ExonumCryptoAdvancedClient:
         self.loader.initialize()
         self.loader.load_main_proto_files()
         self.loader.load_service_proto_files(
-            runtime_id=0,
-            artifact_name="exonum-supervisor",
-            artifact_version="1.0.0-rc.3",
+            runtime_id=0, artifact_name="exonum-supervisor", artifact_version="1.0.0-rc.3",
         )
         self.loader.load_service_proto_files(
-            runtime_id=0,
-            artifact_name=cryptocurrency_service_name,
-            artifact_version=cryptocurrency_service_version,
+            runtime_id=0, artifact_name=cryptocurrency_service_name, artifact_version=cryptocurrency_service_version,
         )
 
         self.cryptocurrency_module = ModuleManager.import_service_module(
@@ -64,9 +60,7 @@ class ExonumCryptoAdvancedClient:
     def get_wallet_info(self, keys):
         """Wrapper for get wallet info operation."""
         public_service_api = self.client.service_public_api("crypto")
-        return public_service_api.get_service(
-            "v1/wallets/info?pub_key=" + keys.public_key.hex()
-        )
+        return public_service_api.get_service("v1/wallets/info?pub_key=" + keys.public_key.hex())
 
     def get_balance(self, keys):
         wallet = self.get_wallet_info(keys).json()
