@@ -40,6 +40,7 @@ datetime
 deadlinks
 deallocated
 decodable
+deinitialize
 deployable
 deque
 deref
@@ -62,6 +63,7 @@ Exonum
 exonumhub
 fsync
 fuzzer
+getpgid
 gitter
 googleapis
 hashable
@@ -73,6 +75,7 @@ kdfparams
 keepalive
 keypair
 keypairs
+killpg
 leveldb
 libfuzzer
 librocksdb
@@ -83,6 +86,7 @@ lifecycle
 loopback
 maintainer's
 markdownlint
+mkdtemp
 memlimit
 memorydb
 mempool
@@ -112,6 +116,7 @@ openssl
 opslimit
 peekable
 permissioned
+popen
 postagainst
 postcondition
 postpropose
@@ -137,6 +142,7 @@ pthread
 pubkey
 pubkeys
 pwbox
+pylint
 quantile
 quux
 readonly

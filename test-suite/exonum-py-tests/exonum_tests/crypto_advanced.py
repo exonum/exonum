@@ -136,7 +136,7 @@ class CryptoAdvancedTest(unittest.TestCase):
                 tx_status = client.public_api.get_tx_info(tx_response.json()["tx_hash"]).json()["status"]["type"]
                 self.assertEqual(tx_status, "success")
                 # create the wallet with the same keys again
-                tx_same_keys = crypto_client.create_wallet(alice_keys, "Alice_Dublicate" + str(validator_id))
+                tx_same_keys = crypto_client.create_wallet(alice_keys, "Alice_Duplicate" + str(validator_id))
                 with client.create_subscriber("blocks") as subscriber:
                     subscriber.wait_for_new_event()
                 tx_status = client.public_api.get_tx_info(tx_same_keys.json()["tx_hash"]).json()["status"]["type"]

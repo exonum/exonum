@@ -14,7 +14,7 @@ NODE_SHUTDOWN_TIMEOUT = 100.0
 
 class ExonumNetwork:
     """Class representing runner of the Exonum network.
-    It provides an interface to start a network of N validatos in the separate threads.
+    It provides an interface to start a network of N validators in the separate threads.
 
     Application is expected to be installed and referenced by its name."""
 
