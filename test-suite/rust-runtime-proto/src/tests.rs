@@ -312,7 +312,7 @@ async fn request_to_pb_endpoint() -> anyhow::Result<()> {
         .await?;
     assert_eq!(response, transfer);
 
-    // Send `Transfer` using Protobuf encoding.
+    // Send `Transfer` using Protobuf encoding manually.
     let proto_bytes = transfer.to_bytes();
     let url = api.public_url("api/services/test-runtime-api/transfer");
     let response: Transfer = Client::new()
@@ -323,6 +323,14 @@ async fn request_to_pb_endpoint() -> anyhow::Result<()> {
         .await?
         .error_for_status()?
         .json()
+        .await?;
+    assert_eq!(response, transfer);
+
+    // Send `Transfer` using testkit API.
+    let response: Transfer = api
+        .public(ApiKind::Service("test-runtime-api"))
+        .query(&transfer)
+        .post_pb("transfer")
         .await?;
     assert_eq!(response, transfer);
 

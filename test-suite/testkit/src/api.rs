@@ -14,6 +14,8 @@
 
 //! API encapsulation for the testkit.
 
+#![allow(clippy::needless_doctest_main)] // false positive
+
 pub use exonum_api::ApiAccess;
 
 use actix_web::{
@@ -25,7 +27,7 @@ use exonum::{
     messages::{AnyTx, Verified},
 };
 use exonum_api::{self as api, ApiAggregator};
-use log::{info, trace};
+use exonum_proto::ProtobufConvert;
 use reqwest::{
     redirect::Policy as RedirectPolicy, Client, ClientBuilder, RequestBuilder as ReqwestBuilder,
     Response, StatusCode,
@@ -70,6 +72,8 @@ impl fmt::Display for ApiKind {
     }
 }
 
+// TODO: Remove `no_run` in the doctest below after fix (ECR-3948)
+
 /// API encapsulation for the testkit. Allows to execute and asynchronously retrieve results
 /// for REST-ful endpoints of services.
 ///
@@ -83,17 +87,20 @@ impl fmt::Display for ApiKind {
 /// The easiest way to do that is to use `#[tokio::test]` or `#[actix_rt::test]` instead of
 /// `#[test]`.
 ///
-/// # Example
+/// # Examples
 ///
-/// ```
+/// ```no_run
+/// # use exonum_testkit::{ApiKind, TestKitBuilder};
+/// use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
+///
 /// #[tokio::test]
 /// async fn test_api() {
-///     let testkit = TestKitBuilder::validator().build();
+/// # // Some shenanigans to not drop test code into the void
+/// # }
+/// # #[tokio::main]
+/// # async fn main() {
+///     let mut testkit = TestKitBuilder::validator().build();
 ///     let api = testkit.api();
-///
-///     // By default we only have Rust runtime endpoints.
-///     use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
-///
 ///     let proto_sources: Vec<ProtoSourceFile> = api
 ///         .public(ApiKind::RustRuntime)
 ///         .query(&ProtoSourcesQuery::Core)
@@ -241,7 +248,7 @@ pub struct RequestBuilder<'a, 'b, Q = ()> {
 
 impl<'a, 'b, Q> fmt::Debug for RequestBuilder<'a, 'b, Q>
 where
-    Q: 'b + fmt::Debug + Serialize,
+    Q: 'b + fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.debug_struct("RequestBuilder")
@@ -254,7 +261,7 @@ where
 
 impl<'a, 'b, Q> RequestBuilder<'a, 'b, Q>
 where
-    Q: 'b + Serialize,
+    Q: 'b,
 {
     fn new(
         test_server_url: &'a str,
@@ -310,77 +317,6 @@ where
         }
     }
 
-    /// Sends a get request to the testing API endpoint and decodes response as
-    /// the corresponding type.
-    ///
-    /// If query was specified, it is serialized as a query string parameters.
-    pub async fn get<R>(self, endpoint: &str) -> api::Result<R>
-    where
-        R: DeserializeOwned + 'static,
-    {
-        let params = self
-            .query
-            .as_ref()
-            .map(|query| {
-                format!(
-                    "?{}",
-                    serde_urlencoded::to_string(query).expect("Unable to serialize query.")
-                )
-            })
-            .unwrap_or_default();
-        let url = format!(
-            "{url}{access}/{prefix}/{endpoint}{query}",
-            url = self.test_server_url,
-            access = self.access,
-            prefix = self.prefix,
-            endpoint = endpoint,
-            query = params
-        );
-
-        trace!("GET {}", url);
-
-        let mut builder = self.test_client.get(&url);
-        if let Some(modifier) = self.modifier {
-            builder = modifier(builder);
-        }
-        let response = builder.send().await.expect("Unable to send request");
-        Self::verify_headers(&self.expected_headers, &response);
-        Self::response_to_api_result(response).await
-    }
-
-    /// Sends a post request to the testing API endpoint and decodes response as
-    /// the corresponding type.
-    ///
-    /// If query was specified, it is serialized as a JSON in the request body.
-    pub async fn post<R>(self, endpoint: &str) -> api::Result<R>
-    where
-        R: DeserializeOwned + 'static,
-    {
-        let url = format!(
-            "{url}{access}/{prefix}/{endpoint}",
-            url = self.test_server_url,
-            access = self.access,
-            prefix = self.prefix,
-            endpoint = endpoint
-        );
-
-        trace!("POST {}", url);
-
-        let builder = self.test_client.post(&url);
-        let mut builder = if let Some(query) = self.query.as_ref() {
-            trace!("Body: {}", serde_json::to_string_pretty(&query).unwrap());
-            builder.json(query)
-        } else {
-            builder.json(&serde_json::Value::Null)
-        };
-        if let Some(modifier) = self.modifier {
-            builder = modifier(builder);
-        }
-        let response = builder.send().await.expect("Unable to send request");
-        Self::verify_headers(&self.expected_headers, &response);
-        Self::response_to_api_result(response).await
-    }
-
     // Checks that response contains headers expected by the request author.
     fn verify_headers(expected_headers: &HashMap<String, String>, response: &Response) {
         let headers = response.headers();
@@ -407,7 +343,7 @@ where
     {
         let code = response.status();
         let body = response.text().await.expect("Unable to get response text");
-        trace!("Body: {}", body);
+        log::trace!("Body: {}", body);
         if code == StatusCode::OK {
             let value = serde_json::from_str(&body).expect("Unable to deserialize body");
             Ok(value)
@@ -415,6 +351,127 @@ where
             let error = api::Error::parse(code, &body).expect("Unable to deserialize API error");
             Err(error)
         }
+    }
+}
+
+impl<Q> RequestBuilder<'_, '_, Q>
+where
+    Q: Serialize,
+{
+    /// Sends a GET request to the testing API endpoint and decodes response as
+    /// the corresponding type.
+    ///
+    /// If query was specified, it is serialized as a query string parameters.
+    pub async fn get<R>(self, endpoint: &str) -> api::Result<R>
+    where
+        R: DeserializeOwned + 'static,
+    {
+        let params = self
+            .query
+            .as_ref()
+            .map(|query| {
+                format!(
+                    "?{}",
+                    serde_urlencoded::to_string(query).expect("Unable to serialize query.")
+                )
+            })
+            .unwrap_or_default();
+        let url = format!(
+            "{url}{access}/{prefix}/{endpoint}{query}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint,
+            query = params
+        );
+
+        log::trace!("GET {}", url);
+
+        let mut builder = self.test_client.get(&url);
+        if let Some(modifier) = self.modifier {
+            builder = modifier(builder);
+        }
+        let response = builder.send().await.expect("Unable to send request");
+        Self::verify_headers(&self.expected_headers, &response);
+        Self::response_to_api_result(response).await
+    }
+
+    /// Sends a POST request to the testing API endpoint and decodes response as
+    /// the corresponding type.
+    ///
+    /// If query was specified, it is serialized as a JSON in the request body.
+    pub async fn post<R>(self, endpoint: &str) -> api::Result<R>
+    where
+        R: DeserializeOwned + 'static,
+    {
+        let url = format!(
+            "{url}{access}/{prefix}/{endpoint}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint
+        );
+
+        log::trace!("POST {}", url);
+
+        let builder = self.test_client.post(&url);
+        let mut builder = if let Some(query) = self.query.as_ref() {
+            builder.json(query)
+        } else {
+            builder.json(&serde_json::Value::Null)
+        };
+        if let Some(modifier) = self.modifier {
+            builder = modifier(builder);
+        }
+        let response = builder.send().await.expect("Unable to send request");
+        Self::verify_headers(&self.expected_headers, &response);
+        Self::response_to_api_result(response).await
+    }
+}
+
+impl<Q> RequestBuilder<'_, '_, Q>
+where
+    Q: ProtobufConvert,
+    Q::ProtoStruct: protobuf::Message,
+{
+    /// Sends a POST request to the testing API endpoint and decodes response as
+    /// the corresponding type.
+    ///
+    /// The query is serialized as Protobuf using `Content-Type: application/octet-stream`.
+    pub async fn post_pb<R>(self, endpoint: &str) -> api::Result<R>
+    where
+        R: DeserializeOwned + 'static,
+    {
+        let url = format!(
+            "{url}{access}/{prefix}/{endpoint}",
+            url = self.test_server_url,
+            access = self.access,
+            prefix = self.prefix,
+            endpoint = endpoint
+        );
+
+        log::trace!("POST Protobuf {}", url);
+
+        let body = self
+            .query
+            .map(|query| {
+                let message = query.to_pb();
+                protobuf::Message::write_to_bytes(&message)
+                    .expect("Cannot write Protobuf message to `Vec<u8>`")
+            })
+            .unwrap_or_default();
+        let mut builder = self
+            .test_client
+            .post(&url)
+            .header("Content-Type", "application/octet-stream")
+            .body(body);
+        if let Some(modifier) = self.modifier {
+            builder = modifier(builder);
+        }
+
+        let response = builder.send().await.expect("Unable to send request");
+        Self::verify_headers(&self.expected_headers, &response);
+        Self::response_to_api_result(response).await
     }
 }
 
@@ -426,7 +483,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
         App::new().service(public_apis).service(private_apis)
     });
 
-    info!("Test server created on {}", server.addr());
+    log::info!("Test server created on {}", server.addr());
     server
 }
 
