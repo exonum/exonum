@@ -93,12 +93,15 @@ impl fmt::Display for ApiKind {
 ///
 /// #[tokio::test]
 /// async fn test_api() {
-/// # // Some shenanigans to not drop test code into the void
+/// # // Trick to execute the test code rather than dropping it; the content of `#[tokio::test]`s
+/// # // is dropped in doc tests.
 /// # }
 /// # #[tokio::main]
 /// # async fn main() {
 ///     let mut testkit = TestKitBuilder::validator().build();
 ///     let api = testkit.api();
+///     // Without services / plugins, API only contains endpoints
+///     // provided by the Rust runtime.
 ///     let proto_sources: Vec<ProtoSourceFile> = api
 ///         .public(ApiKind::RustRuntime)
 ///         .query(&ProtoSourcesQuery::Core)
@@ -432,10 +435,11 @@ where
     Q: ProtobufConvert,
     Q::ProtoStruct: protobuf::Message,
 {
-    /// Sends a POST request to the testing API endpoint and decodes response as
+    /// Sends a Protobuf-encoded POST request to the testing API endpoint and decodes response as
     /// the corresponding type.
     ///
     /// The query is serialized as Protobuf using `Content-Type: application/octet-stream`.
+    /// If the query was not specified, an empty buffer is used.
     pub async fn post_pb<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,
