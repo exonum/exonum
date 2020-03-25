@@ -16,7 +16,7 @@
     "type": "git",
     "url": "git+https://github.com/exonum/exonum.git"
   },
-  "author": "Exonum Team <exonum@bitfury.com>",
+  "author": "The Exonum Team <contact@exonum.com>",
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/exonum/exonum/issues"
