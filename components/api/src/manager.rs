@@ -223,6 +223,7 @@ impl ApiManager {
         let res = self.run_inner(endpoints_rx).await;
         // Stop the HTTP server(s) in any case.
         self.stop_servers().await;
+        log::info!("HTTP servers shut down");
         res
     }
 

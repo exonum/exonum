@@ -160,7 +160,7 @@ def generate_config(
     consensus: dict = None,
     artifact_name: str = ARTIFACT_NAME,
     instances: dict = None,
-    deploy: bool = True
+    artifact_action: str = "deploy"
 ) -> dict:
     if instances is None:
         instances = {}
@@ -173,7 +173,7 @@ def generate_config(
                 "runtime": "rust",
                 "name": artifact_name,
                 "version": ARTIFACT_VERSION,
-                "deploy": deploy
+                "action": artifact_action
             }
         },
         "instances": instances,
