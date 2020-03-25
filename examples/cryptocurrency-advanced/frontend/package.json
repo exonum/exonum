@@ -2,7 +2,7 @@
   "name": "cryptocurrency-demo",
   "version": "1.0.0",
   "description": "Cryptocurrency demo",
-  "author": "Exonum Team <exonum@bitfury.com>",
+  "author": "The Exonum Team <contact@exonum.com>",
   "license": "Apache-2.0",
   "scripts": {
     "proto": "pbjs --keep-case -t static-module --root cryptocurrency --path node_modules/exonum-client/proto ../backend/src/proto/service.proto -o ./proto/stubs.js",

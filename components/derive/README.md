@@ -33,7 +33,7 @@ Include `exonum-derive` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-derive = "1.0.0-rc.2"
+exonum-derive = "1.0.0-rc.3"
 ```
 
 ## License

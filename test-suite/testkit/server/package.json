@@ -20,7 +20,7 @@
     "type": "git",
     "url": "git+https://github.com/exonum/exonum-testkit.git"
   },
-  "author": "Exonum Team <exonum@bitfury.com>",
+  "author": "The Exonum Team <contact@exonum.com>",
   "license": "Apache-2.0",
   "homepage": "https://github.com/exonum/exonum-testkit/tree/master/examples/server#readme",
   "dependencies": {

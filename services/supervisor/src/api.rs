@@ -632,7 +632,7 @@ use exonum_proto::ProtobufBase64;
 #[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct DeployInfoQuery {
-    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2".
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.3".
     pub artifact: String,
     /// Artifact spec bytes serialized as any of four base64 variations supported by Protobuf
     /// (standard or URL-safe, with or without padding).
@@ -692,7 +692,7 @@ impl From<DeployRequest> for DeployInfoQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct MigrationInfoQuery {
-    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2"
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.3"
     pub new_artifact: String,
     /// Target service name.
     pub service: String,
