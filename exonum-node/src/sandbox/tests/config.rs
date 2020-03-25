@@ -19,7 +19,7 @@ use exonum::{
     merkledb::BinaryValue,
 };
 
-use crate::sandbox::{config_updater::TxConfig, sandbox_tests_helper::*, timestamping_sandbox};
+use crate::sandbox::{sandbox_tests_helper::*, supervisor::TxConfig, timestamping_sandbox};
 
 /// - exclude validator from consensus
 /// - idea of test is to exclude sandbox validator from consensus

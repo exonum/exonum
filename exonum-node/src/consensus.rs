@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow::bail;
+use anyhow::{bail, format_err};
 use exonum::{
-    blockchain::{Blockchain, BlockchainMut, PersistentPool, ProposerId, Schema, TransactionCache},
+    blockchain::{
+        BlockContents, BlockKind, BlockParams, BlockPatch, Blockchain, BlockchainMut,
+        PersistentPool, ProposerId, Schema, TransactionCache,
+    },
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
-    merkledb::{BinaryValue, Fork, ObjectHash, Patch},
+    merkledb::{BinaryValue, Fork, ObjectHash},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
     runtime::ExecutionError,
 };
@@ -32,6 +35,7 @@ use crate::{
         Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
         TransactionsResponse,
     },
+    proposer::{ProposeParams, ProposeTemplate},
     schema::NodeSchema,
     state::{IncompleteBlock, ProposeState, RequestData},
     NodeHandler,
@@ -70,7 +74,7 @@ impl PersistChanges for BlockchainMut {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) enum RoundAction {
     /// New height was achieved.
-    NewHeight,
+    NewEpoch,
     /// No actions happened.
     None,
 }
@@ -106,30 +110,28 @@ impl NodeHandler {
         }
 
         // Warning for messages from previous and future height
-        if msg.height() < self.state.height().previous()
-            || msg.height() > self.state.height().next()
-        {
+        if msg.epoch() < self.state.epoch().previous() || msg.epoch() > self.state.epoch().next() {
             warn!(
                 "Received consensus message from other height: msg.height={}, self.height={}",
-                msg.height(),
-                self.state.height()
+                msg.epoch(),
+                self.state.epoch()
             );
         }
 
         // Ignore messages from previous and future height
-        if msg.height() < self.state.height() || msg.height() > self.state.height().next() {
+        if msg.epoch() < self.state.epoch() || msg.epoch() > self.state.epoch().next() {
             return;
         }
 
         // Queued messages from next height or round
         // TODO: Should we ignore messages from far rounds? (ECR-171)
-        if msg.height() == self.state.height().next() || msg.round() > self.state.round() {
+        if msg.epoch() == self.state.epoch().next() || msg.round() > self.state.round() {
             trace!(
                 "Received consensus message from future round: msg.height={}, msg.round={}, \
                  self.height={}, self.round={}",
-                msg.height(),
+                msg.epoch(),
                 msg.round(),
-                self.state.height(),
+                self.state.epoch(),
                 self.state.round()
             );
             let validator = msg.validator();
@@ -138,7 +140,7 @@ impl NodeHandler {
             trace!("Trying to reach actual round.");
             if let Some(r) = self.state.update_validator_round(validator, round) {
                 trace!("Scheduling jump to round.");
-                let height = self.state.height();
+                let height = self.state.epoch();
                 self.execute_later(InternalRequest::JumpToRound(height, r));
             }
             return;
@@ -161,6 +163,14 @@ impl NodeHandler {
             self.state.consensus_public_key_of(msg.payload().validator)
         );
 
+        if msg.payload().skip && !msg.payload().transactions.is_empty() {
+            error!(
+                "Received no-op propose with non-empty transaction list: {:?}",
+                msg
+            );
+            return;
+        }
+
         // Check prev_hash
         if msg.payload().prev_hash != self.state.last_hash() {
             error!("Received propose with wrong last_block_hash msg={:?}", msg);
@@ -168,11 +178,11 @@ impl NodeHandler {
         }
 
         // Check leader
-        if msg.payload().validator != self.state.leader(msg.payload().round()) {
+        if msg.payload().validator != self.state.leader(msg.payload().round) {
             error!(
                 "Wrong propose leader detected: actual={}, expected={}",
                 msg.payload().validator,
-                self.state.leader(msg.payload().round())
+                self.state.leader(msg.payload().round)
             );
             return;
         }
@@ -203,7 +213,7 @@ impl NodeHandler {
                 self.request(RequestData::ProposeTransactions(hash), node);
             }
         } else {
-            self.handle_full_propose(hash, msg.payload().round());
+            self.handle_full_propose(hash, msg.payload().round);
         }
     }
 
@@ -216,7 +226,7 @@ impl NodeHandler {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
-                msg.payload().to().to_hex(),
+                msg.payload().to.to_hex(),
                 msg.author().to_hex()
             );
         }
@@ -228,12 +238,21 @@ impl NodeHandler {
             );
         }
 
-        let block = msg.payload().block();
+        let block = &msg.payload().block;
         let block_hash = block.object_hash();
+        let epoch = block
+            .epoch()
+            .ok_or_else(|| format_err!("Received block without `epoch` field"))?;
 
         // TODO: Add block with greater height to queue. (ECR-171)
-        if self.state.height() != block.height {
-            bail!("Received block has another height, msg={:?}", msg);
+        let is_next_height = self.state.blockchain_height() == block.height;
+        let is_future_epoch =
+            self.state.blockchain_height() == block.height.next() && self.state.epoch() <= epoch;
+        if !is_next_height && !is_future_epoch {
+            bail!(
+                "Received block has inappropriate height or epoch, msg={:?}",
+                msg
+            );
         }
 
         // Check block content.
@@ -250,15 +269,18 @@ impl NodeHandler {
         if self.state.incomplete_block().is_some() {
             bail!("Already there is an incomplete block, msg={:?}", msg);
         }
-        if !msg.payload().verify_tx_hash() {
-            bail!("Received block has invalid tx_hash, msg={:?}", msg);
-        }
         if block.get_header::<ProposerId>()?.is_none() {
             bail!("Received block without `proposer_id` header");
         }
+        if block.is_skip() && !msg.payload().transactions.is_empty() {
+            bail!("Received block skip with non-empty transactions");
+        }
+        if !msg.payload().verify_tx_hash() {
+            bail!("Received block has invalid tx_hash, msg={:?}", msg);
+        }
 
-        let precommits = into_verified(msg.payload().precommits())?;
-        self.validate_precommits(&precommits, block_hash, block.height)?;
+        let precommits = into_verified(&msg.payload().precommits)?;
+        self.validate_precommits(&precommits, epoch, block_hash)?;
         Ok(precommits)
     }
 
@@ -329,7 +351,7 @@ impl NodeHandler {
                  this should never occur. Round: {:?}, propose hash: {:?}, height: {:?}",
                 round,
                 propose_hash,
-                self.state.height()
+                self.state.epoch()
             )
         });
         if propose_state.has_invalid_txs() {
@@ -356,7 +378,7 @@ impl NodeHandler {
                  this should never occur. Round: {:?}, propose hash: {:?}, height: {:?}",
                 round,
                 propose_hash,
-                self.state.height()
+                self.state.epoch()
             )
         });
         if propose_state.has_invalid_txs() {
@@ -390,7 +412,7 @@ impl NodeHandler {
         for round in start_round.iter_to(self.state.round().next()) {
             if self.state.has_majority_prevotes(round, hash) {
                 let action = self.handle_majority_prevotes(round, hash);
-                if action == RoundAction::NewHeight {
+                if action == RoundAction::NewEpoch {
                     return action;
                 }
             }
@@ -408,10 +430,13 @@ impl NodeHandler {
                  incorrect or validators majority works incorrectly."
             );
 
-            let precommits = self.state.precommits(round, our_block_hash).to_vec();
-            self.commit(our_block_hash, precommits.into_iter(), Some(propose_round));
-
-            return RoundAction::NewHeight;
+            let precommits = self
+                .state
+                .precommits(round, our_block_hash)
+                .to_vec()
+                .into_iter();
+            self.commit(block_hash, precommits, Some(propose_round));
+            return RoundAction::NewEpoch;
         }
 
         RoundAction::None
@@ -438,10 +463,19 @@ impl NodeHandler {
                 .get_header::<ProposerId>()
                 .expect("`ProposerId` header should be checked in `validate_block_response`")
                 .expect("`ProposerId` header should be checked in `validate_block_response`");
+            let epoch = header
+                .epoch()
+                .expect("`epoch` header should be checked in `validate_block_response`");
 
-            let (computed_block_hash, patch) =
-                self.create_block(proposer_id, header.height, &transactions);
-            // Verify block_hash.
+            let block_contents = if header.is_skip() {
+                BlockContents::Skip
+            } else {
+                BlockContents::Transactions(&transactions)
+            };
+            let patch = self.create_block(proposer_id, epoch, block_contents);
+            let computed_block_hash = patch.block_hash();
+
+            // Verify `block_hash`.
             assert_eq!(
                 computed_block_hash, block_hash,
                 "Block_hash incorrect in the received block={:?}. Either a node's \
@@ -450,8 +484,9 @@ impl NodeHandler {
             );
 
             self.state
-                .add_block(computed_block_hash, patch, transactions, proposer_id);
+                .add_block(patch, transactions, proposer_id, epoch);
         }
+
         self.commit(block_hash, precommits.into_iter(), None);
         self.request_next_block();
     }
@@ -577,7 +612,7 @@ impl NodeHandler {
         let precommits = self.state.precommits(round, our_block_hash).to_vec();
         self.commit(our_block_hash, precommits.into_iter(), Some(round));
 
-        RoundAction::NewHeight
+        RoundAction::NewEpoch
     }
 
     /// Locks node to the specified round, so pre-votes for the lower round will be ignored.
@@ -662,29 +697,26 @@ impl NodeHandler {
         }
     }
 
-    /// Commits block, so new height is achieved.
+    /// Commits block, so that the new height is achieved.
     fn commit<I: Iterator<Item = Verified<Precommit>>>(
         &mut self,
         block_hash: Hash,
         precommits: I,
         round: Option<Round>,
     ) {
-        trace!("COMMIT {:?}", block_hash);
-
         let mut block_state = self.state.take_block_for_commit(&block_hash);
+        let block_kind = block_state.kind();
+        let block_epoch = block_state.epoch();
         let committed_txs = block_state.txs();
         let proposer = block_state.proposer_id();
+
+        trace!("COMMIT {:?} {:?}", block_kind, block_hash);
 
         // Remove committed transactions from the cache.
         for tx_hash in committed_txs {
             self.state.tx_cache_mut().remove(tx_hash);
         }
         let committed_txs_len = committed_txs.len();
-
-        // Commit block patch to the storage.
-        self.blockchain
-            .commit(block_state.patch(), block_hash, precommits)
-            .expect("Cannot commit block");
 
         // Consensus messages cache is useful only during one height, so it should be
         // cleared when a new height is achieved.
@@ -693,26 +725,47 @@ impl NodeHandler {
             "Cannot clear consensus messages",
         );
 
-        // Update node state.
-        self.state
-            .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
-        // Update state to new height.
-        let block_hash = self.blockchain.as_ref().last_hash();
-        self.state
-            .new_height(&block_hash, self.system_state.current_time());
+        self.blockchain
+            .commit(block_state.patch(), precommits)
+            .expect("Cannot commit block");
 
-        let snapshot = self.blockchain.snapshot();
-        for plugin in &self.plugins {
-            plugin.after_commit(&snapshot);
+        match block_kind {
+            BlockKind::Normal => {
+                // Update node state.
+                self.state
+                    .update_config(Schema::new(&self.blockchain.snapshot()).consensus_config());
+                // Update state to new height.
+                self.state.new_height(
+                    block_hash,
+                    block_epoch.next(),
+                    self.system_state.current_time(),
+                );
+
+                let snapshot = self.blockchain.snapshot();
+                for plugin in &self.plugins {
+                    plugin.after_commit(&snapshot);
+                }
+            }
+
+            BlockKind::Skip => {
+                // Update state to the new epoch (but not a new height).
+                self.state
+                    .new_epoch(block_epoch.next(), self.system_state.current_time());
+            }
+
+            _ => unreachable!("No other block kinds are supported"),
         }
 
+        let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();
-
-        let height = self.state.height();
+        let epoch = self.state.epoch();
+        let blockchain_height = self.state.blockchain_height();
         info!(
-            "COMMIT ====== height={}, proposer={}, round={}, committed={}, pool={}, hash={}",
-            height,
+            "COMMIT ====== epoch={}, height={}, proposer={}, round={}, \
+             committed={}, pool={}, hash={}",
+            epoch,
+            blockchain_height,
             proposer,
             round.map_or_else(|| "?".to_owned(), |x| x.to_string()),
             committed_txs_len,
@@ -723,14 +776,15 @@ impl NodeHandler {
         self.broadcast_status();
         self.add_status_timeout();
 
-        // Add timeout for first round
+        // Add timeout for the first round.
         self.add_round_timeout();
-        // Send propose we is leader
+        // Send propose if we are the round leader.
         if self.state.is_leader() {
             self.add_propose_timeout();
         }
 
-        // Handle queued messages
+        // Handle queued messages. Note that this will drop all messages if the node jumps
+        // epochs (e.g., when it lags behind).
         for msg in self.state.queued() {
             self.handle_consensus(msg);
         }
@@ -802,7 +856,7 @@ impl NodeHandler {
             // If a new height was achieved, no more proposals for this height
             // should be processed. However, we still have to remove requests.
             if !height_bumped {
-                height_bumped = self.handle_full_propose(hash, round) == RoundAction::NewHeight;
+                height_bumped = self.handle_full_propose(hash, round) == RoundAction::NewEpoch;
             }
         }
 
@@ -812,7 +866,7 @@ impl NodeHandler {
         // process the consensus messages.
         let action = self.state.remove_unknown_transaction(hash);
         // Go to handle full block if we've got the last necessary transaction.
-        if action == RoundAction::NewHeight {
+        if action == RoundAction::NewEpoch {
             self.remove_request(&RequestData::BlockTransactions);
             self.handle_full_block();
         }
@@ -827,7 +881,7 @@ impl NodeHandler {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received response intended for another peer, to={}, from={}",
-                msg.payload().to().to_hex(),
+                msg.payload().to.to_hex(),
                 msg.author().to_hex()
             )
         }
@@ -838,8 +892,8 @@ impl NodeHandler {
                 msg.author().to_hex()
             )
         }
-        for tx in msg.payload().transactions() {
-            self.execute_later(InternalRequest::VerifyMessage(tx.clone()));
+        for tx in &msg.payload().transactions {
+            self.execute_later(InternalRequest::VerifyMessage(tx.to_owned()));
         }
         Ok(())
     }
@@ -862,7 +916,7 @@ impl NodeHandler {
     /// Handle new round, after jump.
     pub(crate) fn handle_new_round(&mut self, height: Height, round: Round) {
         trace!("Handle new round");
-        if height != self.state.height() {
+        if height != self.state.epoch() {
             return;
         }
         if round <= self.state.round() {
@@ -900,7 +954,7 @@ impl NodeHandler {
     /// is locked to some round.
     pub(crate) fn handle_round_timeout(&mut self, height: Height, round: Round) {
         // TODO: Debug asserts? (ECR-171)
-        if height != self.state.height() {
+        if height != self.state.epoch() {
             return;
         }
         if round != self.state.round() {
@@ -919,7 +973,7 @@ impl NodeHandler {
     /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
     pub(crate) fn handle_propose_timeout(&mut self, height: Height, round: Round) {
         // TODO debug asserts (ECR-171)?
-        if height != self.state.height() {
+        if height != self.state.epoch() {
             // It is too late
             return;
         }
@@ -929,66 +983,64 @@ impl NodeHandler {
         if self.state.locked_propose().is_some() {
             return;
         }
-        if let Some(validator_id) = self.state.validator_id() {
-            if self.state.have_prevote(round) {
-                return;
-            }
-            let round = self.state.round();
-            let txs = self.get_txs_for_propose();
+        if self.state.have_prevote(round) {
+            return;
+        }
 
-            let propose = self.sign_message(Propose::new(
+        let validator_id = if let Some(validator_id) = self.state.validator_id() {
+            validator_id
+        } else {
+            return;
+        };
+        let round = self.state.round();
+
+        let propose_template = self.get_propose_template();
+        let propose = match propose_template {
+            ProposeTemplate::Ordinary { tx_hashes } => Propose::new(
                 validator_id,
-                self.state.height(),
+                self.state.epoch(),
                 round,
                 self.state.last_hash(),
-                txs,
-            ));
-            // Put our propose to the consensus messages cache.
-            self.blockchain.persist_changes(
-                |schema| schema.save_message(round, propose.clone()),
-                "Cannot save `Propose` to message cache",
-            );
+                tx_hashes,
+            ),
 
-            trace!("Broadcast propose: {:?}", propose);
-            self.broadcast(propose.clone());
-            self.allow_expedited_propose = true;
+            ProposeTemplate::Skip => Propose::skip(
+                validator_id,
+                self.state.epoch(),
+                round,
+                self.state.last_hash(),
+            ),
+        };
+        let propose = self.sign_message(propose);
 
-            // Save our propose into state
-            let hash = self.state.add_self_propose(propose);
+        // Put our propose to the consensus messages cache.
+        self.blockchain.persist_changes(
+            |schema| schema.save_message(round, propose.clone()),
+            "Cannot save `Propose` to message cache",
+        );
 
-            // Send prevote
-            let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
-            if has_majority_prevotes {
-                self.handle_majority_prevotes(round, hash);
-            }
+        trace!("Broadcast propose: {:?}", propose);
+        self.broadcast(propose.clone());
+        self.allow_expedited_propose = true;
+
+        // Save our propose into state
+        let hash = self.state.add_self_propose(propose);
+
+        // Send prevote
+        let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
+        if has_majority_prevotes {
+            self.handle_majority_prevotes(round, hash);
         }
     }
 
-    fn get_txs_for_propose(&self) -> Vec<Hash> {
+    fn get_propose_template(&mut self) -> ProposeTemplate {
         let txs_cache_len = self.state.tx_cache_len() as u64;
-        let tx_block_limit = self.txs_block_limit();
+        info!("LEADER: cache = {}", txs_cache_len);
 
         let snapshot = self.blockchain.snapshot();
-        let schema = Schema::new(&snapshot);
-        let pool = schema.transactions_pool();
-        let pool_len = schema.transactions_pool_len();
-
-        info!("LEADER: pool = {}, cache = {}", pool_len, txs_cache_len);
-
-        let remaining_tx_count = tx_block_limit.saturating_sub(txs_cache_len as u32);
-        let cache_max_count = std::cmp::min(u64::from(tx_block_limit), txs_cache_len);
-
-        let mut cache_txs: Vec<Hash> = self
-            .state
-            .tx_cache()
-            .keys()
-            .take(cache_max_count as usize)
-            .cloned()
-            .collect();
-        let pool_txs: Vec<Hash> = pool.iter().take(remaining_tx_count as usize).collect();
-
-        cache_txs.extend(pool_txs);
-        cache_txs
+        let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
+        let params = ProposeParams::new(self.state(), &snapshot);
+        self.block_proposer.propose_block(pool, params)
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.
@@ -1008,8 +1060,9 @@ impl NodeHandler {
 
             let message: SignedMessage = match *data {
                 RequestData::Propose(propose_hash) => self
-                    .sign_message(ProposeRequest::new(peer, self.state.height(), propose_hash))
+                    .sign_message(ProposeRequest::new(peer, self.state.epoch(), propose_hash))
                     .into(),
+
                 RequestData::ProposeTransactions(ref propose_hash) => {
                     let txs: Vec<_> = self
                         .state
@@ -1022,9 +1075,11 @@ impl NodeHandler {
                     self.sign_message(TransactionsRequest::new(peer, txs))
                         .into()
                 }
+
                 RequestData::PoolTransactions => {
                     self.sign_message(PoolTransactionsRequest::new(peer)).into()
                 }
+
                 RequestData::BlockTransactions => {
                     let txs: Vec<_> = match self.state.incomplete_block() {
                         Some(incomplete_block) => {
@@ -1035,19 +1090,29 @@ impl NodeHandler {
                     self.sign_message(TransactionsRequest::new(peer, txs))
                         .into()
                 }
+
                 RequestData::Prevotes(round, propose_hash) => self
                     .sign_message(PrevotesRequest::new(
                         peer,
-                        self.state.height(),
+                        self.state.epoch(),
                         round,
                         propose_hash,
                         self.state.known_prevotes(round, propose_hash),
                     ))
                     .into(),
+
                 RequestData::Block(height) => {
                     self.sign_message(BlockRequest::new(peer, height)).into()
                 }
+
+                RequestData::BlockOrEpoch {
+                    block_height,
+                    epoch,
+                } => self
+                    .sign_message(BlockRequest::with_epoch(peer, block_height, epoch))
+                    .into(),
             };
+
             trace!("Send request {:?} to peer {:?}", data, peer);
             self.send_to_peer(peer, message);
         }
@@ -1057,36 +1122,38 @@ impl NodeHandler {
     fn create_block(
         &mut self,
         proposer_id: ValidatorId,
-        height: Height,
-        tx_hashes: &[Hash],
-    ) -> (Hash, Patch) {
+        epoch: Height,
+        contents: BlockContents<'_>,
+    ) -> BlockPatch {
+        let block_params = BlockParams::with_contents(contents, proposer_id, epoch);
         self.blockchain
-            .create_patch(proposer_id, height, tx_hashes, self.state.tx_cache())
+            .create_patch(block_params, self.state.tx_cache())
     }
 
     /// Calls `create_block` with transactions from the corresponding `Propose` and returns the
     /// block hash.
     fn execute(&mut self, propose_hash: &Hash) -> Hash {
         // if we already execute this block, return hash
-        if let Some(hash) = self.state.propose_mut(propose_hash).unwrap().block_hash() {
+        let propose_state = self.state.propose(propose_hash).unwrap();
+        let block_kind = propose_state.block_kind();
+        if let Some(hash) = propose_state.block_hash() {
             return hash;
         }
-        let propose = self
-            .state
-            .propose(propose_hash)
-            .unwrap()
-            .message()
-            .clone()
-            .into_payload();
 
-        let (block_hash, patch) = self.create_block(
+        let propose = propose_state.message().payload().to_owned();
+        let block_contents = match block_kind {
+            BlockKind::Normal => BlockContents::Transactions(&propose.transactions),
+            BlockKind::Skip => BlockContents::Skip,
+            _ => unreachable!("No other block kinds are supported"),
+        };
+        let patch = self.create_block(propose.validator, propose.epoch, block_contents);
+        let block_hash = patch.block_hash();
+        self.state.add_block(
+            patch,
+            propose.transactions,
             propose.validator,
-            propose.height,
-            propose.transactions.as_slice(),
+            propose.epoch,
         );
-        // Save patch
-        self.state
-            .add_block(block_hash, patch, propose.transactions, propose.validator);
         self.state
             .propose_mut(propose_hash)
             .unwrap()
@@ -1129,20 +1196,9 @@ impl NodeHandler {
         }
 
         // TODO: Randomize next peer. (ECR-171)
-        let heights: Vec<_> = self
-            .state
-            .nodes_with_bigger_height()
-            .into_iter()
-            .cloned()
-            .collect();
-        if !heights.is_empty() {
-            for peer in heights {
-                if self.state.peers().contains_key(&peer) {
-                    let height = self.state.height();
-                    self.request(RequestData::Block(height), peer);
-                    break;
-                }
-            }
+        let peers = self.state.advanced_peers();
+        if let Some((peer, data)) = peers.send_message(&self.state) {
+            self.request(data, peer);
         }
     }
 
@@ -1161,7 +1217,7 @@ impl NodeHandler {
         let locked_round = self.state.locked_round();
         let prevote = self.sign_message(Prevote::new(
             validator_id,
-            self.state.height(),
+            self.state.epoch(),
             round,
             propose_hash,
             locked_round,
@@ -1189,7 +1245,7 @@ impl NodeHandler {
             .expect("called broadcast_precommit in Auditor node.");
         let precommit = self.sign_message(Precommit::new(
             validator_id,
-            self.state.height(),
+            self.state.epoch(),
             round,
             propose_hash,
             block_hash,
@@ -1211,8 +1267,8 @@ impl NodeHandler {
     fn validate_precommits(
         &self,
         precommits: &[Verified<Precommit>],
+        epoch: Height,
         block_hash: Hash,
-        block_height: Height,
     ) -> anyhow::Result<()> {
         if precommits.len() < self.state.majority_count() {
             bail!("Received block without consensus");
@@ -1226,7 +1282,7 @@ impl NodeHandler {
             if !validators.insert(precommit.payload().validator) {
                 bail!("Several precommits from one validator in block");
             }
-            self.validate_precommit(block_hash, block_height, round, precommit)?;
+            self.validate_precommit(block_hash, epoch, round, precommit)?;
         }
 
         Ok(())
@@ -1237,7 +1293,7 @@ impl NodeHandler {
     fn validate_precommit(
         &self,
         block_hash: Hash,
-        block_height: Height,
+        epoch: Height,
         precommit_round: Round,
         precommit: &Verified<Precommit>,
     ) -> anyhow::Result<()> {
@@ -1260,15 +1316,15 @@ impl NodeHandler {
                     precommit
                 );
             }
-            if precommit.height != block_height {
+            if precommit.epoch != epoch {
                 bail!(
-                    "Received precommit with wrong height, precommit={:?}",
+                    "Received precommit belonging to wrong epoch, precommit={:?}",
                     precommit
                 );
             }
             if precommit.round != precommit_round {
                 bail!(
-                    "Received precommits with the different rounds, precommit={:?}",
+                    "Received precommit with the different rounds, precommit={:?}",
                     precommit
                 );
             }

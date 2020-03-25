@@ -16,25 +16,29 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::ProposerId,
-    crypto::Hash,
+    blockchain::{ProposerId, TransactionCache},
+    crypto::{Hash, KeyPair, PublicKey},
     helpers::{Height, Round, ValidatorId},
     merkledb::{BinaryValue, ObjectHash},
     messages::{AnyTx, Verified},
 };
 
-use std::time::Duration;
+use std::{collections::BTreeSet, iter::FromIterator, time::Duration};
 
 use crate::{
     messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
+    proposer::{Pool, ProposeBlock, ProposeParams, ProposeTemplate},
     sandbox::{
-        config_updater::TxConfig,
         sandbox_tests_helper::*,
-        timestamping::{TimestampingTxGenerator, DATA_SIZE},
+        supervisor::{Supervisor, SupervisorService, TxConfig},
+        timestamping::{
+            Timestamping as _, TimestampingService, TimestampingTxGenerator, DATA_SIZE,
+        },
         timestamping_sandbox, timestamping_sandbox_builder, Milliseconds, Sandbox,
     },
     state::TRANSACTIONS_REQUEST_TIMEOUT,
 };
+use exonum::blockchain::Blockchain;
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
 const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
@@ -262,7 +266,7 @@ fn response_size_larger_than_max_message_len() {
             + TX_RES_PB_OVERHEAD_PAYLOAD * 2
             + tx1.to_bytes().len()
             + tx2.to_bytes().len()) as u32;
-        let actual_from = sandbox.current_height().next();
+        let actual_from = sandbox.current_epoch().next();
 
         TxConfig::create_signed(
             sandbox.public_key(ValidatorId(0)),
@@ -709,4 +713,211 @@ fn executing_block_does_not_lead_to_amnesia() {
             sandbox.secret_key(ValidatorId(0)),
         ),
     );
+}
+
+#[derive(Debug)]
+struct WhitelistProposer {
+    key: PublicKey,
+}
+
+impl WhitelistProposer {
+    fn new(key: PublicKey) -> Self {
+        Self { key }
+    }
+}
+
+impl ProposeBlock for WhitelistProposer {
+    fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
+        let tx_hashes = pool.transactions().filter_map(|(tx_hash, tx)| {
+            if tx.author() == self.key {
+                Some(tx_hash)
+            } else {
+                None
+            }
+        });
+        let tx_limit = params.consensus_config().txs_block_limit;
+        let tx_hashes = tx_hashes.take(tx_limit as usize);
+        ProposeTemplate::ordinary(tx_hashes)
+    }
+}
+
+#[test]
+fn propose_with_custom_logic() {
+    let keypair = KeyPair::random();
+    let sandbox = timestamping_sandbox_builder()
+        .with_proposer(WhitelistProposer::new(keypair.public_key()))
+        .build();
+
+    let good_tx = keypair.timestamp(TimestampingService::ID, vec![1, 2, 3]);
+    let other_good_tx = keypair.timestamp(TimestampingService::ID, vec![1]);
+    let bad_tx = KeyPair::random().timestamp(TimestampingService::ID, vec![1, 2, 3]);
+    sandbox.recv(&good_tx);
+    sandbox.recv(&other_good_tx);
+    sandbox.recv(&bad_tx);
+
+    while !sandbox.is_leader() {
+        sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+    }
+    assert!(sandbox.is_leader());
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+
+    let tx_hashes = BTreeSet::from_iter(vec![good_tx.object_hash(), other_good_tx.object_hash()]);
+    let propose = sandbox.create_propose(
+        ValidatorId(0),
+        Height(1),
+        Round(3),
+        sandbox.last_hash(),
+        tx_hashes,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&propose);
+    let prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(3),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&prevote);
+}
+
+#[test]
+fn custom_proposer_does_not_influence_external_proposes() {
+    let keypair = KeyPair::random();
+    let sandbox = timestamping_sandbox_builder()
+        .with_proposer(WhitelistProposer::new(keypair.public_key()))
+        .build();
+
+    let good_tx = keypair.timestamp(TimestampingService::ID, vec![1, 2, 3]);
+    let bad_tx = KeyPair::random().timestamp(TimestampingService::ID, vec![1, 2, 3]);
+    sandbox.recv(&good_tx);
+    sandbox.recv(&bad_tx);
+
+    let propose = sandbox.create_propose(
+        ValidatorId(2),
+        Height(1),
+        Round(1),
+        sandbox.last_hash(),
+        vec![good_tx.object_hash(), bad_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(2)),
+    );
+    sandbox.recv(&propose);
+
+    let prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(1),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&prevote);
+
+    let block = sandbox.create_block(&[good_tx, bad_tx]);
+    let precommits = (1..4).map(|i| {
+        let validator_id = ValidatorId(i);
+        sandbox.create_precommit(
+            validator_id,
+            Height(1),
+            Round(1),
+            propose.object_hash(),
+            block.object_hash(),
+            sandbox.time().into(),
+            sandbox.secret_key(validator_id),
+        )
+    });
+    for precommit in precommits {
+        sandbox.recv(&precommit);
+    }
+
+    sandbox.assert_state(Height(2), Round(1));
+    sandbox.broadcast(&Sandbox::create_status(
+        sandbox.public_key(ValidatorId(0)),
+        Height(2),
+        block.object_hash(),
+        0,
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+}
+
+#[test]
+fn not_proposing_incorrect_transactions() {
+    let sandbox = timestamping_sandbox();
+    add_one_height(&sandbox, &SandboxState::new());
+
+    let tx = gen_timestamping_tx();
+    let stop_service_tx =
+        KeyPair::random().stop_service(SupervisorService::ID, TimestampingService::ID);
+
+    // Send both transactions to the sandbox.
+    sandbox.recv(&tx);
+    sandbox.recv(&stop_service_tx);
+
+    // Accept the block with the transaction stopping the TS service, but not `tx`
+    // (say, we didn't manage to broadcast it).
+    let stop_propose = sandbox.create_propose(
+        ValidatorId(3),
+        Height(2),
+        Round(1),
+        sandbox.last_hash(),
+        vec![stop_service_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(3)),
+    );
+    let block = sandbox.create_block(&[stop_service_tx]);
+
+    let stop_precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            Height(2),
+            Round(1),
+            stop_propose.object_hash(),
+            block.object_hash(),
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    sandbox.recv(&stop_propose);
+    sandbox.broadcast(&sandbox.create_prevote(
+        ValidatorId(0),
+        Height(2),
+        Round(1),
+        stop_propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    ));
+
+    for precommit in stop_precommits {
+        sandbox.recv(&precommit);
+    }
+    sandbox.broadcast(&sandbox.create_our_status(Height(3), Height(3), 1));
+
+    // The transaction is incorrect now.
+    let snapshot = sandbox.blockchain().snapshot();
+    assert!(Blockchain::check_tx(&snapshot, &tx).is_err());
+
+    // Create a proposal.
+    assert!(sandbox.is_leader());
+    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
+
+    let propose = sandbox.create_propose(
+        ValidatorId(0),
+        Height(3),
+        Round(1),
+        sandbox.last_hash(),
+        vec![], // `tx` is incorrect and should not be included into the proposal.
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&propose);
+    let prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(3),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&prevote);
 }

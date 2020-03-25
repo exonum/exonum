@@ -35,7 +35,10 @@ use std::{
     time::Duration,
 };
 
-use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
+use exonum_node::{
+    generate_testnet_config, proposer::SkipEmptyBlocks, Node, NodeBuilder, NodeConfig,
+    ShutdownHandle,
+};
 
 #[derive(Debug)]
 struct RunHandle {
@@ -124,6 +127,7 @@ impl StartCheckerServiceFactory {
 #[derive(Clone, Copy, Default)]
 struct Options {
     slow_blocks: bool,
+    skip_empty_blocks: bool,
     http_start_port: Option<u16>,
 }
 
@@ -161,14 +165,17 @@ fn run_nodes(
             .build();
 
         let db = TemporaryDB::new();
-        let node = NodeBuilder::new(db, node_cfg, node_keys)
+        let mut node_builder = NodeBuilder::new(db, node_cfg, node_keys)
             .with_genesis_config(genesis_cfg)
             .with_runtime_fn(|channel| {
                 RustRuntime::builder()
                     .with_factory(service)
                     .build(channel.endpoints_sender())
-            })
-            .build();
+            });
+        if options.skip_empty_blocks {
+            node_builder = node_builder.with_block_proposer(SkipEmptyBlocks);
+        }
+        let node = node_builder.build();
 
         node_handles.push(RunHandle::new(node));
         commit_rxs.push(commit_rx);
@@ -192,6 +199,7 @@ async fn nodes_commit_blocks() {
 }
 
 #[tokio::test]
+#[cfg_attr(windows, ignore)]
 async fn node_frees_sockets_on_shutdown() {
     let options = Options {
         http_start_port: Some(16_351),
@@ -253,6 +261,56 @@ async fn nodes_flush_transactions_to_storage_before_commit() {
 }
 
 #[tokio::test]
+async fn nodes_commit_blocks_with_custom_proposal_logic() {
+    const TIMEOUT: Duration = Duration::from_secs(10);
+
+    let options = Options {
+        skip_empty_blocks: true,
+        ..Options::default()
+    };
+    let (nodes, mut commit_rxs) = run_nodes(4, 16_500, options);
+
+    // Send a transaction to the node and wait for it to be committed.
+    let tx = KeyPair::random().timestamp(CommitWatcherService::ID, 0);
+    let tx_hash = tx.object_hash();
+    let send_tx = nodes[0].blockchain.sender().broadcast_transaction(tx);
+    send_tx.await.unwrap();
+
+    let commit_notifications = commit_rxs
+        .iter_mut()
+        .map(|rx| async move { timeout(TIMEOUT, rx.next()).await });
+    future::try_join_all(commit_notifications).await.unwrap();
+
+    let snapshot = nodes[1].blockchain.snapshot();
+    let schema = snapshot.for_core();
+    assert!(schema.transactions().contains(&tx_hash));
+    assert!(schema.transactions_locations().contains(&tx_hash));
+
+    // Check that no new blocks are being approved when there are no transactions.
+    delay_for(TIMEOUT / 2).await;
+    for commit_rx in &mut commit_rxs {
+        assert!(commit_rx.next().now_or_never().is_none());
+    }
+
+    let other_tx = KeyPair::random().timestamp(CommitWatcherService::ID, 0);
+    let other_send_tx = nodes[0].blockchain.sender().broadcast_transaction(other_tx);
+    other_send_tx.await.unwrap();
+
+    let new_commit_notifications = commit_rxs
+        .iter_mut()
+        .map(|rx| async move { timeout(TIMEOUT, rx.next()).await });
+    future::try_join_all(new_commit_notifications)
+        .await
+        .unwrap();
+
+    let last_block = nodes[0].blockchain.last_block();
+    assert_eq!(last_block.height, Height(2));
+    assert!(last_block.epoch().unwrap() > Height(5));
+
+    future::join_all(nodes.into_iter().map(RunHandle::join)).await;
+}
+
+#[tokio::test]
 async fn node_restart_regression() {
     let start_node = |node_cfg: NodeConfig, node_keys, db, start_times| {
         let service = StartCheckerServiceFactory(start_times);
@@ -275,7 +333,7 @@ async fn node_restart_regression() {
     };
 
     let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-    let (node_cfg, node_keys) = generate_testnet_config(1, 3600).pop().unwrap();
+    let (node_cfg, node_keys) = generate_testnet_config(1, 3_600).pop().unwrap();
 
     let start_times = Arc::new(Mutex::new(0));
     // First launch

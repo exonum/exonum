@@ -7,6 +7,18 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### Breaking changes
 
+#### exonum
+
+- `create_patch` and `commit` methods in `BlockchainMut` have been generalized
+  to support block skipping (see *New Features* section for more details). (#1820)
+
+#### exonum-cli
+
+- `run-dev` command has been reworked. It now does not clear database files
+  after the launch. `artifacts-dir` parameter has been renamed to
+  `blockchain-path`. Configuration files are now stored inside `config`
+  subdirectory. (#1822)
+
 #### exonum-supervisor
 
 - `MigrationRequest` was made non-exhaustive. (#1823)
@@ -16,18 +28,30 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `supervisor_name` method was removed. Use `Supervisor::NAME` instead. (#1823)
 
-#### exonum-cli
-
-- `run-dev` command has been reworked. It now does not clear database files
-  after the launch. `artifacts-dir` parameter has been renamed to
-  `blockchain-path`. Configuration files are now stored inside `config`
-  subdirectory. (#1822)
-
 ### New Features
+
+#### exonum-node
+
+- Exonum nodes can now customize how they create block proposals. This can be
+  used to whitelist / blacklist transaction authors or services, prioritize
+  transactions by advanced criteria, implement complex rate limiting, etc.
+  The functionality is available via `proposer` module. (#1820)
+
+- Exonum nodes can now skip block generation at a certain epoch of the consensus
+  algorithm. This can be used to keep a "heartbeat" when the network load is low
+  without bloating the storage used by the nodes. (#1820)
 
 #### exonum-cli
 
 - Several constants in the `command` module became public. (#1821)
+
+### Bug Fixes
+
+#### exonum-node
+
+- Fixed a bug when a node created a propose with incorrect transactions.
+  This could lead to consensus failure or weird error messages in the node log.
+  (#1820)
 
 #### exonum-supervisor
 

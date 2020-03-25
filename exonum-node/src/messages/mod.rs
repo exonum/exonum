@@ -282,26 +282,26 @@ impl Consensus {
     /// Returns validator id of the message sender.
     pub fn validator(&self) -> ValidatorId {
         match self {
-            Self::Propose(msg) => msg.payload().validator(),
-            Self::Prevote(msg) => msg.payload().validator(),
+            Self::Propose(msg) => msg.payload().validator,
+            Self::Prevote(msg) => msg.payload().validator,
             Self::Precommit(msg) => msg.payload().validator,
         }
     }
 
-    /// Returns height of the message.
-    pub fn height(&self) -> Height {
+    /// Returns the epoch the message belongs tp.
+    pub fn epoch(&self) -> Height {
         match self {
-            Self::Propose(msg) => msg.payload().height(),
-            Self::Prevote(msg) => msg.payload().height(),
-            Self::Precommit(msg) => msg.payload().height,
+            Self::Propose(msg) => msg.payload().epoch,
+            Self::Prevote(msg) => msg.payload().epoch,
+            Self::Precommit(msg) => msg.payload().epoch,
         }
     }
 
     /// Returns round of the message.
     pub fn round(&self) -> Round {
         match self {
-            Self::Propose(msg) => msg.payload().round(),
-            Self::Prevote(msg) => msg.payload().round(),
+            Self::Propose(msg) => msg.payload().round,
+            Self::Prevote(msg) => msg.payload().round,
             Self::Precommit(msg) => msg.payload().round,
         }
     }
@@ -341,7 +341,8 @@ mod tests {
         let keypair = KeyPair::random();
 
         let msg = Status {
-            height: Height(0),
+            epoch: Height(0),
+            blockchain_height: Height(0),
             last_hash: Hash::zero(),
             pool_size: 0,
         };
@@ -367,7 +368,8 @@ mod tests {
         let keypair = KeyPair::random();
 
         let msg = Status {
-            height: Height(0),
+            epoch: Height(0),
+            blockchain_height: Height(0),
             last_hash: Hash::zero(),
             pool_size: 0,
         };
@@ -386,7 +388,8 @@ mod tests {
 
         let msg = Verified::from_value(
             Status {
-                height: Height(0),
+                epoch: Height(0),
+                blockchain_height: Height(0),
                 last_hash: Hash::zero(),
                 pool_size: 0,
             },
@@ -483,17 +486,17 @@ mod tests {
         ];
         let transactions = [
             Verified::from_value(
-                Status::new(Height(2), crypto::hash(&[]), 0),
+                Status::new(Height(2), Height(2), crypto::hash(&[]), 0),
                 keys.public_key(),
                 keys.secret_key(),
             ),
             Verified::from_value(
-                Status::new(Height(4), crypto::hash(&[2]), 0),
+                Status::new(Height(4), Height(4), crypto::hash(&[2]), 0),
                 keys.public_key(),
                 keys.secret_key(),
             ),
             Verified::from_value(
-                Status::new(Height(7), crypto::hash(&[3]), 0),
+                Status::new(Height(7), Height(7), crypto::hash(&[3]), 0),
                 keys.public_key(),
                 keys.secret_key(),
             ),

@@ -698,7 +698,7 @@ fn conflicting_service_instances() {
     );
 
     // Commit first fork.
-    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
+    blockchain.commit(patch, vec![]).unwrap();
 
     assert_eq!(
         events_handle.take(),
@@ -858,7 +858,7 @@ fn dependent_service_in_same_block() {
             ),
         ],
     );
-    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
+    blockchain.commit(patch, vec![]).unwrap();
 
     // Start both services in the same block.
     let patch = create_block_with_transactions(
@@ -880,7 +880,7 @@ fn dependent_service_in_same_block() {
             ),
         ],
     );
-    blockchain.commit(patch.1, patch.0, vec![]).unwrap();
+    blockchain.commit(patch, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = snapshot.for_dispatcher();

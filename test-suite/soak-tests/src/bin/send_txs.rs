@@ -37,9 +37,8 @@ use std::{
 };
 
 use exonum_soak_tests::{
-    run_nodes,
     services::{MainConfig, MainService, MainServiceInterface},
-    RunHandle,
+    NetworkBuilder, RunHandle,
 };
 
 /// Runs a network with a service and sends transactions to it, measuring how fast
@@ -172,14 +171,12 @@ async fn main() {
     );
 
     let flush_strategy = args.flush_strategy.unwrap_or_default();
-    let nodes = run_nodes(
-        args.node_count,
-        2_000,
-        |node_cfg| {
+    let nodes = NetworkBuilder::new(args.node_count, 2_000)
+        .modify_config(|node_cfg| {
             node_cfg.mempool.flush_pool_strategy = flush_strategy.clone();
-        },
-        |genesis, rt| main_service.clone().deploy(genesis, rt),
-    );
+        })
+        .init_node(|genesis, rt| main_service.clone().deploy(genesis, rt))
+        .build();
 
     let keys = KeyPair::random();
     let delay = Duration::from_secs(1).mul_f64(1.0 / args.tps as f64);

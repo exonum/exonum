@@ -55,6 +55,26 @@ impl BlockHeaderKey for ProposerId {
     type Value = ValidatorId;
 }
 
+/// Epoch of the consensus algorithm. This field must be present in all correctly formed blocks.
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Epoch(());
+
+impl BlockHeaderKey for Epoch {
+    const NAME: &'static str = "epoch";
+    type Value = Height;
+}
+
+/// Flag indicating a [block skip]. This flag is not set for normal blocks.
+///
+/// [block skip]: enum.BlockContents.html#variant.Skip
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct SkipFlag(());
+
+impl BlockHeaderKey for SkipFlag {
+    const NAME: &'static str = "skip";
+    type Value = ();
+}
+
 /// Expandable set of headers allowed to be added to the block.
 ///
 /// In a serialized form, headers are represented as a sequence of
@@ -127,6 +147,27 @@ impl Block {
     #[doc(hidden)]
     pub fn add_header<K: BlockHeaderKey>(&mut self, value: K::Value) {
         self.additional_headers.insert::<K>(value);
+    }
+
+    /// Adds the epoch to this block.
+    pub(super) fn add_epoch(&mut self, epoch: Height) {
+        self.add_header::<Epoch>(epoch);
+    }
+
+    /// Retrieves the epoch associated with this block, or `None` if the epoch is not recorded.
+    pub fn epoch(&self) -> Option<Height> {
+        self.get_header::<Epoch>().unwrap_or(None)
+    }
+
+    /// Adds the `skip` flag to this block.
+    pub(super) fn set_skip(&mut self) {
+        self.add_header::<SkipFlag>(());
+    }
+
+    /// Checks if this block is formed as a result of skipping ordinary block creation.
+    pub fn is_skip(&self) -> bool {
+        self.get_header::<SkipFlag>()
+            .map_or(false, |flag| flag.is_some())
     }
 
     /// Gets the value of an additional header for the specified key type, which is specified via
@@ -215,12 +256,13 @@ impl BlockProof {
             return Err(ProofError::DoubleEndorsement);
         }
 
-        let correct_heights = self
+        let epoch = self.block.epoch().ok_or(ProofError::NoEpoch)?;
+        let correct_epochs = self
             .precommits
             .iter()
-            .all(|precommit| precommit.payload().height == self.block.height);
-        if !correct_heights {
-            return Err(ProofError::IncorrectHeight);
+            .all(|precommit| precommit.payload().epoch == epoch);
+        if !correct_epochs {
+            return Err(ProofError::IncorrectEpoch);
         }
 
         let block_hash = self.block.object_hash();
@@ -267,10 +309,14 @@ pub enum ProofError {
     #[error("Insufficient number of precommits")]
     NoQuorum,
 
-    /// Block height mentioned in at least one of precommits differs from the height mentioned
+    /// Block header does not include additional header for the consensus epoch.
+    #[error("Block header does not include additional header for the consensus epoch")]
+    NoEpoch,
+
+    /// Block epoch mentioned in at least one of precommits differs from the height mentioned
     /// in the block header.
-    #[error("Incorrect block height in at least one of precommits")]
-    IncorrectHeight,
+    #[error("Incorrect block epoch in at least one of precommits")]
+    IncorrectEpoch,
 
     /// Hash of the block in at least one precommit differs from that of the real block.
     #[error("Incorrect block hash in at least one of precommits")]
@@ -643,6 +689,7 @@ mod tests {
         block
             .additional_headers
             .insert::<ProposerId>(ValidatorId(1));
+        block.additional_headers.insert::<Epoch>(Height(1));
 
         let precommits = keys.iter().enumerate().map(|(i, keypair)| {
             let precommit = Precommit::new(
@@ -670,6 +717,39 @@ mod tests {
         // We can remove one `Precommit` without disturbing the proof integrity.
         proof.precommits.truncate(3);
         proof.verify(&public_keys).unwrap();
+    }
+
+    #[test]
+    fn block_proof_without_epoch() {
+        let mut block = Block {
+            height: Height(1),
+            tx_count: 0,
+            prev_hash: Hash::zero(),
+            tx_hash: Hash::zero(),
+            state_hash: HashTag::empty_map_hash(),
+            error_hash: HashTag::empty_map_hash(),
+            additional_headers: AdditionalHeaders::default(),
+        };
+        block
+            .additional_headers
+            .insert::<ProposerId>(ValidatorId(1));
+
+        let keypair = KeyPair::random();
+        let precommit = Precommit::new(
+            ValidatorId(0),
+            Height(1),
+            Round(1),
+            Hash::zero(),
+            block.object_hash(),
+            Utc::now(),
+        );
+        let precommit = Verified::from_value(precommit, keypair.public_key(), keypair.secret_key());
+
+        let proof = BlockProof::new(block, vec![precommit]);
+        assert_matches!(
+            proof.verify(&[keypair.public_key()]).unwrap_err(),
+            ProofError::NoEpoch
+        );
     }
 
     #[test]
@@ -727,7 +807,7 @@ mod tests {
         mauled_proof.precommits.push(bogus_precommit);
         assert_matches!(
             mauled_proof.verify(&public_keys).unwrap_err(),
-            ProofError::IncorrectHeight
+            ProofError::IncorrectEpoch
         );
 
         // Incorrect block hash in a precommit.
@@ -931,7 +1011,7 @@ mod tests {
         // Check proof invalidation if the block part is mangled.
         call_proof.block_proof.block.height = Height(100);
         let err = call_proof.verify(&public_keys).unwrap_err();
-        assert_matches!(err, ProofError::IncorrectHeight);
+        assert_matches!(err, ProofError::IncorrectBlockHash);
 
         // Check proof invalidation if an error description is supplied.
         call_proof.block_proof.block.height = Height(1);

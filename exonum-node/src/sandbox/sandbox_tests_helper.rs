@@ -16,7 +16,7 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{AdditionalHeaders, Block, ProposerId},
+    blockchain::{AdditionalHeaders, Block, Epoch, ProposerId},
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::{access::CopyAccessExt, Database, HashTag, ObjectHash, TemporaryDB},
@@ -106,9 +106,10 @@ impl<'a> BlockBuilder<'a> {
 
         let mut additional_headers = self.entries.clone().unwrap_or_else(AdditionalHeaders::new);
         additional_headers.insert::<ProposerId>(proposer_id);
+        additional_headers.insert::<Epoch>(self.sandbox.current_epoch());
 
         Block {
-            height: self.height.unwrap_or_else(|| self.sandbox.current_height()),
+            height: self.height.unwrap_or_else(|| self.sandbox.current_epoch()),
             tx_count: self.tx_count.unwrap_or(0),
             prev_hash: self.prev_hash.unwrap_or_else(|| self.sandbox.last_hash()),
             tx_hash: self.tx_hash.unwrap_or_else(HashTag::empty_list_hash),
@@ -175,7 +176,7 @@ impl<'a> ProposeBuilder<'a> {
         self.sandbox.create_propose(
             self.validator_id
                 .unwrap_or_else(|| self.sandbox.current_leader()),
-            self.height.unwrap_or_else(|| self.sandbox.current_height()),
+            self.height.unwrap_or_else(|| self.sandbox.current_epoch()),
             self.round.unwrap_or_else(|| self.sandbox.current_round()),
             *self.prev_hash.unwrap_or(&self.sandbox.last_hash()),
             self.tx_hashes.unwrap_or(&[]).iter().cloned(),
@@ -307,7 +308,7 @@ where
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
 
     trace!("=========================add_one_height_with_timeout started=========================");
-    let initial_height = sandbox.current_height();
+    let initial_height = sandbox.current_epoch();
     // assert 1st round
     sandbox.assert_state(initial_height, Round(1));
 
@@ -423,7 +424,7 @@ pub fn add_one_height_with_transactions_from_other_validator(
     let raw_txs = tx_pool.values().cloned().collect::<Vec<_>>();
 
     trace!("=========================add_one_height_with_timeout started=========================");
-    let initial_height = sandbox.current_height();
+    let initial_height = sandbox.current_epoch();
     // assert 1st round
     sandbox.assert_state(initial_height, Round(1));
 
@@ -516,7 +517,7 @@ fn get_propose_with_transactions_for_validator(
     trace!("sandbox.current_round: {:?}", sandbox.current_round());
     sandbox.create_propose(
         validator,
-        sandbox.current_height(),
+        sandbox.current_epoch(),
         sandbox.current_round(),
         sandbox.last_hash(),
         transactions.iter().cloned(),
@@ -577,7 +578,7 @@ fn try_check_and_broadcast_propose_and_prevote(
 
     sandbox.broadcast(&sandbox.create_prevote(
         ValidatorId(0),
-        sandbox.current_height(),
+        sandbox.current_epoch(),
         sandbox.current_round(),
         propose.object_hash(),
         NOT_LOCKED,
@@ -594,7 +595,7 @@ pub fn receive_valid_propose_with_transactions(
 ) -> Verified<Propose> {
     let propose = sandbox.create_propose(
         sandbox.current_leader(),
-        sandbox.current_height(),
+        sandbox.current_epoch(),
         sandbox.current_round(),
         sandbox.last_hash(),
         transactions.iter().cloned(),
@@ -611,7 +612,7 @@ pub fn make_request_propose_from_precommit(
     Sandbox::create_propose_request(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(precommit.validator),
-        precommit.height,
+        precommit.epoch,
         precommit.propose_hash,
         sandbox.secret_key(ValidatorId(0)),
     )
@@ -625,7 +626,7 @@ pub fn make_request_prevote_from_precommit(
     Sandbox::create_prevote_request(
         sandbox.public_key(ValidatorId(0)),
         sandbox.public_key(precommit.validator),
-        precommit.height,
+        precommit.epoch,
         precommit.round,
         precommit.propose_hash,
         validators,
@@ -641,8 +642,8 @@ pub fn make_prevote_from_propose(
 ) -> Verified<Prevote> {
     sandbox.create_prevote(
         ValidatorId(0),
-        propose.as_ref().height(),
-        propose.as_ref().round(),
+        propose.payload().epoch,
+        propose.payload().round,
         propose.object_hash(),
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
