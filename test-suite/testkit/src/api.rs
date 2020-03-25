@@ -72,8 +72,6 @@ impl fmt::Display for ApiKind {
     }
 }
 
-// TODO: Remove `no_run` in the doctest below after fix (ECR-3948)
-
 /// API encapsulation for the testkit. Allows to execute and asynchronously retrieve results
 /// for REST-ful endpoints of services.
 ///
@@ -89,7 +87,7 @@ impl fmt::Display for ApiKind {
 ///
 /// # Examples
 ///
-/// ```no_run
+/// ```
 /// # use exonum_testkit::{ApiKind, TestKitBuilder};
 /// use exonum_rust_runtime::{ProtoSourcesQuery, ProtoSourceFile};
 ///

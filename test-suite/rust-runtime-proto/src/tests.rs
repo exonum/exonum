@@ -237,7 +237,6 @@ async fn core_protos_with_service() {
 }
 
 #[tokio::test]
-#[should_panic] // TODO: Remove `should_panic` after fix (ECR-3948)
 async fn core_protos_without_services() {
     let mut testkit = TestKitBuilder::validator().build();
     assert_exonum_core_protos(&testkit.api()).await;
