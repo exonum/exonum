@@ -32,6 +32,10 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ### New Features
 
+#### exonum-cli
+
+- Several constants in the `command` module became public. (#1821)
+
 #### exonum-node
 
 - Exonum nodes can now customize how they create block proposals. This can be
@@ -43,11 +47,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   algorithm. This can be used to keep a "heartbeat" when the network load is low
   without bloating the storage used by the nodes. (#1820)
 
-#### exonum-cli
+#### exonum-rust-runtime
 
-- Several constants in the `command` module became public. (#1821)
+- `ServiceApiScope::pb_endpoint_mut` allows to accept Protobuf-encoded messages
+  with the request content type set to `application/octet-stream` in addition
+  to JSON-encoded messages. (#1829)
+
+#### exonum-testkit
+
+- Testkit can send Protobuf-encoded payloads to POST endpoints. (#1831)
 
 ### Bug Fixes
+
+#### exonum-api
+
+- Introduced a workaround for the HTTP restart hanging up on Windows. (#1828)
 
 #### exonum-node
 
@@ -55,16 +69,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   This could lead to consensus failure or weird error messages in the node log.
   (#1820)
 
+#### exonum-rust-runtime
+
+- Fixed updating HTTP endpoints if the Rust runtime does not contain
+  active services during node start. (#1831)
+
 #### exonum-supervisor
 
 - `DeployRequest` and `MigrationRequest` now have cryptographic seeds
   to retry the same request multiple times. (#1823)
-
-### Bug Fixes
-
-#### exonum-api
-
-- Introduced a workaround for the HTTP restart hanging up on Windows. (#1828)
 
 ## 1.0.0-rc.2 - 2020-03-13
 

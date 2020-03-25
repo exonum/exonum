@@ -53,6 +53,7 @@ deserializing
 DESTDIR
 diffie
 discriminants
+doctest
 doctests
 emsp
 encodable
