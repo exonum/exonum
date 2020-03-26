@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### New Features
+
+#### exonum-node
+
+- Exonum nodes now gracefully terminate on receiving SIGINT or SIGTERM signals
+  (on Unix platforms), or a `ctrl + c` break (on Windows). (#1834)
+
 ## 1.0.0-rc.3 - 2020-03-25
 
 ### Breaking changes
