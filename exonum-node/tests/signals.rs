@@ -14,6 +14,8 @@
 
 //! Tests related to signal handling by the nodes.
 
+// cspell:ignore SIGINT, SIGTERM, unistd
+
 #![cfg(unix)]
 
 use nix::{
@@ -55,7 +57,7 @@ fn check_child(child: &mut ChildWrapper, output: &mut File, signal: Signal) {
         .expect("Failed to wait for node exit")
         .unwrap_or_else(|| {
             child.kill().ok();
-            panic!("Node did not exit in 2 secs after being sent SIGINT");
+            panic!("Node did not exit in 2 secs after being sent the signal");
         });
 
     assert!(
