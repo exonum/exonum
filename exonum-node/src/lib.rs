@@ -79,7 +79,8 @@ use exonum_api::{
 };
 use futures::{
     channel::{mpsc, oneshot},
-    future, FutureExt,
+    future,
+    prelude::*,
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
@@ -1317,6 +1318,32 @@ impl Reactor {
         }
     }
 
+    #[cfg(unix)]
+    #[allow(clippy::mut_mut)] // occurs in the `select!` macro
+    async fn listen_to_signals() {
+        use futures::StreamExt;
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let int_listener = tokio::signal::ctrl_c().fuse();
+        futures::pin_mut!(int_listener);
+
+        // If setting the signal listener fails, we replace the listener with a stream
+        // that never resolves.
+        let mut term_listener = signal(SignalKind::terminate())
+            .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
+            .fuse();
+
+        futures::select! {
+            _ = int_listener => (),
+            _ = term_listener.next() => (),
+        }
+    }
+
+    #[cfg(not(unix))]
+    async fn listen_to_signals() {
+        tokio::signal::ctrl_c().await.ok();
+    }
+
     #[allow(clippy::mut_mut)] // occurs in the `select!` macro
     async fn run(self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
         let internal_task = self.internal_part.run().fuse();
@@ -1328,7 +1355,8 @@ impl Reactor {
         let mut api_task = self.api_part.fuse();
 
         let signal_handler = if self.needs_signal_handler {
-            tokio::signal::ctrl_c().fuse().left_future()
+            let signals = Self::listen_to_signals();
+            signals.fuse().left_future()
         } else {
             future::pending().right_future()
         };
@@ -1340,7 +1368,7 @@ impl Reactor {
             () = internal_task => (Ok(()), true),
             () = network_task => (Ok(()), true),
             () = handler_task => (Ok(()), false),
-            res = signal_handler => (res.map_err(From::from), true),
+            () = signal_handler => (Ok(()), true),
 
             res = api_task => {
                 let res = match res {

@@ -33,7 +33,7 @@ use std::{
 pub mod common;
 use crate::common::{run_nodes, Options};
 
-fn check_child(child: &mut ChildWrapper, output: &mut File) {
+fn check_child(child: &mut ChildWrapper, output: &mut File, signal: Signal) {
     // Sleep several seconds in order for the node to launch.
     let maybe_status = child
         .wait_timeout(Duration::from_secs(5))
@@ -45,9 +45,9 @@ fn check_child(child: &mut ChildWrapper, output: &mut File) {
         );
     }
 
-    // Send a SIGINT to the node.
+    // Send a signal to the node.
     let pid = Pid::from_raw(child.id() as i32);
-    kill(pid, Signal::SIGINT).unwrap();
+    kill(pid, signal).unwrap();
 
     // Check that the child has exited.
     let exit_status = child
@@ -97,7 +97,7 @@ fn interrupt_node_without_http() {
         "interrupt_node_without_http",
         rusty_fork_id!(),
         |_| {},
-        check_child,
+        |child, output| check_child(child, output, Signal::SIGINT),
         || {
             let mut runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_450, false));
@@ -112,7 +112,37 @@ fn interrupt_node_with_http() {
         "interrupt_node_with_http",
         rusty_fork_id!(),
         |_| {},
-        check_child,
+        |child, output| check_child(child, output, Signal::SIGINT),
+        || {
+            let mut runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node(16_470, true));
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn terminate_node_without_http() {
+    fork(
+        "terminate_node_without_http",
+        rusty_fork_id!(),
+        |_| {},
+        |child, output| check_child(child, output, Signal::SIGTERM),
+        || {
+            let mut runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node(16_480, false));
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn terminate_node_with_http() {
+    fork(
+        "terminate_node_with_http",
+        rusty_fork_id!(),
+        |_| {},
+        |child, output| check_child(child, output, Signal::SIGTERM),
         || {
             let mut runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_460, true));
