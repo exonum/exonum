@@ -55,6 +55,11 @@ toml = "0.5.6"
 
 exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../runtimes/rust" }
 
+# Unix-specific dependencies for the `signals` test.
+[target.'cfg(unix)'.dev_dependencies]
+nix = "0.17.0"
+rusty-fork = "0.2.2"
+
 [build-dependencies]
 exonum-build = { version = "1.0.0-rc.3", path = "../components/build" }
 
