@@ -115,7 +115,7 @@ fn interrupt_node_with_http() {
         |child, output| check_child(child, output, Signal::SIGINT),
         || {
             let mut runtime = Runtime::new().unwrap();
-            runtime.block_on(start_node(16_470, true));
+            runtime.block_on(start_node(16_460, true));
         },
     )
     .unwrap();
@@ -130,7 +130,7 @@ fn terminate_node_without_http() {
         |child, output| check_child(child, output, Signal::SIGTERM),
         || {
             let mut runtime = Runtime::new().unwrap();
-            runtime.block_on(start_node(16_480, false));
+            runtime.block_on(start_node(16_470, false));
         },
     )
     .unwrap();
@@ -145,7 +145,7 @@ fn terminate_node_with_http() {
         |child, output| check_child(child, output, Signal::SIGTERM),
         || {
             let mut runtime = Runtime::new().unwrap();
-            runtime.block_on(start_node(16_460, true));
+            runtime.block_on(start_node(16_480, true));
         },
     )
     .unwrap();
