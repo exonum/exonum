@@ -79,7 +79,7 @@ use exonum_api::{
 };
 use futures::{
     channel::{mpsc, oneshot},
-    FutureExt,
+    future, FutureExt,
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
@@ -1253,6 +1253,10 @@ struct Reactor {
     internal_part: InternalPart,
     api_part: oneshot::Receiver<io::Result<()>>,
     shutdown_handle: ShutdownHandle,
+    // Flag indicating whether the reactor should explicitly handle signals.
+    // If there is at least one actix HTTP server, signal handling will be performed by it,
+    // so there is no need to perform it explicitly.
+    needs_signal_handler: bool,
 }
 
 impl Reactor {
@@ -1261,6 +1265,7 @@ impl Reactor {
         let connect_list = node.state().connect_list();
         let shutdown_handle = node.shutdown_handle();
 
+        let needs_signal_handler = node.api_manager_config.servers.is_empty();
         let api_manager = ApiManager::new(node.api_manager_config);
         let endpoints = node.channel.endpoints.1;
         let api_task = api_manager.run(endpoints);
@@ -1308,6 +1313,7 @@ impl Reactor {
             internal_part,
             api_part,
             shutdown_handle,
+            needs_signal_handler,
         }
     }
 
@@ -1321,12 +1327,20 @@ impl Reactor {
         futures::pin_mut!(handler_task);
         let mut api_task = self.api_part.fuse();
 
+        let signal_handler = if self.needs_signal_handler {
+            tokio::signal::ctrl_c().fuse().left_future()
+        } else {
+            future::pending().right_future()
+        };
+        futures::pin_mut!(signal_handler);
+
         // The remaining tasks are dropped after the first task is terminated,
         // which should free all associated resources.
         let (res, should_clean_up) = futures::select! {
             () = internal_task => (Ok(()), true),
             () = network_task => (Ok(()), true),
             () = handler_task => (Ok(()), false),
+            res = signal_handler => (res.map_err(From::from), true),
 
             res = api_task => {
                 let res = match res {
