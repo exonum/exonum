@@ -78,11 +78,6 @@ impl InternalPart {
                     let event = InternalEvent::jump_to_round(height, round);
                     tokio::spawn(Self::send_event(internal_tx, event));
                 }
-
-                InternalRequest::Shutdown => {
-                    let event = InternalEvent::shutdown();
-                    tokio::spawn(Self::send_event(internal_tx, event));
-                }
             }
         }
     }

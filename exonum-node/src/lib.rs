@@ -127,7 +127,10 @@ mod state;
 #[doc(hidden)]
 pub mod _bench_types {
     pub use crate::{
-        events::{Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent},
+        events::{
+            Event, EventHandler, EventOutcome, HandlerPart, InternalPart, InternalRequest,
+            NetworkEvent,
+        },
         messages::Message as PeerMessage,
     };
 }
@@ -1249,12 +1252,14 @@ struct Reactor {
     network_part: NetworkPart,
     internal_part: InternalPart,
     api_part: oneshot::Receiver<io::Result<()>>,
+    shutdown_handle: ShutdownHandle,
 }
 
 impl Reactor {
     fn new(node: Node) -> Self {
         let connect_message = node.state().our_connect_message().clone();
         let connect_list = node.state().connect_list();
+        let shutdown_handle = node.shutdown_handle();
 
         let api_manager = ApiManager::new(node.api_manager_config);
         let endpoints = node.channel.endpoints.1;
@@ -1302,6 +1307,7 @@ impl Reactor {
             network_part,
             internal_part,
             api_part,
+            shutdown_handle,
         }
     }
 
@@ -1317,16 +1323,28 @@ impl Reactor {
 
         // The remaining tasks are dropped after the first task is terminated,
         // which should free all associated resources.
-        futures::select! {
-            () = internal_task => Ok(()),
-            () = network_task => Ok(()),
-            () = handler_task => Ok(()),
+        let (res, should_clean_up) = futures::select! {
+            () = internal_task => (Ok(()), true),
+            () = network_task => (Ok(()), true),
+            () = handler_task => (Ok(()), false),
 
-            res = api_task => match res {
-                Err(_) => Err(format_err!("Actix thread panicked")),
-                Ok(res) => res.map_err(From::from),
-            },
+            res = api_task => {
+                let res = match res {
+                    Err(_) => Err(format_err!("Actix thread panicked")),
+                    Ok(res) => res.map_err(From::from),
+                };
+                (res, true)
+            }
+        };
+
+        if should_clean_up {
+            // Ensure that we run the shutdown code, such as flushing messages to the storage.
+            self.shutdown_handle.shutdown().await.ok();
+            handler_task.await;
         }
+
+        log::info!("Node terminated with status {:?}", res);
+        res
     }
 }
 
