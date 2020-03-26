@@ -95,36 +95,38 @@ impl ExonumCommand for RunDev {
         let private_config_path = config_dir.join(PRIVATE_CONFIG_FILE_NAME);
         let db_path = self.blockchain_path.join("db");
 
-        let generate_template = GenerateTemplate {
-            common_config: common_config_path.clone(),
-            validators_count: 1,
-            supervisor_mode: SupervisorMode::Simple,
-        };
-        generate_template.execute()?;
+        if !node_config_path.exists() {
+            let generate_template = GenerateTemplate {
+                common_config: common_config_path.clone(),
+                validators_count: 1,
+                supervisor_mode: SupervisorMode::Simple,
+            };
+            generate_template.execute()?;
 
-        let generate_config = GenerateConfig {
-            common_config: common_config_path,
-            output_dir: config_dir,
-            peer_address: "127.0.0.1:6200".parse().unwrap(),
-            listen_address: None,
-            no_password: true,
-            master_key_pass: None,
-            master_key_path: None,
-        };
-        generate_config.execute()?;
+            let generate_config = GenerateConfig {
+                common_config: common_config_path,
+                output_dir: config_dir,
+                peer_address: "127.0.0.1:6200".parse().unwrap(),
+                listen_address: None,
+                no_password: true,
+                master_key_pass: None,
+                master_key_path: None,
+            };
+            generate_config.execute()?;
 
-        let public_origins = Self::allowed_origins(self.public_api_address, "public");
-        let private_origins = Self::allowed_origins(self.private_api_address, "private");
-        let finalize = Finalize {
-            private_config_path,
-            output_config_path: node_config_path.clone(),
-            public_configs: vec![public_config_path],
-            public_api_address: Some(self.public_api_address),
-            private_api_address: Some(self.private_api_address),
-            public_allow_origin: Some(public_origins),
-            private_allow_origin: Some(private_origins),
-        };
-        finalize.execute()?;
+            let public_origins = Self::allowed_origins(self.public_api_address, "public");
+            let private_origins = Self::allowed_origins(self.private_api_address, "private");
+            let finalize = Finalize {
+                private_config_path,
+                output_config_path: node_config_path.clone(),
+                public_configs: vec![public_config_path],
+                public_api_address: Some(self.public_api_address),
+                private_api_address: Some(self.private_api_address),
+                public_allow_origin: Some(public_origins),
+                private_allow_origin: Some(private_origins),
+            };
+            finalize.execute()?;
+        }
 
         let run = Run {
             node_config: node_config_path,

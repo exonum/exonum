@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Bug Fixes
+
+#### exonum-cli
+
+- Fixed bug in `run-dev` command. Previously, using the existing configuration
+  files in `blockchain-path` led to an error. (#1827)
+
 ## 1.0.0-rc.3 - 2020-03-25
 
 ### Breaking changes
