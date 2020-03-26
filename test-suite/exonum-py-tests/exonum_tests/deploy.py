@@ -1,13 +1,13 @@
 """Tests for Exonum service deploy mechanism based on `exonum-launcher` tool."""
-
+import re
+import time
 import unittest
 
-import re, time
 from exonum_client import ExonumClient
 from exonum_client.crypto import KeyPair
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
-from exonum_launcher.explorer import ExecutionFailError, NotCommittedError
+from exonum_launcher.explorer import NotCommittedError
 
 from suite import (
     run_dev_node,

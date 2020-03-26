@@ -158,13 +158,12 @@ def generate_config(
     network: ExonumNetwork,
     deadline_height: int = 10000,
     consensus: dict = None,
-    artifact_name: str = ARTIFACT_NAME,
     instances: dict = None,
+    artifact_name: str = ARTIFACT_NAME,
+    artifact_version: str = ARTIFACT_VERSION,
     artifact_action: str = "deploy",
 ) -> dict:
-    if instances is None:
-        instances = {}
-    cryptocurrency_advanced_config_dict = {
+    config_dict = {
         "networks": launcher_networks(network),
         "deadline_height": deadline_height,
         "consensus": consensus,
@@ -172,14 +171,20 @@ def generate_config(
             "cryptocurrency": {
                 "runtime": "rust",
                 "name": artifact_name,
-                "version": ARTIFACT_VERSION,
+                "version": artifact_version,
                 "action": artifact_action,
             }
         },
-        "instances": instances,
+        "instances": instances if instances else {},
     }
 
-    return cryptocurrency_advanced_config_dict
+    return config_dict
+
+
+def generate_migration_config(network: ExonumNetwork, migrations: dict, deadline_height: int = 10000) -> dict:
+    config_dict = {"networks": launcher_networks(network), "deadline_height": deadline_height, "migrations": migrations}
+
+    return config_dict
 
 
 def find_service_status(available_service, service_name):
