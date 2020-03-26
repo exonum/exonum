@@ -18,8 +18,9 @@ use actix_cors::{Cors, CorsFactory};
 use actix_rt::time::delay_for;
 use actix_web::{dev::Server, web, App, HttpServer};
 use futures::{
+    channel::mpsc,
     future::{join_all, try_join_all},
-    Stream, StreamExt, TryFutureExt,
+    prelude::*,
 };
 
 #[cfg(windows)]
@@ -176,7 +177,13 @@ impl ApiManager {
         }
     }
 
-    async fn start_servers(&mut self) -> io::Result<()> {
+    /// Starts servers as specified in configuration and stores handles to them in this manager.
+    /// `server_finished_tx` is used to notify that the server has stopped (as a response
+    /// to a signal or if an error has occurred).
+    async fn start_servers(
+        &mut self,
+        server_finished_tx: mpsc::Sender<io::Result<()>>,
+    ) -> io::Result<()> {
         log::trace!("Servers start requested.");
 
         let start_servers = self.config.servers.iter().map(|(&access, server_config)| {
@@ -199,10 +206,23 @@ impl ApiManager {
 
         for (server, (&access, server_config)) in servers.iter().zip(&self.config.servers) {
             let listen_addr = server_config.listen_address;
-            actix_rt::spawn(server.inner.clone().unwrap_or_else(move |e| {
-                log::error!("{} server on {} failed: {}", access, listen_addr, e);
-                // TODO: should the server be restarted on error?
-            }));
+            let mut server_finished = server_finished_tx.clone();
+            let server = server.inner.clone();
+
+            actix_rt::spawn(async move {
+                let res = server.await;
+                if let Err(ref e) = res {
+                    // TODO: should the server be restarted on error?
+                    log::error!("{} server on {} failed: {}", access, listen_addr, e);
+                } else {
+                    log::info!(
+                        "{} server on {} terminated in response to a signal",
+                        access,
+                        listen_addr
+                    );
+                }
+                server_finished.send(res).await.ok();
+            });
         }
 
         self.servers = servers;
@@ -227,17 +247,35 @@ impl ApiManager {
         res
     }
 
-    async fn run_inner<S>(&mut self, mut endpoints_rx: S) -> io::Result<()>
+    async fn run_inner<S>(&mut self, endpoints_rx: S) -> io::Result<()>
     where
         S: Stream<Item = UpdateEndpoints> + Unpin,
     {
-        while let Some(request) = endpoints_rx.next().await {
-            log::info!("Server restart requested");
-            self.stop_servers().await;
-            self.endpoints = request.endpoints;
-            self.start_servers().await?;
+        let mut endpoints_rx = endpoints_rx.fuse();
+        let (server_finished_tx, mut server_finished_rx) = mpsc::channel(1);
+
+        loop {
+            futures::select! {
+                res = server_finished_rx.next() => {
+                    // One of the HTTP servers has terminated, e.g., in a response to a signal.
+                    // Terminate the handling and return the obtained server result.
+                    // The `unwrap_or` branch should never be triggered (one channel sender
+                    // is retained locally as `server_finished_tx`); we use it to be safe.
+                    return res.unwrap_or(Ok(()));
+                }
+
+                maybe_request = endpoints_rx.next() => {
+                    if let Some(request) = maybe_request {
+                        log::info!("Server restart requested");
+                        self.stop_servers().await;
+                        self.endpoints = request.endpoints;
+                        self.start_servers(server_finished_tx.clone()).await?;
+                    } else {
+                        return Ok(());
+                    }
+                }
+            }
         }
-        Ok(())
     }
 
     fn start_server(
@@ -257,7 +295,6 @@ impl ApiManager {
                 .wrap(server_config.cors_factory())
                 .service(aggregator.extend_backend(access, web::scope("api")))
         })
-        .disable_signals()
         .listen(listener)?
         .run();
 
