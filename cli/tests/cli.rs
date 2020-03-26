@@ -482,7 +482,7 @@ fn test_run_dev() {
     // By default, no cleanup is done
     assert!(old_db_file.exists());
 
-    // Subsequent run with the same configuraiton is also possible
+    // Subsequent run with the same configuration is also possible
     let feedback = env
         .command("run-dev")
         .with_arg("--blockchain-path")
