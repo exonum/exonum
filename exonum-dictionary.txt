@@ -169,7 +169,9 @@ serializable
 serialize
 serializer
 sharded
+SIGINT
 signum
+SIGTERM
 smallvec
 socketaddr
 sodiumoxide

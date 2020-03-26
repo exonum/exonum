@@ -14,7 +14,7 @@
 
 //! Tests related to signal handling by the nodes.
 
-// cspell:ignore SIGINT, SIGTERM, unistd
+// cspell:ignore unistd
 
 #![cfg(unix)]
 
