@@ -214,13 +214,15 @@ impl ApiManager {
                 if let Err(ref e) = res {
                     // TODO: should the server be restarted on error?
                     log::error!("{} server on {} failed: {}", access, listen_addr, e);
-                } else {
+                } else if !server_finished.is_closed() {
                     log::info!(
                         "{} server on {} terminated in response to a signal",
                         access,
                         listen_addr
                     );
                 }
+
+                // We're OK if the receiver of termination notification is gone.
                 server_finished.send(res).await.ok();
             });
         }
@@ -252,24 +254,30 @@ impl ApiManager {
         S: Stream<Item = UpdateEndpoints> + Unpin,
     {
         let mut endpoints_rx = endpoints_rx.fuse();
-        let (server_finished_tx, mut server_finished_rx) = mpsc::channel(1);
+        let mut server_finished_channel = mpsc::channel(self.config.servers.len());
 
         loop {
             futures::select! {
-                res = server_finished_rx.next() => {
+                res = server_finished_channel.1.next() => {
                     // One of the HTTP servers has terminated, e.g., in a response to a signal.
                     // Terminate the handling and return the obtained server result.
                     // The `unwrap_or` branch should never be triggered (one channel sender
-                    // is retained locally as `server_finished_tx`); we use it to be safe.
+                    // is retained locally as `server_finished_channel.0`); we use it to be safe.
                     return res.unwrap_or(Ok(()));
                 }
 
                 maybe_request = endpoints_rx.next() => {
                     if let Some(request) = maybe_request {
                         log::info!("Server restart requested");
+
+                        // Do not listen anymore to old server terminations; we *expect*
+                        // the old servers to terminate, so their termination should not
+                        // stop the node.
+                        server_finished_channel = mpsc::channel(self.config.servers.len());
+
                         self.stop_servers().await;
                         self.endpoints = request.endpoints;
-                        self.start_servers(server_finished_tx.clone()).await?;
+                        self.start_servers(server_finished_channel.0.clone()).await?;
                     } else {
                         return Ok(());
                     }
