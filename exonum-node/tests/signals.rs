@@ -18,25 +18,29 @@
 
 #![cfg(unix)]
 
+use futures::StreamExt;
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
 use rusty_fork::{fork, rusty_fork_id, ChildWrapper};
-use tokio::runtime::Runtime;
+use tokio::{
+    runtime::Runtime,
+    signal::unix::{signal, SignalKind},
+};
 
 use std::{
     env,
     fs::File,
     io::{BufRead, BufReader, Seek, SeekFrom},
+    thread,
     time::Duration,
 };
 
 pub mod common;
 use crate::common::{run_nodes, Options};
 
-fn check_child(child: &mut ChildWrapper, output: &mut File, signal: Signal) {
-    // Sleep several seconds in order for the node to launch.
+fn check_child_start(child: &mut ChildWrapper) {
     let maybe_status = child
         .wait_timeout(Duration::from_secs(5))
         .expect("Failed to wait for node to function");
@@ -46,11 +50,9 @@ fn check_child(child: &mut ChildWrapper, output: &mut File, signal: Signal) {
             status
         );
     }
+}
 
-    // Send a signal to the node.
-    let pid = Pid::from_raw(child.id() as i32);
-    kill(pid, signal).unwrap();
-
+fn check_child_exit(child: &mut ChildWrapper, output: &mut File) {
     // Check that the child has exited.
     let exit_status = child
         .wait_timeout(Duration::from_secs(2))
@@ -78,6 +80,18 @@ fn check_child(child: &mut ChildWrapper, output: &mut File, signal: Signal) {
     panic!("Node did not shut down properly");
 }
 
+fn check_child(child: &mut ChildWrapper, output: &mut File, signal: Signal) {
+    // Sleep several seconds in order for the node to launch.
+    check_child_start(child);
+
+    // Send a signal to the node.
+    let pid = Pid::from_raw(child.id() as i32);
+    kill(pid, signal).unwrap();
+
+    // Check that the child has exited.
+    check_child_exit(child, output);
+}
+
 async fn start_node(start_port: u16, with_http: bool) {
     // Enable logs in order to check that the node shuts down properly.
     env::set_var("RUST_LOG", "exonum_node=info");
@@ -90,6 +104,67 @@ async fn start_node(start_port: u16, with_http: bool) {
 
     let (mut nodes, _) = run_nodes(1, start_port, options);
     let node = nodes.pop().unwrap();
+    node.run().await
+}
+
+fn check_child_with_custom_handler(
+    child: &mut ChildWrapper,
+    output: &mut File,
+    http_port: Option<u16>,
+) {
+    // Sleep several seconds in order for the node to launch.
+    check_child_start(child);
+
+    // Send a signal to the node.
+    let pid = Pid::from_raw(child.id() as i32);
+    for _ in 0..2 {
+        kill(pid, Signal::SIGTERM).unwrap();
+        thread::sleep(Duration::from_secs(1));
+
+        // Check that the node did not exit due to a custom handler.
+        let maybe_status = child.try_wait().expect("Failed to query child exit status");
+        if let Some(status) = maybe_status {
+            panic!(
+                "Node exited unexpectedly with this exit status: {:?}",
+                status
+            );
+        }
+    }
+
+    if let Some(http_port) = http_port {
+        // Check that the HTTP server is still functional by querying the Rust runtime.
+        let url = format!(
+            "http://127.0.0.1:{}/api/runtimes/rust/proto-sources?type=core",
+            http_port
+        );
+        let response = reqwest::blocking::get(&url).unwrap();
+        assert!(response.status().is_success(), "{:?}", response);
+    }
+
+    // Send the third signal. The node should now exit.
+    kill(pid, Signal::SIGTERM).unwrap();
+    check_child_exit(child, output);
+}
+
+async fn start_node_without_signals(start_port: u16, with_http: bool) {
+    let mut options = Options::default();
+    options.disable_signals = true;
+    if with_http {
+        options.http_start_port = Some(start_port + 1);
+    }
+
+    let (mut nodes, _) = run_nodes(1, start_port, options);
+    let node = nodes.pop().unwrap();
+
+    // Register a SIGTERM handler that terminates the node after several signals are received.
+    let mut signal = signal(SignalKind::terminate()).unwrap().skip(2);
+    let shutdown_handle = node.shutdown_handle();
+    tokio::spawn(async move {
+        signal.next().await;
+        println!("Shutting down node handler");
+        shutdown_handle.shutdown().await.unwrap();
+    });
+
     node.run().await
 }
 
@@ -148,6 +223,66 @@ fn terminate_node_with_http() {
         || {
             let mut runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_480, true));
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn quit_node_without_http() {
+    fork(
+        "quit_node_without_http",
+        rusty_fork_id!(),
+        |_| {},
+        |child, output| check_child(child, output, Signal::SIGQUIT),
+        || {
+            let mut runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node(16_490, false));
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn quit_node_with_http() {
+    fork(
+        "quit_node_with_http",
+        rusty_fork_id!(),
+        |_| {},
+        |child, output| check_child(child, output, Signal::SIGQUIT),
+        || {
+            let mut runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node(16_500, true));
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn term_node_with_custom_handling_and_http() {
+    fork(
+        "term_node_with_custom_handling_and_http",
+        rusty_fork_id!(),
+        |_| {},
+        |child, output| check_child_with_custom_handler(child, output, Some(16_511)),
+        || {
+            let mut runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node_without_signals(16_510, true));
+        },
+    )
+    .unwrap();
+}
+
+#[test]
+fn term_node_with_custom_handling_and_no_http() {
+    fork(
+        "term_node_with_custom_handling_and_no_http",
+        rusty_fork_id!(),
+        |_| {},
+        |child, output| check_child_with_custom_handler(child, output, None),
+        || {
+            let mut runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node_without_signals(16_520, true));
         },
     )
     .unwrap();

@@ -55,9 +55,10 @@ toml = "0.5.6"
 
 exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../runtimes/rust" }
 
-# Unix-specific dependencies for the `signals` test.
+# Dependencies for the Unix-specific `signals` test.
 [target.'cfg(unix)'.dev_dependencies]
 nix = "0.17.0"
+reqwest = { version = "0.10.2", features = ["blocking"] }
 rusty-fork = "0.2.2"
 
 [build-dependencies]

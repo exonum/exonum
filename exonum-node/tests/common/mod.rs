@@ -50,6 +50,11 @@ impl RunHandle {
         }
     }
 
+    /// Returns the shutdown handle for this node.
+    pub fn shutdown_handle(&self) -> ShutdownHandle {
+        self.shutdown_handle.clone()
+    }
+
     /// Waits for the node to shut down without terminating it.
     pub async fn run(self) {
         self.node_task.await.unwrap()
@@ -126,6 +131,7 @@ pub struct Options {
     pub slow_blocks: bool,
     pub skip_empty_blocks: bool,
     pub http_start_port: Option<u16>,
+    pub disable_signals: bool,
 }
 
 pub fn run_nodes(
@@ -172,8 +178,11 @@ pub fn run_nodes(
         if options.skip_empty_blocks {
             node_builder = node_builder.with_block_proposer(SkipEmptyBlocks);
         }
-        let node = node_builder.build();
+        if options.disable_signals {
+            node_builder = node_builder.disable_signals();
+        }
 
+        let node = node_builder.build();
         node_handles.push(RunHandle::new(node));
         commit_rxs.push(commit_rx);
     }
