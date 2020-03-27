@@ -17,7 +17,7 @@
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain},
     crypto::KeyPair,
-    helpers::Height,
+    helpers::{Height, Round},
     merkledb::{Database, ObjectHash, TemporaryDB},
     runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
@@ -143,12 +143,17 @@ fn run_nodes(
         .into_iter()
         .enumerate();
     for (i, (mut node_cfg, node_keys)) in it {
-        let (commit_tx, commit_rx) = mpsc::unbounded();
         if options.slow_blocks {
             node_cfg.consensus.first_round_timeout = 20_000;
             node_cfg.consensus.min_propose_timeout = 10_000;
             node_cfg.consensus.max_propose_timeout = 10_000;
+        } else {
+            // Slightly increase propose timeout to make block creation on epoch = 1, round = 1
+            // more reliable.
+            node_cfg.consensus.max_propose_timeout += 100;
         }
+
+        let (commit_tx, commit_rx) = mpsc::unbounded();
         if let Some(start_port) = options.http_start_port {
             let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), start_port + i as u16);
             node_cfg.api.public_api_address = Some(addr);
@@ -195,6 +200,15 @@ async fn nodes_commit_blocks() {
         }
     });
     future::join_all(commit_notifications).await;
+
+    // Check that nodes do not skip the first round of the first block.
+    let snapshot = nodes[0].blockchain.snapshot();
+    let block_proof = snapshot.for_core().block_and_precommits(Height(1)).unwrap();
+    assert!(block_proof
+        .precommits
+        .iter()
+        .all(|precommit| precommit.payload().round == Round(1)));
+
     future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 }
 
