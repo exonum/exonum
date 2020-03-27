@@ -62,6 +62,7 @@ impl WebServerConfig {
 
 /// Configuration parameters for `ApiManager`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ApiManagerConfig {
     /// Active API runtimes.
     pub servers: HashMap<ApiAccess, WebServerConfig>,
@@ -73,6 +74,51 @@ pub struct ApiManagerConfig {
     pub server_restart_retry_timeout: u64,
     /// The attempts counts of restarting HTTP-server in case the server failed to restart.
     pub server_restart_max_retries: u16,
+    /// Disables signal handling for HTTP servers. By default, the HTTP servers will shut down
+    /// on receiving SIGINT, SIGTERM or SIGQUIT, and will also set the handler and ignore
+    /// SIGHUP.
+    ///
+    /// This setting is a no-op on platforms not based on Unix.
+    pub disable_signals: bool,
+}
+
+impl ApiManagerConfig {
+    /// Creates a new config with the specified servers and API aggregator. Other parameters are
+    /// set to reasonable defaults.
+    pub fn new(
+        servers: HashMap<ApiAccess, WebServerConfig>,
+        api_aggregator: ApiAggregator,
+    ) -> Self {
+        let mut this = Self::default();
+        this.servers = servers;
+        this.api_aggregator = api_aggregator;
+        this
+    }
+
+    /// Sets the retry policy for this config.
+    pub fn with_retries(mut self, timeout: u64, max_retries: u16) -> Self {
+        self.server_restart_retry_timeout = timeout;
+        self.server_restart_max_retries = max_retries;
+        self
+    }
+
+    /// Disables signal handling.
+    pub fn disable_signals(mut self) -> Self {
+        self.disable_signals = true;
+        self
+    }
+}
+
+impl Default for ApiManagerConfig {
+    fn default() -> Self {
+        Self {
+            servers: HashMap::new(),
+            api_aggregator: ApiAggregator::default(),
+            server_restart_retry_timeout: 500,
+            server_restart_max_retries: 20,
+            disable_signals: false,
+        }
+    }
 }
 
 /// Updates variable endpoints of the service, restarting all HTTP servers managed by the addressed
@@ -186,6 +232,7 @@ impl ApiManager {
     ) -> io::Result<()> {
         log::trace!("Servers start requested.");
 
+        let disable_signals = self.config.disable_signals;
         let start_servers = self.config.servers.iter().map(|(&access, server_config)| {
             let mut aggregator = self.config.api_aggregator.clone();
             aggregator.extend(self.endpoints.clone());
@@ -196,7 +243,14 @@ impl ApiManager {
             );
 
             with_retries(
-                move || Self::start_server(aggregator.clone(), access, server_config.clone()),
+                move || {
+                    Self::start_server(
+                        aggregator.clone(),
+                        access,
+                        server_config.clone(),
+                        disable_signals,
+                    )
+                },
                 action_description,
                 self.config.server_restart_max_retries,
                 self.config.server_restart_retry_timeout,
@@ -290,6 +344,7 @@ impl ApiManager {
         aggregator: ApiAggregator,
         access: ApiAccess,
         server_config: WebServerConfig,
+        disable_signals: bool,
     ) -> io::Result<ServerHandle> {
         let listen_address = server_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
@@ -298,16 +353,19 @@ impl ApiManager {
         #[cfg(windows)]
         let raw_socket = listener.as_raw_socket();
 
-        let server = HttpServer::new(move || {
+        let mut server_builder = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())
                 .service(aggregator.extend_backend(access, web::scope("api")))
         })
-        .listen(listener)?
-        .run();
+        .listen(listener)?;
+
+        if disable_signals {
+            server_builder = server_builder.disable_signals();
+        }
 
         Ok(ServerHandle {
-            inner: server,
+            inner: server_builder.run(),
             #[cfg(windows)]
             raw_socket,
         })

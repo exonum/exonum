@@ -79,7 +79,6 @@ use exonum_api::{
 };
 use futures::{
     channel::{mpsc, oneshot},
-    future,
     prelude::*,
 };
 use log::{info, trace};
@@ -952,6 +951,7 @@ pub struct Node {
     channel: NodeChannel,
     max_message_len: u32,
     thread_pool_size: Option<u8>,
+    disable_signals: bool,
 }
 
 impl Default for NodeChannel {
@@ -1004,6 +1004,7 @@ pub struct NodeBuilder {
     config_manager: Option<Box<dyn ConfigManager>>,
     block_proposer: Box<dyn ProposeBlock>,
     plugins: Vec<Box<dyn NodePlugin>>,
+    disable_signals: bool,
 }
 
 impl fmt::Debug for NodeBuilder {
@@ -1040,6 +1041,7 @@ impl NodeBuilder {
             config_manager: None,
             plugins: vec![],
             block_proposer: Box::new(StandardProposer),
+            disable_signals: false,
         }
     }
 
@@ -1094,10 +1096,16 @@ impl NodeBuilder {
         self
     }
 
+    /// Switches of signal handling for the node.
+    pub fn disable_signals(mut self) -> Self {
+        self.disable_signals = true;
+        self
+    }
+
     /// Converts this builder into a `Node`.
     pub fn build(self) -> Node {
         let blockchain = self.blockchain_builder.build();
-        Node::with_blockchain(
+        let mut node = Node::with_blockchain(
             blockchain,
             self.channel,
             self.node_config,
@@ -1105,7 +1113,9 @@ impl NodeBuilder {
             self.config_manager,
             self.plugins,
             self.block_proposer,
-        )
+        );
+        node.disable_signals = self.disable_signals;
+        node
     }
 }
 
@@ -1159,12 +1169,9 @@ impl Node {
             servers.insert(ApiAccess::Private, server_config);
         }
 
-        let api_runtime_config = ApiManagerConfig {
-            servers,
-            api_aggregator,
-            server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
-            server_restart_max_retries: node_cfg.api.server_restart.max_retries,
-        };
+        let restart_policy = node_cfg.api.server_restart;
+        let api_runtime_config = ApiManagerConfig::new(servers, api_aggregator)
+            .with_retries(restart_policy.retry_timeout, restart_policy.max_retries);
 
         let mut handler = NodeHandler::new(
             blockchain,
@@ -1186,6 +1193,7 @@ impl Node {
             max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
             api_manager_config: api_runtime_config,
+            disable_signals: false,
         }
     }
 
@@ -1266,8 +1274,10 @@ impl Reactor {
         let connect_list = node.state().connect_list();
         let shutdown_handle = node.shutdown_handle();
 
-        let needs_signal_handler = node.api_manager_config.servers.is_empty();
-        let api_manager = ApiManager::new(node.api_manager_config);
+        let mut api_config = node.api_manager_config;
+        api_config.disable_signals = node.disable_signals;
+        let needs_signal_handler = !node.disable_signals && api_config.servers.is_empty();
+        let api_manager = ApiManager::new(api_config);
         let endpoints = node.channel.endpoints.1;
         let api_task = api_manager.run(endpoints);
         let (api_part_tx, api_part) = oneshot::channel();
@@ -1318,6 +1328,7 @@ impl Reactor {
         }
     }
 
+    /// Listens to the same 3 signals as `actix`: SIGINT, SIGTERM, and SIGQUIT.
     #[cfg(unix)]
     #[allow(clippy::mut_mut)] // occurs in the `select!` macro
     async fn listen_to_signals() {
@@ -1333,9 +1344,23 @@ impl Reactor {
             .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
             .fuse();
 
+        let mut quit_listener = signal(SignalKind::quit())
+            .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
+            .fuse();
+
+        // We also register a SIGHUP listener which ignores the signal.
+        if let Ok(mut hangup_listener) = signal(SignalKind::hangup()) {
+            tokio::spawn(async move {
+                while let Some(()) = hangup_listener.next().await {
+                    log::info!("Received SIGHUP; ignoring");
+                }
+            });
+        }
+
         futures::select! {
             _ = int_listener => (),
             _ = term_listener.next() => (),
+            _ = quit_listener.next() => (),
         }
     }
 
@@ -1354,13 +1379,16 @@ impl Reactor {
         futures::pin_mut!(handler_task);
         let mut api_task = self.api_part.fuse();
 
-        let signal_handler = if self.needs_signal_handler {
-            let signals = Self::listen_to_signals();
-            signals.fuse().left_future()
-        } else {
-            future::pending().right_future()
+        if self.needs_signal_handler {
+            // Send the shutdown signal once we received a signal.
+            let shutdown_handle = self.shutdown_handle.clone();
+            let signal_rx = Self::listen_to_signals();
+
+            tokio::spawn(async {
+                signal_rx.await;
+                shutdown_handle.shutdown().await.ok();
+            });
         };
-        futures::pin_mut!(signal_handler);
 
         // The remaining tasks are dropped after the first task is terminated,
         // which should free all associated resources.
@@ -1368,7 +1396,6 @@ impl Reactor {
             () = internal_task => (Ok(()), true),
             () = network_task => (Ok(()), true),
             () = handler_task => (Ok(()), false),
-            () = signal_handler => (Ok(()), true),
 
             res = api_task => {
                 let res = match res {
