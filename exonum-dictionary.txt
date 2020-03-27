@@ -169,8 +169,10 @@ serializable
 serialize
 serializer
 sharded
+SIGHUP
 SIGINT
 signum
+SIGQUIT
 SIGTERM
 smallvec
 socketaddr
