@@ -5,12 +5,20 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking Changes
+
+#### exonum-api
+
+- `ApiManagerConfig` was made non-exhaustive. (#1834)
+
 ### New Features
 
 #### exonum-node
 
-- Exonum nodes now gracefully terminate on receiving SIGINT or SIGTERM signals
-  (on Unix platforms), or a `ctrl + c` break (on Windows). (#1834)
+- Exonum nodes now gracefully terminate on receiving SIGINT, SIGTERM
+  and SIGQUIT signals (on Unix platforms), or a `ctrl + c` break (on Windows).
+  These signal handlers may be switched off by using `NodeBuilder::disable_signals()`.
+  (#1834)
 
 ### Bug Fixes
 
