@@ -663,6 +663,12 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", key);
         }
 
+        // Re-initialize epoch start to make it closer to the actual start time of the node.
+        // While this is mainly useful for tests, there may be other cases in which the node
+        // is not immediately started after construction.
+        self.state
+            .set_epoch_start_time(self.system_state.current_time());
+
         let snapshot = self.blockchain.snapshot();
         let schema = NodeSchema::new(&snapshot);
         // Recover previous saved round if any.
@@ -673,12 +679,15 @@ impl NodeHandler {
         self.add_timeouts();
         if self.state.is_leader() && round == Round(1) {
             // Propose the block after a short delay, which is used to gather initial transactions
-            // (if any). Note that this handles the case when the node has already proposed
+            // (if any), connect to peers, etc.
+            //
+            // Note that this handles the case when the node has already proposed a block
             // at the same `(epoch, round)`; in this case, the node has at least its own `Prevote`,
             // so the `Propose` creation will be skipped in `handle_propose_timeout`.
             //
             // Restricting `round == Round(1)` is in order to prevent proposals with a large delay.
-            // Heuristically, `round > Round(1)` increases probability that
+            // (Indeed, the delay in this case will be at least `first_round_timeout`, i.e.,
+            // order of 3 seconds.) Heuristically, `round > Round(1)` increases probability that
             // the node's `(epoch, round)` is outdated.
             self.add_propose_timeout();
         }

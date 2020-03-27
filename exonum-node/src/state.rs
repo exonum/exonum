@@ -831,9 +831,14 @@ impl State {
         self.blockchain_height
     }
 
-    /// Returns start time of the current height.
+    /// Returns the start time of the current consensus epoch.
     pub(super) fn epoch_start_time(&self) -> SystemTime {
         self.epoch_start_time
+    }
+
+    /// Sets the start time of the current consensus epoch.
+    pub(super) fn set_epoch_start_time(&mut self, time: SystemTime) {
+        self.epoch_start_time = time;
     }
 
     /// Returns the current round.

@@ -36,8 +36,8 @@ fn should_not_send_propose_after_node_restart() {
     // Round happens.
     let round_timeout = sandbox.current_round_timeout();
     sandbox.add_time(Duration::from_millis(round_timeout));
-    let round_timeout = sandbox.current_round_timeout();
-    sandbox.add_time(Duration::from_millis(round_timeout + PROPOSE_TIMEOUT));
+    let new_round_timeout = sandbox.current_round_timeout();
+    sandbox.add_time(Duration::from_millis(new_round_timeout + PROPOSE_TIMEOUT));
 
     assert!(sandbox.is_leader());
     sandbox.assert_state(Height(1), Round(3));
