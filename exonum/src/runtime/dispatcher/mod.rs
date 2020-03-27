@@ -966,13 +966,6 @@ impl Dispatcher {
         }
     }
 
-    /// Notify the runtimes that it has to shutdown.
-    pub(crate) fn shutdown(&mut self) {
-        for runtime in self.runtimes.values_mut() {
-            runtime.shutdown();
-        }
-    }
-
     /// Commits service instance status to the corresponding runtime.
     ///
     /// # Panics
