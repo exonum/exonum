@@ -115,8 +115,6 @@ impl NodeHandler {
         self.execute_later(InternalRequest::Shutdown);
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
-        // Notify the blockchain about the shutdown.
-        self.blockchain.shutdown();
     }
 
     pub(crate) fn flush_txs_into_pool(&mut self) {

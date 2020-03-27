@@ -758,8 +758,10 @@ impl Runtime for ShutdownRuntime {
     }
 
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, _mailbox: &mut Mailbox) {}
+}
 
-    fn shutdown(&mut self) {
+impl Drop for ShutdownRuntime {
+    fn drop(&mut self) {
         self.turned_off.store(true, Ordering::Relaxed);
     }
 }
@@ -771,11 +773,11 @@ fn test_shutdown() {
     let runtime_a = ShutdownRuntime::new(turned_off_a.clone());
     let runtime_b = ShutdownRuntime::new(turned_off_b.clone());
 
-    let mut dispatcher = DispatcherBuilder::new()
+    let dispatcher = DispatcherBuilder::new()
         .with_runtime(2, runtime_a)
         .with_runtime(3, runtime_b)
         .finalize(&Blockchain::build_for_tests());
-    dispatcher.shutdown();
+    drop(dispatcher);
 
     assert_eq!(turned_off_a.load(Ordering::Relaxed), true);
     assert_eq!(turned_off_b.load(Ordering::Relaxed), true);

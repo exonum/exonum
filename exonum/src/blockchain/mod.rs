@@ -768,10 +768,4 @@ impl BlockchainMut {
         db.merge(fork.into_patch())
             .expect("Cannot update transaction pool");
     }
-
-    /// Shuts down the service dispatcher enclosed by this blockchain. This must be
-    /// the last operation performed on the blockchain.
-    pub fn shutdown(&mut self) {
-        self.dispatcher.shutdown();
-    }
 }
