@@ -14,7 +14,7 @@
 
 use assert_matches::assert_matches;
 use exonum::{
-    blockchain::{AdditionalHeaders, CallInBlock, ProposerId},
+    blockchain::{AdditionalHeaders, CallInBlock, Epoch, ProposerId},
     crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
     merkledb::{BinaryValue, HashTag, ObjectHash},
@@ -87,6 +87,7 @@ async fn test_explorer_blocks_basic() {
 
     let mut headers = AdditionalHeaders::new();
     headers.insert::<ProposerId>(ValidatorId(0));
+    headers.insert::<Epoch>(Height(1));
 
     assert_eq!(blocks.len(), 2);
     assert_eq!(blocks[0].block.height, Height(1));

@@ -56,6 +56,7 @@ define_names!(
     BLOCKS => "blocks";
     BLOCK_HASHES_BY_HEIGHT => "block_hashes_by_height";
     BLOCK_TRANSACTIONS => "block_transactions";
+    BLOCK_SKIP => "block_skip";
     PRECOMMITS => "precommits";
     CONSENSUS_CONFIG => "consensus_config";
 );
@@ -209,6 +210,27 @@ impl<T: Access> Schema<T> {
         self.access.get_proof_list((BLOCK_TRANSACTIONS, &height))
     }
 
+    /// Returns an entry storing the latest skip block for the node.
+    fn block_skip_entry(&self) -> Entry<T::Base, Block> {
+        self.access.get_entry(BLOCK_SKIP)
+    }
+
+    /// Returns the recorded [block skip], if any.
+    ///
+    /// [block skip]: enum.BlockContents.html#variant.Skip
+    pub fn block_skip(&self) -> Option<Block> {
+        self.block_skip_entry().get()
+    }
+
+    /// Returns the recorded [block skip] together with authenticating information.
+    ///
+    /// [block skip]: enum.BlockContents.html#variant.Skip
+    pub fn block_skip_and_precommits(&self) -> Option<BlockProof> {
+        let block = self.block_skip_entry().get()?;
+        let precommits = self.precommits(&block.object_hash()).iter().collect();
+        Some(BlockProof::new(block, precommits))
+    }
+
     /// Returns a table that keeps a list of precommits for the block with the given hash.
     pub fn precommits(&self, hash: &Hash) -> ListIndex<T::Base, Verified<Precommit>> {
         self.access.get_list((PRECOMMITS, hash))
@@ -357,6 +379,19 @@ where
         let aux = err.split_aux();
         self.call_errors_map(height).put(&call, err);
         self.call_errors_aux(height).put(&call, aux);
+    }
+
+    pub(super) fn clear_block_skip(&mut self) {
+        if let Some(block_skip) = self.block_skip_entry().take() {
+            let block_hash = block_skip.object_hash();
+            self.precommits(&block_hash).clear();
+        }
+    }
+
+    pub(super) fn store_block_skip(&mut self, block_skip: Block) {
+        // TODO: maybe it makes sense to use a circular buffer here.
+        self.clear_block_skip();
+        self.block_skip_entry().set(block_skip);
     }
 }
 

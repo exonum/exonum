@@ -1,6 +1,6 @@
 [package]
 name = "exonum-cli"
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -9,16 +9,16 @@ documentation = "https://docs.rs/exonum-cli"
 readme = "README.md"
 license = "Apache-2.0"
 keywords = ["exonum", "cli", "library"]
-categories = ["command-line-interface", "configuration"]
+categories = ["command-line-interface", "command-line-utilities", "config"]
 description = "Helper crate for secure and convenient configuration of the Exonum nodes."
 
 [dependencies]
-exonum = { version = "1.0.0-rc.2", path = "../exonum" }
-exonum-node = { version = "1.0.0-rc.2", path = "../exonum-node" }
-exonum-explorer-service = { version = "1.0.0-rc.2", path = "../services/explorer" }
-exonum-supervisor = { version = "1.0.0-rc.2", path = "../services/supervisor" }
-exonum-system-api = { version = "1.0.0-rc.2", path = "../components/system-api" }
-exonum-rust-runtime = { version = "1.0.0-rc.2", path = "../runtimes/rust" }
+exonum = { version = "1.0.0-rc.3", path = "../exonum" }
+exonum-node = { version = "1.0.0-rc.3", path = "../exonum-node" }
+exonum-explorer-service = { version = "1.0.0-rc.3", path = "../services/explorer" }
+exonum-supervisor = { version = "1.0.0-rc.3", path = "../services/supervisor" }
+exonum-system-api = { version = "1.0.0-rc.3", path = "../components/system-api" }
+exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../runtimes/rust" }
 
 anyhow = "1.0.26"
 log = "0.4"
@@ -31,7 +31,7 @@ toml = "0.5"
 zeroize = "1.1.0"
 
 [dev-dependencies]
-exonum-derive = { version = "1.0.0-rc.2", path = "../components/derive" }
+exonum-derive = { version = "1.0.0-rc.3", path = "../components/derive" }
 
 futures = "0.3.4"
 lazy_static = "1.4.0"

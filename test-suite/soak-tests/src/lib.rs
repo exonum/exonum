@@ -17,12 +17,14 @@ use exonum::{
     crypto::KeyPair,
     merkledb::{Database, TemporaryDB},
 };
-use exonum_node::{generate_testnet_config, Node, NodeBuilder, NodeConfig, ShutdownHandle};
+use exonum_node::{
+    generate_testnet_config, proposer::ProposeBlock, Node, NodeBuilder, NodeConfig, ShutdownHandle,
+};
 use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
 use futures::TryFutureExt;
 use tokio::task::JoinHandle;
 
-use std::sync::Arc;
+use std::{fmt, sync::Arc};
 
 pub mod services;
 
@@ -59,29 +61,92 @@ impl RunHandle {
     }
 }
 
-pub fn run_nodes(
+type ProposerGen = Box<dyn Fn() -> Box<dyn ProposeBlock>>;
+
+pub struct NetworkBuilder<'a> {
     count: u16,
     start_port: u16,
-    mut modify_cfg: impl FnMut(&mut NodeConfig),
-    mut init_node: impl FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder),
-) -> Vec<RunHandle> {
-    let mut node_threads = Vec::with_capacity(count as usize);
+    modify_cfg: Option<Box<dyn FnMut(&mut NodeConfig) + 'a>>,
+    init_node: Option<Box<dyn FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder) + 'a>>,
+    block_proposer: Option<ProposerGen>,
+}
 
-    let configs = generate_testnet_config(count, start_port);
-    for (mut node_cfg, node_keys) in configs {
-        modify_cfg(&mut node_cfg);
-        let mut genesis_cfg =
-            GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone());
-        let mut rt = RustRuntime::builder();
-        init_node(&mut genesis_cfg, &mut rt);
-
-        let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
-        let node = NodeBuilder::new(db, node_cfg, node_keys)
-            .with_genesis_config(genesis_cfg.build())
-            .with_runtime_fn(|channel| rt.build(channel.endpoints_sender()))
-            .build();
-
-        node_threads.push(RunHandle::new(node));
+impl fmt::Debug for NetworkBuilder<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NetworkBuilder")
+            .field("count", &self.count)
+            .field("start_port", &self.start_port)
+            .finish()
     }
-    node_threads
+}
+
+impl<'a> NetworkBuilder<'a> {
+    /// Starts building an Exonum network.
+    pub fn new(count: u16, start_port: u16) -> Self {
+        Self {
+            count,
+            start_port,
+            modify_cfg: None,
+            init_node: None,
+            block_proposer: None,
+        }
+    }
+
+    /// Allows to modify node configs before the nodes are started.
+    pub fn modify_config<F>(mut self, modify_cfg: F) -> Self
+    where
+        F: FnMut(&mut NodeConfig) + 'a,
+    {
+        self.modify_cfg = Some(Box::new(modify_cfg));
+        self
+    }
+
+    /// Customizes services on the nodes.
+    pub fn init_node<F>(mut self, init_node: F) -> Self
+    where
+        F: FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder) + 'a,
+    {
+        self.init_node = Some(Box::new(init_node));
+        self
+    }
+
+    /// Customizes block proposal logic.
+    pub fn with_block_proposer<T>(mut self, proposer: T) -> Self
+    where
+        T: ProposeBlock + Clone + 'static,
+    {
+        let f = move || Box::new(proposer.clone()) as Box<dyn ProposeBlock>;
+        self.block_proposer = Some(Box::new(f));
+        self
+    }
+
+    /// Builds the network and returns handles for all nodes.
+    pub fn build(mut self) -> Vec<RunHandle> {
+        let mut node_handles = Vec::with_capacity(self.count as usize);
+
+        let configs = generate_testnet_config(self.count, self.start_port);
+        for (mut node_cfg, node_keys) in configs {
+            if let Some(modify_cfg) = self.modify_cfg.as_mut() {
+                modify_cfg(&mut node_cfg);
+            }
+            let mut genesis_cfg =
+                GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone());
+            let mut rt = RustRuntime::builder();
+            if let Some(init_node) = self.init_node.as_mut() {
+                init_node(&mut genesis_cfg, &mut rt);
+            }
+
+            let db = Arc::new(TemporaryDB::new()) as Arc<dyn Database>;
+            let mut node_builder = NodeBuilder::new(db, node_cfg, node_keys)
+                .with_genesis_config(genesis_cfg.build())
+                .with_runtime_fn(|channel| rt.build(channel.endpoints_sender()));
+
+            if let Some(ref gen_proposer) = self.block_proposer {
+                node_builder = node_builder.with_block_proposer(gen_proposer());
+            }
+            node_handles.push(RunHandle::new(node_builder.build()));
+        }
+        node_handles
+    }
 }

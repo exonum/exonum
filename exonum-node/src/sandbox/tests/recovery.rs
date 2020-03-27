@@ -49,7 +49,7 @@ fn should_not_send_propose_and_prevote_after_node_restart() {
     sandbox.broadcast(&propose);
     sandbox.broadcast(&prevote);
 
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     let sandbox_restarted = sandbox.restart();
@@ -108,7 +108,7 @@ fn should_not_vote_after_node_restart() {
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(Round(1), Some(propose.object_hash()));
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     // Simulate node restart.
@@ -173,7 +173,7 @@ fn should_save_precommit_to_consensus_cache() {
 
     sandbox.broadcast(&precommit);
 
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     // Simulate node restart
@@ -266,7 +266,7 @@ fn test_recover_consensus_messages_in_other_round() {
     // make sure we broadcasted same Prevote for second round
     let first_updated_prevote = sandbox.create_prevote(
         first_prevote.payload().validator,
-        first_prevote.payload().height,
+        first_prevote.payload().epoch,
         Round(2),
         first_prevote.payload().propose_hash,
         Round(1),
@@ -331,7 +331,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     let first_precommit_new_time = sandbox_new.create_precommit(
         first_precommit.payload().validator,
-        first_precommit.payload().height,
+        first_precommit.payload().epoch,
         first_precommit.payload().round,
         first_precommit.payload().propose_hash,
         first_precommit.payload().block_hash,

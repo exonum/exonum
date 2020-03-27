@@ -1,6 +1,6 @@
 [package]
 name = "exonum-testkit"
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -22,19 +22,21 @@ all-features = true # document `exonum-node`-specific APIs
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-exonum = { version = "1.0.0-rc.2", path = "../../exonum" }
-exonum-api = { version = "1.0.0-rc.2", path = "../../components/api" }
-exonum-derive = { version = "1.0.0-rc.2", path = "../../components/derive" }
-exonum-explorer = { version = "1.0.0-rc.2", path = "../../components/explorer" }
-exonum-merkledb = { version = "1.0.0-rc.2", path = "../../components/merkledb" }
-exonum-node = { version = "1.0.0-rc.2", path = "../../exonum-node", optional = true }
-exonum-rust-runtime = { version = "1.0.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0-rc.3", path = "../../exonum" }
+exonum-api = { version = "1.0.0-rc.3", path = "../../components/api" }
+exonum-derive = { version = "1.0.0-rc.3", path = "../../components/derive" }
+exonum-explorer = { version = "1.0.0-rc.3", path = "../../components/explorer" }
+exonum-merkledb = { version = "1.0.0-rc.3", path = "../../components/merkledb" }
+exonum-node = { version = "1.0.0-rc.3", path = "../../exonum-node", optional = true }
+exonum-proto = { version = "1.0.0-rc.3", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../../runtimes/rust" }
 
 actix = { version = "0.9.0", default-features = false }
 actix-web = { version = "2.0.0", default-features = false }
 chrono = "0.4.6"
 futures = "0.3.4"
 log = "0.4.6"
+protobuf = "2.11.0"
 reqwest = { version = "0.10.2", features = ["json"] }
 serde = "1.0.10"
 serde_derive = "1.0"

@@ -48,19 +48,11 @@ Include `exonum-api` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-api = "1.0.0-rc.2"
+exonum-api = "1.0.0-rc.3"
 ```
 
 Note that the crate rarely needs to be imported directly; it is re-exported
 by the `exonum` crate.
-
-## Known Issues
-
-### Server Restart on Windows
-
-The server restart after the set of endpoints is updated seems to be broken
-in some Windows environments. The restart process hangs up,
-and the HTTP server becomes unresponsive.
 
 ## License
 

@@ -34,9 +34,14 @@ use crate::command::{
 #[derive(StructOpt, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct RunDev {
-    /// The path where configuration and db files will be generated.
-    #[structopt(long, short = "a")]
-    pub artifacts_dir: PathBuf,
+    /// Path to a directory for blockchain database and configuration files.
+    ///
+    /// Database is located in <blockchain_path>/db directory, node configuration files
+    /// are located in <blockchain_path>/config directory. Existing files and directories are
+    /// reused. To generate new node configuration and start a new blockchain, the user must
+    /// use --clean flag or specify an another directory.
+    #[structopt(long, short = "-p")]
+    pub blockchain_path: PathBuf,
     /// Listen address for node public API.
     ///
     /// Public API is used mainly for sending API requests to user services.
@@ -47,20 +52,17 @@ pub struct RunDev {
     /// Private API is used by node administrators for node monitoring and control.
     #[structopt(long, default_value = "127.0.0.1:8081")]
     pub private_api_address: SocketAddr,
+    /// Clean existing blockchain database and configuration files before run.
+    #[structopt(long)]
+    pub clean: bool,
 }
 
 impl RunDev {
-    fn artifact_path(&self, artifact_name: &str) -> PathBuf {
-        let mut path = self.artifacts_dir.clone();
-        path.push(artifact_name);
-        path
-    }
-
     fn cleanup(&self) -> Result<(), Error> {
-        let database_dir = self.artifact_path("db");
+        let database_dir = self.blockchain_path.join("db");
         if database_dir.exists() {
-            fs::remove_dir_all(self.artifacts_dir.clone())
-                .context("Expected DATABASE_PATH folder being removable.")?;
+            fs::remove_dir_all(&self.blockchain_path)
+                .context("Expected DATABASE_PATH directory being removable")?;
         }
         Ok(())
     }
@@ -82,20 +84,27 @@ impl RunDev {
 
 impl ExonumCommand for RunDev {
     fn execute(self) -> Result<StandardResult, Error> {
-        self.cleanup()?;
+        if self.clean {
+            self.cleanup()?;
+        }
 
-        let common_config = self.artifact_path("template.toml");
+        let config_dir = self.blockchain_path.join("config");
+        let node_config_path = config_dir.join("node.toml");
+        let common_config_path = config_dir.join("template.toml");
+        let public_config_path = config_dir.join(PUBLIC_CONFIG_FILE_NAME);
+        let private_config_path = config_dir.join(PRIVATE_CONFIG_FILE_NAME);
+        let db_path = self.blockchain_path.join("db");
 
         let generate_template = GenerateTemplate {
-            common_config: common_config.clone(),
+            common_config: common_config_path.clone(),
             validators_count: 1,
             supervisor_mode: SupervisorMode::Simple,
         };
         generate_template.execute()?;
 
         let generate_config = GenerateConfig {
-            common_config,
-            output_dir: self.artifacts_dir.clone(),
+            common_config: common_config_path,
+            output_dir: config_dir,
             peer_address: "127.0.0.1:6200".parse().unwrap(),
             listen_address: None,
             no_password: true,
@@ -104,13 +113,12 @@ impl ExonumCommand for RunDev {
         };
         generate_config.execute()?;
 
-        let node_config_file_name = "node.toml";
         let public_origins = Self::allowed_origins(self.public_api_address, "public");
         let private_origins = Self::allowed_origins(self.private_api_address, "private");
         let finalize = Finalize {
-            private_config_path: self.artifact_path(PRIVATE_CONFIG_FILE_NAME),
-            output_config_path: self.artifact_path(node_config_file_name),
-            public_configs: vec![self.artifact_path(PUBLIC_CONFIG_FILE_NAME)],
+            private_config_path,
+            output_config_path: node_config_path.clone(),
+            public_configs: vec![public_config_path],
             public_api_address: Some(self.public_api_address),
             private_api_address: Some(self.private_api_address),
             public_allow_origin: Some(public_origins),
@@ -119,8 +127,8 @@ impl ExonumCommand for RunDev {
         finalize.execute()?;
 
         let run = Run {
-            node_config: self.artifact_path(node_config_file_name),
-            db_path: self.artifact_path("db"),
+            node_config: node_config_path,
+            db_path,
             public_api_address: None,
             private_api_address: None,
             master_key_pass: Some(FromStr::from_str("pass:").unwrap()),

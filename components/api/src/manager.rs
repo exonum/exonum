@@ -22,7 +22,14 @@ use futures::{
     Stream, StreamExt, TryFutureExt,
 };
 
-use std::{collections::HashMap, io, net::SocketAddr, time::Duration};
+#[cfg(windows)]
+use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
+use std::{
+    collections::HashMap,
+    io,
+    net::{SocketAddr, TcpListener},
+    time::Duration,
+};
 
 use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
@@ -61,9 +68,9 @@ pub struct ApiManagerConfig {
     /// affected by `UpdateEndpoints` messages.
     pub api_aggregator: ApiAggregator,
     /// The interval in milliseconds between attempts of restarting HTTP-server in case
-    /// the server failed to restart
+    /// the server failed to restart.
     pub server_restart_retry_timeout: u64,
-    /// The attempts counts of restarting HTTP-server in case the server failed to restart
+    /// The attempts counts of restarting HTTP-server in case the server failed to restart.
     pub server_restart_max_retries: u16,
 }
 
@@ -121,12 +128,41 @@ async fn with_retries<T>(
     Err(io::Error::new(io::ErrorKind::Other, msg))
 }
 
-/// Actor responsible for API management. The actor encapsulates endpoint handlers and
+#[derive(Debug)]
+struct ServerHandle {
+    inner: Server,
+    #[cfg(windows)]
+    raw_socket: RawSocket,
+}
+
+impl ServerHandle {
+    #[cfg(not(windows))]
+    async fn stop(self) {
+        self.inner.stop(false).await;
+    }
+
+    #[cfg(windows)]
+    #[allow(unsafe_code)]
+    async fn stop(self) {
+        self.inner.stop(false).await;
+
+        // SAFETY: The safety of `from_raw_socket` relies on the fact that the socket is not used
+        // by `actix` afterwards and is not freed by it before. That is, it relies
+        // on the incorrect behavior of external libraries (`actix` *should* free the socket
+        // on its side). Not a good guarantee, but it works with current `actix-web` (2.0.0,
+        // with actual dependencies as of 2020-03-24).
+        //
+        // See actix/actix-web#1249 for details on the issue.
+        let _socket = unsafe { TcpListener::from_raw_socket(self.raw_socket) };
+    }
+}
+
+/// Component responsible for API management. The `ApiManager` encapsulates endpoint handlers and
 /// is capable of updating them via `UpdateEndpoints`.
 #[derive(Debug)]
 pub struct ApiManager {
     config: ApiManagerConfig,
-    servers: Vec<Server>,
+    servers: Vec<ServerHandle>,
     endpoints: Vec<(String, ApiBuilder)>,
 }
 
@@ -163,7 +199,7 @@ impl ApiManager {
 
         for (server, (&access, server_config)) in servers.iter().zip(&self.config.servers) {
             let listen_addr = server_config.listen_address;
-            actix_rt::spawn(server.clone().unwrap_or_else(move |e| {
+            actix_rt::spawn(server.inner.clone().unwrap_or_else(move |e| {
                 log::error!("{} server on {} failed: {}", access, listen_addr, e);
                 // TODO: should the server be restarted on error?
             }));
@@ -176,7 +212,7 @@ impl ApiManager {
     async fn stop_servers(&mut self) {
         log::trace!("Servers stop requested.");
 
-        join_all(self.servers.drain(..).map(|server| server.stop(false))).await;
+        join_all(self.servers.drain(..).map(ServerHandle::stop)).await;
     }
 
     /// Starts API manager actor with the specified endpoints update stream.
@@ -187,6 +223,7 @@ impl ApiManager {
         let res = self.run_inner(endpoints_rx).await;
         // Stop the HTTP server(s) in any case.
         self.stop_servers().await;
+        log::info!("HTTP servers shut down");
         res
     }
 
@@ -207,9 +244,13 @@ impl ApiManager {
         aggregator: ApiAggregator,
         access: ApiAccess,
         server_config: WebServerConfig,
-    ) -> io::Result<Server> {
+    ) -> io::Result<ServerHandle> {
         let listen_address = server_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
+
+        let listener = TcpListener::bind(listen_address)?;
+        #[cfg(windows)]
+        let raw_socket = listener.as_raw_socket();
 
         let server = HttpServer::new(move || {
             App::new()
@@ -217,8 +258,13 @@ impl ApiManager {
                 .service(aggregator.extend_backend(access, web::scope("api")))
         })
         .disable_signals()
-        .bind(listen_address)?
+        .listen(listener)?
         .run();
-        Ok(server)
+
+        Ok(ServerHandle {
+            inner: server,
+            #[cfg(windows)]
+            raw_socket,
+        })
     }
 }

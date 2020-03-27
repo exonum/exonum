@@ -83,6 +83,7 @@ use futures::{
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
+use tokio::time::delay_for;
 
 use std::{
     collections::{HashMap, HashSet},
@@ -101,6 +102,7 @@ use crate::{
         NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
+    proposer::{ProposeBlock, StandardProposer},
     schema::NodeSchema,
     state::{RequestData, State},
 };
@@ -113,6 +115,7 @@ mod events_impl;
 pub mod helpers;
 mod messages;
 mod plugin;
+pub mod proposer;
 mod proto;
 mod requests;
 #[cfg(test)]
@@ -198,6 +201,8 @@ pub(crate) struct NodeHandler {
     config_manager: Option<Box<dyn ConfigManager>>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
+    /// Block proposer.
+    block_proposer: Box<dyn ProposeBlock>,
 }
 
 /// HTTP API configuration options.
@@ -511,6 +516,7 @@ impl NodeRole {
 
 impl NodeHandler {
     /// Creates `NodeHandler` using specified `Configuration`.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         blockchain: BlockchainMut,
         external_address: &str,
@@ -519,10 +525,13 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
         config_manager: Option<Box<dyn ConfigManager>>,
+        block_proposer: Box<dyn ProposeBlock>,
     ) -> Self {
-        let last_block = blockchain.as_ref().last_block();
         let snapshot = blockchain.snapshot();
-        let consensus_config = Schema::new(&snapshot).consensus_config();
+        let schema = Schema::new(&snapshot);
+        let last_block = schema.last_block();
+        let last_block_skip = schema.block_skip();
+        let consensus_config = schema.consensus_config();
         info!("Creating a node with config: {:#?}", consensus_config);
 
         let connect = Connect::new(
@@ -542,6 +551,7 @@ impl NodeHandler {
             connect,
             peers,
             &last_block,
+            last_block_skip.as_ref(),
             system_state.current_time(),
         );
 
@@ -562,6 +572,7 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
+            block_proposer,
         }
     }
 
@@ -601,11 +612,6 @@ impl NodeHandler {
     /// Returns value of the `peers_timeout` field from the current `ConsensusConfig`.
     fn peers_timeout(&self) -> Milliseconds {
         self.state().consensus_config().peers_timeout
-    }
-
-    /// Returns value of the `txs_block_limit` field from the current `ConsensusConfig`.
-    fn txs_block_limit(&self) -> u32 {
-        self.state().consensus_config().txs_block_limit
     }
 
     /// Returns value of the minimal propose timeout.
@@ -736,10 +742,10 @@ impl NodeHandler {
         trace!(
             "ADD ROUND TIMEOUT: time={:?}, height={}, round={}",
             time,
-            self.state.height(),
+            self.state.epoch(),
             self.state.round()
         );
-        let timeout = NodeTimeout::Round(self.state.height(), self.state.round());
+        let timeout = NodeTimeout::Round(self.state.epoch(), self.state.round());
         self.add_timeout(timeout, time);
     }
 
@@ -756,10 +762,10 @@ impl NodeHandler {
         trace!(
             "ADD PROPOSE TIMEOUT: time={:?}, height={}, round={}",
             time,
-            self.state.height(),
+            self.state.epoch(),
             self.state.round()
         );
-        let timeout = NodeTimeout::Propose(self.state.height(), self.state.round());
+        let timeout = NodeTimeout::Propose(self.state.epoch(), self.state.round());
         self.add_timeout(timeout, time);
     }
 
@@ -781,7 +787,7 @@ impl NodeHandler {
     /// Adds `NodeTimeout::Status` timeout to the channel.
     fn add_status_timeout(&mut self) {
         let time = self.system_state.current_time() + Duration::from_millis(self.status_timeout());
-        let height = self.state.height();
+        let height = self.state.epoch();
         self.add_timeout(NodeTimeout::Status(height), time);
     }
 
@@ -834,7 +840,7 @@ impl NodeHandler {
         let ms = previous_round * self.first_round_timeout()
             + (previous_round * previous_round.saturating_sub(1)) / 2
                 * self.round_timeout_increase();
-        self.state.height_start_time() + Duration::from_millis(ms)
+        self.state.epoch_start_time() + Duration::from_millis(ms)
     }
 }
 
@@ -992,6 +998,7 @@ pub struct NodeBuilder {
     node_config: NodeConfig,
     node_keys: Keys,
     config_manager: Option<Box<dyn ConfigManager>>,
+    block_proposer: Box<dyn ProposeBlock>,
     plugins: Vec<Box<dyn NodePlugin>>,
 }
 
@@ -1028,6 +1035,7 @@ impl NodeBuilder {
             node_keys,
             config_manager: None,
             plugins: vec![],
+            block_proposer: Box::new(StandardProposer),
         }
     }
 
@@ -1063,6 +1071,19 @@ impl NodeBuilder {
         self
     }
 
+    /// Sets custom `Propose` creation logic for the node.
+    ///
+    /// # Stability and safety
+    ///
+    /// Using a custom proposer **CAN LEAD TO CONSENSUS FAILURE.** See the [`proposer`] module docs
+    /// for more details.
+    ///
+    /// [`proposer`]: proposer/index.html
+    pub fn with_block_proposer<T: ProposeBlock + 'static>(mut self, proposer: T) -> Self {
+        self.block_proposer = Box::new(proposer);
+        self
+    }
+
     /// Adds a plugin.
     pub fn with_plugin<T: NodePlugin + 'static>(mut self, plugin: T) -> Self {
         self.plugins.push(Box::new(plugin));
@@ -1079,6 +1100,7 @@ impl NodeBuilder {
             self.node_keys,
             self.config_manager,
             self.plugins,
+            self.block_proposer,
         )
     }
 }
@@ -1092,6 +1114,7 @@ impl Node {
         node_keys: Keys,
         config_manager: Option<Box<dyn ConfigManager>>,
         plugins: Vec<Box<dyn NodePlugin>>,
+        block_proposer: Box<dyn ProposeBlock>,
     ) -> Self {
         crypto::init();
 
@@ -1147,6 +1170,7 @@ impl Node {
             config,
             api_state,
             config_manager,
+            block_proposer,
         );
         handler.plugins = plugins;
 
@@ -1164,8 +1188,24 @@ impl Node {
     /// Launches only consensus messages handler.
     /// This may be used if you want to customize api with the `ApiContext`.
     async fn run_handler(mut self, handshake_params: HandshakeParams) -> anyhow::Result<()> {
+        // Stop timeout sufficient to prevent undefined behavior in RocksDB destructor code
+        // (see below).
+        const STOP_TIMEOUT: Duration = Duration::from_millis(50);
+
         self.handler.initialize();
-        Reactor::new(self).run(handshake_params).await
+        let res = Reactor::new(self).run(handshake_params).await;
+
+        // Wait for a little bit to prevent undefined behavior with RocksDB, when it is dropped
+        // concurrently with the process exiting. By delaying, we give time for
+        // the `actix` servers to exit (these servers contain the bulk of `Arc` pointers to RocksDB).
+        // The exit happens once the node infrastructure (in particular, the sender of endpoints to
+        // `exonum_api::ApiManager`) is dropped, i.e., before this point.
+        //
+        // We assume that waiting `STOP_TIMEOUT` is acceptable for typical use cases;
+        // even if the process does not terminate with the node exit,
+        // running a node is generally understood as a long-term task.
+        delay_for(STOP_TIMEOUT).await;
+        res
     }
 
     /// Launches a `Node` and optionally creates threads for public and private API handlers,

@@ -17,11 +17,11 @@
 use exonum::{
     blockchain::{
         config::{GenesisConfigBuilder, InstanceInitParams},
-        Blockchain, BlockchainMut, ConsensusConfig, Schema as CoreSchema,
+        BlockParams, BlockPatch, Blockchain, BlockchainMut, ConsensusConfig, Schema as CoreSchema,
     },
     crypto::Hash,
     helpers::{Height, ValidatorId},
-    merkledb::{ObjectHash, Patch, Snapshot},
+    merkledb::{ObjectHash, Snapshot},
     messages::{AnyTx, Verified},
     runtime::{
         migrations::{InitMigrationError, MigrationScript},
@@ -50,8 +50,8 @@ pub fn execute_transaction(
 ) -> Result<(), ExecutionError> {
     let tx_hash = tx.object_hash();
 
-    let (block_hash, patch) = create_block_with_transactions(blockchain, vec![tx]);
-    blockchain.commit(patch, block_hash, vec![]).unwrap();
+    let patch = create_block_with_transactions(blockchain, vec![tx]);
+    blockchain.commit(patch, vec![]).unwrap();
 
     let snapshot = blockchain.snapshot();
     let schema = CoreSchema::new(&snapshot);
@@ -62,15 +62,10 @@ pub fn execute_transaction(
 pub fn create_block_with_transactions(
     blockchain: &mut BlockchainMut,
     transactions: Vec<Verified<AnyTx>>,
-) -> (Hash, Patch) {
+) -> BlockPatch {
     let tx_hashes = add_transactions_into_pool(blockchain, transactions);
-
-    let height = {
-        let snapshot = blockchain.snapshot();
-        CoreSchema::new(&snapshot).next_height()
-    };
-
-    blockchain.create_patch(ValidatorId::zero(), height, &tx_hashes, &())
+    let block_params = BlockParams::new(ValidatorId(0), Height(100), &tx_hashes);
+    blockchain.create_patch(block_params, &())
 }
 
 pub fn create_genesis_config_builder() -> GenesisConfigBuilder {

@@ -139,14 +139,14 @@ impl StartService {
             .ok_or_else(|| {
                 let msg = format!(
                     "Discarded start of service `{}` from the unknown artifact `{}`.",
-                    self.name, self.artifact.name,
+                    self.name, self.artifact,
                 );
                 ArtifactError::UnknownArtifact.with_description(msg)
             })?;
         if artifact_state.status != ArtifactStatus::Active {
             let msg = format!(
                 "Discarded start of service `{}` from the non-active artifact `{}`.",
-                self.name, self.artifact.name,
+                self.name, self.artifact,
             );
             return Err(ArtifactError::UnknownArtifact.with_description(msg));
         }
@@ -825,6 +825,12 @@ impl Supervisor {
         deploy_request: &DeployRequest,
         error: ExecutionError,
     ) {
+        log::warn!(
+            "Deploying artifact for request {:?} failed. Reason: {}",
+            deploy_request,
+            error
+        );
+
         let height = context.data().for_core().height();
         let mut schema = SchemaImpl::new(context.service_data());
 
@@ -912,14 +918,14 @@ impl Supervisor {
     ) -> Result<(), ExecutionError> {
         if initiate_rollback {
             log::warn!(
-                "Migration for a request {:?} failed. Error: '{}'. \
+                "Migration for a request {:?} failed. Reason: {}. \
                  This migration is going to be rolled back.",
                 request,
                 error
             );
         } else {
             log::warn!(
-                "Migration for a request {:?} failed to start. Error: '{}'.",
+                "Migration for a request {:?} failed to start. Reason: {}.",
                 request,
                 error
             );

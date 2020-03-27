@@ -119,7 +119,7 @@ mod tests {
     fn get_signed_message() -> SignedMessage {
         let keys = KeyPair::random();
         Verified::from_value(
-            Status::new(Height(0), Hash::zero(), 0),
+            Status::new(Height(0), Height(0), Hash::zero(), 0),
             keys.public_key(),
             keys.secret_key(),
         )

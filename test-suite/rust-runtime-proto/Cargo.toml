@@ -2,7 +2,7 @@
 name = "exonum-rust-runtime-proto-tests"
 version = "0.0.0"
 edition = "2018"
-authors = ["The Exonum Team <exonum@bitfury.com>"]
+authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
 readme = "README.md"
@@ -10,24 +10,28 @@ description = "The test crate for testing rust runtime API endpoints."
 publish = false
 
 [dependencies]
-exonum = { version = "1.0.0-rc.2", path = "../../exonum" }
-exonum-derive = { version = "1.0.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "1.0.0-rc.2", path = "../../components/merkledb" }
-exonum-proto = { version = "1.0.0-rc.2", path = "../../components/proto" }
-exonum-rust-runtime = { version = "1.0.0-rc.2", path = "../../runtimes/rust" }
-exonum-testkit = { version = "1.0.0-rc.2", path = "../../test-suite/testkit" }
+exonum = { version = "1.0.0-rc.3", path = "../../exonum" }
+exonum-derive = { version = "1.0.0-rc.3", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0-rc.3", path = "../../components/merkledb" }
+exonum-proto = { version = "1.0.0-rc.3", path = "../../components/proto" }
+exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../../runtimes/rust" }
+exonum-testkit = { version = "1.0.0-rc.3", path = "../../test-suite/testkit" }
 
+anyhow = "1.0.26"
 bit-vec = "0.6.1"
 chrono = { version = "0.4.6", features = ["serde"] }
 protobuf = "2.10.1"
 pretty_assertions = "0.6.1"
+serde = "1.0"
+serde_derive = "1.0"
 
 [dev-dependencies]
-anyhow = "1.0.26"
+exonum-api = { version = "1.0.0-rc.3", path = "../../components/api" }
+reqwest = "0.10.4"
 
 [dev-dependencies.tokio]
 version = "0.2.13"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [build-dependencies]
-exonum-build = { version = "1.0.0-rc.2", path = "../../components/build" }
+exonum-build = { version = "1.0.0-rc.3", path = "../../components/build" }

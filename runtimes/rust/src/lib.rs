@@ -494,7 +494,10 @@ impl RustRuntimeBuilder {
             deployed_artifacts: HashSet::new(),
             started_services: BTreeMap::new(),
             started_services_by_name: HashMap::new(),
-            changed_services_since_last_block: false,
+            changed_services_since_last_block: true,
+            // ^-- We set this flag to `true` to propagate initial changes to API (which always
+            // include the runtime API) after the runtime is resumed or the genesis block
+            // is created.
         }
     }
 

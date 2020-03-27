@@ -24,6 +24,9 @@ artifacts:
     runtime: rust
     name: "exonum-cryptocurrency-advanced"
     version: "0.2.0"
+    action: "none"
+
 instances:
   crypto:
     artifact: cryptocurrency
+    action: "freeze"

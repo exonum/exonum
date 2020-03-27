@@ -16,8 +16,8 @@
 
 use exonum::{
     blockchain::{
-        config::GenesisConfigBuilder, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
-        ConsensusConfig,
+        config::GenesisConfigBuilder, ApiSender, BlockParams, Blockchain, BlockchainBuilder,
+        BlockchainMut, ConsensusConfig,
     },
     crypto::{self, KeyPair, PublicKey},
     merkledb::{ObjectHash, TemporaryDB},
@@ -134,10 +134,11 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
     use std::time::SystemTime;
 
     let tx_hashes: Vec<_> = transactions.iter().map(ObjectHash::object_hash).collect();
-    let height = blockchain.as_ref().last_block().height.next();
     blockchain.add_transactions_into_pool(transactions);
 
-    let (block_hash, patch) = blockchain.create_patch(ValidatorId(0), height, &tx_hashes, &());
+    let height = blockchain.as_ref().last_block().height.next();
+    let block_params = BlockParams::new(ValidatorId(0), height, &tx_hashes);
+    let patch = blockchain.create_patch(block_params, &());
     let consensus_keys = consensus_keys();
 
     let precommit = Verified::from_value(
@@ -146,14 +147,12 @@ pub fn create_block(blockchain: &mut BlockchainMut, transactions: Vec<Verified<A
             height,
             Round::first(),
             Hash::zero(),
-            block_hash,
+            patch.block_hash(),
             SystemTime::now().into(),
         ),
         consensus_keys.public_key(),
         consensus_keys.secret_key(),
     );
 
-    blockchain
-        .commit(patch, block_hash, vec![precommit])
-        .unwrap();
+    blockchain.commit(patch, vec![precommit]).unwrap();
 }

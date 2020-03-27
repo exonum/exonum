@@ -79,8 +79,8 @@ Include `exonum-supervisor` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "1.0.0-rc.2"
-exonum-supervisor = "1.0.0-rc.2"
+exonum = "1.0.0-rc.3"
+exonum-supervisor = "1.0.0-rc.3"
 ```
 
 Note that the supervisor service is added to the blockchain automatically

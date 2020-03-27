@@ -17,6 +17,7 @@ btree
 bytearray
 byteorder
 canonicalize
+CBOR
 checkpointed
 chmod
 chrono
@@ -52,6 +53,7 @@ deserializing
 DESTDIR
 diffie
 discriminants
+doctest
 doctests
 emsp
 encodable
@@ -131,6 +133,7 @@ protobuf
 protoc
 protos
 proxying
+pthread
 pubkey
 pubkeys
 pwbox
