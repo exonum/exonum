@@ -103,13 +103,10 @@ pub struct ConsensusConfig {
     /// between the moment a new block is committed to the blockchain and the
     /// time when second round starts, regardless of whether a new block has
     /// been committed during this period or not.
-    /// Each consecutive round will be longer then previous by constant factor determined
-    /// by ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT constant.
+    /// Each consecutive round will be longer then previous by a constant factor, 10%.
     ///
-    /// Note that rounds in Exonum
-    /// do not have a defined end time. Nodes in a new round can
-    /// continue to vote for proposals and process messages related to previous
-    /// rounds.
+    /// Note that rounds in Exonum do not have a defined end time. Nodes in a new round can
+    /// continue to vote for proposals and process messages related to previous rounds.
     pub first_round_timeout: Milliseconds,
     /// Period of sending a Status message. This parameter defines the frequency
     /// with which a node broadcasts its status message to the network.
@@ -141,10 +138,10 @@ impl Default for ConsensusConfig {
     fn default() -> Self {
         Self {
             validator_keys: Vec::default(),
-            first_round_timeout: 3000,
-            status_timeout: 5000,
+            first_round_timeout: 3_000,
+            status_timeout: 5_000,
             peers_timeout: 10_000,
-            txs_block_limit: 1000,
+            txs_block_limit: 1_000,
             max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
             min_propose_timeout: 10,
             max_propose_timeout: 200,

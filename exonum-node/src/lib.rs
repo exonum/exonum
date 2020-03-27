@@ -671,6 +671,17 @@ impl NodeHandler {
         info!("Jump to round {}", round);
 
         self.add_timeouts();
+        if self.state.is_leader() && round == Round(1) {
+            // Propose the block after a short delay, which is used to gather initial transactions
+            // (if any). Note that this handles the case when the node has already proposed
+            // at the same `(epoch, round)`; in this case, the node has at least its own `Prevote`,
+            // so the `Propose` creation will be skipped in `handle_propose_timeout`.
+            //
+            // Restricting `round == Round(1)` is in order to prevent proposals with a large delay.
+            // Heuristically, `round > Round(1)` increases probability that
+            // the node's `(epoch, round)` is outdated.
+            self.add_propose_timeout();
+        }
 
         // Recover cached consensus messages if any. We do this after main initialization and before
         // the start of event processing.
