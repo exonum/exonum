@@ -942,6 +942,18 @@ pub trait ConfigManager: Send {
 
 /// Node capable of processing requests from external clients and participating in the consensus
 /// algorithm.
+///
+/// # Signal Handling
+///
+/// By default, the node installs several signal hooks. This can be disabled by using
+/// [`disable_signals()`] method in `NodeBuilder`.
+///
+/// On Unix, the node will gracefully shut down on receiving any of SIGINT, SIGTERM
+/// or SIGQUIT and will ignore SIGHUP. On Windows, the node will gracefully shut down on
+/// receiving `Ctrl + C` break. Graceful shutdown means, among other things, flushing uncommitted
+/// transactions into the persistent storage.
+///
+/// [`disable_signals()`]: struct.NodeBuilder.html#method.disable_signals
 #[derive(Debug)]
 pub struct Node {
     api_manager_config: ApiManagerConfig,
@@ -1096,7 +1108,15 @@ impl NodeBuilder {
         self
     }
 
-    /// Switches of signal handling for the node.
+    /// Switches off [default signal handling] for the node.
+    /// This is useful to implement more complex signal handling, or one that differs
+    /// from the default.
+    ///
+    /// If you use custom signal handlers, the node may be shut down gracefully using
+    /// [`ShutdownHandle`].
+    ///
+    /// [`ShutdownHandle`]: struct.ShutdownHandle.html
+    /// [default signal handling]: struct.Node.html#signal-handling
     pub fn disable_signals(mut self) -> Self {
         self.disable_signals = true;
         self
