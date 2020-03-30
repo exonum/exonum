@@ -627,7 +627,7 @@ impl TestKit {
 
         let tx_hashes: Vec<_> = core_schema
             .transactions_pool()
-            .iter()
+            .keys()
             .filter(filter_transactions)
             .collect();
         self.do_create_block(&tx_hashes)

@@ -32,7 +32,7 @@ pub(crate) use crate::runtime::ExecutionError;
 use exonum_crypto::{Hash, KeyPair};
 use exonum_merkledb::{
     access::{Access, RawAccess},
-    Database, Fork, HashTag, KeySetIndex, MapIndex, ObjectHash, Patch, Result as StorageResult,
+    Database, Fork, HashTag, MapIndex, ObjectHash, Patch, Result as StorageResult,
     Snapshot, SystemSchema, TemporaryDB,
 };
 
@@ -115,7 +115,7 @@ impl TransactionCache for BTreeMap<Hash, Verified<AnyTx>> {
 pub struct PersistentPool<'a, C: ?Sized, T: RawAccess> {
     cache: &'a C,
     transactions: MapIndex<T, Hash, Verified<AnyTx>>,
-    transactions_pool: KeySetIndex<T, Hash>,
+    transactions_pool: MapIndex<T, Hash, Verified<AnyTx>>,
 }
 
 impl<'a, C, T> PersistentPool<'a, C, T>
@@ -154,13 +154,10 @@ where
 
     fn transactions(&self) -> Transactions<'_> {
         // TODO: should transactions be ordered?
-        let pool_it = self.transactions_pool.iter().map(move |tx_hash| {
-            let tx = self
-                .transactions
-                .get(&tx_hash)
-                .expect("Transaction in pool is lost");
-            (tx_hash, Cow::Owned(tx))
-        });
+        let pool_it = self
+            .transactions_pool
+            .iter()
+            .map(move |(tx_hash, tx)| (tx_hash, Cow::Owned(tx)));
         let it = self.cache.transactions().chain(pool_it);
         Box::new(it)
     }

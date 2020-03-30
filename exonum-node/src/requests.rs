@@ -90,7 +90,7 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let schema = Schema::new(&snapshot);
 
-        let mut hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
+        let mut hashes: Vec<Hash> = schema.transactions_pool().keys().collect();
         hashes.extend(self.state.tx_cache().keys().cloned());
 
         self.send_transactions_by_hash(msg.author(), &hashes);

@@ -834,7 +834,7 @@ impl Sandbox {
         let schema = snapshot.for_core();
         let idx = schema.transactions_pool();
 
-        let mut vec: Vec<Hash> = idx.iter().collect();
+        let mut vec: Vec<Hash> = idx.keys().collect();
         vec.extend(self.node_state().tx_cache().keys().cloned());
         vec
     }

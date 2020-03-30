@@ -24,7 +24,7 @@ use exonum::{
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
     keys::Keys,
-    merkledb::{access::RawAccess, KeySetIndex, MapIndex, ObjectHash, Snapshot},
+    merkledb::{access::RawAccess, MapIndex, ObjectHash, Snapshot},
     messages::{AnyTx, Precommit, Verified},
 };
 use log::{error, trace};
@@ -1116,7 +1116,7 @@ impl State {
         &mut self,
         msg: Verified<Propose>,
         transactions: &MapIndex<T, Hash, Verified<AnyTx>>,
-        transaction_pool: &KeySetIndex<T, Hash>,
+        transaction_pool: &MapIndex<T, Hash, Verified<AnyTx>>,
     ) -> anyhow::Result<&ProposeState> {
         let propose_hash = msg.object_hash();
         match self.proposes.entry(propose_hash) {
@@ -1199,7 +1199,7 @@ impl State {
         &mut self,
         mut incomplete_block: IncompleteBlock,
         snapshot: &dyn Snapshot,
-        txs_pool: &KeySetIndex<&dyn Snapshot, Hash>,
+        txs_pool: &MapIndex<&dyn Snapshot, Hash, Verified<AnyTx>>,
     ) -> &IncompleteBlock {
         assert!(self.incomplete_block().is_none());
         let tx_cache = PersistentPool::new(snapshot, &self.tx_cache);

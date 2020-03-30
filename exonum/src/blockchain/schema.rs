@@ -19,7 +19,7 @@ use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
     impl_binary_key_for_binary_value,
     indexes::{Entries, Values},
-    Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
+    Entry, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
 
@@ -171,9 +171,9 @@ impl<T: Access> Schema<T> {
         pool.get().unwrap_or(0)
     }
 
-    /// Returns a table that represents a set of uncommitted transactions hashes.
-    pub fn transactions_pool(&self) -> KeySetIndex<T::Base, Hash> {
-        self.access.get_key_set(TRANSACTIONS_POOL)
+    /// Returns a table that represents a set of uncommitted transactions.
+    pub fn transactions_pool(&self) -> MapIndex<T::Base, Hash, Verified<AnyTx>> {
+        self.access.get_map(TRANSACTIONS_POOL)
     }
 
     /// Returns an entry that represents count of uncommitted transactions.
@@ -320,7 +320,7 @@ where
     /// be sure to decrement it when the transaction committed.
     #[doc(hidden)]
     pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
-        self.transactions_pool().insert(&tx.object_hash());
+        self.transactions_pool().put(&tx.object_hash(), tx.clone());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);
         self.transactions().put(&tx.object_hash(), tx);
