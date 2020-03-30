@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Breaking changes
+
+#### exonum
+
+- `Schema::transactions_pool` now stores the whole transactions, not only hashes.
+  (#1839)
+
 ### Bug Fixes
 
 #### exonum-cli
