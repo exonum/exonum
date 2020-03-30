@@ -1080,7 +1080,7 @@ impl SandboxBuilder {
     }
 
     /// Customizes block proposal creation.
-    pub fn with_proposer(mut self, proposer: impl ManagePool + 'static) -> Self {
+    pub fn with_pool_manager(mut self, proposer: impl ManagePool + 'static) -> Self {
         self.proposer = Box::new(proposer);
         self
     }
