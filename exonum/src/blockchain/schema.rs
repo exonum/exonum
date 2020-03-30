@@ -318,12 +318,39 @@ where
     ///
     /// This method increments the number of transactions in the pool,
     /// be sure to decrement it when the transaction committed.
-    #[doc(hidden)]
+    #[doc(hidden)] // considered an implementation detail
     pub fn add_transaction_into_pool(&mut self, tx: Verified<AnyTx>) {
         self.transactions_pool().insert(&tx.object_hash());
         let x = self.transactions_pool_len_index().get().unwrap_or(0);
         self.transactions_pool_len_index().set(x + 1);
         self.transactions().put(&tx.object_hash(), tx);
+    }
+
+    /// Removes transaction from the persistent transaction pool. The caller must ensure
+    /// that the transaction is not committed; this is checked in the debug mode, but not
+    /// in the release one.
+    ///
+    /// # Return value
+    ///
+    /// Returns `true` if the transaction was present in the persistent pool.
+    #[doc(hidden)] // considered an implementation detail
+    pub fn reject_transaction(&mut self, hash: Hash) -> bool {
+        debug_assert!(
+            self.transactions_locations().get(&hash).is_none(),
+            "Attempt to remove a committed transaction"
+        );
+
+        let contains = self.transactions_pool().contains(&hash);
+        self.transactions_pool().remove(&hash);
+        self.transactions().remove(&hash);
+
+        if contains {
+            let len = self.transactions_pool_len_index().get().unwrap();
+            self.transactions_pool_len_index().set(len - 1);
+            true
+        } else {
+            false
+        }
     }
 
     /// Changes the transaction status from `in_pool`, to `committed`.

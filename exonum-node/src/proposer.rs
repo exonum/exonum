@@ -30,7 +30,7 @@
 //! #    keys;
 //! let database = TemporaryDB::new();
 //! let node = NodeBuilder::new(database, node_config, node_keys)
-//!     .with_block_proposer(SkipEmptyBlocks)
+//!     .with_pool_manager(SkipEmptyBlocks)
 //!     // specify other node params...
 //!     .build();
 //! node.run().await?;
@@ -39,7 +39,7 @@
 //! ```
 //!
 //! [`ProposeBlock`]: trait.ProposeBlock.html
-//! [`NodeBuilder`]: ../struct.NodeBuilder.html#method.with_block_proposer
+//! [`NodeBuilder`]: ../struct.NodeBuilder.html#method.with_pool_manager
 //!
 //! # Stability
 //!
@@ -142,7 +142,10 @@ impl ProposeTemplate {
     }
 }
 
-/// Proposal creation logic.
+/// Transaction pool management, responsible for proposing new blocks and garbage-collecting
+/// transactions in the memory pool.
+///
+/// # Proposing Blocks
 ///
 /// An implementation of this trait can be supplied to a node to change how the node will
 /// form block proposals. Some use cases for this functionality are as follows:
@@ -159,29 +162,89 @@ impl ProposeTemplate {
 /// among nodes. At the same time, some proposer implementations (such as whitelisting or blacklisting)
 /// do not work effectively unless adopted by all validator nodes.
 ///
+/// # Removing Transactions
+///
+/// The trait implementation can also be used to garbage-collect transactions once a new block
+/// or block skip has been accepted by the node. Note that this is the only time when such garbage
+/// collection is safe. Indeed, it cannot be safely performed if node has voted for
+/// at least one block proposal at the current epoch, since in this case some of removed transactions
+/// may belong to this proposal(s). Removing such a transaction from the node pool may result
+/// in consensus stalling.
+///
 /// [`ProposeTemplate::Skip`]: enum.ProposeTemplate.html#variant.Skip
-pub trait ProposeBlock: Send {
+pub trait ManagePool: Send {
     /// Creates a block proposal based on the transaction pool and block creation params.
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate;
+
+    /// Indicates transactions for removal from the pool of unconfirmed transactions.
+    ///
+    /// This method is called from the commit handler of the block.
+    fn remove_transactions(&mut self, pool: Pool<'_>, snapshot: &dyn Snapshot) -> Vec<Hash>;
 }
 
-impl fmt::Debug for dyn ProposeBlock {
+impl fmt::Debug for dyn ManagePool {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.debug_tuple("ProposeBlock").finish()
     }
 }
 
-impl ProposeBlock for Box<dyn ProposeBlock> {
+impl ManagePool for Box<dyn ManagePool> {
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         (**self).propose_block(pool, params)
     }
+
+    fn remove_transactions(&mut self, pool: Pool<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        (**self).remove_transactions(pool, snapshot)
+    }
 }
 
-/// Standard block proposer used by the nodes if no other proposer is specified.
+/// Standard pool manager used by the nodes if no other manager is specified.
+///
+/// The manager will propose correct transactions in no particular order. It will also remove
+/// incorrect transactions from the pool, unless this setting is switched off by using
+/// [`with_removal_limit`]`(0)`.
+///
+/// [`with_removal_limit`]: #method.with_removal_limit
 #[derive(Debug, Clone)]
-pub struct StandardProposer;
+pub struct StandardPoolManager {
+    removal_limit: Option<usize>,
+}
 
-impl ProposeBlock for StandardProposer {
+impl Default for StandardPoolManager {
+    fn default() -> Self {
+        Self {
+            // FIXME: What's the appropriate default value?
+            removal_limit: Some(100),
+        }
+    }
+}
+
+impl StandardPoolManager {
+    /// Creates a proposer with the specified limit on transactions considered for removal
+    /// each time a block is accepted. `None` signifies no limit. Use `0` to switch off transaction
+    /// removal logic altogether; with this setting, the node will never remove incorrect transactions
+    /// from the pool.
+    ///
+    /// # Performance notes
+    ///
+    /// The higher the limit, the
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use exonum_node::proposer::StandardPoolManager;
+    /// // Manager that considers no more than 500 transactions for removal
+    /// // after a block is accepted.
+    /// let manager = StandardPoolManager::with_removal_limit(500);
+    /// ```
+    pub fn with_removal_limit(removal_limit: impl Into<Option<usize>>) -> Self {
+        Self {
+            removal_limit: removal_limit.into(),
+        }
+    }
+}
+
+impl ManagePool for StandardPoolManager {
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         let max_transactions = params.consensus_config.txs_block_limit;
         let snapshot = params.snapshot();
@@ -202,19 +265,52 @@ impl ProposeBlock for StandardProposer {
 
         ProposeTemplate::ordinary(tx_hashes)
     }
+
+    fn remove_transactions(&mut self, pool: Pool<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let tx_limit = self.removal_limit.unwrap_or_else(usize::max_value);
+        pool.transactions()
+            .take(tx_limit)
+            .filter_map(|(tx_hash, tx)| {
+                if let Err(e) = Blockchain::check_tx(snapshot, tx.as_ref()) {
+                    log::trace!(
+                        "Removing transaction {:?} from pool, since it is incorrect: {}",
+                        tx_hash,
+                        e
+                    );
+                    Some(tx_hash)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
-/// Block proposer that skips a block if there are no uncommitted transactions.
-#[derive(Debug, Clone)]
-pub struct SkipEmptyBlocks;
+/// Pool manager that skips a block if there are no uncommitted transactions returned by the
+/// wrapped manager. The `remove_transactions` method is proxied to the wrapped manager.
+#[derive(Debug, Clone, Default)]
+pub struct SkipEmptyBlocks<T> {
+    inner: T,
+}
 
-impl ProposeBlock for SkipEmptyBlocks {
+impl<T: ManagePool> SkipEmptyBlocks<T> {
+    /// Creates a new wrapper.
+    pub fn new(inner: T) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T: ManagePool> ManagePool for SkipEmptyBlocks<T> {
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
-        match StandardProposer.propose_block(pool, params) {
+        match self.inner.propose_block(pool, params) {
             ProposeTemplate::Ordinary { tx_hashes } if tx_hashes.is_empty() => {
                 ProposeTemplate::Skip
             }
             other => other,
         }
+    }
+
+    fn remove_transactions(&mut self, pool: Pool<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
+        self.inner.remove_transactions(pool, snapshot)
     }
 }

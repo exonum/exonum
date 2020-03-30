@@ -757,6 +757,24 @@ impl NodeHandler {
         }
 
         let snapshot = self.blockchain.snapshot();
+        let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
+        let tx_hashes_to_remove = self.pool_manager.remove_transactions(pool, &snapshot);
+        if !tx_hashes_to_remove.is_empty() {
+            log::info!(
+                "Removing {} transactions from pool",
+                tx_hashes_to_remove.len()
+            );
+
+            let fork = self.blockchain.fork();
+            for tx_hash in &tx_hashes_to_remove {
+                self.state.tx_cache_mut().remove(tx_hash);
+                Schema::new(&fork).reject_transaction(*tx_hash);
+            }
+            self.blockchain
+                .merge(fork.into_patch())
+                .expect("Cannot save changes to transaction pool");
+        }
+
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();
         let epoch = self.state.epoch();
@@ -1040,7 +1058,7 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
         let params = ProposeParams::new(self.state(), &snapshot);
-        self.block_proposer.propose_block(pool, params)
+        self.pool_manager.propose_block(pool, params)
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.

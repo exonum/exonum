@@ -18,7 +18,7 @@ use exonum::{
     merkledb::{Database, TemporaryDB},
 };
 use exonum_node::{
-    generate_testnet_config, proposer::ProposeBlock, Node, NodeBuilder, NodeConfig, ShutdownHandle,
+    generate_testnet_config, proposer::ManagePool, Node, NodeBuilder, NodeConfig, ShutdownHandle,
 };
 use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
 use futures::TryFutureExt;
@@ -61,14 +61,14 @@ impl RunHandle {
     }
 }
 
-type ProposerGen = Box<dyn Fn() -> Box<dyn ProposeBlock>>;
+type ManagerGen = Box<dyn Fn() -> Box<dyn ManagePool>>;
 
 pub struct NetworkBuilder<'a> {
     count: u16,
     start_port: u16,
     modify_cfg: Option<Box<dyn FnMut(&mut NodeConfig) + 'a>>,
     init_node: Option<Box<dyn FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder) + 'a>>,
-    block_proposer: Option<ProposerGen>,
+    pool_manager: Option<ManagerGen>,
 }
 
 impl fmt::Debug for NetworkBuilder<'_> {
@@ -89,7 +89,7 @@ impl<'a> NetworkBuilder<'a> {
             start_port,
             modify_cfg: None,
             init_node: None,
-            block_proposer: None,
+            pool_manager: None,
         }
     }
 
@@ -112,12 +112,12 @@ impl<'a> NetworkBuilder<'a> {
     }
 
     /// Customizes block proposal logic.
-    pub fn with_block_proposer<T>(mut self, proposer: T) -> Self
+    pub fn with_pool_manager<T>(mut self, proposer: T) -> Self
     where
-        T: ProposeBlock + Clone + 'static,
+        T: ManagePool + Clone + 'static,
     {
-        let f = move || Box::new(proposer.clone()) as Box<dyn ProposeBlock>;
-        self.block_proposer = Some(Box::new(f));
+        let f = move || Box::new(proposer.clone()) as Box<dyn ManagePool>;
+        self.pool_manager = Some(Box::new(f));
         self
     }
 
@@ -142,8 +142,8 @@ impl<'a> NetworkBuilder<'a> {
                 .with_genesis_config(genesis_cfg.build())
                 .with_runtime_fn(|channel| rt.build(channel.endpoints_sender()));
 
-            if let Some(ref gen_proposer) = self.block_proposer {
-                node_builder = node_builder.with_block_proposer(gen_proposer());
+            if let Some(ref gen_proposer) = self.pool_manager {
+                node_builder = node_builder.with_pool_manager(gen_proposer());
             }
             node_handles.push(RunHandle::new(node_builder.build()));
         }

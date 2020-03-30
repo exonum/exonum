@@ -16,10 +16,10 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{ProposerId, TransactionCache},
+    blockchain::{Blockchain, ProposerId, TransactionCache},
     crypto::{Hash, KeyPair, PublicKey},
     helpers::{Height, Round, ValidatorId},
-    merkledb::{BinaryValue, ObjectHash},
+    merkledb::{BinaryValue, ObjectHash, Snapshot},
     messages::{AnyTx, Verified},
 };
 
@@ -27,7 +27,7 @@ use std::{collections::BTreeSet, iter::FromIterator, time::Duration};
 
 use crate::{
     messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
-    proposer::{Pool, ProposeBlock, ProposeParams, ProposeTemplate},
+    proposer::{ManagePool, Pool, ProposeParams, ProposeTemplate},
     sandbox::{
         sandbox_tests_helper::*,
         supervisor::{Supervisor, SupervisorService, TxConfig},
@@ -38,7 +38,6 @@ use crate::{
     },
     state::TRANSACTIONS_REQUEST_TIMEOUT,
 };
-use exonum::blockchain::Blockchain;
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
 const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
@@ -726,7 +725,7 @@ impl WhitelistProposer {
     }
 }
 
-impl ProposeBlock for WhitelistProposer {
+impl ManagePool for WhitelistProposer {
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         let tx_hashes = pool.transactions().filter_map(|(tx_hash, tx)| {
             if tx.author() == self.key {
@@ -738,6 +737,10 @@ impl ProposeBlock for WhitelistProposer {
         let tx_limit = params.consensus_config().txs_block_limit;
         let tx_hashes = tx_hashes.take(tx_limit as usize);
         ProposeTemplate::ordinary(tx_hashes)
+    }
+
+    fn remove_transactions(&mut self, _pool: Pool<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        vec![]
     }
 }
 

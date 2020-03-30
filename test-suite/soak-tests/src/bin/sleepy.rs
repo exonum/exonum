@@ -21,7 +21,7 @@ use exonum::{
     helpers::Height,
     runtime::SnapshotExt,
 };
-use exonum_node::proposer::SkipEmptyBlocks;
+use exonum_node::proposer::{SkipEmptyBlocks, StandardPoolManager};
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,
@@ -95,7 +95,7 @@ async fn main() {
 
     let nodes = NetworkBuilder::new(args.node_count, 2_000)
         .init_node(|genesis, rt| main_service.clone().deploy(genesis, rt))
-        .with_block_proposer(SkipEmptyBlocks)
+        .with_pool_manager(SkipEmptyBlocks::new(StandardPoolManager::default()))
         .build();
 
     let sender = nodes[0].blockchain().sender().to_owned();
