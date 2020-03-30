@@ -8,7 +8,6 @@ from exonum_launcher.launcher import Launcher
 
 from suite import (
     assert_processes_exited_successfully,
-    launcher_networks,
     run_4_nodes,
     wait_network_to_start,
     ExonumCryptoAdvancedClient,
@@ -31,7 +30,7 @@ class CryptoAdvancedTest(unittest.TestCase):
         with Launcher(cryptocurrency_advanced_config) as launcher:
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
-                deployed = explorer.check_deployed(artifact)
+                deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
             # Launcher checks that config is applied, no need to check it again.

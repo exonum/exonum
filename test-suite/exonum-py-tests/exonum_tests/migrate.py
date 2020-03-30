@@ -2,6 +2,7 @@ import time
 import unittest
 
 from exonum_client import ExonumClient
+from exonum_client.crypto import KeyPair
 from exonum_launcher.action_result import ActionResult
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.explorer import NotCommittedError
@@ -9,10 +10,11 @@ from exonum_launcher.launcher import Launcher
 
 from suite import (
     assert_processes_exited_successfully,
-    run_4_nodes,
-    wait_network_to_start,
+    ExonumCryptoAdvancedClient,
     generate_config,
     generate_migration_config,
+    run_4_nodes,
+    wait_network_to_start,
 )
 
 INSTANCE_NAME = "cryptocurrency"
@@ -33,9 +35,7 @@ class MigrationTests(unittest.TestCase):
         time.sleep(0.25)
         wait_network_to_start(self.network)
 
-    def test_full_migration_flow(self):
-        """Tests full service migration flow."""
-
+    def full_migration_flow(self, action: str):
         host, public_port, private_port = self.network.api_address(0)
         client = ExonumClient(host, public_port, private_port)
 
@@ -54,8 +54,11 @@ class MigrationTests(unittest.TestCase):
                 deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, True)
 
+        # Create Alice's wallet with 0.1.0 version of the service
+        alice_keys = self._create_wallet(client, "Alice", "0.1.0")
+
         # Stop the working service with version 0.1.0.
-        instances = {INSTANCE_NAME: {"artifact": "cryptocurrency", "action": "stop"}}
+        instances = {INSTANCE_NAME: {"artifact": "cryptocurrency", "action": action}}
         stop_config_dict = generate_config(
             self.network, instances=instances, artifact_action="none", artifact_version="0.1.0"
         )
@@ -69,7 +72,7 @@ class MigrationTests(unittest.TestCase):
             # Check that the service status has been changed to `stopped`.
             for service in client.public_api.available_services().json()["services"]:
                 if service["spec"]["name"] == INSTANCE_NAME:
-                    self.assertEqual(service["status"]["type"], "stopped")
+                    self.assertEqual(service["status"]["type"], "stopped" if action == "stop" else "frozen")
 
         # Migrate service data from 0.1.0 to 0.2.0 version
         migrations = {INSTANCE_NAME: {"runtime": "rust", "name": "exonum-cryptocurrency", "version": "0.2.0"}}
@@ -84,7 +87,7 @@ class MigrationTests(unittest.TestCase):
                 if service["spec"]["name"] == INSTANCE_NAME:
                     self.assertEqual(service["data_version"], "0.2.0")
 
-        # Migrate service logic from 0.1.0 to 0.2.0 version
+        # Switch service artifact from 0.1.0 to 0.2.0 version
         with Launcher(migration_config) as launcher:
             launcher.migrate_all()
             launcher.wait_for_migration()
@@ -128,6 +131,36 @@ class MigrationTests(unittest.TestCase):
                 deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, False)
 
+        # Create Bob's wallet with version 0.2.0 of the service.
+        bob_keys = self._create_wallet(client, "Bob", "0.2.0")
+
+        # Transfer some coins and check balances and history length.
+        with ExonumCryptoAdvancedClient(client, instance_name=INSTANCE_NAME) as crypto_client:
+            alice_balance = crypto_client.get_balance(alice_keys)
+            self.assertEqual(alice_balance, 100)
+            alice_history_len = crypto_client.get_history_len(alice_keys)
+            self.assertEqual(alice_history_len, 0)
+            bob_balance = crypto_client.get_balance(bob_keys)
+            self.assertEqual(bob_balance, 100)
+            crypto_client.transfer(20, alice_keys, bob_keys.public_key)
+            with client.create_subscriber("transactions") as subscriber:
+                subscriber.wait_for_new_event()
+                alice_balance = crypto_client.get_balance(alice_keys)
+                self.assertEqual(alice_balance, 80)
+                # Get a value from the new field `history_len`.
+                alice_history_len = crypto_client.get_history_len(alice_keys)
+                self.assertEqual(alice_history_len, 1)
+                bob_balance = crypto_client.get_balance(bob_keys)
+                self.assertEqual(bob_balance, 120)
+
+    def test_full_migration_flow_with_stopped_service(self):
+        """Tests full service migration flow with stopped service."""
+        self.full_migration_flow("stop")
+
+    def test_full_migration_flow_with_frozen_service(self):
+        """Tests full service migration flow with frozen service."""
+        self.full_migration_flow("freeze")
+
     def test_migrate_running_service(self):
         """Tests migration flow when the migrating service is running."""
 
@@ -160,7 +193,7 @@ class MigrationTests(unittest.TestCase):
                     self.assertEqual(status, ActionResult.Fail)
                     self.assertTrue("is not stopped or frozen" in message)
 
-    def test_migrate_without_migration_logic_stage(self):
+    def test_migration_without_switching_artifact(self):
         """Tests migration flow without migration logic stage."""
 
         host, public_port, private_port = self.network.api_address(0)
@@ -278,3 +311,12 @@ class MigrationTests(unittest.TestCase):
 
     def tearDown(self):
         self._tear_down()
+
+    def _create_wallet(self, client: ExonumClient, wallet_name: str, version: str) -> KeyPair:
+        with ExonumCryptoAdvancedClient(client, INSTANCE_NAME, version) as crypto_client:
+            keys = KeyPair.generate()
+            response = crypto_client.create_wallet(keys, wallet_name)
+            self.assertEqual(response.status_code, 200)
+            with client.create_subscriber("transactions") as subscriber:
+                subscriber.wait_for_new_event()
+            return keys
