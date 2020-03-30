@@ -1019,7 +1019,7 @@ pub struct SandboxBuilder {
     rust_runtime: RustRuntimeBuilder,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
-    proposer: Box<dyn ManagePool>,
+    pool_manager: Box<dyn ManagePool>,
 }
 
 impl Default for SandboxBuilder {
@@ -1046,7 +1046,7 @@ impl Default for SandboxBuilder {
             rust_runtime: RustRuntimeBuilder::new(),
             instances: Vec::new(),
             artifacts: HashMap::new(),
-            proposer: Box::new(StandardPoolManager::default()),
+            pool_manager: Box::new(StandardPoolManager::default()),
         }
     }
 }
@@ -1080,8 +1080,8 @@ impl SandboxBuilder {
     }
 
     /// Customizes block proposal creation.
-    pub fn with_pool_manager(mut self, proposer: impl ManagePool + 'static) -> Self {
-        self.proposer = Box::new(proposer);
+    pub fn with_pool_manager(mut self, manager: impl ManagePool + 'static) -> Self {
+        self.pool_manager = Box::new(manager);
         self
     }
 
@@ -1126,7 +1126,7 @@ impl SandboxBuilder {
             self.consensus_config,
             self.validators_count,
         );
-        sandbox.inner.borrow_mut().handler.pool_manager = self.proposer;
+        sandbox.inner.borrow_mut().handler.pool_manager = self.pool_manager;
 
         sandbox.inner.borrow_mut().sent.clear(); // To clear initial connect messages.
         if self.initialize {

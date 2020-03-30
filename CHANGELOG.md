@@ -48,7 +48,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Exonum nodes can now customize how they create block proposals. This can be
   used to whitelist / blacklist transaction authors or services, prioritize
   transactions by advanced criteria, implement complex rate limiting, etc.
-  The functionality is available via `proposer` module. (#1820)
+  The functionality is available via `pool` module. (#1820)
 
 - Exonum nodes can now skip block generation at a certain epoch of the consensus
   algorithm. This can be used to keep a "heartbeat" when the network load is low

@@ -144,8 +144,8 @@ impl<'a> NetworkBuilder<'a> {
                 .with_genesis_config(genesis_cfg.build())
                 .with_runtime_fn(|channel| rt.build(channel.endpoints_sender()));
 
-            if let Some(ref gen_proposer) = self.pool_manager {
-                node_builder = node_builder.with_pool_manager(gen_proposer());
+            if let Some(ref manager_gen) = self.pool_manager {
+                node_builder = node_builder.with_pool_manager(manager_gen());
             }
             node_handles.push(RunHandle::new(node_builder.build()));
         }
