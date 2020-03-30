@@ -13,20 +13,22 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{config::GenesisConfigBuilder, Blockchain},
+    blockchain::{config::GenesisConfigBuilder, ApiSender, Blockchain},
     crypto::KeyPair,
+    helpers::Height,
     merkledb::{Database, TemporaryDB},
 };
 use exonum_node::{
     generate_testnet_config, pool::ManagePool, Node, NodeBuilder, NodeConfig, ShutdownHandle,
 };
-use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder};
 use futures::TryFutureExt;
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::delay_for};
 
-use std::{fmt, sync::Arc};
+use std::{fmt, sync::Arc, time::Duration};
 
 pub mod services;
+use crate::services::{MainService, MainServiceInterface};
 
 #[derive(Debug)]
 pub struct RunHandle {
@@ -112,11 +114,11 @@ impl<'a> NetworkBuilder<'a> {
     }
 
     /// Customizes block proposal logic.
-    pub fn with_pool_manager<T>(mut self, proposer: T) -> Self
+    pub fn with_pool_manager<T>(mut self, manager: T) -> Self
     where
         T: ManagePool + Clone + 'static,
     {
-        let f = move || Box::new(proposer.clone()) as Box<dyn ManagePool>;
+        let f = move || Box::new(manager.clone()) as Box<dyn ManagePool>;
         self.pool_manager = Some(Box::new(f));
         self
     }
@@ -148,5 +150,20 @@ impl<'a> NetworkBuilder<'a> {
             node_handles.push(RunHandle::new(node_builder.build()));
         }
         node_handles
+    }
+}
+
+/// Generates a stream of transaction with the specified `interval`.
+pub async fn send_transactions(sender: ApiSender, interval: Duration) {
+    let mut counter = Height(0);
+    let keys = KeyPair::random();
+    loop {
+        let tx = keys.timestamp(MainService::INSTANCE_ID, counter);
+        log::trace!("Sending transaction #{}", counter.0 + 1);
+        if sender.broadcast_transaction(tx).await.is_err() {
+            return;
+        }
+        counter.increment();
+        delay_for(interval).await;
     }
 }
