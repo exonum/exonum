@@ -65,7 +65,7 @@ use crate::{
         PoolTransactionsRequest, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
         TransactionsRequest, TransactionsResponse,
     },
-    proposer::{ManagePool, StandardPoolManager},
+    pool::{ManagePool, StandardPoolManager},
     state::State,
     ApiSender, Configuration, ConnectInfo, ConnectListConfig, ExternalMessage, MemoryPoolConfig,
     NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, SystemStateProvider,

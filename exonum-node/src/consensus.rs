@@ -35,7 +35,7 @@ use crate::{
         Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
         TransactionsResponse,
     },
-    proposer::{ProposeParams, ProposeTemplate},
+    pool::{ProposeParams, ProposeTemplate},
     schema::NodeSchema,
     state::{IncompleteBlock, ProposeState, RequestData},
     NodeHandler,

@@ -37,7 +37,7 @@ use std::{
 
 use exonum_node::{
     generate_testnet_config,
-    proposer::{SkipEmptyBlocks, StandardPoolManager},
+    pool::{SkipEmptyBlocks, StandardPoolManager},
     Node, NodeBuilder, NodeConfig, ShutdownHandle,
 };
 

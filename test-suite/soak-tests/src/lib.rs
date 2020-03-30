@@ -18,7 +18,7 @@ use exonum::{
     merkledb::{Database, TemporaryDB},
 };
 use exonum_node::{
-    generate_testnet_config, proposer::ManagePool, Node, NodeBuilder, NodeConfig, ShutdownHandle,
+    generate_testnet_config, pool::ManagePool, Node, NodeBuilder, NodeConfig, ShutdownHandle,
 };
 use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
 use futures::TryFutureExt;

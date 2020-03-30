@@ -102,7 +102,7 @@ use crate::{
         NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
-    proposer::{ManagePool, StandardPoolManager},
+    pool::{ManagePool, StandardPoolManager},
     schema::NodeSchema,
     state::{RequestData, State},
 };
@@ -115,7 +115,7 @@ mod events_impl;
 pub mod helpers;
 mod messages;
 mod plugin;
-pub mod proposer;
+pub mod pool;
 mod proto;
 mod requests;
 #[cfg(test)]
@@ -1071,14 +1071,16 @@ impl NodeBuilder {
         self
     }
 
-    /// Sets custom `Propose` creation logic for the node.
+    /// Sets custom pool management logic for the node. Using this method, it is possible
+    /// to customize block proposals and removing transactions from the pool of unconfirmed
+    /// transactions.
     ///
     /// # Stability and safety
     ///
-    /// Using a custom proposer **CAN LEAD TO CONSENSUS FAILURE.** See the [`proposer`] module docs
+    /// Using a custom pool manager **CAN LEAD TO CONSENSUS FAILURE.** See the [`pool`] module docs
     /// for more details.
     ///
-    /// [`proposer`]: proposer/index.html
+    /// [`pool`]: pool/index.html
     pub fn with_pool_manager<T: ManagePool + 'static>(mut self, manager: T) -> Self {
         self.pool_manager = Box::new(manager);
         self

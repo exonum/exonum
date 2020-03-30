@@ -27,7 +27,7 @@ use std::{collections::BTreeSet, iter::FromIterator, time::Duration};
 
 use crate::{
     messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
-    proposer::{ManagePool, Pool, ProposeParams, ProposeTemplate, StandardPoolManager},
+    pool::{ManagePool, Pool, ProposeParams, ProposeTemplate, StandardPoolManager},
     sandbox::{
         sandbox_tests_helper::*,
         supervisor::{Supervisor, SupervisorService, TxConfig},
@@ -741,10 +741,10 @@ impl ManagePool for WhitelistManager {
 
     fn remove_transactions(&mut self, pool: Pool<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
         let tx_hashes = pool.transactions().filter_map(|(tx_hash, tx)| {
-            if tx.author() != self.key {
-                Some(tx_hash)
-            } else {
+            if tx.author() == self.key {
                 None
+            } else {
+                Some(tx_hash)
             }
         });
         tx_hashes.collect()

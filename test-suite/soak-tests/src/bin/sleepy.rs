@@ -21,7 +21,7 @@ use exonum::{
     helpers::Height,
     runtime::SnapshotExt,
 };
-use exonum_node::proposer::{SkipEmptyBlocks, StandardPoolManager};
+use exonum_node::pool::{SkipEmptyBlocks, StandardPoolManager};
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,

@@ -20,7 +20,7 @@
 //! ```
 //! # use exonum::{keys::Keys, merkledb::TemporaryDB};
 //! # use exonum_node::{generate_testnet_config, NodeBuilder, NodeConfig};
-//! use exonum_node::proposer::SkipEmptyBlocks;
+//! use exonum_node::pool::{SkipEmptyBlocks, StandardPoolManager};
 //!
 //! # async fn not_run() -> anyhow::Result<()> {
 //! # let (node_config, keys) = generate_testnet_config(1, 2_000).pop().unwrap();
@@ -29,8 +29,9 @@
 //! let node_keys: Keys = // ...
 //! #    keys;
 //! let database = TemporaryDB::new();
+//! let pool_manager = SkipEmptyBlocks::new(StandardPoolManager::default());
 //! let node = NodeBuilder::new(database, node_config, node_keys)
-//!     .with_pool_manager(SkipEmptyBlocks)
+//!     .with_pool_manager(pool_manager)
 //!     // specify other node params...
 //!     .build();
 //! node.run().await?;
@@ -232,7 +233,7 @@ impl StandardPoolManager {
     /// # Examples
     ///
     /// ```
-    /// # use exonum_node::proposer::StandardPoolManager;
+    /// # use exonum_node::pool::StandardPoolManager;
     /// // Manager that considers no more than 500 transactions for removal
     /// // after a block is accepted.
     /// let manager = StandardPoolManager::with_removal_limit(500);
