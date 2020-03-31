@@ -21,9 +21,8 @@ WORKDIR /usr/src
 RUN git clone --branch v1.0.0-rc.3 https://github.com/exonum/exonum.git \
   && mv /root/.cargo/bin/* /usr/bin \
   && cd exonum/examples/cryptocurrency-advanced/backend \
-  && cargo update && cargo install --path .
-  # skip frontend part until JS light client is fixed
-  # && cd ../frontend && npm install && npm run build
+  && cargo update && cargo install --path . \
+  && cd ../frontend && npm install && npm run build
 WORKDIR /usr/src/exonum/examples/cryptocurrency-advanced
 COPY launch.sh .
 
