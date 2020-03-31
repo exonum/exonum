@@ -227,8 +227,8 @@ impl NodeHandler {
 
     /// Handles `NodeTimeout::Status`, broadcasts the `Status` message if it isn't outdated as
     /// result.
-    pub(crate) fn handle_status_timeout(&mut self, height: Height) {
-        if self.state.epoch() == height {
+    pub(crate) fn handle_status_timeout(&mut self, epoch: Height) {
+        if self.state.epoch() == epoch {
             self.broadcast_status();
             self.add_status_timeout();
         }

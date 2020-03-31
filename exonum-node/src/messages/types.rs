@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use bit_vec::BitVec;
 use chrono::{DateTime, Utc};
 use exonum::{

@@ -123,7 +123,6 @@ pub enum RuntimeEvent {
     CommitService(Height, InstanceSpec, InstanceStatus),
     AfterTransactions(Height, InstanceId),
     AfterCommit(Height),
-    Shutdown,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -289,11 +288,6 @@ impl<T: Runtime> Runtime for Inspected<T> {
         let height = CoreSchema::new(snapshot).next_height();
         self.events.push(RuntimeEvent::AfterCommit(height));
         self.runtime.after_commit(snapshot, mailbox);
-    }
-
-    fn shutdown(&mut self) {
-        self.events.push(RuntimeEvent::Shutdown);
-        self.runtime.shutdown();
     }
 }
 

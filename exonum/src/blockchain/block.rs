@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{

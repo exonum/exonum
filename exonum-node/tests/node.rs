@@ -17,7 +17,7 @@
 use exonum::{
     blockchain::config::GenesisConfigBuilder,
     crypto::KeyPair,
-    helpers::Height,
+    helpers::{Height, Round},
     merkledb::{Database, ObjectHash, TemporaryDB},
     runtime::SnapshotExt,
 };
@@ -49,6 +49,15 @@ async fn nodes_commit_blocks() {
         }
     });
     future::join_all(commit_notifications).await;
+
+    // Check that nodes do not skip the first round of the first block.
+    let snapshot = nodes[0].blockchain.snapshot();
+    let block_proof = snapshot.for_core().block_and_precommits(Height(1)).unwrap();
+    assert!(block_proof
+        .precommits
+        .iter()
+        .all(|precommit| precommit.payload().round == Round(1)));
+
     future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 }
 

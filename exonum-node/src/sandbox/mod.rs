@@ -666,7 +666,8 @@ impl Sandbox {
             time.add_assign(duration);
             *time.deref()
         };
-        // handle timeouts if occurs
+
+        // Handle timeouts.
         loop {
             let timeout = {
                 let timers = &mut self.inner.borrow_mut().timers;
@@ -961,9 +962,10 @@ impl Sandbox {
             keys,
         };
 
+        let shared_time = SharedTime::new(Mutex::new(time));
         let system_state = SandboxSystemStateProvider {
             listen_address: address,
-            shared_time: SharedTime::new(Mutex::new(time)),
+            shared_time: shared_time.clone(),
         };
 
         let blockchain = inner.handler.blockchain;
@@ -988,7 +990,7 @@ impl Sandbox {
             api_requests_rx: api_channel.1,
             transactions_rx: tx_channel.1,
             handler,
-            time: Arc::clone(&inner.time),
+            time: shared_time,
         };
         let sandbox = Self {
             inner: RefCell::new(inner),

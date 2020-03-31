@@ -104,12 +104,12 @@ impl NodeHandler {
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
         match timeout {
-            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
+            NodeTimeout::Round(epoch, round) => self.handle_round_timeout(epoch, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
-            NodeTimeout::Status(height) => self.handle_status_timeout(height),
+            NodeTimeout::Status(epoch) => self.handle_status_timeout(epoch),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
             NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
-            NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
+            NodeTimeout::Propose(epoch, round) => self.handle_propose_timeout(epoch, round),
             NodeTimeout::FlushPool => {
                 self.flush_txs_into_pool();
                 self.maybe_add_flush_pool_timeout();
@@ -128,8 +128,6 @@ impl NodeHandler {
 
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
-        // Notify the blockchain about the shutdown.
-        self.blockchain.shutdown();
     }
 
     pub(crate) fn flush_txs_into_pool(&mut self) {

@@ -663,16 +663,6 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// by the supervisor service to enqueue artifact deployment. A runtime may ignore `mailbox`
     /// if its services (or the runtime itself) do not require privileged access to the dispatcher.
     fn after_commit(&mut self, snapshot: &dyn Snapshot, mailbox: &mut Mailbox);
-
-    /// Notifies the runtime that it has to shutdown.
-    ///
-    /// This callback is invoked sequentially for each runtime just before the node shutdown.
-    /// Thus, the runtimes can stop themselves gracefully.
-    ///
-    /// Invoking this callback is the last operation for the runtime.
-    /// This method is a part of shutdown process. Thus, the runtimes can block and perform
-    /// heavy operations here if needed.
-    fn shutdown(&mut self) {}
 }
 
 #[allow(clippy::use_self)] // false positive
