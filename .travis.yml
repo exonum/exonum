@@ -132,7 +132,7 @@ jobs:
   # Unit tests (including test runs for benchmarks).
   - name: unit-test
     script:
-    - cargo test --all --lib --tests --benches
+    - cargo test --all --lib --tests --benches --bins
 
   # Doc tests.
   - name: doc-test

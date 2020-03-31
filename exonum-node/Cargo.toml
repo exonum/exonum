@@ -43,7 +43,7 @@ exonum_sodiumoxide = { version = "0.0.23", optional = true }
 
 [dependencies.tokio]
 version = "0.2.13"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "signal", "tcp", "time"]
 
 [dev-dependencies]
 bincode = "1.2.1"
@@ -54,6 +54,12 @@ serde_json = "1.0.44"
 toml = "0.5.6"
 
 exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../runtimes/rust" }
+
+# Dependencies for the Unix-specific `signals` test.
+[target.'cfg(unix)'.dev_dependencies]
+nix = "0.17.0"
+reqwest = { version = "0.10.2", features = ["blocking"] }
+rusty-fork = "0.2.2"
 
 [build-dependencies]
 exonum-build = { version = "1.0.0-rc.3", path = "../components/build" }

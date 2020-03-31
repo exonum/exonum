@@ -18,8 +18,9 @@ use actix_cors::{Cors, CorsFactory};
 use actix_rt::time::delay_for;
 use actix_web::{dev::Server, web, App, HttpServer};
 use futures::{
+    channel::mpsc,
     future::{join_all, try_join_all},
-    Stream, StreamExt, TryFutureExt,
+    prelude::*,
 };
 
 #[cfg(windows)]
@@ -61,6 +62,7 @@ impl WebServerConfig {
 
 /// Configuration parameters for `ApiManager`.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct ApiManagerConfig {
     /// Active API runtimes.
     pub servers: HashMap<ApiAccess, WebServerConfig>,
@@ -72,6 +74,51 @@ pub struct ApiManagerConfig {
     pub server_restart_retry_timeout: u64,
     /// The attempts counts of restarting HTTP-server in case the server failed to restart.
     pub server_restart_max_retries: u16,
+    /// Disables signal handling for HTTP servers. By default, the HTTP servers will shut down
+    /// on receiving SIGINT, SIGTERM or SIGQUIT, and will also set the handler and ignore
+    /// SIGHUP.
+    ///
+    /// This setting is a no-op on platforms not based on Unix.
+    pub disable_signals: bool,
+}
+
+impl ApiManagerConfig {
+    /// Creates a new config with the specified servers and API aggregator. Other parameters are
+    /// set to reasonable defaults.
+    pub fn new(
+        servers: HashMap<ApiAccess, WebServerConfig>,
+        api_aggregator: ApiAggregator,
+    ) -> Self {
+        let mut this = Self::default();
+        this.servers = servers;
+        this.api_aggregator = api_aggregator;
+        this
+    }
+
+    /// Sets the retry policy for this config.
+    pub fn with_retries(mut self, timeout: u64, max_retries: u16) -> Self {
+        self.server_restart_retry_timeout = timeout;
+        self.server_restart_max_retries = max_retries;
+        self
+    }
+
+    /// Disables signal handling.
+    pub fn disable_signals(mut self) -> Self {
+        self.disable_signals = true;
+        self
+    }
+}
+
+impl Default for ApiManagerConfig {
+    fn default() -> Self {
+        Self {
+            servers: HashMap::new(),
+            api_aggregator: ApiAggregator::default(),
+            server_restart_retry_timeout: 500,
+            server_restart_max_retries: 20,
+            disable_signals: false,
+        }
+    }
 }
 
 /// Updates variable endpoints of the service, restarting all HTTP servers managed by the addressed
@@ -176,9 +223,16 @@ impl ApiManager {
         }
     }
 
-    async fn start_servers(&mut self) -> io::Result<()> {
+    /// Starts servers as specified in configuration and stores handles to them in this manager.
+    /// `server_finished_tx` is used to notify that the server has stopped (as a response
+    /// to a signal or if an error has occurred).
+    async fn start_servers(
+        &mut self,
+        server_finished_tx: mpsc::Sender<io::Result<()>>,
+    ) -> io::Result<()> {
         log::trace!("Servers start requested.");
 
+        let disable_signals = self.config.disable_signals;
         let start_servers = self.config.servers.iter().map(|(&access, server_config)| {
             let mut aggregator = self.config.api_aggregator.clone();
             aggregator.extend(self.endpoints.clone());
@@ -189,7 +243,14 @@ impl ApiManager {
             );
 
             with_retries(
-                move || Self::start_server(aggregator.clone(), access, server_config.clone()),
+                move || {
+                    Self::start_server(
+                        aggregator.clone(),
+                        access,
+                        server_config.clone(),
+                        disable_signals,
+                    )
+                },
                 action_description,
                 self.config.server_restart_max_retries,
                 self.config.server_restart_retry_timeout,
@@ -199,10 +260,25 @@ impl ApiManager {
 
         for (server, (&access, server_config)) in servers.iter().zip(&self.config.servers) {
             let listen_addr = server_config.listen_address;
-            actix_rt::spawn(server.inner.clone().unwrap_or_else(move |e| {
-                log::error!("{} server on {} failed: {}", access, listen_addr, e);
-                // TODO: should the server be restarted on error?
-            }));
+            let mut server_finished = server_finished_tx.clone();
+            let server = server.inner.clone();
+
+            actix_rt::spawn(async move {
+                let res = server.await;
+                if let Err(ref e) = res {
+                    // TODO: should the server be restarted on error?
+                    log::error!("{} server on {} failed: {}", access, listen_addr, e);
+                } else if !server_finished.is_closed() {
+                    log::info!(
+                        "{} server on {} terminated in response to a signal",
+                        access,
+                        listen_addr
+                    );
+                }
+
+                // We're OK if the receiver of termination notification is gone.
+                server_finished.send(res).await.ok();
+            });
         }
 
         self.servers = servers;
@@ -227,23 +303,48 @@ impl ApiManager {
         res
     }
 
-    async fn run_inner<S>(&mut self, mut endpoints_rx: S) -> io::Result<()>
+    async fn run_inner<S>(&mut self, endpoints_rx: S) -> io::Result<()>
     where
         S: Stream<Item = UpdateEndpoints> + Unpin,
     {
-        while let Some(request) = endpoints_rx.next().await {
-            log::info!("Server restart requested");
-            self.stop_servers().await;
-            self.endpoints = request.endpoints;
-            self.start_servers().await?;
+        let mut endpoints_rx = endpoints_rx.fuse();
+        let mut server_finished_channel = mpsc::channel(self.config.servers.len());
+
+        loop {
+            futures::select! {
+                res = server_finished_channel.1.next() => {
+                    // One of the HTTP servers has terminated, e.g., in a response to a signal.
+                    // Terminate the handling and return the obtained server result.
+                    // The `unwrap_or` branch should never be triggered (one channel sender
+                    // is retained locally as `server_finished_channel.0`); we use it to be safe.
+                    return res.unwrap_or(Ok(()));
+                }
+
+                maybe_request = endpoints_rx.next() => {
+                    if let Some(request) = maybe_request {
+                        log::info!("Server restart requested");
+
+                        // Do not listen anymore to old server terminations; we *expect*
+                        // the old servers to terminate, so their termination should not
+                        // stop the node.
+                        server_finished_channel = mpsc::channel(self.config.servers.len());
+
+                        self.stop_servers().await;
+                        self.endpoints = request.endpoints;
+                        self.start_servers(server_finished_channel.0.clone()).await?;
+                    } else {
+                        return Ok(());
+                    }
+                }
+            }
         }
-        Ok(())
     }
 
     fn start_server(
         aggregator: ApiAggregator,
         access: ApiAccess,
         server_config: WebServerConfig,
+        disable_signals: bool,
     ) -> io::Result<ServerHandle> {
         let listen_address = server_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
@@ -252,17 +353,19 @@ impl ApiManager {
         #[cfg(windows)]
         let raw_socket = listener.as_raw_socket();
 
-        let server = HttpServer::new(move || {
+        let mut server_builder = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())
                 .service(aggregator.extend_backend(access, web::scope("api")))
         })
-        .disable_signals()
-        .listen(listener)?
-        .run();
+        .listen(listener)?;
+
+        if disable_signals {
+            server_builder = server_builder.disable_signals();
+        }
 
         Ok(ServerHandle {
-            inner: server,
+            inner: server_builder.run(),
             #[cfg(windows)]
             raw_socket,
         })

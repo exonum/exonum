@@ -140,14 +140,7 @@ struct Args {
     no_probe: bool,
 }
 
-#[tokio::main]
-async fn main() {
-    exonum::crypto::init();
-    exonum::helpers::init_logger().ok();
-
-    let args = Args::from_args();
-    println!("Running test with {:?}", args);
-
+fn create_nodes(node_count: u16) -> Vec<RunHandle> {
     let config = MainConfig {
         generate_tx_in_after_commit: true,
     };
@@ -159,7 +152,7 @@ async fn main() {
     let supervisor = Spec::new(TogglingSupervisor).with_default_instance();
 
     let mut set_api = false;
-    let nodes = NetworkBuilder::new(args.node_count, 2_000)
+    NetworkBuilder::new(node_count, 2_000)
         .modify_config(|node_cfg| {
             // Enable public HTTP server for a single node.
             if !set_api {
@@ -176,8 +169,18 @@ async fn main() {
             supervisor.clone().deploy(genesis, rt);
             main_service.clone().deploy(genesis, rt);
         })
-        .build();
+        .build()
+}
 
+#[tokio::main]
+async fn main() {
+    exonum::crypto::init();
+    exonum::helpers::init_logger().ok();
+
+    let args = Args::from_args();
+    println!("Running test with {:?}", args);
+
+    let nodes = create_nodes(args.node_count);
     let probes = if args.no_probe {
         None
     } else {
@@ -237,5 +240,34 @@ async fn main() {
             supervisor_probe.get().await
         );
         println!("Main service availability: {:#?}", main_probe.get().await);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::time::Instant;
+
+    /// Checks that the node functions after an HTTP server reboot.
+    #[tokio::test]
+    async fn basic_workflow_is_functional() {
+        const EXPECTED_HEIGHT: Height = Height(5);
+        const MAX_WAIT: Duration = Duration::from_secs(10);
+
+        let node = create_nodes(1).pop().unwrap();
+        let start_time = Instant::now();
+
+        loop {
+            let last_block = node.blockchain().last_block();
+            if last_block.height > EXPECTED_HEIGHT {
+                break;
+            } else if Instant::now() - start_time > MAX_WAIT {
+                panic!("Node did not achieve {:?}", EXPECTED_HEIGHT);
+            }
+
+            delay_for(MAX_WAIT / 20).await;
+        }
+        node.join().await;
     }
 }

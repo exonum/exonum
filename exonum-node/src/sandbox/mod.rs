@@ -141,9 +141,10 @@ impl SandboxInner {
             match internal {
                 InternalRequest::Timeout(t) => self.timers.push(t),
 
-                InternalRequest::JumpToRound(height, round) => self
-                    .handler
-                    .handle_event(InternalEvent::jump_to_round(height, round).into()),
+                InternalRequest::JumpToRound(height, round) => {
+                    self.handler
+                        .handle_event(InternalEvent::jump_to_round(height, round).into());
+                }
 
                 InternalRequest::VerifyMessage(raw) => {
                     let msg = SignedMessage::from_bytes(raw.into())
@@ -152,10 +153,8 @@ impl SandboxInner {
                         .unwrap();
 
                     self.handler
-                        .handle_event(InternalEvent::message_verified(msg).into())
+                        .handle_event(InternalEvent::message_verified(msg).into());
                 }
-
-                InternalRequest::Shutdown => unreachable!(),
             }
         }
     }
