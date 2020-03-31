@@ -1,6 +1,6 @@
 [package]
 name = "exonum-node"
-version = "1.0.0-rc.3"
+version = "1.0.0"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
@@ -34,11 +34,11 @@ snow = { version = "0.6.0", default-features = false }
 thiserror = "1.0"
 tokio-util = { version = "0.3.0", features = ["codec"] }
 
-exonum = { version = "1.0.0-rc.3", path = "../exonum" }
-exonum-api = { version = "1.0.0-rc.3", path = "../components/api" }
-exonum-derive = { version = "1.0.0-rc.3", path = "../components/derive" }
-exonum-merkledb = { version = "1.0.0-rc.3", path = "../components/merkledb" }
-exonum-proto = { version = "1.0.0-rc.3", path = "../components/proto" }
+exonum = { version = "1.0.0", path = "../exonum" }
+exonum-api = { version = "1.0.0", path = "../components/api" }
+exonum-derive = { version = "1.0.0", path = "../components/derive" }
+exonum-merkledb = { version = "1.0.0", path = "../components/merkledb" }
+exonum-proto = { version = "1.0.0", path = "../components/proto" }
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
 
 [dependencies.tokio]
@@ -53,7 +53,7 @@ pretty_assertions = "0.6.1"
 serde_json = "1.0.44"
 toml = "0.5.6"
 
-exonum-rust-runtime = { version = "1.0.0-rc.3", path = "../runtimes/rust" }
+exonum-rust-runtime = { version = "1.0.0", path = "../runtimes/rust" }
 
 # Dependencies for the Unix-specific `signals` test.
 [target.'cfg(unix)'.dev_dependencies]
@@ -62,7 +62,7 @@ reqwest = { version = "0.10.2", features = ["blocking"] }
 rusty-fork = "0.2.2"
 
 [build-dependencies]
-exonum-build = { version = "1.0.0-rc.3", path = "../components/build" }
+exonum-build = { version = "1.0.0", path = "../components/build" }
 
 [features]
 default = ["exonum_sodiumoxide"]

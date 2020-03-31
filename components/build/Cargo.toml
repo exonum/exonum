@@ -1,6 +1,6 @@
 [package]
 name = "exonum-build"
-version = "1.0.0-rc.3"
+version = "1.0.0"
 edition = "2018"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
