@@ -100,15 +100,14 @@ impl ExonumCommand for RunDev {
             };
             generate_config.execute()?;
 
-            let allow_origin = "*".to_owned();
             let finalize = Finalize {
                 private_config_path,
                 output_config_path: node_config_path.clone(),
                 public_configs: vec![public_config_path],
                 public_api_address: Some(self.public_api_address),
                 private_api_address: Some(self.private_api_address),
-                public_allow_origin: Some(allow_origin.clone()),
-                private_allow_origin: Some(allow_origin),
+                public_allow_origin: Some("*".to_owned()),
+                private_allow_origin: Some("*".to_owned()),
             };
             finalize.execute()?;
         }
