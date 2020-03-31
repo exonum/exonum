@@ -10,9 +10,9 @@ import signal
 class ProcessExitResult(Enum):
     """Result of the process termination."""
 
-    # Process exited succesfully.
+    # Process exited successfully.
     Ok = enum_auto()
-    # Process did not exit succesfully and was killed.
+    # Process did not exit successfully and was killed.
     Killed = enum_auto()
 
 
@@ -41,19 +41,12 @@ class ProcessManager:
         # With this argument process will start in separate shell, not related to the shell
         # in which script is executed.
         self._process = subprocess.Popen(
-            self._command,
-            shell=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            preexec_fn=os.setsid,
+            self._command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid,
         )
 
         exit_code = self._process.wait()
         stdout, stderr = map(lambda x: str(x, "utf-8"), self._process.communicate())
-
-        exit_result = (
-            ProcessExitResult.Ok if not self._killed else ProcessExitResult.Killed
-        )
+        exit_result = ProcessExitResult.Ok if not self._killed else ProcessExitResult.Killed
 
         self._output = ProcessOutput(exit_result, exit_code, stdout, stderr)
 
@@ -75,9 +68,7 @@ class ProcessManager:
         self._thread_handle.setDaemon(True)
         self._thread_handle.start()
 
-    def join_process(
-        self, timeout: float, kill_on_timeout: bool = True
-    ) -> ProcessOutput:
+    def join_process(self, timeout: float, kill_on_timeout: bool = True) -> ProcessOutput:
         """Tries to wait until process is terminated, kills it otherwise."""
         self._thread_handle.join(timeout=timeout)
 
