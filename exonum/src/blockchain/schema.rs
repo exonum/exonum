@@ -171,6 +171,11 @@ impl<T: Access> Schema<T> {
     }
 
     /// Returns a table that represents a set of uncommitted transactions hashes.
+    ///
+    /// # Stability
+    ///
+    /// Since a signature of this method could be changed in the future due to performance reasons,
+    /// this method is considered unstable.
     pub fn transactions_pool(&self) -> KeySetIndex<T::Base, Hash> {
         self.access.get_key_set(TRANSACTIONS_POOL)
     }
