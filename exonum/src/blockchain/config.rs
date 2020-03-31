@@ -18,7 +18,6 @@
 //! The configuration includes the public keys of validators, consensus related parameters,
 //! and built-in services (services deployed at the blockchain start).
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use anyhow::{bail, ensure};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
