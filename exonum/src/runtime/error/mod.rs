@@ -45,7 +45,6 @@ pub use self::{
     error_match::ErrorMatch, execution_status::ExecutionStatus,
 };
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use exonum_derive::*;
 use exonum_merkledb::Error as MerkledbError;
 use exonum_proto::ProtobufConvert;

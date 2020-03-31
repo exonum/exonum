@@ -23,7 +23,7 @@ bit-vec = "0.6.1"
 serde = "1.0.101"
 serde_derive = "1.0.101"
 exonum-derive = { path = "../derive", version = "1.0.0-rc.3"}
-protobuf-convert = "0.3.0"
+protobuf-convert = "0.4.0"
 
 [dev-dependencies]
 rand = "0.7.3"
