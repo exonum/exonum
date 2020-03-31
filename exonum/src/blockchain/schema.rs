@@ -171,7 +171,8 @@ impl<T: Access> Schema<T> {
         pool.get().unwrap_or(0)
     }
 
-    /// Returns a table that represents a set of uncommitted transactions.
+    /// Returns a table with uncommitted transactions, where the hash of the transaction
+    /// is mapped to its contents.
     pub fn transactions_pool(&self) -> MapIndex<T::Base, Hash, Verified<AnyTx>> {
         self.access.get_map(TRANSACTIONS_POOL)
     }

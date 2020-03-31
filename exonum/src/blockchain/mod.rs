@@ -32,8 +32,8 @@ pub(crate) use crate::runtime::ExecutionError;
 use exonum_crypto::{Hash, KeyPair};
 use exonum_merkledb::{
     access::{Access, RawAccess},
-    Database, Fork, HashTag, MapIndex, ObjectHash, Patch, Result as StorageResult,
-    Snapshot, SystemSchema, TemporaryDB,
+    Database, Fork, HashTag, MapIndex, ObjectHash, Patch, Result as StorageResult, Snapshot,
+    SystemSchema, TemporaryDB,
 };
 
 use std::{borrow::Cow, collections::BTreeMap, iter, sync::Arc};
@@ -157,7 +157,7 @@ where
         let pool_it = self
             .transactions_pool
             .iter()
-            .map(move |(tx_hash, tx)| (tx_hash, Cow::Owned(tx)));
+            .map(|(tx_hash, tx)| (tx_hash, Cow::Owned(tx)));
         let it = self.cache.transactions().chain(pool_it);
         Box::new(it)
     }
