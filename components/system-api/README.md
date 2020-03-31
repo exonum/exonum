@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
+![rust 1.42.0+ required](https://img.shields.io/badge/rust-1.42.0+-blue.svg?label=Required%20Rust)
 
 Plugin extending HTTP API of the node to return information about node state.
 
@@ -25,7 +25,7 @@ Include `exonum-system-api` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum-system-api = "1.0.0-rc.3"
+exonum-system-api = "1.0.0"
 ```
 
 `SystemApiPlugin` type, located at the root of the crate, should be used
