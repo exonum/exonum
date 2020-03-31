@@ -14,7 +14,7 @@
 
 //! Utilities allowing to customize proposal creation logic for an Exonum node.
 //!
-//! To customize block proposals, you should supply a [`ProposeBlock`] implementation
+//! To customize block proposals, you should supply a [`ManagePool`] implementation
 //! to the [`NodeBuilder`]:
 //!
 //! ```
@@ -39,7 +39,7 @@
 //! # }
 //! ```
 //!
-//! [`ProposeBlock`]: trait.ProposeBlock.html
+//! [`ManagePool`]: trait.ManagePool.html
 //! [`NodeBuilder`]: ../struct.NodeBuilder.html#method.with_pool_manager
 //!
 //! # Stability
@@ -288,7 +288,7 @@ impl ManagePool for StandardPoolManager {
 }
 
 /// Pool manager that skips a block if there are no uncommitted transactions returned by the
-/// wrapped manager. The `remove_transactions` method is proxied to the wrapped manager.
+/// wrapped manager. The `remove_transactions` method is relayed to the wrapped manager.
 #[derive(Debug, Clone, Default)]
 pub struct SkipEmptyBlocks<T> {
     inner: T,
