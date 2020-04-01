@@ -16,7 +16,7 @@ use anyhow::{bail, format_err};
 use exonum::{
     blockchain::{
         BlockContents, BlockKind, BlockParams, BlockPatch, Blockchain, BlockchainMut,
-        PersistentPool, ProposerId, Schema, TransactionCache,
+        PersistentPool, ProposerId, Schema,
     },
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
@@ -822,10 +822,16 @@ impl NodeHandler {
     /// This function panics if it receives an invalid transaction for an already committed block.
     pub(crate) fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), HandleTxError> {
         let hash = msg.object_hash();
+        if self.state.tx_cache().contains_key(&hash) {
+            // Transaction is already in the ephemeral transaction cache, i.e.,
+            // `handle_tx` was called for it previously.
+            return Err(HandleTxError::AlreadyProcessed);
+        }
 
         let snapshot = self.blockchain.snapshot();
-        let tx_pool = PersistentPool::new(&snapshot, self.state.tx_cache());
-        if tx_pool.contains_transaction(hash) {
+        let schema = Schema::new(&snapshot);
+        if schema.transactions().contains(&hash) {
+            // Transaction is either committed or is present in the persistent pool.
             return Err(HandleTxError::AlreadyProcessed);
         }
 
@@ -834,7 +840,7 @@ impl NodeHandler {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
             // since the latter uses `invalid_txs` to recalculate the validity of proposals.
-            self.state.invalid_txs_mut().insert(msg.object_hash());
+            self.state.invalid_txs_mut().insert(hash);
 
             // Since the transaction, despite being incorrect, is received from within the
             // network, we have to deal with it. We don't consider the transaction unknown
