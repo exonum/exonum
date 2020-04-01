@@ -1678,7 +1678,7 @@ fn commit_as_leader_send_propose_round_timeout() {
         // here round 1 is just started
         sandbox.assert_state(Height(2), Round(1));
         {
-            assert_eq!(*sandbox_state.time_millis_since_round_start.borrow(), 0);
+            assert_eq!(*sandbox_state.time_since_round_start.borrow(), 0);
         }
         // assert!(sandbox.is_leader());
     }

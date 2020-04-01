@@ -79,7 +79,7 @@ use exonum_api::{
 };
 use futures::{
     channel::{mpsc, oneshot},
-    FutureExt,
+    prelude::*,
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
@@ -127,7 +127,10 @@ mod state;
 #[doc(hidden)]
 pub mod _bench_types {
     pub use crate::{
-        events::{Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent},
+        events::{
+            Event, EventHandler, EventOutcome, HandlerPart, InternalPart, InternalRequest,
+            NetworkEvent,
+        },
         messages::Message as PeerMessage,
     };
 }
@@ -663,6 +666,12 @@ impl NodeHandler {
             info!("Trying to connect with peer {}", key);
         }
 
+        // Re-initialize epoch start to make it closer to the actual start time of the node.
+        // While this is mainly useful for tests, there may be other cases in which the node
+        // is not immediately started after construction.
+        self.state
+            .set_epoch_start_time(self.system_state.current_time());
+
         let snapshot = self.blockchain.snapshot();
         let schema = NodeSchema::new(&snapshot);
         // Recover previous saved round if any.
@@ -671,6 +680,20 @@ impl NodeHandler {
         info!("Jump to round {}", round);
 
         self.add_timeouts();
+        if self.state.is_leader() && round == Round(1) {
+            // Propose the block after a short delay, which is used to gather initial transactions
+            // (if any), connect to peers, etc.
+            //
+            // Note that this handles the case when the node has already proposed a block
+            // at the same `(epoch, round)`; in this case, the node has at least its own `Prevote`,
+            // so the `Propose` creation will be skipped in `handle_propose_timeout`.
+            //
+            // Restricting `round == Round(1)` is in order to prevent proposals with a large delay.
+            // (Indeed, the delay in this case will be at least `first_round_timeout`, i.e.,
+            // order of 3 seconds.) Heuristically, `round > Round(1)` increases probability that
+            // the node's `(epoch, round)` is outdated.
+            self.add_propose_timeout();
+        }
 
         // Recover cached consensus messages if any. We do this after main initialization and before
         // the start of event processing.
@@ -939,6 +962,18 @@ pub trait ConfigManager: Send {
 
 /// Node capable of processing requests from external clients and participating in the consensus
 /// algorithm.
+///
+/// # Signal Handling
+///
+/// By default, the node installs several signal hooks. This can be disabled by using
+/// [`disable_signals()`] method in `NodeBuilder`.
+///
+/// On Unix, the node will gracefully shut down on receiving any of SIGINT, SIGTERM
+/// or SIGQUIT and will ignore SIGHUP. On Windows, the node will gracefully shut down on
+/// receiving `Ctrl + C` break. Graceful shutdown means, among other things, flushing uncommitted
+/// transactions into the persistent storage.
+///
+/// [`disable_signals()`]: struct.NodeBuilder.html#method.disable_signals
 #[derive(Debug)]
 pub struct Node {
     api_manager_config: ApiManagerConfig,
@@ -948,6 +983,7 @@ pub struct Node {
     channel: NodeChannel,
     max_message_len: u32,
     thread_pool_size: Option<u8>,
+    disable_signals: bool,
 }
 
 impl Default for NodeChannel {
@@ -1000,6 +1036,7 @@ pub struct NodeBuilder {
     config_manager: Option<Box<dyn ConfigManager>>,
     pool_manager: Box<dyn ManagePool>,
     plugins: Vec<Box<dyn NodePlugin>>,
+    disable_signals: bool,
 }
 
 impl fmt::Debug for NodeBuilder {
@@ -1036,6 +1073,7 @@ impl NodeBuilder {
             config_manager: None,
             plugins: vec![],
             pool_manager: Box::new(StandardPoolManager::default()),
+            disable_signals: false,
         }
     }
 
@@ -1092,10 +1130,24 @@ impl NodeBuilder {
         self
     }
 
+    /// Switches off [default signal handling] for the node.
+    /// This is useful to implement more complex signal handling, or one that differs
+    /// from the default.
+    ///
+    /// If you use custom signal handlers, the node may be shut down gracefully using
+    /// [`ShutdownHandle`].
+    ///
+    /// [`ShutdownHandle`]: struct.ShutdownHandle.html
+    /// [default signal handling]: struct.Node.html#signal-handling
+    pub fn disable_signals(mut self) -> Self {
+        self.disable_signals = true;
+        self
+    }
+
     /// Converts this builder into a `Node`.
     pub fn build(self) -> Node {
         let blockchain = self.blockchain_builder.build();
-        Node::with_blockchain(
+        let mut node = Node::with_blockchain(
             blockchain,
             self.channel,
             self.node_config,
@@ -1103,7 +1155,9 @@ impl NodeBuilder {
             self.config_manager,
             self.plugins,
             self.pool_manager,
-        )
+        );
+        node.disable_signals = self.disable_signals;
+        node
     }
 }
 
@@ -1157,12 +1211,9 @@ impl Node {
             servers.insert(ApiAccess::Private, server_config);
         }
 
-        let api_runtime_config = ApiManagerConfig {
-            servers,
-            api_aggregator,
-            server_restart_retry_timeout: node_cfg.api.server_restart.retry_timeout,
-            server_restart_max_retries: node_cfg.api.server_restart.max_retries,
-        };
+        let restart_policy = node_cfg.api.server_restart;
+        let api_runtime_config = ApiManagerConfig::new(servers, api_aggregator)
+            .with_retries(restart_policy.retry_timeout, restart_policy.max_retries);
 
         let mut handler = NodeHandler::new(
             blockchain,
@@ -1184,6 +1235,7 @@ impl Node {
             max_message_len: node_cfg.consensus.max_message_len,
             thread_pool_size: node_cfg.thread_pool_size,
             api_manager_config: api_runtime_config,
+            disable_signals: false,
         }
     }
 
@@ -1251,14 +1303,23 @@ struct Reactor {
     network_part: NetworkPart,
     internal_part: InternalPart,
     api_part: oneshot::Receiver<io::Result<()>>,
+    shutdown_handle: ShutdownHandle,
+    // Flag indicating whether the reactor should explicitly handle signals.
+    // If there is at least one actix HTTP server, signal handling will be performed by it,
+    // so there is no need to perform it explicitly.
+    needs_signal_handler: bool,
 }
 
 impl Reactor {
     fn new(node: Node) -> Self {
         let connect_message = node.state().our_connect_message().clone();
         let connect_list = node.state().connect_list();
+        let shutdown_handle = node.shutdown_handle();
 
-        let api_manager = ApiManager::new(node.api_manager_config);
+        let mut api_config = node.api_manager_config;
+        api_config.disable_signals = node.disable_signals;
+        let needs_signal_handler = !node.disable_signals && api_config.servers.is_empty();
+        let api_manager = ApiManager::new(api_config);
         let endpoints = node.channel.endpoints.1;
         let api_task = api_manager.run(endpoints);
         let (api_part_tx, api_part) = oneshot::channel();
@@ -1304,7 +1365,50 @@ impl Reactor {
             network_part,
             internal_part,
             api_part,
+            shutdown_handle,
+            needs_signal_handler,
         }
+    }
+
+    /// Listens to the same 3 signals as `actix`: SIGINT, SIGTERM, and SIGQUIT.
+    #[cfg(unix)]
+    #[allow(clippy::mut_mut)] // occurs in the `select!` macro
+    async fn listen_to_signals() {
+        use futures::StreamExt;
+        use tokio::signal::unix::{signal, SignalKind};
+
+        let int_listener = tokio::signal::ctrl_c().fuse();
+        futures::pin_mut!(int_listener);
+
+        // If setting the signal listener fails, we replace the listener with a stream
+        // that never resolves.
+        let mut term_listener = signal(SignalKind::terminate())
+            .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
+            .fuse();
+
+        let mut quit_listener = signal(SignalKind::quit())
+            .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
+            .fuse();
+
+        // We also register a SIGHUP listener which ignores the signal.
+        if let Ok(mut hangup_listener) = signal(SignalKind::hangup()) {
+            tokio::spawn(async move {
+                while let Some(()) = hangup_listener.next().await {
+                    log::info!("Received SIGHUP; ignoring");
+                }
+            });
+        }
+
+        futures::select! {
+            _ = int_listener => (),
+            _ = term_listener.next() => (),
+            _ = quit_listener.next() => (),
+        }
+    }
+
+    #[cfg(not(unix))]
+    async fn listen_to_signals() {
+        tokio::signal::ctrl_c().await.ok();
     }
 
     #[allow(clippy::mut_mut)] // occurs in the `select!` macro
@@ -1317,18 +1421,41 @@ impl Reactor {
         futures::pin_mut!(handler_task);
         let mut api_task = self.api_part.fuse();
 
+        if self.needs_signal_handler {
+            // Send the shutdown signal once we received a signal.
+            let shutdown_handle = self.shutdown_handle.clone();
+            let signal_rx = Self::listen_to_signals();
+
+            tokio::spawn(async {
+                signal_rx.await;
+                shutdown_handle.shutdown().await.ok();
+            });
+        };
+
         // The remaining tasks are dropped after the first task is terminated,
         // which should free all associated resources.
-        futures::select! {
-            () = internal_task => Ok(()),
-            () = network_task => Ok(()),
-            () = handler_task => Ok(()),
+        let (res, should_clean_up) = futures::select! {
+            () = internal_task => (Ok(()), true),
+            () = network_task => (Ok(()), true),
+            () = handler_task => (Ok(()), false),
 
-            res = api_task => match res {
-                Err(_) => Err(format_err!("Actix thread panicked")),
-                Ok(res) => res.map_err(From::from),
-            },
+            res = api_task => {
+                let res = match res {
+                    Err(_) => Err(format_err!("Actix thread panicked")),
+                    Ok(res) => res.map_err(From::from),
+                };
+                (res, true)
+            }
+        };
+
+        if should_clean_up {
+            // Ensure that we run the shutdown code, such as flushing messages to the storage.
+            self.shutdown_handle.shutdown().await.ok();
+            handler_task.await;
         }
+
+        log::info!("Node terminated with status {:?}", res);
+        res
     }
 }
 

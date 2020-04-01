@@ -15,19 +15,15 @@
 //! High-level tests for the Exonum node.
 
 use exonum::{
-    blockchain::{config::GenesisConfigBuilder, Blockchain},
+    blockchain::config::GenesisConfigBuilder,
     crypto::KeyPair,
-    helpers::Height,
+    helpers::{Height, Round},
     merkledb::{Database, ObjectHash, TemporaryDB},
-    runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
+    runtime::SnapshotExt,
 };
-use exonum_derive::*;
-use exonum_rust_runtime::{AfterCommitContext, RustRuntime, Service, ServiceFactory};
-use futures::{channel::mpsc, prelude::*};
-use tokio::{
-    task::JoinHandle,
-    time::{delay_for, timeout},
-};
+use exonum_rust_runtime::{RustRuntime, ServiceFactory};
+use futures::prelude::*;
+use tokio::time::{delay_for, timeout};
 
 use std::{
     net::{Ipv4Addr, SocketAddr, TcpListener},
@@ -35,156 +31,12 @@ use std::{
     time::Duration,
 };
 
-use exonum_node::{
-    generate_testnet_config,
-    pool::{SkipEmptyBlocks, StandardPoolManager},
-    Node, NodeBuilder, NodeConfig, ShutdownHandle,
+use exonum_node::{generate_testnet_config, NodeBuilder, NodeConfig};
+
+pub mod common;
+use crate::common::{
+    run_nodes, CommitWatcherService, DummyInterface, Options, RunHandle, StartCheckerServiceFactory,
 };
-
-#[derive(Debug)]
-struct RunHandle {
-    blockchain: Blockchain,
-    node_task: JoinHandle<()>,
-    shutdown_handle: ShutdownHandle,
-}
-
-impl RunHandle {
-    fn new(node: Node) -> Self {
-        let blockchain = node.blockchain().to_owned();
-        let shutdown_handle = node.shutdown_handle();
-        let node_task = node.run().unwrap_or_else(|err| panic!("{}", err));
-        Self {
-            blockchain,
-            shutdown_handle,
-            node_task: tokio::spawn(node_task),
-        }
-    }
-
-    async fn join(self) {
-        self.shutdown_handle.shutdown().await.unwrap();
-        self.node_task.await.unwrap();
-    }
-}
-
-#[exonum_interface(auto_ids)]
-trait DummyInterface<Ctx> {
-    type Output;
-    fn timestamp(&self, context: Ctx, _value: u64) -> Self::Output;
-}
-
-#[derive(Debug, Clone, ServiceDispatcher, ServiceFactory)]
-#[service_dispatcher(implements("DummyInterface"))]
-#[service_factory(
-    artifact_name = "after-commit",
-    artifact_version = "1.0.0",
-    proto_sources = "exonum::proto::schema",
-    service_constructor = "CommitWatcherService::new_instance"
-)]
-struct CommitWatcherService(mpsc::UnboundedSender<()>);
-
-impl CommitWatcherService {
-    const ID: InstanceId = 2;
-
-    fn new_instance(&self) -> Box<dyn Service> {
-        Box::new(self.clone())
-    }
-}
-
-impl Service for CommitWatcherService {
-    fn after_commit(&self, _context: AfterCommitContext<'_>) {
-        self.0.unbounded_send(()).ok();
-    }
-}
-
-impl DummyInterface<ExecutionContext<'_>> for CommitWatcherService {
-    type Output = Result<(), ExecutionError>;
-
-    fn timestamp(&self, _context: ExecutionContext<'_>, _value: u64) -> Self::Output {
-        Ok(())
-    }
-}
-
-#[derive(Debug, ServiceDispatcher)]
-struct StartCheckerService;
-
-impl Service for StartCheckerService {}
-
-#[derive(Debug, ServiceFactory)]
-#[service_factory(
-    artifact_name = "configure",
-    artifact_version = "1.0.2",
-    proto_sources = "exonum::proto::schema",
-    service_constructor = "StartCheckerServiceFactory::new_instance"
-)]
-struct StartCheckerServiceFactory(pub Arc<Mutex<u64>>);
-
-impl StartCheckerServiceFactory {
-    fn new_instance(&self) -> Box<dyn Service> {
-        *self.0.lock().unwrap() += 1;
-        Box::new(StartCheckerService)
-    }
-}
-
-#[derive(Clone, Copy, Default)]
-struct Options {
-    slow_blocks: bool,
-    skip_empty_blocks: bool,
-    http_start_port: Option<u16>,
-}
-
-fn run_nodes(
-    count: u16,
-    start_port: u16,
-    options: Options,
-) -> (Vec<RunHandle>, Vec<mpsc::UnboundedReceiver<()>>) {
-    let mut node_handles = Vec::new();
-    let mut commit_rxs = Vec::new();
-
-    let it = generate_testnet_config(count, start_port)
-        .into_iter()
-        .enumerate();
-    for (i, (mut node_cfg, node_keys)) in it {
-        let (commit_tx, commit_rx) = mpsc::unbounded();
-        if options.slow_blocks {
-            node_cfg.consensus.first_round_timeout = 20_000;
-            node_cfg.consensus.min_propose_timeout = 10_000;
-            node_cfg.consensus.max_propose_timeout = 10_000;
-        }
-        if let Some(start_port) = options.http_start_port {
-            let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), start_port + i as u16);
-            node_cfg.api.public_api_address = Some(addr);
-        }
-
-        let service = CommitWatcherService(commit_tx);
-        let artifact = service.artifact_id();
-        let instance = artifact
-            .clone()
-            .into_default_instance(CommitWatcherService::ID, "commit-watcher");
-        let genesis_cfg = GenesisConfigBuilder::with_consensus_config(node_cfg.consensus.clone())
-            .with_artifact(artifact)
-            .with_instance(instance)
-            .build();
-
-        let db = TemporaryDB::new();
-        let mut node_builder = NodeBuilder::new(db, node_cfg, node_keys)
-            .with_genesis_config(genesis_cfg)
-            .with_runtime_fn(|channel| {
-                RustRuntime::builder()
-                    .with_factory(service)
-                    .build(channel.endpoints_sender())
-            });
-        if options.skip_empty_blocks {
-            let pool_manager = SkipEmptyBlocks::new(StandardPoolManager::default());
-            node_builder = node_builder.with_pool_manager(pool_manager);
-        }
-        let node = node_builder.build();
-
-        node_handles.push(RunHandle::new(node));
-        commit_rxs.push(commit_rx);
-    }
-
-    (node_handles, commit_rxs)
-}
 
 #[tokio::test]
 async fn nodes_commit_blocks() {
@@ -197,11 +49,19 @@ async fn nodes_commit_blocks() {
         }
     });
     future::join_all(commit_notifications).await;
+
+    // Check that nodes do not skip the first round of the first block.
+    let snapshot = nodes[0].blockchain.snapshot();
+    let block_proof = snapshot.for_core().block_and_precommits(Height(1)).unwrap();
+    assert!(block_proof
+        .precommits
+        .iter()
+        .all(|precommit| precommit.payload().round == Round(1)));
+
     future::join_all(nodes.into_iter().map(RunHandle::join)).await;
 }
 
 #[tokio::test]
-#[cfg_attr(windows, ignore)]
 async fn node_frees_sockets_on_shutdown() {
     let options = Options {
         http_start_port: Some(16_351),

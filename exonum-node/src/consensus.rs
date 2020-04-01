@@ -970,38 +970,29 @@ impl NodeHandler {
 
     /// Handles round timeout. As result node sends `Propose` if it is a leader or `Prevote` if it
     /// is locked to some round.
-    pub(crate) fn handle_round_timeout(&mut self, height: Height, round: Round) {
+    pub(crate) fn handle_round_timeout(&mut self, epoch: Height, round: Round) {
         // TODO: Debug asserts? (ECR-171)
-        if height != self.state.epoch() {
+        if epoch != self.state.epoch() || round != self.state.round() {
             return;
         }
-        if round != self.state.round() {
-            return;
-        }
-        warn!("ROUND TIMEOUT height={}, round={}", height, round);
+        warn!("ROUND TIMEOUT epoch={}, round={}", epoch, round);
 
-        // Update state to new round
+        // Update the node state to the new round.
         self.state.new_round();
-
-        // Add timeout for this round
+        // Add a timeout for this round.
         self.add_round_timeout();
         self.process_new_round();
     }
 
-    /// Handles propose timeout. Node sends `Propose` and `Prevote` if it is a leader as result.
-    pub(crate) fn handle_propose_timeout(&mut self, height: Height, round: Round) {
+    /// Handles propose timeout. Node sends `Propose` and `Prevote` as a result.
+    ///
+    /// Invariants: it is assumed that this node is a leader for `(epoch, round)`.
+    pub(crate) fn handle_propose_timeout(&mut self, epoch: Height, round: Round) {
         // TODO debug asserts (ECR-171)?
-        if height != self.state.epoch() {
-            // It is too late
+        if epoch != self.state.epoch() || round != self.state.round() {
             return;
         }
-        if round != self.state.round() {
-            return;
-        }
-        if self.state.locked_propose().is_some() {
-            return;
-        }
-        if self.state.have_prevote(round) {
+        if self.state.locked_propose().is_some() || self.state.have_prevote(round) {
             return;
         }
 
@@ -1010,7 +1001,7 @@ impl NodeHandler {
         } else {
             return;
         };
-        let round = self.state.round();
+        debug_assert!(self.state.is_leader());
 
         let propose_template = self.get_propose_template();
         let propose = match propose_template {

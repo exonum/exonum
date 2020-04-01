@@ -9,7 +9,7 @@
 [![Docs.rs](https://docs.rs/exonum/badge.svg)](https://docs.rs/exonum)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](LICENSE.md)
 [![LoC](https://tokei.rs/b1/github/exonum/exonum)](https://github.com/exonum/exonum)
-![rust 1.41.0+ required](https://img.shields.io/badge/rust-1.41.0+-blue.svg?label=Required%20Rust)
+![rust 1.42.0+ required](https://img.shields.io/badge/rust-1.42.0+-blue.svg?label=Required%20Rust)
 
 **Community:**
 [![Join the chat at https://gitter.im/exonum/exonum](https://img.shields.io/gitter/room/exonum/exonum.svg?label=Chat)](https://gitter.im/exonum/exonum)
@@ -91,7 +91,7 @@ versioning limitations.
 
 ## Supported Rust Versions
 
-The Exonum crates are built against a specific stable Rust version (1.41.0).
+The Exonum crates are built against a specific stable Rust version (1.42.0).
 Newer stable versions are supported as a result. (Feel free to file an issue
 if any Exonum crate does not build on a newer stable version.)
 Newer beta and nightly versions *should* be supported as well,

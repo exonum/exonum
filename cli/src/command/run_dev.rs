@@ -66,20 +66,6 @@ impl RunDev {
         }
         Ok(())
     }
-
-    fn allowed_origins(addr: SocketAddr, kind: &str) -> String {
-        let mut allow_origin = format!("http://{}", addr);
-        if addr.ip().is_loopback() {
-            allow_origin += &format!(", http://localhost:{}", addr.port());
-        } else {
-            log::warn!(
-                "Non-loopback {} API address used for `run-dev` command: {}",
-                kind,
-                addr
-            );
-        }
-        allow_origin
-    }
 }
 
 impl ExonumCommand for RunDev {
@@ -114,16 +100,14 @@ impl ExonumCommand for RunDev {
             };
             generate_config.execute()?;
 
-            let public_origins = Self::allowed_origins(self.public_api_address, "public");
-            let private_origins = Self::allowed_origins(self.private_api_address, "private");
             let finalize = Finalize {
                 private_config_path,
                 output_config_path: node_config_path.clone(),
                 public_configs: vec![public_config_path],
                 public_api_address: Some(self.public_api_address),
                 private_api_address: Some(self.private_api_address),
-                public_allow_origin: Some(public_origins),
-                private_allow_origin: Some(private_origins),
+                public_allow_origin: Some("*".to_owned()),
+                private_allow_origin: Some("*".to_owned()),
             };
             finalize.execute()?;
         }

@@ -5,6 +5,23 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 1.0.0 - 2020-03-31
+
+### Breaking Changes
+
+#### exonum-api
+
+- `ApiManagerConfig` was made non-exhaustive. (#1834)
+
+### New Features
+
+#### exonum-node
+
+- Exonum nodes now gracefully terminate on receiving SIGINT, SIGTERM
+  and SIGQUIT signals (on Unix platforms), or a `ctrl + c` break (on Windows).
+  These signal handlers may be switched off by using `NodeBuilder::disable_signals()`.
+  (#1834)
+
 ### Bug Fixes
 
 #### exonum-cli
@@ -124,7 +141,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
   error. (#1806)
 
-### exonum-api
+#### exonum-api
 
 - Data types were made non-exhaustive where appropriate. (#1799)
 
@@ -166,7 +183,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - API data types were made non-exhaustive where appropriate. (#1799)
 
-### exonum-testkit
+#### exonum-testkit
 
 - `TestKitBuilder` was refactored to use a more intuitive set of interfaces
   for adding built-in artifacts and services to the blockchain. (#1800)
@@ -393,6 +410,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Protobuf declarations were organized according to their packages. (#1756)
 
+#### exonum-explorer
+
+- The field `content` of the `CommittedTransaction` struct and
+  the `InPool` variant of the `TransactionInfo` enum has been renamed
+  to `message`. (#1721)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
@@ -447,7 +470,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Service interface methods now can be marked as removed. (#1707)
 
-### exonum-testkit
+#### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)
 
@@ -460,16 +483,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `TestNode` now returns `KeyPair` instead of a `(PublicKey, SecretKey)`
   tuple. (#1761)
 
-### exonum-time
+#### exonum-time
 
 - Modules were made private, crate now provides re-exports of necessary types
   instead. (#1716)
-
-### exonum-explorer
-
-- The field `content` of the `CommittedTransaction` struct and
-  the `InPool` variant of the `TransactionInfo` enum has been renamed
-  to `message`. (#1721)
 
 ### New features
 
