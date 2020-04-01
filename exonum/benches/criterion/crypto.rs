@@ -42,7 +42,7 @@ fn bench_hash(b: &mut Bencher<'_>, &count: &usize) {
 }
 
 pub fn bench_crypto(c: &mut Criterion) {
-    ::exonum::crypto::init();
+    exonum::crypto::init();
 
     // Testing crypto functions with different data sizes.
     //
