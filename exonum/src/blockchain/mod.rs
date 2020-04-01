@@ -24,6 +24,7 @@ pub use self::{
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
     schema::{CallErrorsIter, CallInBlock, CallRecords, Schema, TxLocation},
 };
+pub use crate::runtime::TxCheckCache;
 
 pub mod config;
 
@@ -267,7 +268,16 @@ impl Blockchain {
     /// executed successfully, but returned `Err(..)` value means that this transaction is
     /// **obviously** incorrect and should be declined as early as possible.
     pub fn check_tx(snapshot: &dyn Snapshot, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
-        Dispatcher::check_tx(snapshot, tx)
+        Dispatcher::check_tx(snapshot, tx, None)
+    }
+
+    /// Checks transaction with cache.
+    pub fn check_tx_with_cache(
+        snapshot: &dyn Snapshot,
+        tx: &Verified<AnyTx>,
+        cache: &mut TxCheckCache,
+    ) -> Result<(), ExecutionError> {
+        Dispatcher::check_tx(snapshot, tx, Some(cache))
     }
 }
 
