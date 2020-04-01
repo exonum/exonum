@@ -1115,8 +1115,8 @@ impl NodeBuilder {
     ///
     /// # Stability and safety
     ///
-    /// Using a custom pool manager **CAN LEAD TO CONSENSUS FAILURE.** See the [`pool`] module docs
-    /// for more details.
+    /// This method is unstable. Using a custom pool manager **CAN LEAD TO CONSENSUS FAILURE.**
+    /// See the [`pool`] module docs for more details.
     ///
     /// [`pool`]: pool/index.html
     pub fn with_pool_manager<T: ManagePool + 'static>(mut self, manager: T) -> Self {

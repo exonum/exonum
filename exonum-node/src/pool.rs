@@ -49,7 +49,7 @@
 //!
 //! # Safety
 //!
-//! **USING CUSTOM PROPOSER LOGIC CAN LEAD TO CONSENSUS HANG-UP AND OTHER ADVERSE EFFECTS.**
+//! **USING CUSTOM POOL MANAGEMENT LOGIC CAN LEAD TO CONSENSUS HANG-UP AND OTHER ADVERSE EFFECTS.**
 //! Consensus safety and liveness properties proven in the [Exonum white paper]
 //! **DO NOT HOLD** for arbitrary proposal creation logic.
 //!
@@ -228,7 +228,8 @@ impl StandardPoolManager {
     ///
     /// # Performance notes
     ///
-    /// The higher the limit, the
+    /// The higher the limit, the more work the manager will do after each block commit.
+    /// This means that transactions are removed more accurately, but the performance may be harmed.
     ///
     /// # Examples
     ///
