@@ -138,9 +138,9 @@ fn check_tx_no_cache(bencher: &mut Bencher) {
     let transactions = prepare_transactions(128);
     let snapshot = blockchain.snapshot();
     bencher.iter(|| {
-        transactions
+        assert!(transactions
             .iter()
-            .all(|tx| Blockchain::check_tx(&snapshot, tx).is_ok())
+            .all(|tx| Blockchain::check_tx(&snapshot, tx).is_ok()));
     })
 }
 
@@ -152,9 +152,9 @@ fn check_tx_cache(bencher: &mut Bencher) {
     bencher.iter_batched(
         TxCheckCache::new,
         |mut cache| {
-            transactions
+            assert!(transactions
                 .iter()
-                .all(|tx| Blockchain::check_tx_with_cache(&snapshot, tx, &mut cache).is_ok())
+                .all(|tx| Blockchain::check_tx_with_cache(&snapshot, tx, &mut cache).is_ok()));
         },
         BatchSize::SmallInput,
     )
