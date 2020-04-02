@@ -5,6 +5,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Internal Improvements
+
+#### exonum
+
+- It is now possible cache results of transaction correctness verification,
+  which leads to a moderate improvement in node performance. (#1844)
+
 ## 1.0.0 - 2020-03-31
 
 ### Breaking Changes
