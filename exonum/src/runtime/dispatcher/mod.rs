@@ -224,6 +224,30 @@ impl Migrations {
 ///
 /// A single cache object is only valid for a single blockchain height, which **MUST** be ensured
 /// by the caller. Using the cache with multiple heights may lead to unpredictable results.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::{blockchain::{Blockchain, TxCheckCache}, messages::{AnyTx, Verified}};
+/// # use exonum::merkledb::{Database, TemporaryDB};
+/// let mut check_cache = TxCheckCache::new();
+/// let snapshot = // (blockchain snapshot)
+/// #   TemporaryDB::new().snapshot();
+/// let transactions: Vec<Verified<AnyTx>> = // ...
+/// #   vec![];
+///
+/// // Check that all `transactions` are correct.
+/// assert!(transactions
+///     .iter()
+///     .all(|transaction| {
+///         Blockchain::check_tx_with_cache(
+///             &snapshot,
+///             transaction,
+///             &mut check_cache,
+///         )
+///         .is_ok()
+///     }));
+/// ```
 #[derive(Debug, Default)]
 pub struct TxCheckCache {
     service_states: HashMap<InstanceId, Option<InstanceStatus>>,
@@ -246,7 +270,7 @@ impl TxCheckCache {
         CoreError::ServiceNotActive.with_description(msg)
     }
 
-    /// Creates a new cache for checking transaction validity.
+    /// Creates a new empty cache for checking transaction validity.
     pub fn new() -> Self {
         Self::default()
     }
