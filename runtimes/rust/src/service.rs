@@ -379,7 +379,7 @@ impl Broadcaster {
     }
 }
 
-/// Signs and asynchronous broadcasts a transaction to the other nodes in the network.
+/// Signs and asynchronously broadcasts a transaction to the other nodes in the network.
 ///
 /// The transaction is signed by the service keypair of the node. The same input transaction
 /// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
@@ -414,7 +414,7 @@ impl GenericCall<()> for Broadcaster {
 #[derive(Debug, Clone)]
 pub struct BlockingBroadcaster(Broadcaster);
 
-/// Signs and synchronous broadcasts a transaction to the other nodes in the network.
+/// Signs and synchronously broadcasts a transaction to the other nodes in the network.
 ///
 /// The transaction is signed by the service keypair of the node. The same input transaction
 /// will lead to the identical transaction being broadcast. If this is undesired, add a nonce
