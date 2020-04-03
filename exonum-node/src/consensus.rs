@@ -812,7 +812,8 @@ impl NodeHandler {
         }
 
         let outcome;
-        if let Err(e) = Blockchain::check_tx(&snapshot, &msg) {
+        let tx_check_cache = self.state.tx_check_cache_mut();
+        if let Err(e) = Blockchain::check_tx_with_cache(&snapshot, &msg, tx_check_cache) {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
             // since the latter uses `invalid_txs` to recalculate the validity of proposals.

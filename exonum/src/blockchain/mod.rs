@@ -24,6 +24,7 @@ pub use self::{
     config::{ConsensusConfig, ConsensusConfigBuilder, ValidatorKeys},
     schema::{CallErrorsIter, CallInBlock, CallRecords, Schema, TxLocation},
 };
+pub use crate::runtime::TxCheckCache;
 
 pub mod config;
 
@@ -266,8 +267,26 @@ impl Blockchain {
     /// Returned `Ok(())` value doesn't necessarily mean that transaction is correct and will be
     /// executed successfully, but returned `Err(..)` value means that this transaction is
     /// **obviously** incorrect and should be declined as early as possible.
+    ///
+    /// See [`check_tx_with_cache`](#method.check_tx_with_cache) for a more efficient alternative
+    /// for repeated checks.
     pub fn check_tx(snapshot: &dyn Snapshot, tx: &Verified<AnyTx>) -> Result<(), ExecutionError> {
-        Dispatcher::check_tx(snapshot, tx)
+        Dispatcher::check_tx(snapshot, tx, None)
+    }
+
+    /// Performs several shallow checks that transaction is correct, using the provided cache
+    /// for speed-up.
+    ///
+    /// See [`TxCheckCache`] docs for the details how caching should be set up, and
+    /// [`check_tx`](#method.check_tx) for the semantics of the returned value.
+    ///
+    /// [`TxCheckCache`]: struct.TxCheckCache.html
+    pub fn check_tx_with_cache(
+        snapshot: &dyn Snapshot,
+        tx: &Verified<AnyTx>,
+        cache: &mut TxCheckCache,
+    ) -> Result<(), ExecutionError> {
+        Dispatcher::check_tx(snapshot, tx, Some(cache))
     }
 }
 

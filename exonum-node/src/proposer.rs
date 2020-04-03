@@ -55,7 +55,7 @@
 //! [Exonum white paper]: https://bitfury.com/content/downloads/wp_consensus_181227.pdf
 
 use exonum::{
-    blockchain::{Blockchain, ConsensusConfig, PersistentPool, TransactionCache},
+    blockchain::{Blockchain, ConsensusConfig, PersistentPool, TransactionCache, TxCheckCache},
     crypto::Hash,
     helpers::{Height, Round},
     merkledb::Snapshot,
@@ -185,6 +185,7 @@ impl ProposeBlock for StandardProposer {
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         let max_transactions = params.consensus_config.txs_block_limit;
         let snapshot = params.snapshot();
+        let mut cache = TxCheckCache::new();
 
         let tx_hashes = pool
             .transactions()
@@ -192,7 +193,7 @@ impl ProposeBlock for StandardProposer {
                 // TODO: this is wildly inefficient.
                 // It should be easy to cache tx status within single height; however,
                 // spanning cache across multiple heights would be significantly harder.
-                if Blockchain::check_tx(snapshot, tx.as_ref()).is_ok() {
+                if Blockchain::check_tx_with_cache(snapshot, tx.as_ref(), &mut cache).is_ok() {
                     Some(tx_hash)
                 } else {
                     None

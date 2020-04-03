@@ -434,11 +434,11 @@ pub use exonum_explorer::{
 };
 
 use exonum::{
-    blockchain::{ApiSender, Blockchain, CallInBlock, Schema},
+    blockchain::{ApiSender, Blockchain, CallInBlock, Schema, TxCheckCache},
     helpers::Height,
     merkledb::{ObjectHash, Snapshot},
     messages::SignedMessage,
-    runtime::ExecutionStatus,
+    runtime::{ExecutionStatus, SnapshotExt},
 };
 use exonum_explorer::BlockchainExplorer;
 use exonum_rust_runtime::api::{self, ServiceApiScope};
@@ -446,9 +446,34 @@ use futures::{future, Future, FutureExt, TryFutureExt};
 use hex::FromHex;
 use serde_json::json;
 
-use std::ops::Bound;
+use std::{cell::RefCell, ops::Bound};
 
 pub mod websocket;
+
+#[derive(Debug)]
+struct ClearableCheckCache {
+    inner: TxCheckCache,
+    height: Height,
+}
+
+impl Default for ClearableCheckCache {
+    fn default() -> Self {
+        Self {
+            inner: TxCheckCache::new(),
+            height: Height(0),
+        }
+    }
+}
+
+impl ClearableCheckCache {
+    fn actualize(&mut self, snapshot: &dyn Snapshot) {
+        let current_height = snapshot.for_core().height();
+        if current_height != self.height {
+            self.inner = TxCheckCache::new();
+            self.height = current_height;
+        }
+    }
+}
 
 /// Exonum blockchain explorer API.
 #[derive(Debug, Clone)]
@@ -603,12 +628,21 @@ impl ExplorerApi {
         sender: &ApiSender,
         query: TransactionHex,
     ) -> impl Future<Output = api::Result<TransactionResponse>> {
+        thread_local! {
+            static CHECK_CACHE: RefCell<ClearableCheckCache> = RefCell::default();
+        }
+
         // Synchronous part of message verification.
         let verify_message = |snapshot: &dyn Snapshot, hex: String| -> anyhow::Result<_> {
             let msg = SignedMessage::from_hex(hex)?;
             let tx_hash = msg.object_hash();
             let verified = msg.into_verified()?;
-            Blockchain::check_tx(snapshot, &verified)?;
+
+            CHECK_CACHE.with(|cache| {
+                let mut cache = cache.borrow_mut();
+                cache.actualize(snapshot);
+                Blockchain::check_tx_with_cache(snapshot, &verified, &mut cache.inner)
+            })?;
             Ok((verified, tx_hash))
         };
 
