@@ -42,7 +42,7 @@ function deserializeWalletTx (transaction) {
   return { name: 'initialTx' }
 }
 
-module.exports = {
+export default {
   install (Vue) {
     Vue.prototype.$blockchain = {
       generateKeyPair () {

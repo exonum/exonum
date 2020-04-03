@@ -6,18 +6,26 @@
           <nav class="mt-5" aria-label="breadcrumb">
             <ol class="breadcrumb">
               <li class="breadcrumb-item">
-                <router-link :to="{ name: 'blockchain' }">Blockchain</router-link>
+                <router-link :to="{ name: 'blockchain' }">
+                  Blockchain
+                </router-link>
               </li>
-              <li class="breadcrumb-item active" aria-current="page">Block {{ height }}</li>
+              <li class="breadcrumb-item active" aria-current="page">
+                Block {{ height }}
+              </li>
             </ol>
           </nav>
 
           <div class="card mt-5">
-            <div class="card-header">Block</div>
+            <div class="card-header">
+              Block
+            </div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>Height:</strong></div>
+                  <div class="col-sm-3">
+                    <strong>Height:</strong>
+                  </div>
                   <div class="col-sm-9">
                     <code>{{ block.height }}</code>
                   </div>
@@ -25,7 +33,9 @@
               </li>
               <li class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>Previous block hash:</strong></div>
+                  <div class="col-sm-3">
+                    <strong>Previous block hash:</strong>
+                  </div>
                   <div class="col-sm-9">
                     <code>{{ block.prev_hash }}</code>
                   </div>
@@ -33,7 +43,9 @@
               </li>
               <li class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>Proposer ID:</strong></div>
+                  <div class="col-sm-3">
+                    <strong>Proposer ID:</strong>
+                  </div>
                   <div class="col-sm-9">
                     <code>{{ block.proposer_id }}</code>
                   </div>
@@ -41,7 +53,9 @@
               </li>
               <li class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>State hash:</strong></div>
+                  <div class="col-sm-3">
+                    <strong>State hash:</strong>
+                  </div>
                   <div class="col-sm-9">
                     <code>{{ block.state_hash }}</code>
                   </div>
@@ -51,18 +65,24 @@
           </div>
 
           <div class="card mt-5">
-            <div class="card-header">Transactions</div>
+            <div class="card-header">
+              Transactions
+            </div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item font-weight-bold">
                 <div class="row">
-                  <div class="col-sm-12">Hash</div>
+                  <div class="col-sm-12">
+                    Hash
+                  </div>
                 </div>
               </li>
               <!-- eslint-disable-next-line vue/require-v-for-key -->
               <li v-for="(transaction) in transactions" class="list-group-item">
                 <div class="row">
                   <div class="col-sm-12">
-                    <router-link :to="{ name: 'transaction', params: { hash: transaction.tx_hash } }">{{ transaction.tx_hash }}</router-link>
+                    <router-link :to="{ name: 'transaction', params: { hash: transaction.tx_hash } }">
+                      {{ transaction.tx_hash }}
+                    </router-link>
                   </div>
                 </div>
               </li>
@@ -79,10 +99,14 @@
           <nav class="mt-5" aria-label="Nearby blocks navigation">
             <ul class="pagination justify-content-center">
               <li class="page-item">
-                <router-link :to="{ name: 'block', params: { height: previous } }" class="page-link">&larr; Previous block</router-link>
+                <router-link :to="{ name: 'block', params: { height: previous } }" class="page-link">
+                  &larr; Previous block
+                </router-link>
               </li>
               <li class="page-item">
-                <router-link :to="{ name: 'block', params: { height: next } }" class="page-link">Next block &rarr;</router-link>
+                <router-link :to="{ name: 'block', params: { height: next } }" class="page-link">
+                  Next block &rarr;
+                </router-link>
               </li>
             </ul>
           </nav>
@@ -90,18 +114,23 @@
       </div>
     </div>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
 <script>
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
       Spinner
     },
-    props: ['height'],
+    props: {
+      height: {
+        type: String,
+        default: "0"
+      }
+    },
     data() {
       return {
         block: {},
@@ -122,6 +151,11 @@
         this.loadBlock()
       }
     },
+    mounted() {
+      this.$nextTick(function() {
+        this.loadBlock()
+      })
+    },
     methods: {
       async loadBlock() {
         this.isSpinnerVisible = true
@@ -136,11 +170,6 @@
           this.$notify('error', error.toString())
         }
       }
-    },
-    mounted() {
-      this.$nextTick(function() {
-        this.loadBlock()
-      })
     }
   }
 </script>

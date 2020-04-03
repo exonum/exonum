@@ -31,7 +31,7 @@ do
 done
 
 echo "Deployment of the timestamping service is in progress..."
-sleep 7
+sleep 10
 python3 -m exonum_launcher -i ../../timestamping.yaml
 
 cd ../../frontend
