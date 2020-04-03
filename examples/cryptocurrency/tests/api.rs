@@ -65,6 +65,20 @@ async fn test_create_wallet() {
     assert_eq!(wallet.balance, 100);
 }
 
+#[allow(unused_variables)]
+#[tokio::test]
+async fn test_create_destroy_testkit() {
+    use std::{thread, time};
+
+    for i in 1..128 {
+        println!("Created {} testkits", i + 1);
+        let (mut testkit, api) = create_testkit();
+        if i % 10 == 0 {
+            thread::sleep(time::Duration::from_secs(10));
+        }
+    }
+}
+
 /// Check that the transfer transaction works as intended.
 #[tokio::test]
 async fn test_transfer() {
