@@ -5,6 +5,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### New Features
+
+#### exonum-node
+
+- Functionality of the `proposer` module was extended. Now, it can also be used
+  for removing transactions from the pool of unconfirmed transactions.
+  The module was renamed to `pool` and related names were updated accordingly.
+  (#1840)
+
 ### Internal Improvements
 
 #### exonum
