@@ -271,10 +271,12 @@ impl ManagePool for StandardPoolManager {
 
     fn remove_transactions(&mut self, pool: Pool<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
         let tx_limit = self.removal_limit.unwrap_or_else(usize::max_value);
+        let mut cache = TxCheckCache::new();
+
         pool.transactions()
             .take(tx_limit)
             .filter_map(|(tx_hash, tx)| {
-                if let Err(e) = Blockchain::check_tx(snapshot, tx.as_ref()) {
+                if let Err(e) = Blockchain::check_tx_with_cache(snapshot, tx.as_ref(), &mut cache) {
                     log::trace!(
                         "Removing transaction {:?} from pool, since it is incorrect: {}",
                         tx_hash,
