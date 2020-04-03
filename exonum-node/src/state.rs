@@ -19,7 +19,7 @@ use bit_vec::BitVec;
 use exonum::{
     blockchain::{
         Block, BlockKind, BlockPatch, ConsensusConfig, PersistentPool, TransactionCache,
-        ValidatorKeys,
+        TxCheckCache, ValidatorKeys,
     },
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
@@ -156,6 +156,7 @@ pub(crate) struct State {
     // Cache that stores transactions before adding to persistent pool.
     tx_cache: BTreeMap<Hash, Verified<AnyTx>>,
     flush_pool_strategy: FlushPoolStrategy,
+    tx_check_cache: TxCheckCache,
 
     // An in-memory set of transaction hashes, rejected by a node
     // within block.
@@ -593,6 +594,7 @@ impl State {
             incomplete_block: None,
             tx_cache: BTreeMap::new(),
             flush_pool_strategy: config.mempool.flush_pool_strategy,
+            tx_check_cache: TxCheckCache::new(),
             invalid_txs: HashSet::default(),
 
             keys: config.keys,
@@ -951,6 +953,7 @@ impl State {
         self.blockchain_height.increment();
         self.last_hash = block_hash;
         self.invalid_txs.clear();
+        self.tx_check_cache = TxCheckCache::new();
     }
 
     /// Returns a list of queued consensus messages.
@@ -1423,6 +1426,11 @@ impl State {
     /// Returns mutable reference to the transactions cache.
     pub(super) fn tx_cache_mut(&mut self) -> &mut BTreeMap<Hash, Verified<AnyTx>> {
         &mut self.tx_cache
+    }
+
+    /// Returns mutable reference to transaction checking cache.
+    pub(super) fn tx_check_cache_mut(&mut self) -> &mut TxCheckCache {
+        &mut self.tx_check_cache
     }
 
     /// Returns interval between flushing transaction pool to the database, if any.

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_crypto::{gen_keypair, Hash};
+use exonum_crypto::{gen_keypair, Hash, KeyPair};
 use exonum_merkledb::{BinaryValue, Database, Fork, ObjectHash, Patch, Snapshot, TemporaryDB};
 use pretty_assertions::assert_eq;
 use semver::Version;
@@ -28,18 +28,18 @@ use std::{
     time::Duration,
 };
 
-use crate::runtime::CommonError;
 use crate::{
     blockchain::{AdditionalHeaders, ApiSender, Block, Blockchain, Schema as CoreSchema},
     helpers::Height,
+    messages::AnyTx,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
         migrations::{InitMigrationError, MigrationScript},
         oneshot::{self, Receiver},
-        ArtifactId, BlockchainData, CallInfo, CoreError, DispatcherSchema, ErrorKind, ErrorMatch,
-        ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
+        ArtifactId, BlockchainData, CallInfo, CommonError, CoreError, DispatcherSchema, ErrorKind,
+        ErrorMatch, ExecutionContext, ExecutionError, InstanceDescriptor, InstanceId, InstanceSpec,
         InstanceState, InstanceStatus, MethodId, Runtime, RuntimeFeature, RuntimeInstance,
-        SnapshotExt,
+        SnapshotExt, TxCheckCache,
     },
 };
 
@@ -1334,4 +1334,85 @@ fn unload_artifact_workflow() {
     let snapshot = db.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
     assert!(schema.get_artifact(&artifact).is_none());
+}
+
+#[test]
+fn check_tx_caching() {
+    let FreezingRig {
+        db,
+        mut dispatcher,
+        service,
+        ..
+    } = blockchain_with_frozen_service(SampleRuntimes::First).unwrap();
+
+    // Add an active service to the blockchain.
+    let active_service =
+        InstanceSpec::from_raw_parts(100, "other-service".to_owned(), service.artifact);
+    let mut fork = db.fork();
+    let mut should_rollback = false;
+    let mut context = ExecutionContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        &mut should_rollback,
+        active_service.as_descriptor(),
+    );
+    context
+        .initiate_adding_service(active_service.clone(), vec![])
+        .unwrap();
+    Dispatcher::activate_pending(&fork);
+    let patch = dispatcher.commit_block_and_notify_runtimes(fork);
+    db.merge_sync(patch).unwrap();
+
+    // Check that `check_tx` caching works properly.
+    let snapshot = db.snapshot();
+    let mut cache = TxCheckCache::new();
+    let keys = KeyPair::random();
+    let tx = AnyTx::new(CallInfo::new(active_service.id, 0), vec![]).sign_with_keypair(&keys);
+    Dispatcher::check_tx(&snapshot, &tx, Some(&mut cache)).unwrap();
+    assert_eq!(
+        cache.service_states[&active_service.id],
+        Some(InstanceStatus::Active)
+    );
+
+    let other_correct_tx =
+        AnyTx::new(CallInfo::new(active_service.id, 0), vec![1, 2, 3]).sign_with_keypair(&keys);
+    Dispatcher::check_tx(&snapshot, &other_correct_tx, Some(&mut cache)).unwrap();
+
+    let incorrect_tx = AnyTx::new(CallInfo::new(service.id, 0), vec![]).sign_with_keypair(&keys);
+    let err = Dispatcher::check_tx(&snapshot, &incorrect_tx, Some(&mut cache)).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ServiceNotActive).with_any_description()
+    );
+    assert_eq!(
+        cache.service_states[&service.id],
+        Some(InstanceStatus::Frozen)
+    );
+
+    let other_incorrect_tx =
+        AnyTx::new(CallInfo::new(service.id, 0), vec![1, 2]).sign_with_keypair(&keys);
+    let err = Dispatcher::check_tx(&snapshot, &other_incorrect_tx, Some(&mut cache)).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::ServiceNotActive).with_any_description()
+    );
+
+    let invalid_service_id = 200;
+    let tx_without_service =
+        AnyTx::new(CallInfo::new(invalid_service_id, 0), vec![]).sign_with_keypair(&keys);
+    let err = Dispatcher::check_tx(&snapshot, &tx_without_service, Some(&mut cache)).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId).with_any_description()
+    );
+    assert_eq!(cache.service_states[&invalid_service_id], None);
+
+    let other_tx_without_service =
+        AnyTx::new(CallInfo::new(invalid_service_id, 0), vec![1]).sign_with_keypair(&keys);
+    let err =
+        Dispatcher::check_tx(&snapshot, &other_tx_without_service, Some(&mut cache)).unwrap_err();
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CoreError::IncorrectInstanceId).with_any_description()
+    );
 }

@@ -201,6 +201,8 @@
 //! [docs:lifecycle]: https://exonum.com/doc/version/latest/architecture/service-lifecycle/
 //! [blog:lifecycle]: https://medium.com/meetbitfury/about-service-lifecycles-in-exonum-58c67678c6bb
 
+#[doc(hidden)] // re-exported from the `blockchain` module
+pub use self::dispatcher::TxCheckCache;
 pub use self::{
     blockchain_data::{BlockchainData, SnapshotExt},
     dispatcher::{

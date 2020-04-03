@@ -220,6 +220,79 @@ impl Migrations {
     }
 }
 
+/// Opaque cache used for transaction checking.
+///
+/// A single cache object is only valid for a single blockchain height, which **MUST** be ensured
+/// by the caller. Using the cache with multiple heights may lead to unpredictable results.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::{blockchain::{Blockchain, TxCheckCache}, messages::{AnyTx, Verified}};
+/// # use exonum::merkledb::{Database, TemporaryDB};
+/// let mut check_cache = TxCheckCache::new();
+/// let snapshot = // (blockchain snapshot)
+/// #   TemporaryDB::new().snapshot();
+/// let transactions: Vec<Verified<AnyTx>> = // ...
+/// #   vec![];
+///
+/// // Check that all `transactions` are correct.
+/// assert!(transactions
+///     .iter()
+///     .all(|transaction| {
+///         Blockchain::check_tx_with_cache(
+///             &snapshot,
+///             transaction,
+///             &mut check_cache,
+///         )
+///         .is_ok()
+///     }));
+/// ```
+#[derive(Debug, Default)]
+pub struct TxCheckCache {
+    service_states: HashMap<InstanceId, Option<InstanceStatus>>,
+}
+
+impl TxCheckCache {
+    fn missing_error(service_id: InstanceId) -> ExecutionError {
+        let msg = format!(
+            "Cannot dispatch transaction to unknown service with ID {}",
+            service_id
+        );
+        CoreError::IncorrectInstanceId.with_description(msg)
+    }
+
+    fn non_active_error(service_id: InstanceId, status: &InstanceStatus) -> ExecutionError {
+        let msg = format!(
+            "Cannot dispatch transaction to non-active service `{}` (status: {})",
+            service_id, status
+        );
+        CoreError::ServiceNotActive.with_description(msg)
+    }
+
+    /// Creates a new empty cache for checking transaction validity.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn set_missing_service(&mut self, service_id: InstanceId) {
+        self.service_states.insert(service_id, None);
+    }
+
+    fn set_service_status(&mut self, service_id: InstanceId, status: InstanceStatus) {
+        self.service_states.insert(service_id, Some(status));
+    }
+
+    fn check_service_status(&self, service_id: InstanceId) -> Option<Result<(), ExecutionError>> {
+        let status = self.service_states.get(&service_id)?.as_ref();
+        Some(match status {
+            None => Err(Self::missing_error(service_id)),
+            Some(InstanceStatus::Active) => Ok(()),
+            Some(other_status) => Err(Self::non_active_error(service_id, other_status)),
+        })
+    }
+}
+
 /// A collection of `Runtime`s capable of modifying the blockchain state.
 #[derive(Debug)]
 pub struct Dispatcher {
@@ -551,30 +624,46 @@ impl Dispatcher {
     pub(crate) fn check_tx(
         snapshot: &dyn Snapshot,
         tx: &Verified<AnyTx>,
+        mut cache: Option<&mut TxCheckCache>,
     ) -> Result<(), ExecutionError> {
+        let service_id = tx.as_ref().call_info.instance_id;
+
+        if let Some(cache) = cache.as_deref_mut() {
+            if let Some(res) = cache.check_service_status(service_id) {
+                return res;
+            }
+        }
+
         // Currently the only check is that destination service exists, but later
         // functionality of this method can be extended.
-        let call_info = &tx.as_ref().call_info;
         let instance = Schema::new(snapshot)
-            .get_instance(call_info.instance_id)
+            .get_instance(service_id)
             .ok_or_else(|| {
-                let msg = format!(
-                    "Cannot dispatch transaction to unknown service with ID {}",
-                    call_info.instance_id
-                );
-                CoreError::IncorrectInstanceId.with_description(msg)
+                if let Some(cache) = cache.as_deref_mut() {
+                    cache.set_missing_service(service_id);
+                }
+                TxCheckCache::missing_error(service_id)
             })?;
 
         match instance.status {
-            Some(InstanceStatus::Active) => Ok(()),
-            status => {
-                let status_str = status.map_or_else(|| "none".to_owned(), |st| st.to_string());
-                let msg = format!(
-                    "Cannot dispatch transaction to non-active service `{}` (status: {})",
-                    instance.spec.as_descriptor(),
-                    status_str
-                );
-                Err(CoreError::ServiceNotActive.with_description(msg))
+            Some(InstanceStatus::Active) => {
+                if let Some(cache) = cache.as_deref_mut() {
+                    cache.set_service_status(service_id, InstanceStatus::Active);
+                }
+                Ok(())
+            }
+            Some(status) => {
+                let err = TxCheckCache::non_active_error(service_id, &status);
+                if let Some(cache) = cache.as_deref_mut() {
+                    cache.set_service_status(service_id, status);
+                }
+                Err(err)
+            }
+            None => {
+                if let Some(cache) = cache.as_deref_mut() {
+                    cache.set_missing_service(service_id);
+                }
+                Err(TxCheckCache::missing_error(service_id))
             }
         }
     }
