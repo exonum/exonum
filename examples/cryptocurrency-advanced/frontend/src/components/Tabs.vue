@@ -10,14 +10,14 @@
     </ul>
 
     <div class="tab-content">
-      <slot @mount="addTab"/>
+      <slot @mount="addTab" />
     </div>
   </div>
 </template>
 
 <script>
-  module.exports = {
-    name: 'tabs',
+  export default {
+    name: 'Tabs',
     data() {
       return {
         tabs: [],

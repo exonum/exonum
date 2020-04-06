@@ -8,7 +8,9 @@
           <ul class="list-group mt-5">
             <li class="list-group-item">
               <div class="row">
-                <div class="col-sm-3"><strong>Hash:</strong></div>
+                <div class="col-sm-3">
+                  <strong>Hash:</strong>
+                </div>
                 <div class="col-sm-9">
                   <code>{{ timestamp.content_hash }}</code>
                 </div>
@@ -16,13 +18,19 @@
             </li>
             <li class="list-group-item">
               <div class="row">
-                <div class="col-sm-3"><strong>Metadata:</strong></div>
-                <div class="col-sm-9 break-word">{{ timestamp.metadata }}</div>
+                <div class="col-sm-3">
+                  <strong>Metadata:</strong>
+                </div>
+                <div class="col-sm-9 break-word">
+                  {{ timestamp.metadata }}
+                </div>
               </div>
             </li>
             <li class="list-group-item">
               <div class="row">
-                <div class="col-sm-3"><strong>Transaction:</strong></div>
+                <div class="col-sm-3">
+                  <strong>Transaction:</strong>
+                </div>
                 <div class="col-sm-9">
                   <code>
                     <router-link :to="{ name: 'transaction', params: { hash: transactionHash } }">{{ transactionHash }}</router-link>
@@ -32,8 +40,12 @@
             </li>
             <li class="list-group-item">
               <div class="row">
-                <div class="col-sm-3"><strong>Date:</strong></div>
-                <div class="col-sm-9">{{ $moment(time) }}</div>
+                <div class="col-sm-3">
+                  <strong>Date:</strong>
+                </div>
+                <div class="col-sm-9">
+                  {{ $moment(time) }}
+                </div>
               </div>
             </li>
           </ul>
@@ -41,18 +53,23 @@
       </div>
     </div>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
 <script>
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
       Spinner
     },
-    props: ['hash'],
+    props: {
+      hash: {
+        type: String,
+        default: ""
+      }
+    },
     data() {
       return {
         isSpinnerVisible: false,
@@ -60,6 +77,11 @@
         transactionHash: '',
         time: null
       }
+    },
+    mounted() {
+      this.$nextTick(function() {
+        this.loadTimestamp()
+      })
     },
     methods: {
       async loadTimestamp() {
@@ -76,11 +98,6 @@
           this.$notify('error', error.toString())
         }
       }
-    },
-    mounted() {
-      this.$nextTick(function() {
-        this.loadTimestamp()
-      })
     }
   }
 </script>

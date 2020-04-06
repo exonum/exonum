@@ -4,20 +4,30 @@
       <div class="row">
         <div class="col-sm-12">
           <div class="card mt-5">
-            <div class="card-header">Latest blocks</div>
+            <div class="card-header">
+              Latest blocks
+            </div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item font-weight-bold">
                 <div class="row">
-                  <div class="col-sm-6">Block height</div>
-                  <div class="col-sm-6">Transactions count</div>
+                  <div class="col-sm-6">
+                    Block height
+                  </div>
+                  <div class="col-sm-6">
+                    Transactions count
+                  </div>
                 </div>
               </li>
               <li v-for="(block) in blocks" :key="block.height" class="list-group-item">
                 <div class="row">
                   <div class="col-sm-6">
-                    <router-link :to="{ name: 'block', params: { height: block.height } }">{{ block.height }}</router-link>
+                    <router-link :to="{ name: 'block', params: { height: block.height } }">
+                      {{ block.height }}
+                    </router-link>
                   </div>
-                  <div class="col-sm-6">{{ block.tx_count }}</div>
+                  <div class="col-sm-6">
+                    {{ block.tx_count }}
+                  </div>
                 </div>
               </li>
             </ul>
@@ -29,14 +39,14 @@
       </div>
     </div>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
 <script>
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
       Spinner
     },
@@ -45,6 +55,14 @@
         isSpinnerVisible: false,
         blocks: []
       }
+    },
+    mounted() {
+      this.$nextTick(function() {
+        this.loadBlocks()
+      })
+    },
+    destroyed() {
+      this.webSocket.close()
     },
     methods: {
       async loadBlocks(latest) {
@@ -73,14 +91,6 @@
       handleNewBlock(event) {
         this.blocks.unshift(JSON.parse(event.data))
       }
-    },
-    mounted() {
-      this.$nextTick(function() {
-        this.loadBlocks()
-      })
-    },
-    destroyed() {
-      this.webSocket.close()
     }
   }
 </script>

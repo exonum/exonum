@@ -7,7 +7,7 @@ const SERVICE_ID = 4
 const TX_ID = 0
 const TimestampEntry = Exonum.newType(proto.exonum.examples.timestamping.TimestampEntry)
 
-module.exports = {
+export default {
   install (Vue) {
     Vue.prototype.$blockchain = {
       generateKeyPair () {
