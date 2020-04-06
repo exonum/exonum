@@ -4,7 +4,7 @@
   },
   "extends": "plugin:vue/recommended",
   "rules": {
-    "vue/max-attributes-per-line": false,
+    "vue/max-attributes-per-line": 0,
     "object-curly-spacing" : [2, "always"]
   }
 }

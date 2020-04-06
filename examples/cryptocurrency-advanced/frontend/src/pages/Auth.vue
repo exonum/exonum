@@ -3,7 +3,9 @@
     <div class="container">
       <div class="row justify-content-sm-center">
         <div class="col-md-6 col-md-offset-3">
-          <h1 class="mt-5 mb-4">Authorization</h1>
+          <h1 class="mt-5 mb-4">
+            Authorization
+          </h1>
           <tabs>
             <tab :is-active="true" title="Register">
               <form @submit.prevent="register">
@@ -11,7 +13,9 @@
                   <label class="control-label">Name:</label>
                   <input v-model="name" type="text" class="form-control" placeholder="Enter name" maxlength="260" required>
                 </div>
-                <button type="submit" class="btn btn-lg btn-block btn-primary">Register</button>
+                <button type="submit" class="btn btn-lg btn-block btn-primary">
+                  Register
+                </button>
               </form>
             </tab>
             <tab title="Log in">
@@ -20,7 +24,9 @@
                   <label class="control-label">Secret key:</label>
                   <input v-model="secretKey" type="text" class="form-control" placeholder="Enter secret key" required>
                 </div>
-                <button type="submit" class="btn btn-lg btn-block btn-primary">Log in</button>
+                <button type="submit" class="btn btn-lg btn-block btn-primary">
+                  Log in
+                </button>
               </form>
             </tab>
           </tabs>
@@ -29,14 +35,16 @@
     </div>
 
     <modal :visible="isModalVisible" title="Wallet has been created" action-btn="Log in" @close="closeModal" @submit="proceed">
-      <div class="alert alert-warning" role="alert">Save the secret key in a safe place. You will need it to log in to the demo next time.</div>
+      <div class="alert alert-warning" role="alert">
+        Save the secret key in a safe place. You will need it to log in to the demo next time.
+      </div>
       <div class="form-group">
         <label>Secret key:</label>
         <div><code>{{ keyPair.secretKey }}</code></div>
       </div>
     </modal>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
@@ -46,7 +54,7 @@
   import Modal from '../components/Modal.vue'
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
       Tab,
       Tabs,

@@ -1,13 +1,13 @@
-var express = require('express');
-var proxy = require('http-proxy-middleware');
+const express = require('express')
+const { createProxyMiddleware } = require('http-proxy-middleware')
 
 // Initialize application
-var app = express();
+const app = express()
 
 // Get app params
-var argv = require('yargs-parser')(process.argv.slice(2));
-var port = argv.port;
-var apiRoot = argv.apiRoot;
+const argv = require('yargs-parser')(process.argv.slice(2))
+const port = argv.port
+const apiRoot = argv.apiRoot
 
 if (typeof port === 'undefined') {
   throw new Error('--port parameter is not set.');
@@ -21,7 +21,7 @@ if (typeof apiRoot === 'undefined') {
 app.use(express.static(__dirname + '/'));
 
 // Proxy middleware options
-var apiProxy = proxy({
+const apiProxy = createProxyMiddleware({
   target: apiRoot,
   ws: true,
   headers: {

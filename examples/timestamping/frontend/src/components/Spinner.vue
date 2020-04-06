@@ -1,10 +1,10 @@
 <template>
-  <div v-if="visible" class="spinner"/>
+  <div v-if="visible" class="spinner" />
 </template>
 
 <script>
-  module.exports = {
-    name: 'spinner',
+  export default {
+    name: 'Spinner',
     props: {
       visible: Boolean
     }

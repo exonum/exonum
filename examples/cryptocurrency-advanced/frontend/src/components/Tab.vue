@@ -1,23 +1,26 @@
 <template>
   <div :class="{ 'active': active }" class="tab-pane">
-    <slot/>
+    <slot />
   </div>
 </template>
 
 <script>
-  module.exports = {
-    name: 'tab',
-    data() {
-      return {
-        active: false
-      }
-    },
+  export default {
+    name: 'Tab',
     props: {
-      title: String,
+      title: {
+        type: String,
+        default: ""
+      },
       isActive: {
         required: false,
         type: Boolean,
         default: false
+      }
+    },
+    data() {
+      return {
+        active: false
       }
     },
     created() {
