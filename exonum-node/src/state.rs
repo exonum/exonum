@@ -18,8 +18,8 @@ use anyhow::bail;
 use bit_vec::BitVec;
 use exonum::{
     blockchain::{
-        Block, BlockKind, BlockPatch, ConsensusConfig, PersistentPool, TransactionCache,
-        TxCheckCache, ValidatorKeys,
+        Block, BlockKind, BlockPatch, BlockchainMut, ConsensusConfig, PersistentPool,
+        TransactionCache, TxCheckCache, ValidatorKeys,
     },
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
@@ -37,7 +37,7 @@ use std::{
 
 use crate::{
     connect_list::ConnectList,
-    consensus::RoundAction,
+    consensus::{PersistChanges, RoundAction},
     events::network::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose, Status},
     Configuration, ConnectInfo, FlushPoolStrategy,
@@ -1096,9 +1096,20 @@ impl State {
     }
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
-    /// cannot contain unknown transactions. Returns hash of the propose.
-    pub(super) fn add_self_propose(&mut self, msg: Verified<Propose>) -> Hash {
+    /// cannot contain unknown transactions. Returns the hash of the propose.
+    pub(super) fn add_self_propose(
+        &mut self,
+        msg: Verified<Propose>,
+        blockchain: &mut BlockchainMut,
+    ) -> Hash {
         debug_assert!(self.validator_state().is_some());
+
+        let round = msg.payload().round;
+        blockchain.persist_changes(
+            |schema| schema.save_message(round, msg.clone()),
+            "Cannot save `Propose` to message cache",
+        );
+
         let propose_hash = msg.object_hash();
         self.proposes.insert(
             propose_hash,
@@ -1106,11 +1117,8 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
-                // TODO: For the moment it's true because this code gets called immediately after
-                // saving a propose to the cache. Think about making this approach less error-prone.
-                // (ECR-1635)
                 is_saved: true,
-                // We expect ourself not to produce invalid proposes.
+                // We expect our node not to produce invalid proposes.
                 is_valid: true,
             },
         );
