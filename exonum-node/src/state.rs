@@ -141,7 +141,7 @@ pub(crate) struct State {
 
     queued: Vec<ConsensusMessage>,
 
-    unknown_txs: HashMap<Hash, Vec<Hash>>,
+    // Unknown `Propose` messages confirmed by a majority of `Precommit`s.
     proposes_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
 
     // Our requests state.
@@ -580,7 +580,6 @@ impl State {
 
             queued: Vec::new(),
 
-            unknown_txs: HashMap::new(),
             proposes_confirmed_by_majority: HashMap::new(),
 
             peer_states: BTreeMap::new(),
@@ -1155,13 +1154,6 @@ impl State {
                     } else {
                         unknown_txs.insert(*hash);
                     }
-                }
-
-                for tx in &unknown_txs {
-                    self.unknown_txs
-                        .entry(*tx)
-                        .or_insert_with(Vec::new)
-                        .push(propose_hash);
                 }
 
                 Ok(e.insert(ProposeState {
