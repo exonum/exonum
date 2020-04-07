@@ -102,7 +102,7 @@ use crate::{
         NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
-    proposer::{ProposeBlock, StandardProposer},
+    pool::{ManagePool, StandardPoolManager},
     schema::NodeSchema,
     state::{RequestData, State},
 };
@@ -115,7 +115,7 @@ mod events_impl;
 pub mod helpers;
 mod messages;
 mod plugin;
-pub mod proposer;
+pub mod pool;
 mod proto;
 mod requests;
 #[cfg(test)]
@@ -204,8 +204,8 @@ pub(crate) struct NodeHandler {
     config_manager: Option<Box<dyn ConfigManager>>,
     /// Can we speed up Propose with transaction pressure?
     allow_expedited_propose: bool,
-    /// Block proposer.
-    block_proposer: Box<dyn ProposeBlock>,
+    /// Pool manager.
+    pool_manager: Box<dyn ManagePool>,
 }
 
 /// HTTP API configuration options.
@@ -528,7 +528,7 @@ impl NodeHandler {
         config: Configuration,
         api_state: SharedNodeState,
         config_manager: Option<Box<dyn ConfigManager>>,
-        block_proposer: Box<dyn ProposeBlock>,
+        pool_manager: Box<dyn ManagePool>,
     ) -> Self {
         let snapshot = blockchain.snapshot();
         let schema = Schema::new(&snapshot);
@@ -575,7 +575,7 @@ impl NodeHandler {
             node_role,
             config_manager,
             allow_expedited_propose: true,
-            block_proposer,
+            pool_manager,
         }
     }
 
@@ -1034,7 +1034,7 @@ pub struct NodeBuilder {
     node_config: NodeConfig,
     node_keys: Keys,
     config_manager: Option<Box<dyn ConfigManager>>,
-    block_proposer: Box<dyn ProposeBlock>,
+    pool_manager: Box<dyn ManagePool>,
     plugins: Vec<Box<dyn NodePlugin>>,
     disable_signals: bool,
 }
@@ -1072,7 +1072,7 @@ impl NodeBuilder {
             node_keys,
             config_manager: None,
             plugins: vec![],
-            block_proposer: Box::new(StandardProposer),
+            pool_manager: Box::new(StandardPoolManager::default()),
             disable_signals: false,
         }
     }
@@ -1109,16 +1109,18 @@ impl NodeBuilder {
         self
     }
 
-    /// Sets custom `Propose` creation logic for the node.
+    /// Sets custom pool management logic for the node. Using this method, it is possible
+    /// to customize block proposals and removing transactions from the pool of unconfirmed
+    /// transactions.
     ///
     /// # Stability and safety
     ///
-    /// Using a custom proposer **CAN LEAD TO CONSENSUS FAILURE.** See the [`proposer`] module docs
-    /// for more details.
+    /// This method is unstable. Using a custom pool manager **CAN LEAD TO CONSENSUS FAILURE.**
+    /// See the [`pool`] module docs for more details.
     ///
-    /// [`proposer`]: proposer/index.html
-    pub fn with_block_proposer<T: ProposeBlock + 'static>(mut self, proposer: T) -> Self {
-        self.block_proposer = Box::new(proposer);
+    /// [`pool`]: pool/index.html
+    pub fn with_pool_manager<T: ManagePool + 'static>(mut self, manager: T) -> Self {
+        self.pool_manager = Box::new(manager);
         self
     }
 
@@ -1152,7 +1154,7 @@ impl NodeBuilder {
             self.node_keys,
             self.config_manager,
             self.plugins,
-            self.block_proposer,
+            self.pool_manager,
         );
         node.disable_signals = self.disable_signals;
         node
@@ -1168,7 +1170,7 @@ impl Node {
         node_keys: Keys,
         config_manager: Option<Box<dyn ConfigManager>>,
         plugins: Vec<Box<dyn NodePlugin>>,
-        block_proposer: Box<dyn ProposeBlock>,
+        pool_manager: Box<dyn ManagePool>,
     ) -> Self {
         crypto::init();
 
@@ -1221,7 +1223,7 @@ impl Node {
             config,
             api_state,
             config_manager,
-            block_proposer,
+            pool_manager,
         );
         handler.plugins = plugins;
 

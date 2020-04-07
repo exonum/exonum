@@ -16,6 +16,10 @@ The crate exposes the following binaries:
   (namely, the mode in which nodes do not create blocks unless they have
   uncommitted transactions).
 
+- [`tx_filtering`](src/bin/tx_filtering.rs). Tests custom pool management,
+  which includes proposing and retaining in pool only the newest transaction
+  (all other transactions are removed from the transaction pool on block commit).
+
 ## Usage
 
 Run the selected binary like this:

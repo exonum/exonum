@@ -150,7 +150,7 @@ where
     }
 
     fn contains_transaction(&self, hash: Hash) -> bool {
-        self.cache.contains_transaction(hash) || self.transactions.contains(&hash)
+        self.cache.contains_transaction(hash) || self.transactions_pool.contains(&hash)
     }
 
     fn transactions(&self) -> Transactions<'_> {

@@ -16,7 +16,7 @@ use anyhow::{bail, format_err};
 use exonum::{
     blockchain::{
         BlockContents, BlockKind, BlockParams, BlockPatch, Blockchain, BlockchainMut,
-        PersistentPool, ProposerId, Schema, TransactionCache,
+        PersistentPool, ProposerId, Schema,
     },
     crypto::{Hash, PublicKey},
     helpers::{Height, Round, ValidatorId},
@@ -35,7 +35,7 @@ use crate::{
         Prevote, PrevotesRequest, Propose, ProposeRequest, TransactionsRequest,
         TransactionsResponse,
     },
-    proposer::{ProposeParams, ProposeTemplate},
+    pool::{ProposeParams, ProposeTemplate},
     schema::NodeSchema,
     state::{IncompleteBlock, ProposeState, RequestData},
     NodeHandler,
@@ -757,6 +757,24 @@ impl NodeHandler {
         }
 
         let snapshot = self.blockchain.snapshot();
+        let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
+        let tx_hashes_to_remove = self.pool_manager.remove_transactions(pool, &snapshot);
+        if !tx_hashes_to_remove.is_empty() {
+            log::info!(
+                "Removing {} transactions from pool",
+                tx_hashes_to_remove.len()
+            );
+
+            let fork = self.blockchain.fork();
+            for tx_hash in &tx_hashes_to_remove {
+                self.state.tx_cache_mut().remove(tx_hash);
+                Schema::new(&fork).reject_transaction(*tx_hash);
+            }
+            self.blockchain
+                .merge(fork.into_patch())
+                .expect("Cannot save changes to transaction pool");
+        }
+
         let schema = Schema::new(&snapshot);
         let pool_len = schema.transactions_pool_len();
         let epoch = self.state.epoch();
@@ -804,10 +822,16 @@ impl NodeHandler {
     /// This function panics if it receives an invalid transaction for an already committed block.
     pub(crate) fn handle_tx(&mut self, msg: Verified<AnyTx>) -> Result<(), HandleTxError> {
         let hash = msg.object_hash();
+        if self.state.tx_cache().contains_key(&hash) {
+            // Transaction is already in the ephemeral transaction cache, i.e.,
+            // `handle_tx` was called for it previously.
+            return Err(HandleTxError::AlreadyProcessed);
+        }
 
         let snapshot = self.blockchain.snapshot();
-        let tx_pool = PersistentPool::new(&snapshot, self.state.tx_cache());
-        if tx_pool.contains_transaction(hash) {
+        let schema = Schema::new(&snapshot);
+        if schema.transactions().contains(&hash) {
+            // Transaction is either committed or is present in the persistent pool.
             return Err(HandleTxError::AlreadyProcessed);
         }
 
@@ -817,7 +841,7 @@ impl NodeHandler {
             // Store transaction as invalid to know it if it'll be included into a proposal.
             // Please note that it **must** happen before calling `check_incomplete_proposes`,
             // since the latter uses `invalid_txs` to recalculate the validity of proposals.
-            self.state.invalid_txs_mut().insert(msg.object_hash());
+            self.state.invalid_txs_mut().insert(hash);
 
             // Since the transaction, despite being incorrect, is received from within the
             // network, we have to deal with it. We don't consider the transaction unknown
@@ -1032,7 +1056,7 @@ impl NodeHandler {
         let snapshot = self.blockchain.snapshot();
         let pool = PersistentPool::new(snapshot.as_ref(), self.state.tx_cache());
         let params = ProposeParams::new(self.state(), &snapshot);
-        self.block_proposer.propose_block(pool, params)
+        self.pool_manager.propose_block(pool, params)
     }
 
     /// Handles request timeout by sending the corresponding request message to a peer.

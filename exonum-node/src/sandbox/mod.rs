@@ -29,9 +29,7 @@ use exonum::{
     crypto::{Hash, KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH},
     helpers::{user_agent, Height, Round, ValidatorId},
     keys::Keys,
-    merkledb::{
-        BinaryValue, Fork, HashTag, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB,
-    },
+    merkledb::{BinaryValue, HashTag, MapProof, ObjectHash, Snapshot, SystemSchema, TemporaryDB},
     messages::{AnyTx, Precommit, SignedMessage, Verified},
     runtime::{ArtifactId, SnapshotExt},
 };
@@ -67,7 +65,7 @@ use crate::{
         PoolTransactionsRequest, Prevote, PrevotesRequest, Propose, ProposeRequest, Status,
         TransactionsRequest, TransactionsResponse,
     },
-    proposer::{ProposeBlock, StandardProposer},
+    pool::{ManagePool, StandardPoolManager},
     state::State,
     ApiSender, Configuration, ConnectInfo, ConnectListConfig, ExternalMessage, MemoryPoolConfig,
     NetworkConfiguration, NodeHandler, NodeSender, SharedNodeState, SystemStateProvider,
@@ -755,7 +753,7 @@ impl Sandbox {
         let fork = blockchain.fork();
         let mut schema = Schema::new(&fork);
         for hash in recover {
-            reject_transaction(&mut schema, &hash).unwrap();
+            assert!(schema.reject_transaction(hash));
         }
         blockchain.merge(fork.into_patch()).unwrap();
 
@@ -977,7 +975,7 @@ impl Sandbox {
             config,
             inner.handler.api_state.clone(),
             None,
-            Box::new(StandardProposer),
+            Box::new(StandardPoolManager::default()),
         );
         handler.initialize();
 
@@ -1022,7 +1020,7 @@ pub struct SandboxBuilder {
     rust_runtime: RustRuntimeBuilder,
     instances: Vec<InstanceInitParams>,
     artifacts: HashMap<ArtifactId, Vec<u8>>,
-    proposer: Box<dyn ProposeBlock>,
+    pool_manager: Box<dyn ManagePool>,
 }
 
 impl Default for SandboxBuilder {
@@ -1049,7 +1047,7 @@ impl Default for SandboxBuilder {
             rust_runtime: RustRuntimeBuilder::new(),
             instances: Vec::new(),
             artifacts: HashMap::new(),
-            proposer: Box::new(StandardProposer),
+            pool_manager: Box::new(StandardPoolManager::default()),
         }
     }
 }
@@ -1083,8 +1081,8 @@ impl SandboxBuilder {
     }
 
     /// Customizes block proposal creation.
-    pub fn with_proposer(mut self, proposer: impl ProposeBlock + 'static) -> Self {
-        self.proposer = Box::new(proposer);
+    pub fn with_pool_manager(mut self, manager: impl ManagePool + 'static) -> Self {
+        self.pool_manager = Box::new(manager);
         self
     }
 
@@ -1129,7 +1127,7 @@ impl SandboxBuilder {
             self.consensus_config,
             self.validators_count,
         );
-        sandbox.inner.borrow_mut().handler.block_proposer = self.proposer;
+        sandbox.inner.borrow_mut().handler.pool_manager = self.pool_manager;
 
         sandbox.inner.borrow_mut().sent.clear(); // To clear initial connect messages.
         if self.initialize {
@@ -1137,20 +1135,6 @@ impl SandboxBuilder {
             sandbox.initialize(time, 1, self.validators_count as usize);
         }
         sandbox
-    }
-}
-
-fn reject_transaction(schema: &mut Schema<&Fork>, hash: &Hash) -> Result<(), ()> {
-    let contains = schema.transactions_pool().contains(hash);
-    schema.transactions_pool().remove(hash);
-    schema.transactions().remove(hash);
-
-    if contains {
-        let x = schema.transactions_pool_len_index().get().unwrap();
-        schema.transactions_pool_len_index().set(x - 1);
-        Ok(())
-    } else {
-        Err(())
     }
 }
 
@@ -1279,7 +1263,7 @@ fn sandbox_with_services_uninitialized(
         config,
         api_state,
         None,
-        Box::new(StandardProposer),
+        Box::new(StandardPoolManager::default()),
     );
     handler.initialize();
 

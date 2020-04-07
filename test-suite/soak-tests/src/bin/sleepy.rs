@@ -15,13 +15,8 @@
 //! Runs a network with custom `Propose` creation logic: blocks are not created when
 //! there are no transactions.
 
-use exonum::{
-    blockchain::{ApiSender, Blockchain},
-    crypto::KeyPair,
-    helpers::Height,
-    runtime::SnapshotExt,
-};
-use exonum_node::proposer::SkipEmptyBlocks;
+use exonum::{blockchain::Blockchain, helpers::Height, runtime::SnapshotExt};
+use exonum_node::pool::{SkipEmptyBlocks, StandardPoolManager};
 use exonum_rust_runtime::{
     spec::{Deploy, Spec},
     DefaultInstance,
@@ -32,7 +27,8 @@ use tokio::time::delay_for;
 use std::time::Duration;
 
 use exonum_soak_tests::{
-    services::{MainConfig, MainService, MainServiceInterface},
+    send_transactions,
+    services::{MainConfig, MainService},
     NetworkBuilder,
 };
 
@@ -48,6 +44,7 @@ fn get_epoch(blockchain: &Blockchain) -> Height {
 /// Runs a network with custom `Propose` creation logic: blocks are not created when
 /// there are no transactions.
 #[derive(Debug, StructOpt)]
+#[structopt(name = "sleepy", set_term_width = 80)]
 struct Args {
     /// Number of nodes in the network.
     #[structopt(name = "nodes", default_value = "4")]
@@ -57,23 +54,9 @@ struct Args {
     #[structopt(name = "max-height", long, short = "H")]
     max_height: Option<u64>,
 
-    /// Interval between sending a transaction to a random node, measured in milliseconds.
+    /// Interval between sending a transaction to a node, measured in milliseconds.
     #[structopt(name = "tx-interval", long, short = "t", default_value = "2000")]
     tx_interval: u64,
-}
-
-async fn send_transactions(sender: ApiSender, interval: Duration) {
-    let mut counter = Height(0);
-    let keys = KeyPair::random();
-    loop {
-        let tx = keys.timestamp(MainService::INSTANCE_ID, counter);
-        log::trace!("Sending transaction #{}", counter.0 + 1);
-        if sender.broadcast_transaction(tx).await.is_err() {
-            return;
-        }
-        counter.increment();
-        delay_for(interval).await;
-    }
 }
 
 #[tokio::main]
@@ -95,7 +78,7 @@ async fn main() {
 
     let nodes = NetworkBuilder::new(args.node_count, 2_000)
         .init_node(|genesis, rt| main_service.clone().deploy(genesis, rt))
-        .with_block_proposer(SkipEmptyBlocks)
+        .with_pool_manager(SkipEmptyBlocks::new(StandardPoolManager::default()))
         .build();
 
     let sender = nodes[0].blockchain().sender().to_owned();

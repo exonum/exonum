@@ -13,20 +13,22 @@
 // limitations under the License.
 
 use exonum::{
-    blockchain::{config::GenesisConfigBuilder, Blockchain},
+    blockchain::{config::GenesisConfigBuilder, ApiSender, Blockchain},
     crypto::KeyPair,
+    helpers::Height,
     merkledb::{Database, TemporaryDB},
 };
 use exonum_node::{
-    generate_testnet_config, proposer::ProposeBlock, Node, NodeBuilder, NodeConfig, ShutdownHandle,
+    generate_testnet_config, pool::ManagePool, Node, NodeBuilder, NodeConfig, ShutdownHandle,
 };
-use exonum_rust_runtime::{RustRuntime, RustRuntimeBuilder};
+use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder};
 use futures::TryFutureExt;
-use tokio::task::JoinHandle;
+use tokio::{task::JoinHandle, time::delay_for};
 
-use std::{fmt, sync::Arc};
+use std::{fmt, sync::Arc, time::Duration};
 
 pub mod services;
+use crate::services::{MainService, MainServiceInterface};
 
 #[derive(Debug)]
 pub struct RunHandle {
@@ -61,14 +63,14 @@ impl RunHandle {
     }
 }
 
-type ProposerGen = Box<dyn Fn() -> Box<dyn ProposeBlock>>;
+type ManagerGen = Box<dyn Fn() -> Box<dyn ManagePool>>;
 
 pub struct NetworkBuilder<'a> {
     count: u16,
     start_port: u16,
     modify_cfg: Option<Box<dyn FnMut(&mut NodeConfig) + 'a>>,
     init_node: Option<Box<dyn FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder) + 'a>>,
-    block_proposer: Option<ProposerGen>,
+    pool_manager: Option<ManagerGen>,
 }
 
 impl fmt::Debug for NetworkBuilder<'_> {
@@ -89,7 +91,7 @@ impl<'a> NetworkBuilder<'a> {
             start_port,
             modify_cfg: None,
             init_node: None,
-            block_proposer: None,
+            pool_manager: None,
         }
     }
 
@@ -112,12 +114,12 @@ impl<'a> NetworkBuilder<'a> {
     }
 
     /// Customizes block proposal logic.
-    pub fn with_block_proposer<T>(mut self, proposer: T) -> Self
+    pub fn with_pool_manager<T>(mut self, manager: T) -> Self
     where
-        T: ProposeBlock + Clone + 'static,
+        T: ManagePool + Clone + 'static,
     {
-        let f = move || Box::new(proposer.clone()) as Box<dyn ProposeBlock>;
-        self.block_proposer = Some(Box::new(f));
+        let f = move || Box::new(manager.clone()) as Box<dyn ManagePool>;
+        self.pool_manager = Some(Box::new(f));
         self
     }
 
@@ -142,11 +144,26 @@ impl<'a> NetworkBuilder<'a> {
                 .with_genesis_config(genesis_cfg.build())
                 .with_runtime_fn(|channel| rt.build(channel.endpoints_sender()));
 
-            if let Some(ref gen_proposer) = self.block_proposer {
-                node_builder = node_builder.with_block_proposer(gen_proposer());
+            if let Some(ref manager_gen) = self.pool_manager {
+                node_builder = node_builder.with_pool_manager(manager_gen());
             }
             node_handles.push(RunHandle::new(node_builder.build()));
         }
         node_handles
+    }
+}
+
+/// Generates a stream of transaction with the specified `interval`.
+pub async fn send_transactions(sender: ApiSender, interval: Duration) {
+    let mut counter = Height(0);
+    let keys = KeyPair::random();
+    loop {
+        let tx = keys.timestamp(MainService::INSTANCE_ID, counter);
+        log::trace!("Sending transaction #{}", counter.0 + 1);
+        if sender.broadcast_transaction(tx).await.is_err() {
+            return;
+        }
+        counter.increment();
+        delay_for(interval).await;
     }
 }

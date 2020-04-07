@@ -43,7 +43,14 @@ pub struct MainService;
 impl MainServiceInterface<ExecutionContext<'_>> for MainService {
     type Output = Result<(), ExecutionError>;
 
-    fn timestamp(&self, _context: ExecutionContext<'_>, _height: Height) -> Self::Output {
+    fn timestamp(&self, context: ExecutionContext<'_>, height: Height) -> Self::Output {
+        let mut latest_stamp = context
+            .service_data()
+            .get_entry::<_, Height>("latest_stamp");
+        if latest_stamp.get().map_or(true, |stamp| stamp < height) {
+            latest_stamp.set(height);
+        }
+
         Ok(())
     }
 }

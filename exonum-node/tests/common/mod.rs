@@ -28,7 +28,9 @@ use std::{
 };
 
 use exonum_node::{
-    generate_testnet_config, proposer::SkipEmptyBlocks, Node, NodeBuilder, ShutdownHandle,
+    generate_testnet_config,
+    pool::{SkipEmptyBlocks, StandardPoolManager},
+    Node, NodeBuilder, ShutdownHandle,
 };
 
 #[derive(Debug)]
@@ -176,7 +178,8 @@ pub fn run_nodes(
                     .build(channel.endpoints_sender())
             });
         if options.skip_empty_blocks {
-            node_builder = node_builder.with_block_proposer(SkipEmptyBlocks);
+            let manager = SkipEmptyBlocks::new(StandardPoolManager::default());
+            node_builder = node_builder.with_pool_manager(manager);
         }
         if options.disable_signals {
             node_builder = node_builder.disable_signals();

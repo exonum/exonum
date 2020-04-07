@@ -16,10 +16,10 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::{ProposerId, TransactionCache},
+    blockchain::{Blockchain, ProposerId, TransactionCache},
     crypto::{Hash, KeyPair, PublicKey},
     helpers::{Height, Round, ValidatorId},
-    merkledb::{BinaryValue, ObjectHash},
+    merkledb::{BinaryValue, ObjectHash, Snapshot},
     messages::{AnyTx, Verified},
 };
 
@@ -27,7 +27,7 @@ use std::{collections::BTreeSet, iter::FromIterator, time::Duration};
 
 use crate::{
     messages::{TX_RES_EMPTY_SIZE, TX_RES_PB_OVERHEAD_PAYLOAD},
-    proposer::{Pool, ProposeBlock, ProposeParams, ProposeTemplate},
+    pool::{ManagePool, Pool, ProposeParams, ProposeTemplate, StandardPoolManager},
     sandbox::{
         sandbox_tests_helper::*,
         supervisor::{Supervisor, SupervisorService, TxConfig},
@@ -38,7 +38,6 @@ use crate::{
     },
     state::TRANSACTIONS_REQUEST_TIMEOUT,
 };
-use exonum::blockchain::Blockchain;
 
 const MAX_PROPOSE_TIMEOUT: Milliseconds = 200;
 const MIN_PROPOSE_TIMEOUT: Milliseconds = 10;
@@ -716,17 +715,17 @@ fn executing_block_does_not_lead_to_amnesia() {
 }
 
 #[derive(Debug)]
-struct WhitelistProposer {
+struct WhitelistManager {
     key: PublicKey,
 }
 
-impl WhitelistProposer {
+impl WhitelistManager {
     fn new(key: PublicKey) -> Self {
         Self { key }
     }
 }
 
-impl ProposeBlock for WhitelistProposer {
+impl ManagePool for WhitelistManager {
     fn propose_block(&mut self, pool: Pool<'_>, params: ProposeParams<'_>) -> ProposeTemplate {
         let tx_hashes = pool.transactions().filter_map(|(tx_hash, tx)| {
             if tx.author() == self.key {
@@ -739,13 +738,24 @@ impl ProposeBlock for WhitelistProposer {
         let tx_hashes = tx_hashes.take(tx_limit as usize);
         ProposeTemplate::ordinary(tx_hashes)
     }
+
+    fn remove_transactions(&mut self, pool: Pool<'_>, _snapshot: &dyn Snapshot) -> Vec<Hash> {
+        let tx_hashes = pool.transactions().filter_map(|(tx_hash, tx)| {
+            if tx.author() == self.key {
+                None
+            } else {
+                Some(tx_hash)
+            }
+        });
+        tx_hashes.collect()
+    }
 }
 
 #[test]
 fn propose_with_custom_logic() {
     let keypair = KeyPair::random();
     let sandbox = timestamping_sandbox_builder()
-        .with_proposer(WhitelistProposer::new(keypair.public_key()))
+        .with_pool_manager(WhitelistManager::new(keypair.public_key()))
         .build();
 
     let good_tx = keypair.timestamp(TimestampingService::ID, vec![1, 2, 3]);
@@ -786,7 +796,7 @@ fn propose_with_custom_logic() {
 fn custom_proposer_does_not_influence_external_proposes() {
     let keypair = KeyPair::random();
     let sandbox = timestamping_sandbox_builder()
-        .with_proposer(WhitelistProposer::new(keypair.public_key()))
+        .with_pool_manager(WhitelistManager::new(keypair.public_key()))
         .build();
 
     let good_tx = keypair.timestamp(TimestampingService::ID, vec![1, 2, 3]);
@@ -842,8 +852,86 @@ fn custom_proposer_does_not_influence_external_proposes() {
 }
 
 #[test]
-fn not_proposing_incorrect_transactions() {
-    let sandbox = timestamping_sandbox();
+fn transactions_can_be_restored_after_local_removal() {
+    let keypair = KeyPair::random();
+    let sandbox = timestamping_sandbox_builder()
+        .with_pool_manager(WhitelistManager::new(keypair.public_key()))
+        .build();
+
+    let good_tx = keypair.timestamp(TimestampingService::ID, vec![1, 2, 3]);
+    let bad_tx = KeyPair::random().timestamp(TimestampingService::ID, vec![1, 2, 3]);
+    sandbox.recv(&bad_tx);
+    add_one_height_with_transactions(&sandbox, &SandboxState::new(), vec![&good_tx]);
+
+    // Check that `bad_tx` is no longer in the pool.
+    sandbox.assert_pool_len(0);
+    sandbox.assert_tx_cache_len(0);
+
+    // Receive an external proposal with `bad_tx`.
+    let propose = sandbox.create_propose(
+        ValidatorId(3),
+        Height(2),
+        Round(1),
+        sandbox.last_hash(),
+        vec![bad_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(3)),
+    );
+    sandbox.recv(&propose);
+    sandbox.add_time(Duration::from_millis(TRANSACTIONS_REQUEST_TIMEOUT));
+
+    // The node should request `bad_tx`.
+    let txs_request = Sandbox::create_transactions_request(
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(3)),
+        vec![bad_tx.object_hash()],
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.send(sandbox.public_key(ValidatorId(3)), &txs_request);
+    sandbox.recv(&bad_tx);
+
+    let our_prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(2),
+        Round(1),
+        propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&our_prevote);
+
+    let timeout = sandbox.first_round_timeout() + PROPOSE_TIMEOUT - TRANSACTIONS_REQUEST_TIMEOUT;
+    sandbox.add_time(Duration::from_millis(timeout));
+
+    // Check that the node still does not include `bad_tx` into its own proposals.
+    let our_propose = sandbox.create_propose(
+        ValidatorId(0),
+        Height(2),
+        Round(2),
+        sandbox.last_hash(),
+        vec![],
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&our_propose);
+    let our_new_prevote = sandbox.create_prevote(
+        ValidatorId(0),
+        Height(2),
+        Round(2),
+        our_propose.object_hash(),
+        NOT_LOCKED,
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.broadcast(&our_new_prevote);
+}
+
+fn test_not_proposing_incorrect_transactions(tx_removal: bool) {
+    let sandbox = if tx_removal {
+        timestamping_sandbox()
+    } else {
+        timestamping_sandbox_builder()
+            // Switch off transaction removal.
+            .with_pool_manager(StandardPoolManager::with_removal_limit(0))
+            .build()
+    };
     add_one_height(&sandbox, &SandboxState::new());
 
     let tx = gen_timestamping_tx();
@@ -892,7 +980,8 @@ fn not_proposing_incorrect_transactions() {
     for precommit in stop_precommits {
         sandbox.recv(&precommit);
     }
-    sandbox.broadcast(&sandbox.create_our_status(Height(3), Height(3), 1));
+    let pool_size = if tx_removal { 0 } else { 1 };
+    sandbox.broadcast(&sandbox.create_our_status(Height(3), Height(3), pool_size));
 
     // The transaction is incorrect now.
     let snapshot = sandbox.blockchain().snapshot();
@@ -920,4 +1009,14 @@ fn not_proposing_incorrect_transactions() {
         sandbox.secret_key(ValidatorId(0)),
     );
     sandbox.broadcast(&prevote);
+}
+
+#[test]
+fn not_proposing_incorrect_transactions() {
+    test_not_proposing_incorrect_transactions(true);
+}
+
+#[test]
+fn not_proposing_incorrect_transactions_with_no_tx_removal() {
+    test_not_proposing_incorrect_transactions(false);
 }

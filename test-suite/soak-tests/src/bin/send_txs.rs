@@ -44,7 +44,7 @@ use exonum_soak_tests::{
 /// Runs a network with a service and sends transactions to it, measuring how fast
 /// transactions appear in the mempool and are confirmed.
 #[derive(Debug, StructOpt)]
-#[structopt(name = "toggle", set_term_width = 80)]
+#[structopt(name = "send_txs", set_term_width = 80)]
 struct Args {
     /// Number of nodes in the network.
     #[structopt(name = "nodes", default_value = "4")]
@@ -118,7 +118,7 @@ async fn transaction_task(
     times_to_pool: Arc<Mutex<TimingStats>>,
     times_to_commit: Arc<Mutex<TimingStats>>,
 ) {
-    /// Poll delay foreach transaction.
+    /// Poll delay for each transaction.
     const POLL_DELAY: Duration = Duration::from_millis(5);
 
     let tx_hash = transaction.object_hash();
