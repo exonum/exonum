@@ -96,7 +96,7 @@ impl TestHandler {
 
     pub async fn wait_for_connect(&mut self) -> Verified<Connect> {
         match self.wait_for_event().await {
-            Ok(NetworkEvent::PeerConnected(_addr, connect)) => connect,
+            Ok(NetworkEvent::PeerConnected { connect, .. }) => *connect,
             Ok(other) => panic!("Unexpected connect received, {:?}", other),
             Err(()) => panic!("An error during wait for connect occurred"),
         }

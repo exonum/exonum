@@ -38,7 +38,7 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     consensus::{PersistChanges, RoundAction},
-    events::network::ConnectedPeerAddr,
+    events::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose, Status},
     Configuration, ConnectInfo, FlushPoolStrategy,
 };

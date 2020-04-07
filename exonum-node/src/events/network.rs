@@ -101,19 +101,28 @@ impl ConnectedPeerAddr {
     }
 }
 
-#[allow(clippy::large_enum_variant)]
+/// Network events.
 #[derive(Debug)]
 pub enum NetworkEvent {
+    /// A message was received from the network.
     MessageReceived(Vec<u8>),
-    PeerConnected(ConnectedPeerAddr, Verified<Connect>),
+    /// The node has connected to a peer.
+    PeerConnected {
+        /// Peer address.
+        addr: ConnectedPeerAddr,
+        /// Connect message.
+        connect: Box<Verified<Connect>>,
+    },
+    /// The node has disconnected from a peer.
     PeerDisconnected(PublicKey),
+    /// Connection to a peer failed.
     UnableConnectToPeer(PublicKey),
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum NetworkRequest {
     SendMessage(PublicKey, SignedMessage),
+    #[cfg(test)]
     DisconnectWithPeer(PublicKey),
 }
 
@@ -561,6 +570,7 @@ impl NetworkHandler {
                     });
                 }
 
+                #[cfg(test)]
                 NetworkRequest::DisconnectWithPeer(peer) => {
                     let disconnected = self.pool.write().remove(&peer, None);
                     if disconnected {
@@ -606,11 +616,14 @@ impl NetworkHandler {
     }
 
     async fn send_peer_connected_event(
-        address: ConnectedPeerAddr,
-        message: Verified<Connect>,
+        addr: ConnectedPeerAddr,
+        connect: Verified<Connect>,
         network_tx: &mut mpsc::Sender<NetworkEvent>,
     ) -> anyhow::Result<()> {
-        let peer_connected = NetworkEvent::PeerConnected(address, message);
+        let peer_connected = NetworkEvent::PeerConnected {
+            addr,
+            connect: Box::new(connect),
+        };
         network_tx
             .send(peer_connected)
             .await

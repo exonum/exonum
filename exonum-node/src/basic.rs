@@ -17,7 +17,7 @@ use log::{error, info, trace};
 use rand::Rng;
 
 use crate::{
-    events::network::ConnectedPeerAddr,
+    events::ConnectedPeerAddr,
     messages::{Connect, Message, PeersRequest, Responses, Service, Status},
     schema::NodeSchema,
     state::{PeerState, RequestData},
@@ -63,12 +63,12 @@ impl NodeHandler {
     /// if received `Connect` message is correct.
     pub(crate) fn handle_connected(
         &mut self,
-        address: &ConnectedPeerAddr,
+        address: ConnectedPeerAddr,
         connect: Verified<Connect>,
     ) {
         info!("Received Connect message from peer: {:?}", address);
         // TODO: use `ConnectInfo` instead of connect-messages. (ECR-1452)
-        self.state.add_connection(connect.author(), address.clone());
+        self.state.add_connection(connect.author(), address);
         self.handle_connect(connect);
     }
 

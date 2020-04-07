@@ -98,8 +98,8 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart, InternalRequest,
-        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+        HandlerPart, HandshakeParams, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
+        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
     pool::{ManagePool, StandardPoolManager},

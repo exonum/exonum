@@ -12,15 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_debug_implementations, missing_docs)]
+pub use self::{
+    internal::InternalPart,
+    network::{ConnectedPeerAddr, NetworkEvent, NetworkPart, NetworkRequest},
+    noise::HandshakeParams,
+};
 
-pub use self::internal::InternalPart;
-pub use self::network::{NetworkEvent, NetworkPart, NetworkRequest};
-
-pub mod codec;
-pub mod internal;
-pub mod network;
-pub mod noise;
+mod codec;
+mod internal;
+mod network;
+mod noise;
 
 use exonum::{
     helpers::{Height, Round},
@@ -119,12 +120,14 @@ pub(crate) enum InternalEventInner {
     MessageVerified(Box<Message>),
 }
 
-#[derive(Debug)]
 /// Asynchronous requests for internal actions.
+#[derive(Debug)]
 pub enum InternalRequest {
+    /// Send an event on the specified timeout.
     Timeout(TimeoutRequest),
+    /// Jump to the specified round.
     JumpToRound(Height, Round),
-    /// Async request to verify a message in the thread pool.
+    /// Verify a message in the thread pool.
     VerifyMessage(Vec<u8>),
 }
 
@@ -143,11 +146,16 @@ impl TimeoutRequest {
     }
 }
 
+/// Events processed by the node.
 #[derive(Debug)]
 pub enum Event {
+    /// Event related to network logic.
     Network(NetworkEvent),
+    /// Event carrying a verified transaction.
     Transaction(Verified<AnyTx>),
+    /// External control message (e.g., node shutdown).
     Api(ExternalMessage),
+    /// Internally generated event.
     Internal(InternalEvent),
 }
 
@@ -160,20 +168,34 @@ pub enum EventOutcome {
     Terminated,
 }
 
+/// Trait encapsulating event processing logic.
 pub trait EventHandler {
+    /// Handles a single event.
+    ///
+    /// # Return value
+    ///
+    /// The implementation should return `EventOutcome::Terminated` iff the event loop
+    /// should terminate right now.
     fn handle_event(&mut self, event: Event) -> EventOutcome;
 }
 
+/// Event handler for an Exonum node.
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
+    /// Handler logic.
     pub handler: H,
+    /// Receiver of internal events.
     pub internal_rx: mpsc::Receiver<InternalEvent>,
+    /// Receiver of network events.
     pub network_rx: mpsc::Receiver<NetworkEvent>,
+    /// Receiver of verified transactions.
     pub transactions_rx: mpsc::Receiver<Verified<AnyTx>>,
+    /// Receiver of external control commands.
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl<H: EventHandler + 'static + Send> HandlerPart<H> {
+    /// Processes events until `handler` signals that the event loop should be terminated.
     pub async fn run(self) {
         let mut handler = self.handler;
         let mut aggregator = EventsAggregator::new(
