@@ -38,7 +38,6 @@ use std::{
 use crate::{
     events::{
         codec::MessagesCodec,
-        error::{into_failure, LogError},
         noise::{Handshake, HandshakeData, HandshakeParams, NoiseHandshake},
     },
     messages::{Connect, Message, Service},
@@ -475,7 +474,7 @@ impl NetworkHandler {
         // Processing of incoming messages.
         let incoming = async move {
             let res = (&mut network_tx)
-                .sink_map_err(into_failure)
+                .sink_map_err(anyhow::Error::from)
                 .send_all(&mut stream.map_ok(NetworkEvent::MessageReceived))
                 .await;
             if pool.write().remove(&key, Some(connection_id)) {
@@ -556,7 +555,9 @@ impl NetworkHandler {
                 NetworkRequest::SendMessage(key, message) => {
                     let mut this = self.clone();
                     tokio::spawn(async move {
-                        this.handle_send_message(key, message).await.log_error();
+                        if let Err(e) = this.handle_send_message(key, message).await {
+                            log::error!("Cannot send message to peer {:?}: {}", key, e);
+                        }
                     });
                 }
 

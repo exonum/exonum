@@ -18,7 +18,6 @@ pub use self::internal::InternalPart;
 pub use self::network::{NetworkEvent, NetworkPart, NetworkRequest};
 
 pub mod codec;
-pub mod error;
 pub mod internal;
 pub mod network;
 pub mod noise;
@@ -36,7 +35,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{events::error::LogError, messages::Message, ExternalMessage, NodeTimeout};
+use crate::{messages::Message, ExternalMessage, NodeTimeout};
 
 #[cfg(test)]
 mod tests;
@@ -45,6 +44,9 @@ mod tests;
 pub struct SyncSender<T>(mpsc::Sender<T>);
 
 impl<T: Send + 'static> SyncSender<T> {
+    const ERROR_MSG: &'static str =
+        "Cannot send message via MPSC channel: the other side has hanged up";
+
     pub fn new(inner: mpsc::Sender<T>) -> Self {
         Self(inner)
     }
@@ -59,10 +61,12 @@ impl<T: Send + 'static> SyncSender<T> {
         if let Ok(handle) = Handle::try_current() {
             let mut sender = self.0.clone();
             handle.spawn(async move {
-                sender.send(message).await.log_error();
+                if sender.send(message).await.is_err() {
+                    log::error!("{}", Self::ERROR_MSG);
+                }
             });
-        } else {
-            block_on(self.0.send(message)).log_error();
+        } else if block_on(self.0.send(message)).is_err() {
+            log::error!("{}", Self::ERROR_MSG);
         }
     }
 
@@ -71,7 +75,9 @@ impl<T: Send + 'static> SyncSender<T> {
     pub fn send(&mut self, message: T) {
         let mut sender = self.0.clone();
         tokio::spawn(async move {
-            sender.send(message).await.log_error();
+            if sender.send(message).await.is_err() {
+                log::error!("{}", Self::ERROR_MSG);
+            }
         });
     }
 }

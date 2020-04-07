@@ -17,7 +17,7 @@ use log::{error, info, trace};
 use rand::Rng;
 
 use crate::{
-    events::{error::LogError, network::ConnectedPeerAddr},
+    events::network::ConnectedPeerAddr,
     messages::{Connect, Message, PeersRequest, Responses, Service, Status},
     schema::NodeSchema,
     state::{PeerState, RequestData},
@@ -48,7 +48,13 @@ impl NodeHandler {
                 self.handle_block(msg);
             }
             Message::Responses(Responses::TransactionsResponse(msg)) => {
-                self.handle_txs_batch(&msg).log_error()
+                if let Err(e) = self.handle_txs_batch(&msg) {
+                    log::warn!(
+                        "Error processing `TransactionsResponse` from {:?}: {}",
+                        msg.author(),
+                        e
+                    );
+                }
             }
         }
     }
