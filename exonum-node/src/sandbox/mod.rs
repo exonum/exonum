@@ -43,7 +43,7 @@ use std::{
     fmt::Debug,
     iter::FromIterator,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::{AddAssign, Deref, DerefMut},
+    ops,
     sync::{Arc, Mutex},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -501,7 +501,7 @@ impl Sandbox {
     #[allow(clippy::let_and_return)]
     pub fn time(&self) -> SystemTime {
         let inner = self.inner.borrow();
-        let time = *inner.time.lock().unwrap().deref();
+        let time = *inner.time.lock().unwrap();
         time
     }
 
@@ -513,7 +513,7 @@ impl Sandbox {
         self.inner.borrow().handler.blockchain.as_ref().clone()
     }
 
-    pub fn blockchain_mut<'s>(&'s self) -> impl DerefMut<Target = BlockchainMut> + 's {
+    pub fn blockchain_mut(&self) -> impl ops::DerefMut<Target = BlockchainMut> + '_ {
         RefMut::map(self.inner.borrow_mut(), |inner| {
             &mut inner.handler.blockchain
         })
@@ -661,8 +661,8 @@ impl Sandbox {
         let now = {
             let inner = self.inner.borrow_mut();
             let mut time = inner.time.lock().unwrap();
-            time.add_assign(duration);
-            *time.deref()
+            *time += duration;
+            *time
         };
 
         // Handle timeouts.
