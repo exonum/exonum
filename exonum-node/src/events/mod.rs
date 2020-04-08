@@ -42,14 +42,21 @@ use crate::{messages::Message, ExternalMessage, NodeTimeout};
 mod tests;
 
 #[derive(Debug)]
-pub struct SyncSender<T>(mpsc::Sender<T>);
+pub struct SyncSender<T> {
+    inner: mpsc::Sender<T>,
+    message_kind: &'static str,
+}
 
 impl<T: Send + 'static> SyncSender<T> {
-    const ERROR_MSG: &'static str =
-        "Cannot send message via MPSC channel: the other side has hanged up";
+    const ERROR_MSG_SUFFIX: &'static str =
+        "This is the expected behavior if the node is being shut down, \
+         but could warrant an investigation otherwise.";
 
-    pub fn new(inner: mpsc::Sender<T>) -> Self {
-        Self(inner)
+    pub fn new(inner: mpsc::Sender<T>, message_kind: &'static str) -> Self {
+        Self {
+            inner,
+            message_kind,
+        }
     }
 
     // Since sandbox tests execute outside the `tokio` context, we detect this and block
@@ -60,24 +67,38 @@ impl<T: Send + 'static> SyncSender<T> {
         use tokio::runtime::Handle;
 
         if let Ok(handle) = Handle::try_current() {
-            let mut sender = self.0.clone();
+            let mut sender = self.inner.clone();
+            let message_kind = self.message_kind;
             handle.spawn(async move {
                 if sender.send(message).await.is_err() {
-                    log::error!("{}", Self::ERROR_MSG);
+                    log::warn!(
+                        "Cannot send a {}; processing has shut down. {}",
+                        message_kind,
+                        Self::ERROR_MSG_SUFFIX
+                    );
                 }
             });
-        } else if block_on(self.0.send(message)).is_err() {
-            log::error!("{}", Self::ERROR_MSG);
+        } else if block_on(self.inner.send(message)).is_err() {
+            log::warn!(
+                "Cannot send a {}; processing has shut down. {}",
+                self.message_kind,
+                Self::ERROR_MSG_SUFFIX
+            );
         }
     }
 
     // Outside tests, `send()` is always called from an async context.
     #[cfg(not(test))]
     pub fn send(&mut self, message: T) {
-        let mut sender = self.0.clone();
+        let mut sender = self.inner.clone();
+        let message_kind = self.message_kind;
         tokio::spawn(async move {
             if sender.send(message).await.is_err() {
-                log::error!("{}", Self::ERROR_MSG);
+                log::warn!(
+                    "Cannot send a {}; processing has shut down. {}",
+                    message_kind,
+                    Self::ERROR_MSG_SUFFIX
+                );
             }
         });
     }

@@ -938,10 +938,10 @@ impl Sandbox {
         let inner = self.inner.into_inner();
 
         let node_sender = NodeSender {
-            network_requests: SyncSender::new(network_channel.0.clone()),
-            internal_requests: SyncSender::new(internal_channel.0.clone()),
-            transactions: SyncSender::new(tx_channel.0.clone()),
-            api_requests: SyncSender::new(api_channel.0.clone()),
+            network_requests: SyncSender::new(network_channel.0.clone(), "network request"),
+            internal_requests: SyncSender::new(internal_channel.0.clone(), "internal request"),
+            _transactions: tx_channel.0.clone(),
+            _api_requests: api_channel.0,
         };
         let peers = inner
             .handler
@@ -1248,12 +1248,12 @@ fn sandbox_with_services_uninitialized(
     let internal_channel = mpsc::channel(100);
     let api_channel = mpsc::channel(100);
     let node_sender = NodeSender {
-        network_requests: SyncSender::new(network_channel.0.clone()),
-        internal_requests: SyncSender::new(internal_channel.0.clone()),
-        transactions: SyncSender::new(tx_channel.0.clone()),
-        api_requests: SyncSender::new(api_channel.0.clone()),
+        network_requests: SyncSender::new(network_channel.0.clone(), "network request"),
+        internal_requests: SyncSender::new(internal_channel.0.clone(), "internal request"),
+        _transactions: tx_channel.0.clone(),
+        _api_requests: api_channel.0,
     };
-    let api_state = SharedNodeState::new(5000);
+    let api_state = SharedNodeState::new(5_000);
 
     let mut handler = NodeHandler::new(
         blockchain,
