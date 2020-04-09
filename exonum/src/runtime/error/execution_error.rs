@@ -149,37 +149,65 @@ impl ExecutionError {
     }
 }
 
-impl Display for ExecutionError {
+impl fmt::Debug for ExecutionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(ref call_site) = self.call_site {
-            write!(
-                formatter,
-                "Execution error with code `{kind}` occurred in {site}",
-                kind = self.kind,
-                site = call_site
-            )?;
-        } else if let Some(runtime_id) = self.runtime_id {
-            write!(
-                formatter,
-                "Execution error with code `{kind}` occurred in {runtime}",
-                kind = self.kind,
-                runtime = if let Ok(runtime) = RuntimeIdentifier::transform(runtime_id) {
-                    runtime.to_string()
-                } else {
-                    format!("Non-default runtime with id {}", runtime_id)
-                }
-            )?;
+        if formatter.alternate() {
+            formatter
+                .debug_struct("ExecutionError")
+                .field("kind", &self.kind)
+                .field("descriptions", &self.description)
+                .field("runtime_id", &self.runtime_id)
+                .field("call_site", &self.call_site)
+                .field("backtrace", &self.backtrace)
+                .finish()
         } else {
             write!(
                 formatter,
                 "Execution error with code `{kind}` occurred",
                 kind = self.kind
             )?;
+            if !self.description.is_empty() {
+                write!(formatter, ": {}", self.description)?;
+            }
+
+            if self.call_site.is_some() {
+                writeln!(formatter, "\nError backtrace (most recent call first):")?;
+                let calls = self.call_site.as_ref().into_iter().chain(&self.backtrace);
+                for (i, backtrace_site) in calls.enumerate() {
+                    writeln!(formatter, "{i:>4}: {site}", i = i, site = backtrace_site)?;
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+impl Display for ExecutionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "Execution error with code `{kind}` occurred",
+            kind = self.kind
+        )?;
+
+        if let Some(ref call_site) = self.call_site {
+            write!(formatter, " in {site}", site = call_site)?;
+        } else if let Some(runtime_id) = self.runtime_id {
+            write!(
+                formatter,
+                " in {runtime}",
+                runtime = if let Ok(runtime) = RuntimeIdentifier::transform(runtime_id) {
+                    runtime.to_string()
+                } else {
+                    format!("non-default runtime with id {}", runtime_id)
+                }
+            )?;
         }
 
         if !self.description.is_empty() {
             write!(formatter, ": {}", self.description)?;
         }
+
         Ok(())
     }
 }

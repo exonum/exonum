@@ -101,17 +101,27 @@ pub trait ExecutionFail {
 /// - an [error kind][`ErrorKind`]
 /// - call information (runtime ID and, if appropriate, [`CallSite`] where the error has occurred)
 /// - an optional description
+/// - an error backtrace
 ///
-/// Call information is added by the core automatically; it is impossible to add from the service
-/// code. It *is* possible to inspect the call info for an error that was returned by a service
-/// though.
+/// Call information and backtrace are added by the core automatically; they are impossible
+/// to add from the service code. It *is* possible to inspect the call info / backtrace for an error
+/// that was returned by a service though.
 ///
-/// The error kind and call info affect the blockchain state hash, while the description does not.
+/// The error kind and call info affect the blockchain state hash, while the description
+/// and backtrace do not.
 /// Therefore descriptions are mostly used for developer purposes, not for interaction with users.
+///
+/// # Display Formats
+///
+/// - The default debug format `{:?}` on an `ExecutionError` will output complete
+///   information about the error, including the error backtrace.
+/// - To output an ordinary debug structure, use the alternate debug format `{:#?}`.
+/// - The default display format `{}` does not include the backtrace, but includes
+///   other error details.
 ///
 /// [`ErrorKind`]: enum.ErrorKind.html
 /// [`CallSite`]: struct.CallSite.html
-#[derive(Clone, Debug, Error, BinaryValue)]
+#[derive(Clone, Error, BinaryValue)]
 #[cfg_attr(test, derive(PartialEq))]
 // ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
 // by the caller. It is useful for roundtrip tests, though.

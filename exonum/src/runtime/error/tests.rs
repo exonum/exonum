@@ -207,6 +207,43 @@ fn execution_error_display() {
     assert!(err.to_string().contains("in Java runtime"));
 }
 
+fn create_error() -> ExecutionError {
+    ExecutionError {
+        kind: ErrorKind::Service { code: 10 },
+        description: "That is wrong!".to_owned(),
+        runtime_id: Some(1),
+        call_site: Some(CallSite::new(100, CallType::Resume)),
+        backtrace: vec![
+            CallSite::new(
+                10,
+                CallType::Method {
+                    interface: "exonum.Token".to_owned(),
+                    id: 1,
+                },
+            ),
+            CallSite::new(0, CallType::AfterTransactions),
+        ],
+    }
+}
+
+#[test]
+fn execution_error_debug_format() {
+    let message = format!("{:?}", create_error());
+    assert!(message.contains("occurred: That is wrong!\n"));
+    assert!(message.contains("Error backtrace (most recent call first)"));
+    assert!(message.contains("   0: resuming routine of service 100"));
+    assert!(message.contains("   1: exonum.Token::(method 1) of service 10"));
+    assert!(message.contains("   2: after_transactions hook of service 0"));
+}
+
+#[test]
+fn execution_error_alternate_debug_format() {
+    let message = format!("{:#?}", create_error());
+    assert!(!message.contains("occurred: That is wrong!\n"));
+    assert!(!message.contains("   0: resuming routine of service 100"));
+    assert!(message.contains("backtrace: ["));
+}
+
 #[test]
 fn execution_result_serde_presentation() {
     let result = ExecutionStatus(Ok(()));
