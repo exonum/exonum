@@ -551,13 +551,21 @@ mod tests {
     use super::*;
 
     use serde::de::DeserializeOwned;
-
     use hex::FromHex;
+
+    use std::str::FromStr;
 
     #[test]
     fn to_from_hex_hash() {
         let original = hash(&[]);
         let from_hex = Hash::from_hex(original.to_hex()).unwrap();
+        assert_eq!(original, from_hex);
+    }
+    
+    #[test]
+    fn to_from_string_hash() {
+        let original = hash(&[]);
+        let from_hex = Hash::from_str(&original.to_string()).unwrap();
         assert_eq!(original, from_hex);
     }
 
@@ -576,6 +584,14 @@ mod tests {
 
         let sh = SecretKey::from_hex(s.to_hex()).unwrap();
         assert_eq!(s, sh);
+    }
+
+    #[test]
+    fn to_from_string_public_key() {
+        let (p, _s) = gen_keypair();
+
+        let ph = PublicKey::from_str(&p.to_string()).unwrap();
+        assert_eq!(p, ph);
     }
 
     #[test]
