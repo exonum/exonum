@@ -15,10 +15,12 @@
 pub use self::schema::{remove_local_migration_result, Schema};
 
 use exonum_merkledb::{
-    migration::{flush_migration, rollback_migration, AbortHandle, MigrationHelper},
+    migration::{
+        flush_migration, rollback_migration, AbortHandle, MigrationError as DbMigrationError,
+        MigrationHelper,
+    },
     Database, Fork, Patch, Snapshot,
 };
-use log::{error, info};
 use semver::Version;
 
 use std::{
@@ -55,6 +57,11 @@ mod migration_tests;
 mod schema;
 #[cfg(test)]
 mod tests;
+
+// Warning shared among several log messages.
+const NOT_FINAL_WARNING: &str =
+    "NB: This operation may be rolled back if the fork with it is discarded, \
+    but this probability is reasonably low in most cases.";
 
 #[derive(Debug)]
 struct ServiceInfo {
@@ -148,6 +155,49 @@ impl Migrations {
         }
     }
 
+    fn report_result(
+        res: &Result<Hash, MigrationError>,
+        script_name: &str,
+        instance_spec: &InstanceSpec,
+    ) {
+        match res {
+            Ok(migration_hash) => {
+                log::info!(
+                    "Successfully finished migration script \"{}\" for service {} with hash {:?}",
+                    script_name,
+                    instance_spec,
+                    migration_hash
+                );
+            }
+
+            Err(MigrationError::Custom(msg)) => {
+                log::error!(
+                    "Migration script \"{}\" for {} has failed: {}",
+                    script_name,
+                    instance_spec,
+                    msg
+                );
+            }
+
+            Err(MigrationError::Helper(DbMigrationError::Merge(db_err))) => {
+                log::error!(
+                    "DB error during running migration script \"{}\" for {:?}: {}",
+                    script_name,
+                    instance_spec,
+                    db_err
+                );
+            }
+
+            Err(MigrationError::Helper(DbMigrationError::Aborted)) => {
+                log::info!(
+                    "Migration script \"{}\" for {:?} was aborted",
+                    script_name,
+                    instance_spec
+                );
+            }
+        }
+    }
+
     fn add_migration(
         &mut self,
         instance_spec: InstanceSpec,
@@ -155,13 +205,19 @@ impl Migrations {
         script: MigrationScript,
     ) {
         let db = Arc::clone(&self.db);
+        let instance_spec_ = instance_spec.clone();
         let instance_name = instance_spec.name.clone();
         let script_name = script.name().to_owned();
+        let script_name_ = script_name.clone();
         let (handle_tx, handle_rx) = mpsc::channel();
 
         let thread_fn = move || -> Result<Hash, MigrationError> {
             let script_name = script.name().to_owned();
-            log::info!("Starting migration script {}", script_name);
+            log::info!(
+                "Starting migration script \"{}\" for service {}",
+                script_name,
+                instance_spec
+            );
 
             let (helper, abort_handle) =
                 MigrationHelper::with_handle(Arc::clone(&db), &instance_spec.name);
@@ -170,17 +226,16 @@ impl Migrations {
 
             script.execute(&mut context)?;
             let migration_hash = context.helper.finish()?;
-            log::info!(
-                "Successfully finished migration script {} with hash {:?}",
-                script_name,
-                migration_hash
-            );
             Ok(migration_hash)
         };
 
         let handle = thread::Builder::new()
             .name(script_name)
-            .spawn(thread_fn)
+            .spawn(move || {
+                let res = thread_fn();
+                Self::report_result(&res, &script_name_, &instance_spec_);
+                res
+            })
             .expect("Cannot spawn thread for migration script");
 
         let prev_thread = self.threads.insert(
@@ -456,6 +511,11 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         // TODO: revise dispatcher integrity checks [ECR-3743]
         debug_assert!(artifact.validate().is_ok());
+        log::info!(
+            "Deploying artifact `{}` with payload {:?}",
+            artifact,
+            payload
+        );
 
         if let Some(runtime) = self.runtimes.get_mut(&artifact.runtime_id) {
             let runtime_id = artifact.runtime_id;
@@ -519,6 +579,13 @@ impl Dispatcher {
             schema.add_pending_migration(instance_state, migration);
             MigrationType::Async
         } else {
+            log::info!(
+                "Reassigning artifact for service {} to `{}`. {}",
+                instance_state.spec,
+                new_artifact,
+                NOT_FINAL_WARNING
+            );
+
             // No migration script means that the service instance may be immediately updated to
             // the new artifact version.
             schema.fast_forward_migration(instance_state, new_artifact);
@@ -546,6 +613,13 @@ impl Dispatcher {
         service_name: &str,
         migration_hash: Hash,
     ) -> Result<(), ExecutionError> {
+        log::info!(
+            "Committing migration for service `{}` (migration hash = {:?}). {}",
+            service_name,
+            migration_hash,
+            NOT_FINAL_WARNING
+        );
+
         Schema::new(fork)
             .add_migration_commit(service_name, migration_hash)
             .map_err(From::from)
@@ -555,6 +629,12 @@ impl Dispatcher {
         fork: &mut Fork,
         service_name: &str,
     ) -> Result<(), ExecutionError> {
+        log::info!(
+            "Flushing migration for service `{}`. {}",
+            service_name,
+            NOT_FINAL_WARNING
+        );
+
         Schema::new(&*fork).complete_migration(service_name)?;
         flush_migration(fork, service_name);
         Ok(())
@@ -608,6 +688,7 @@ impl Dispatcher {
 
     fn block_until_deployed(&mut self, artifact: ArtifactId, payload: Vec<u8>) {
         if !self.is_artifact_deployed(&artifact) {
+            log::info!("Blocking until artifact `{}` is deployed", artifact);
             self.deploy_artifact(artifact, payload).unwrap_or_else(|e| {
                 // In this case artifact deployment error is fatal because the deploy
                 // was committed on the network level.
@@ -830,6 +911,7 @@ impl Dispatcher {
                     self.block_until_deployed(artifact, deploy_spec);
                 }
                 ArtifactAction::Unload => {
+                    log::info!("Unloading artifact `{}`", artifact);
                     let runtime = self
                         .runtimes
                         .get_mut(&artifact.runtime_id)
@@ -933,6 +1015,7 @@ impl Dispatcher {
         local_result: Option<MigrationStatus>,
     ) -> MigrationStatus {
         let local_result = if let Some(thread) = self.migrations.threads.remove(namespace) {
+            log::info!("Blocking on migration script for service `{}`", namespace);
             // If the migration script hasn't finished locally, wait until it's finished.
             thread.join()
         } else {
@@ -979,6 +1062,8 @@ impl Dispatcher {
             modified_info.migration_transition == Some(MigrationTransition::Rollback)
         });
         for (state, _) in migration_rollbacks {
+            log::info!("Rolling back migration for service {}", state.spec);
+
             // Remove the thread corresponding to the migration (if any). This will abort
             // the migration script since its `AbortHandle` is dropped.
             let namespace = &state.spec.name;
@@ -1074,9 +1159,10 @@ impl Dispatcher {
             .status
             .clone()
             .expect("BUG: instance status cannot change to `None`");
-        info!(
-            "Committing service instance {:?} with status {}",
-            instance.spec, status
+        log::info!(
+            "Assigning status \"{}\" to service {}",
+            status,
+            instance.spec
         );
 
         self.service_infos.insert(
@@ -1142,7 +1228,7 @@ impl Action {
                 then,
             } => {
                 then(dispatcher.deploy_artifact(artifact.clone(), spec)).unwrap_or_else(|e| {
-                    error!("Deploying artifact {:?} failed: {}", artifact, e);
+                    log::error!("Deploying artifact {:?} failed: {}", artifact, e);
                 });
             }
         }
