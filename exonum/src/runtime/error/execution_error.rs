@@ -113,9 +113,17 @@ impl ExecutionError {
         self.call_site.as_ref()
     }
 
-    pub(crate) fn set_call_site(&mut self, call_site: impl FnOnce() -> CallSite) -> &mut Self {
+    /// Returns the error backtrace. The backtrace excludes the call in which the error has occurred
+    /// (it is recorded in [`call_site`](#method.call_site)). The most recent call is first.
+    pub fn backtrace(&self) -> &[CallSite] {
+        &self.backtrace
+    }
+
+    pub(crate) fn set_call_site(&mut self, call_site: CallSite) -> &mut Self {
         if self.call_site.is_none() {
-            self.call_site = Some(call_site());
+            self.call_site = Some(call_site);
+        } else {
+            self.backtrace.push(call_site);
         }
         self
     }

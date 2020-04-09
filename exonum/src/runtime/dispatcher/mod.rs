@@ -728,7 +728,7 @@ impl Dispatcher {
             fork.rollback();
 
             err.set_runtime_id(runtime_id)
-                .set_call_site(|| CallSite::from_call_info(call_info, ""));
+                .set_call_site(CallSite::from_call_info(call_info, ""));
             Self::report_error(err, fork, CallInBlock::transaction(tx_index));
         } else {
             fork.flush();
@@ -766,7 +766,7 @@ impl Dispatcher {
                 if let Err(mut err) = res {
                     fork.rollback();
                     err.set_runtime_id(runtime_id)
-                        .set_call_site(|| CallSite::new(instance.id, call_type.clone()));
+                        .set_call_site(CallSite::new(instance.id, call_type.clone()));
 
                     let call = match &call_type {
                         CallType::BeforeTransactions => {
