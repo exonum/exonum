@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(missing_debug_implementations, missing_docs)]
+pub use self::{
+    internal::InternalPart,
+    network::{ConnectedPeerAddr, NetworkEvent, NetworkPart, NetworkRequest},
+    noise::HandshakeParams,
+};
 
-pub use self::internal::InternalPart;
-pub use self::network::{NetworkEvent, NetworkPart, NetworkRequest};
-
-pub mod codec;
-pub mod error;
-pub mod internal;
-pub mod network;
-pub mod noise;
+mod codec;
+mod internal;
+mod network;
+mod noise;
 
 use exonum::{
     helpers::{Height, Round},
@@ -36,17 +36,27 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{events::error::LogError, messages::Message, ExternalMessage, NodeTimeout};
+use crate::{messages::Message, ExternalMessage, NodeTimeout};
 
 #[cfg(test)]
 mod tests;
 
 #[derive(Debug)]
-pub struct SyncSender<T>(mpsc::Sender<T>);
+pub struct SyncSender<T> {
+    inner: mpsc::Sender<T>,
+    message_kind: &'static str,
+}
 
 impl<T: Send + 'static> SyncSender<T> {
-    pub fn new(inner: mpsc::Sender<T>) -> Self {
-        Self(inner)
+    const ERROR_MSG_SUFFIX: &'static str =
+        "This is the expected behavior if the node is being shut down, \
+         but could warrant an investigation otherwise.";
+
+    pub fn new(inner: mpsc::Sender<T>, message_kind: &'static str) -> Self {
+        Self {
+            inner,
+            message_kind,
+        }
     }
 
     // Since sandbox tests execute outside the `tokio` context, we detect this and block
@@ -57,21 +67,39 @@ impl<T: Send + 'static> SyncSender<T> {
         use tokio::runtime::Handle;
 
         if let Ok(handle) = Handle::try_current() {
-            let mut sender = self.0.clone();
+            let mut sender = self.inner.clone();
+            let message_kind = self.message_kind;
             handle.spawn(async move {
-                sender.send(message).await.log_error();
+                if sender.send(message).await.is_err() {
+                    log::warn!(
+                        "Cannot send a {}; processing has shut down. {}",
+                        message_kind,
+                        Self::ERROR_MSG_SUFFIX
+                    );
+                }
             });
-        } else {
-            block_on(self.0.send(message)).log_error();
+        } else if block_on(self.inner.send(message)).is_err() {
+            log::warn!(
+                "Cannot send a {}; processing has shut down. {}",
+                self.message_kind,
+                Self::ERROR_MSG_SUFFIX
+            );
         }
     }
 
     // Outside tests, `send()` is always called from an async context.
     #[cfg(not(test))]
     pub fn send(&mut self, message: T) {
-        let mut sender = self.0.clone();
+        let mut sender = self.inner.clone();
+        let message_kind = self.message_kind;
         tokio::spawn(async move {
-            sender.send(message).await.log_error();
+            if sender.send(message).await.is_err() {
+                log::warn!(
+                    "Cannot send a {}; processing has shut down. {}",
+                    message_kind,
+                    Self::ERROR_MSG_SUFFIX
+                );
+            }
         });
     }
 }
@@ -113,12 +141,14 @@ pub(crate) enum InternalEventInner {
     MessageVerified(Box<Message>),
 }
 
-#[derive(Debug)]
 /// Asynchronous requests for internal actions.
+#[derive(Debug)]
 pub enum InternalRequest {
+    /// Send an event on the specified timeout.
     Timeout(TimeoutRequest),
+    /// Jump to the specified round.
     JumpToRound(Height, Round),
-    /// Async request to verify a message in the thread pool.
+    /// Verify a message in the thread pool.
     VerifyMessage(Vec<u8>),
 }
 
@@ -137,11 +167,16 @@ impl TimeoutRequest {
     }
 }
 
+/// Events processed by the node.
 #[derive(Debug)]
 pub enum Event {
+    /// Event related to network logic.
     Network(NetworkEvent),
+    /// Event carrying a verified transaction.
     Transaction(Verified<AnyTx>),
+    /// External control message (e.g., node shutdown).
     Api(ExternalMessage),
+    /// Internally generated event.
     Internal(InternalEvent),
 }
 
@@ -154,20 +189,34 @@ pub enum EventOutcome {
     Terminated,
 }
 
+/// Trait encapsulating event processing logic.
 pub trait EventHandler {
+    /// Handles a single event.
+    ///
+    /// # Return value
+    ///
+    /// The implementation should return `EventOutcome::Terminated` iff the event loop
+    /// should terminate right now.
     fn handle_event(&mut self, event: Event) -> EventOutcome;
 }
 
+/// Event handler for an Exonum node.
 #[derive(Debug)]
 pub struct HandlerPart<H: EventHandler> {
+    /// Handler logic.
     pub handler: H,
+    /// Receiver of internal events.
     pub internal_rx: mpsc::Receiver<InternalEvent>,
+    /// Receiver of network events.
     pub network_rx: mpsc::Receiver<NetworkEvent>,
+    /// Receiver of verified transactions.
     pub transactions_rx: mpsc::Receiver<Verified<AnyTx>>,
+    /// Receiver of external control commands.
     pub api_rx: mpsc::Receiver<ExternalMessage>,
 }
 
 impl<H: EventHandler + 'static + Send> HandlerPart<H> {
+    /// Processes events until `handler` signals that the event loop should be terminated.
     pub async fn run(self) {
         let mut handler = self.handler;
         let mut aggregator = EventsAggregator::new(

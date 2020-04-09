@@ -18,8 +18,8 @@ use anyhow::bail;
 use bit_vec::BitVec;
 use exonum::{
     blockchain::{
-        Block, BlockKind, BlockPatch, ConsensusConfig, PersistentPool, TransactionCache,
-        TxCheckCache, ValidatorKeys,
+        Block, BlockKind, BlockPatch, BlockchainMut, ConsensusConfig, PersistentPool,
+        TransactionCache, TxCheckCache, ValidatorKeys,
     },
     crypto::{Hash, PublicKey},
     helpers::{byzantine_quorum, Height, Milliseconds, Round, ValidatorId},
@@ -37,8 +37,8 @@ use std::{
 
 use crate::{
     connect_list::ConnectList,
-    consensus::RoundAction,
-    events::network::ConnectedPeerAddr,
+    consensus::{PersistChanges, RoundAction},
+    events::ConnectedPeerAddr,
     messages::{Connect, Consensus as ConsensusMessage, Prevote, Propose, Status},
     Configuration, ConnectInfo, FlushPoolStrategy,
 };
@@ -141,7 +141,7 @@ pub(crate) struct State {
 
     queued: Vec<ConsensusMessage>,
 
-    unknown_txs: HashMap<Hash, Vec<Hash>>,
+    // Unknown `Propose` messages confirmed by a majority of `Precommit`s.
     proposes_confirmed_by_majority: HashMap<Hash, (Round, Hash)>,
 
     // Our requests state.
@@ -580,7 +580,6 @@ impl State {
 
             queued: Vec::new(),
 
-            unknown_txs: HashMap::new(),
             proposes_confirmed_by_majority: HashMap::new(),
 
             peer_states: BTreeMap::new(),
@@ -1097,9 +1096,20 @@ impl State {
     }
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
-    /// cannot contain unknown transactions. Returns hash of the propose.
-    pub(super) fn add_self_propose(&mut self, msg: Verified<Propose>) -> Hash {
+    /// cannot contain unknown transactions. Returns the hash of the propose.
+    pub(super) fn add_self_propose(
+        &mut self,
+        msg: Verified<Propose>,
+        blockchain: &mut BlockchainMut,
+    ) -> Hash {
         debug_assert!(self.validator_state().is_some());
+
+        let round = msg.payload().round;
+        blockchain.persist_changes(
+            |schema| schema.save_message(round, msg.clone()),
+            "Cannot save `Propose` to message cache",
+        );
+
         let propose_hash = msg.object_hash();
         self.proposes.insert(
             propose_hash,
@@ -1107,11 +1117,8 @@ impl State {
                 propose: msg,
                 unknown_txs: HashSet::new(),
                 block_hash: None,
-                // TODO: For the moment it's true because this code gets called immediately after
-                // saving a propose to the cache. Think about making this approach less error-prone.
-                // (ECR-1635)
                 is_saved: true,
-                // We expect ourself not to produce invalid proposes.
+                // We expect our node not to produce invalid proposes.
                 is_valid: true,
             },
         );
@@ -1155,13 +1162,6 @@ impl State {
                     } else {
                         unknown_txs.insert(*hash);
                     }
-                }
-
-                for tx in &unknown_txs {
-                    self.unknown_txs
-                        .entry(*tx)
-                        .or_insert_with(Vec::new)
-                        .push(propose_hash);
                 }
 
                 Ok(e.insert(ProposeState {

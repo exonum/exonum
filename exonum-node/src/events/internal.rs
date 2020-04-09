@@ -21,9 +21,12 @@ use std::time::{Duration, SystemTime};
 use super::{InternalEvent, InternalRequest, TimeoutRequest};
 use crate::messages::{ExonumMessage, Message};
 
+/// Processor of `InternalRequest`s that emits `InternalEvent`s as a result.
 #[derive(Debug)]
 pub struct InternalPart {
+    /// Sender of internal events.
     pub internal_tx: mpsc::Sender<InternalEvent>,
+    /// Receiver of internal requests.
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
 }
 

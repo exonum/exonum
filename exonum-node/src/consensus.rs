@@ -52,7 +52,7 @@ fn into_verified<T: TryFrom<SignedMessage>>(raw: &[Vec<u8>]) -> anyhow::Result<V
 }
 
 /// Helper trait to efficiently merge changes to the `BlockchainMut`.
-trait PersistChanges {
+pub(crate) trait PersistChanges {
     /// Persists changes to the node schema.
     fn persist_changes<F>(&mut self, change: F, error_msg: &str)
     where
@@ -628,7 +628,7 @@ impl NodeHandler {
             // Lock on the round and propose if we've received the majority of prevotes.
             if self.state.has_majority_prevotes(round, propose_hash) {
                 // Put consensus messages for current `Propose` and this round to the cache.
-                self.check_propose_saved(round, &propose_hash);
+                self.ensure_saved_propose(round, &propose_hash);
                 let raw_messages = self
                     .state
                     .prevotes(prevote_round, propose_hash)
@@ -1029,20 +1029,14 @@ impl NodeHandler {
         };
         let propose = self.sign_message(propose);
 
-        // Put our propose to the consensus messages cache.
-        self.blockchain.persist_changes(
-            |schema| schema.save_message(round, propose.clone()),
-            "Cannot save `Propose` to message cache",
-        );
-
         trace!("Broadcast propose: {:?}", propose);
         self.broadcast(propose.clone());
         self.allow_expedited_propose = true;
 
-        // Save our propose into state
-        let hash = self.state.add_self_propose(propose);
+        // Save our propose into the state.
+        let hash = self.state.add_self_propose(propose, &mut self.blockchain);
 
-        // Send prevote
+        // Send a prevote.
         let has_majority_prevotes = self.check_propose_and_broadcast_prevote(round, hash);
         if has_majority_prevotes {
             self.handle_majority_prevotes(round, hash);
@@ -1240,8 +1234,8 @@ impl NodeHandler {
         ));
         let has_majority_prevotes = self.state.add_prevote(prevote.clone());
 
-        // save outgoing Prevote to the consensus messages cache before broadcast
-        self.check_propose_saved(round, &propose_hash);
+        // Save the outgoing `Prevote` to the consensus messages cache before broadcast.
+        self.ensure_saved_propose(round, &propose_hash);
         self.blockchain.persist_changes(
             |schema| schema.save_message(round, prevote.clone()),
             "Cannot save `Prevote` to message cache",
@@ -1354,7 +1348,7 @@ impl NodeHandler {
     }
 
     /// Checks whether `Propose` is saved to the consensus cache and saves it otherwise.
-    fn check_propose_saved(&mut self, round: Round, propose_hash: &Hash) {
+    fn ensure_saved_propose(&mut self, round: Round, propose_hash: &Hash) {
         if let Some(propose_state) = self.state.propose_mut(propose_hash) {
             if !propose_state.is_saved() {
                 self.blockchain.persist_changes(

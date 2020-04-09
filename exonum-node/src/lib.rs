@@ -98,8 +98,8 @@ use std::{
 use crate::{
     connect_list::ConnectList,
     events::{
-        noise::HandshakeParams, HandlerPart, InternalEvent, InternalPart, InternalRequest,
-        NetworkEvent, NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
+        HandlerPart, HandshakeParams, InternalEvent, InternalPart, InternalRequest, NetworkEvent,
+        NetworkPart, NetworkRequest, SyncSender, TimeoutRequest,
     },
     messages::Connect,
     pool::{ManagePool, StandardPoolManager},
@@ -478,10 +478,12 @@ pub(crate) struct NodeSender {
     pub internal_requests: SyncSender<InternalRequest>,
     /// Network requests sender.
     pub network_requests: SyncSender<NetworkRequest>,
-    /// Transactions sender.
-    pub transactions: SyncSender<Verified<AnyTx>>,
-    /// Api requests sender.
-    pub api_requests: SyncSender<ExternalMessage>,
+    /// Transactions sender. This sender is not used by the node, but is necessary to guarantee
+    /// that the node won't terminate if external senders are dropped.
+    pub _transactions: mpsc::Sender<Verified<AnyTx>>,
+    /// API requests sender. This sender is not used by the node, but is necessary to guarantee
+    /// that the node won't terminate if external senders are dropped.
+    pub _api_requests: mpsc::Sender<ExternalMessage>,
 }
 
 /// Node role.
@@ -1019,10 +1021,13 @@ impl NodeChannel {
     /// Returns the channel for sending timeouts, networks and API requests.
     fn node_sender(&self) -> NodeSender {
         NodeSender {
-            internal_requests: SyncSender::new(self.internal_requests.0.clone()),
-            network_requests: SyncSender::new(self.network_requests.0.clone()),
-            transactions: SyncSender::new(self.transactions.0.clone()),
-            api_requests: SyncSender::new(self.api_requests.0.clone()),
+            internal_requests: SyncSender::new(
+                self.internal_requests.0.clone(),
+                "internal request",
+            ),
+            network_requests: SyncSender::new(self.network_requests.0.clone(), "network request"),
+            _transactions: self.transactions.0.clone(),
+            _api_requests: self.api_requests.0.clone(),
         }
     }
 }
