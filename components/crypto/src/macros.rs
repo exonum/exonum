@@ -46,7 +46,7 @@ macro_rules! implement_public_crypto_wrapper {
         /// Returns a hex representation of binary data.
         /// Lower case letters are used (e.g. `f9b4ca`).
         pub fn to_hex(&self) -> String {
-            encode_hex(self)
+            $crate::encode_hex(self)
         }
     }
 
@@ -66,14 +66,14 @@ macro_rules! implement_public_crypto_wrapper {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
-            write_short_hex(f, &self[..])?;
+            $crate::write_short_hex(f, &self[..])?;
             write!(f, ")")
         }
     }
 
     impl fmt::Display for $name {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write_short_hex(f, &self[..])
+            f.write_str(&self.to_hex())
         }
     }
     )
