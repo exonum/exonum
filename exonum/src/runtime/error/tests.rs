@@ -173,6 +173,7 @@ fn execution_error_display() {
         description: String::new(),
         runtime_id: Some(1),
         call_site: Some(CallSite::new(100, CallType::Constructor)),
+        backtrace: vec![],
     };
     let err_string = err.to_string();
     assert!(err_string.contains("Execution error with code `service:3`"));
@@ -219,6 +220,7 @@ fn execution_result_serde_presentation() {
         description: "Some error".to_owned(),
         runtime_id: None,
         call_site: None,
+        backtrace: vec![],
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),
@@ -233,6 +235,7 @@ fn execution_result_serde_presentation() {
         description: String::new(),
         runtime_id: Some(1),
         call_site: Some(CallSite::new(100, CallType::Constructor)),
+        backtrace: vec![],
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),
@@ -252,6 +255,7 @@ fn execution_result_serde_presentation() {
         description: String::new(),
         runtime_id: Some(1),
         call_site: Some(CallSite::new(100, CallType::Resume)),
+        backtrace: vec![CallSite::new(0, CallType::AfterTransactions)],
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),
@@ -262,7 +266,10 @@ fn execution_result_serde_presentation() {
             "call_site": {
                 "instance_id": 100,
                 "call_type": "resume",
-            }
+            },
+            "backtrace": [
+                { "instance_id": 0, "call_type": "after_transactions" },
+            ],
         })
     );
 
@@ -277,6 +284,7 @@ fn execution_result_serde_presentation() {
                 id: 1,
             },
         )),
+        backtrace: vec![],
     }));
     assert_eq!(
         serde_json::to_value(result).unwrap(),

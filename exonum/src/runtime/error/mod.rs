@@ -120,6 +120,7 @@ pub struct ExecutionError {
     description: String,
     runtime_id: Option<u32>,
     call_site: Option<CallSite>,
+    backtrace: Vec<CallSite>,
 }
 
 /// Additional details about an `ExecutionError` that do not influence blockchain state hash.
@@ -128,6 +129,9 @@ pub struct ExecutionError {
 pub(crate) struct ExecutionErrorAux {
     /// Human-readable error description.
     pub description: String,
+    /// Backtrace. The backtrace excludes the call in which the error has occurred (it is recorded
+    /// in `ExecutionError.call_site`). The most recent call is first.
+    pub backtrace: Vec<CallSite>,
 }
 
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.

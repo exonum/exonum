@@ -46,6 +46,7 @@ impl ExecutionError {
             description: description.into(),
             runtime_id: None,
             call_site: None,
+            backtrace: vec![],
         }
     }
 
@@ -123,13 +124,20 @@ impl ExecutionError {
     pub(crate) fn split_aux(&mut self) -> ExecutionErrorAux {
         ExecutionErrorAux {
             description: mem::take(&mut self.description),
+            backtrace: mem::take(&mut self.backtrace),
         }
+    }
+
+    /// Checks if the error has auxiliary part removed.
+    pub(crate) fn has_empty_aux(&self) -> bool {
+        self.description.is_empty() && self.backtrace.is_empty()
     }
 
     /// Combines this error with the provided auxiliary information.
     pub(crate) fn recombine_with_aux(&mut self, aux: ExecutionErrorAux) {
-        debug_assert!(self.description.is_empty());
+        debug_assert!(self.has_empty_aux());
         self.description = aux.description;
+        self.backtrace = aux.backtrace;
     }
 }
 
@@ -214,11 +222,18 @@ impl ProtobufConvert for ExecutionError {
             bail!("No call site info or no_call_site marker");
         };
 
+        let backtrace: Result<Vec<_>, _> = pb
+            .take_backtrace()
+            .into_iter()
+            .map(ProtobufConvert::from_pb)
+            .collect();
+
         Ok(Self {
             kind,
             description: pb.take_description(),
             runtime_id,
             call_site,
+            backtrace: backtrace?,
         })
     }
 }
