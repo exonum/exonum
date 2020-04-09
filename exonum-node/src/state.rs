@@ -1154,7 +1154,7 @@ impl State {
                         // we don't stop processing, since we expect this propose to
                         // be declined by the consensus rules.
                         error!(
-                            "Received propose {:?} with transaction {:?} known as invalid",
+                            "Received propose {:?} with transaction `{}` known as invalid",
                             msg.payload(),
                             hash
                         );
@@ -1293,7 +1293,8 @@ impl State {
                         panic!(
                             "Trying to send different precommits for same round, old={:?}, \
                              new={:?}",
-                            other, msg
+                            other.payload(),
+                            msg.payload()
                         );
                     }
                 }

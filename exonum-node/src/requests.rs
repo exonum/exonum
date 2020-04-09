@@ -39,13 +39,13 @@ impl NodeHandler {
     pub(crate) fn handle_request(&mut self, msg: &Requests) {
         // Request are sent to us
         if msg.to() != self.state.keys().consensus_pk() {
-            error!("Received message addressed to other peer = {:?}.", msg.to());
+            error!("Received message addressed to other peer = {}.", msg.to());
             return;
         }
 
         if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             error!(
-                "Received request message from peer = {:?} which not in ConnectList.",
+                "Received request message from peer = {} which not in ConnectList.",
                 msg.author()
             );
             return;

@@ -23,6 +23,7 @@ use serde::{
 use std::{
     borrow::Cow,
     convert::{TryFrom, TryInto},
+    fmt::{self, Debug},
 };
 
 use crate::{
@@ -71,7 +72,7 @@ impl_serde_hex_for_binary_value! { SignedMessage }
 /// # Examples
 ///
 /// See [module documentation](index.html#examples) for examples.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Verified<T> {
     raw: SignedMessage,
     inner: T,
@@ -234,6 +235,15 @@ where
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
         let signed_message = SignedMessage::from_pb(pb)?;
         signed_message.into_verified()
+    }
+}
+
+impl<T: Debug> Debug for Verified<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Verified")
+            .field("raw", &self.raw.to_string())
+            .field("inner", &self.inner)
+            .finish()
     }
 }
 
