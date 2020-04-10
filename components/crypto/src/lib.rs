@@ -550,8 +550,8 @@ fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
 mod tests {
     use super::*;
 
-    use serde::de::DeserializeOwned;
     use hex::FromHex;
+    use serde::de::DeserializeOwned;
 
     use std::str::FromStr;
 
@@ -561,7 +561,7 @@ mod tests {
         let from_hex = Hash::from_hex(original.to_hex()).unwrap();
         assert_eq!(original, from_hex);
     }
-    
+
     #[test]
     fn to_from_string_hash() {
         let original = hash(&[]);
@@ -646,16 +646,29 @@ mod tests {
     fn display_format() {
         // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
-        assert_eq!(format!("{}", &hash), "01010101...");
+        assert_eq!(
+            format!("{}", &hash),
+            "0101010101010101010101010101010101010101010101010101010101010101"
+        );
 
         let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
-        assert_eq!(format!("{}", &pk), "0f0f0f0f...");
+        assert_eq!(
+            format!("{}", &pk),
+            "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+        );
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
-        assert_eq!(format!("{}", &signature), "0a0a0a0a...");
+        assert_eq!(
+            format!("{}", &signature),
+            "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a\
+            0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+        );
 
         // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
-        assert_eq!(format!("{}", &hash), "80808080...");
+        assert_eq!(
+            format!("{}", &hash),
+            "8080808080808080808080808080808080808080808080808080808080808080"
+        );
     }
 
     #[test]

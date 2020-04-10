@@ -79,11 +79,11 @@ macro_rules! implement_public_crypto_wrapper {
 
     impl std::str::FromStr for $name {
         type Err = hex::FromHexError;
-    
+
         fn from_str(s: &str) -> Result<Self, Self::Err> {
             Self::from_hex(s)
         }
-    }    
+    }
 
     )
 }
