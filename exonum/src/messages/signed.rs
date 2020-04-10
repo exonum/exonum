@@ -241,7 +241,7 @@ where
 impl<T: Debug> Debug for Verified<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Verified")
-            .field("raw", &self.raw.to_string())
+            .field("author", &self.raw.author)
             .field("inner", &self.inner)
             .finish()
     }

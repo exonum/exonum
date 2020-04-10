@@ -588,7 +588,7 @@ mod tests {
 
     #[test]
     fn to_from_string_public_key() {
-        let (p, _s) = gen_keypair();
+        let p = gen_keypair().0;
 
         let ph = PublicKey::from_str(&p.to_string()).unwrap();
         assert_eq!(p, ph);
