@@ -34,6 +34,7 @@ use crate::{
     messages::AnyTx,
     runtime::{
         dispatcher::{Action, ArtifactStatus, Dispatcher, Mailbox},
+        execution_context::TopLevelContext,
         migrations::{InitMigrationError, MigrationScript},
         oneshot::{self, Receiver},
         ArtifactId, BlockchainData, CallInfo, CommonError, CoreError, DispatcherSchema, ErrorKind,
@@ -86,12 +87,8 @@ impl Dispatcher {
             .runtime_for_service(call_info.instance_id)
             .ok_or(CoreError::IncorrectInstanceId)?;
 
-        let mut should_rollback = false;
-        let context = ExecutionContext::for_block_call(self, fork, &mut should_rollback, instance);
-        let res = runtime.execute(context, call_info.method_id, arguments);
-
-        assert!(!should_rollback);
-        res
+        let context = TopLevelContext::for_block_call(self, fork, instance);
+        context.call(|ctx| runtime.execute(ctx, call_info.method_id, arguments))
     }
 }
 
@@ -345,21 +342,14 @@ fn test_dispatcher_simple() {
         rust_artifact.clone(),
     );
 
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        rust_service.as_descriptor(),
-    );
-    context
-        .initiate_adding_service(rust_service, vec![])
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, rust_service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(rust_service, vec![]))
         .expect("`initiate_adding_service` failed for rust");
 
     let java_service =
         InstanceSpec::from_raw_parts(JAVA_SERVICE_ID, JAVA_SERVICE_NAME.into(), java_artifact);
-    context
-        .initiate_adding_service(java_service, vec![])
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, java_service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(java_service, vec![]))
         .expect("`initiate_adding_service` failed for java");
 
     // Since services are not active yet, transactions to them should fail.
@@ -379,14 +369,13 @@ fn test_dispatcher_simple() {
         rust_artifact.clone(),
     );
 
-    let mut context = ExecutionContext::for_block_call(
+    let context = TopLevelContext::for_block_call(
         &dispatcher,
         &mut fork,
-        &mut should_rollback,
         conflicting_rust_service.as_descriptor(),
     );
     let err = context
-        .initiate_adding_service(conflicting_rust_service, vec![])
+        .call(|mut ctx| ctx.initiate_adding_service(conflicting_rust_service, vec![]))
         .unwrap_err();
     assert_eq!(
         err,
@@ -396,8 +385,13 @@ fn test_dispatcher_simple() {
 
     let conflicting_rust_service =
         InstanceSpec::from_raw_parts(RUST_SERVICE_ID + 1, RUST_SERVICE_NAME.into(), rust_artifact);
+    let context = TopLevelContext::for_block_call(
+        &dispatcher,
+        &mut fork,
+        conflicting_rust_service.as_descriptor(),
+    );
     let err = context
-        .initiate_adding_service(conflicting_rust_service, vec![])
+        .call(|mut ctx| ctx.initiate_adding_service(conflicting_rust_service, vec![]))
         .unwrap_err();
     assert_eq!(
         err,
@@ -468,8 +462,6 @@ fn test_dispatcher_simple() {
         expected_new_services,
         changes_rx.iter().take(2).collect::<Vec<_>>()
     );
-
-    assert!(!should_rollback);
 }
 
 struct FreezingRig {
@@ -505,14 +497,8 @@ fn blockchain_with_frozen_service(rt: SampleRuntimes) -> Result<FreezingRig, Exe
     let mut fork = db.fork();
     dispatcher.add_builtin_artifact(&fork, artifact.clone(), vec![]);
     let service = InstanceSpec::from_raw_parts(SERVICE_ID, "some-service".to_owned(), artifact);
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    context.initiate_adding_service(service.clone(), vec![])?;
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(service.clone(), vec![]))?;
 
     let patch = create_genesis_block(&mut dispatcher, fork);
     db.merge(patch).unwrap();
@@ -531,15 +517,11 @@ fn blockchain_with_frozen_service(rt: SampleRuntimes) -> Result<FreezingRig, Exe
     );
 
     // Command service freeze.
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    context
-        .supervisor_extensions()
-        .initiate_freezing_service(SERVICE_ID)?;
+    let context = TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor());
+    context.call(|mut ctx| {
+        ctx.supervisor_extensions()
+            .initiate_freezing_service(SERVICE_ID)
+    })?;
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
     db.merge(patch).unwrap();
@@ -589,16 +571,11 @@ fn test_service_freezing() {
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Change service status to stopped.
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    context
-        .supervisor_extensions()
-        .initiate_stopping_service(SERVICE_ID)
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| {
+            ctx.supervisor_extensions()
+                .initiate_stopping_service(SERVICE_ID)
+        })
         .expect("Cannot stop service");
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
@@ -606,15 +583,11 @@ fn test_service_freezing() {
 
     // Check that the service cannot be easily changed to frozen.
     let mut fork = db.fork();
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    let err = context
-        .supervisor_extensions()
-        .initiate_freezing_service(SERVICE_ID)
+    let err = TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| {
+            ctx.supervisor_extensions()
+                .initiate_freezing_service(SERVICE_ID)
+        })
         .expect_err("Service cannot be frozen from `Stopped` status");
     let expected_msg = "transition is precluded by the current service status (stopped)";
     assert_eq!(
@@ -670,16 +643,11 @@ fn service_freeze_then_restart() {
     assert_eq!(err, ErrorMatch::from_fail(&CoreError::IncorrectInstanceId));
 
     // Resume the service.
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    context
-        .supervisor_extensions()
-        .initiate_resuming_service(SERVICE_ID, ())
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| {
+            ctx.supervisor_extensions()
+                .initiate_resuming_service(SERVICE_ID, ())
+        })
         .expect("Cannot resume service");
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);
@@ -1124,15 +1092,8 @@ fn stopped_service_workflow() {
     dispatcher.add_builtin_artifact(&fork, artifact.clone(), vec![]);
 
     let service = InstanceSpec::from_raw_parts(instance_id, instance_name.into(), artifact);
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    context
-        .initiate_adding_service(service.clone(), vec![])
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(service.clone(), vec![]))
         .expect("`initiate_adding_service` failed");
 
     // Activate artifact and service.
@@ -1239,15 +1200,9 @@ fn stopped_service_workflow() {
     );
 
     // Check that it is impossible to add previously stopped service.
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    context
-        .initiate_adding_service(service, vec![])
-        .expect_err("`initiate_adding_service` should failed");
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(service, vec![]))
+        .expect_err("`initiate_adding_service` should fail");
 
     // Check that it is impossible to stop service twice.
     let actual_err = Dispatcher::initiate_stopping_service(&fork, instance_id)
@@ -1258,7 +1213,6 @@ fn stopped_service_workflow() {
         ErrorMatch::from_fail(&CoreError::InvalidServiceTransition)
             .with_description_containing(bogus_transition_msg)
     );
-    assert!(!should_rollback);
 }
 
 #[test]
@@ -1311,15 +1265,8 @@ fn unload_artifact_workflow() {
 
     // Check that a service cannot be instantiated from the artifact now that it's being unloaded.
     let service = InstanceSpec::from_raw_parts(100, "some-service".into(), artifact.clone());
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        service.as_descriptor(),
-    );
-    let err = context
-        .initiate_adding_service(service, vec![])
+    let err = TopLevelContext::for_block_call(&dispatcher, &mut fork, service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(service, vec![]))
         .unwrap_err();
     let expected_msg = "from non-active artifact `2:good:1.0.0` (artifact status: unloading)";
     assert_eq!(
@@ -1349,15 +1296,8 @@ fn check_tx_caching() {
     let active_service =
         InstanceSpec::from_raw_parts(100, "other-service".to_owned(), service.artifact);
     let mut fork = db.fork();
-    let mut should_rollback = false;
-    let mut context = ExecutionContext::for_block_call(
-        &dispatcher,
-        &mut fork,
-        &mut should_rollback,
-        active_service.as_descriptor(),
-    );
-    context
-        .initiate_adding_service(active_service.clone(), vec![])
+    TopLevelContext::for_block_call(&dispatcher, &mut fork, active_service.as_descriptor())
+        .call(|mut ctx| ctx.initiate_adding_service(active_service.clone(), vec![]))
         .unwrap();
     Dispatcher::activate_pending(&fork);
     let patch = dispatcher.commit_block_and_notify_runtimes(fork);

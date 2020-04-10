@@ -26,6 +26,39 @@ use crate::{
 
 const ACCESS_ERROR_STR: &str = "An attempt to access blockchain data after execution error.";
 
+#[derive(Debug)]
+enum CallErrorFlag<'a> {
+    Owned(bool),
+    Borrowed(&'a mut bool),
+}
+
+impl CallErrorFlag<'_> {
+    fn new() -> Self {
+        Self::Owned(false)
+    }
+
+    fn set(&mut self) {
+        match self {
+            Self::Owned(ref mut flag) => *flag = true,
+            Self::Borrowed(flag) => **flag = true,
+        }
+    }
+
+    fn is_set(&self) -> bool {
+        match self {
+            Self::Owned(flag) => *flag,
+            Self::Borrowed(flag) => **flag,
+        }
+    }
+
+    fn reborrow(&mut self) -> CallErrorFlag<'_> {
+        match self {
+            Self::Owned(ref mut flag) => CallErrorFlag::Borrowed(flag),
+            Self::Borrowed(flag) => CallErrorFlag::Borrowed(&mut *flag),
+        }
+    }
+}
+
 /// Provides the current state of the blockchain and the caller information for the call
 /// which is being executed.
 ///
@@ -49,51 +82,16 @@ pub struct ExecutionContext<'a> {
     /// Depth of the call stack.
     call_stack_depth: u64,
     /// Flag indicating an error occurred during the child call.
-    has_child_call_error: &'a mut bool,
+    call_error_flag: CallErrorFlag<'a>,
 }
 
 impl<'a> ExecutionContext<'a> {
     /// Maximum depth of the call stack.
     pub const MAX_CALL_STACK_DEPTH: u64 = 128;
 
-    pub(crate) fn for_transaction(
-        dispatcher: &'a Dispatcher,
-        fork: &'a mut Fork,
-        has_child_call_error: &'a mut bool,
-        instance: InstanceDescriptor,
-        author: PublicKey,
-        transaction_hash: Hash,
-    ) -> Self {
-        Self::new(
-            dispatcher,
-            fork,
-            has_child_call_error,
-            instance,
-            Caller::Transaction { author },
-            Some(transaction_hash),
-        )
-    }
-
-    pub(crate) fn for_block_call(
-        dispatcher: &'a Dispatcher,
-        fork: &'a mut Fork,
-        has_child_call_error: &'a mut bool,
-        instance: InstanceDescriptor,
-    ) -> Self {
-        Self::new(
-            dispatcher,
-            fork,
-            has_child_call_error,
-            instance,
-            Caller::Blockchain,
-            None,
-        )
-    }
-
     fn new(
         dispatcher: &'a Dispatcher,
         fork: &'a mut Fork,
-        has_child_call_error: &'a mut bool,
         instance: InstanceDescriptor,
         caller: Caller,
         transaction_hash: Option<Hash>,
@@ -106,7 +104,7 @@ impl<'a> ExecutionContext<'a> {
             transaction_hash,
             interface_name: "",
             call_stack_depth: 0,
-            has_child_call_error,
+            call_error_flag: CallErrorFlag::new(),
         }
     }
 
@@ -118,7 +116,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Provides access to blockchain data.
     pub fn data(&self) -> BlockchainData<&Fork> {
-        if *self.has_child_call_error {
+        if self.call_error_flag.is_set() {
             panic!(ACCESS_ERROR_STR);
         }
 
@@ -192,7 +190,7 @@ impl<'a> ExecutionContext<'a> {
         runtime
             .initiate_adding_service(context, &spec.artifact, constructor.into_bytes())
             .map_err(|mut err| {
-                self.should_rollback();
+                self.set_should_rollback();
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite::new(spec.id, CallType::Constructor));
                 err
@@ -206,7 +204,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Re-borrows an execution context with the given instance descriptor.
     fn reborrow(&mut self, instance: InstanceDescriptor) -> ExecutionContext<'_> {
-        if *self.has_child_call_error {
+        if self.call_error_flag.is_set() {
             panic!(ACCESS_ERROR_STR);
         }
 
@@ -218,7 +216,7 @@ impl<'a> ExecutionContext<'a> {
             interface_name: self.interface_name,
             dispatcher: self.dispatcher,
             call_stack_depth: self.call_stack_depth,
-            has_child_call_error: self.has_child_call_error,
+            call_error_flag: self.call_error_flag.reborrow(),
         }
     }
 
@@ -236,7 +234,7 @@ impl<'a> ExecutionContext<'a> {
         instance: InstanceDescriptor,
         fallthrough_auth: bool,
     ) -> ExecutionContext<'s> {
-        if *self.has_child_call_error {
+        if self.call_error_flag.is_set() {
             panic!(ACCESS_ERROR_STR);
         }
 
@@ -256,13 +254,67 @@ impl<'a> ExecutionContext<'a> {
             fork: &mut *self.fork,
             interface_name,
             call_stack_depth: self.call_stack_depth + 1,
-            has_child_call_error: self.has_child_call_error,
+            call_error_flag: self.call_error_flag.reborrow(),
         }
     }
 
     /// Sets the flag that the fork should rollback after this execution.
-    pub(crate) fn should_rollback(&mut self) {
-        *self.has_child_call_error = true;
+    pub(crate) fn set_should_rollback(&mut self) {
+        self.call_error_flag.set();
+    }
+}
+
+/// Version of `ExecutionContext` used for top-level calls.
+#[derive(Debug)]
+pub(crate) struct TopLevelContext<'a> {
+    inner: ExecutionContext<'a>,
+}
+
+impl<'a> TopLevelContext<'a> {
+    /// Creates a context for executing a transaction.
+    pub fn for_transaction(
+        dispatcher: &'a Dispatcher,
+        fork: &'a mut Fork,
+        instance: InstanceDescriptor,
+        author: PublicKey,
+        transaction_hash: Hash,
+    ) -> Self {
+        Self {
+            inner: ExecutionContext::new(
+                dispatcher,
+                fork,
+                instance,
+                Caller::Transaction { author },
+                Some(transaction_hash),
+            ),
+        }
+    }
+
+    /// Creates a context for executing a service hook.
+    pub fn for_block_call(
+        dispatcher: &'a Dispatcher,
+        fork: &'a mut Fork,
+        instance: InstanceDescriptor,
+    ) -> Self {
+        Self {
+            inner: ExecutionContext::new(dispatcher, fork, instance, Caller::Blockchain, None),
+        }
+    }
+
+    /// Yields an `ExecutionContext` which can be used to execute a user-defined call.
+    /// After the call is complete, the result will be coerced to an error if an error
+    /// has occurred in any child call.
+    pub fn call<F>(mut self, command_fn: F) -> Result<(), ExecutionError>
+    where
+        F: FnOnce(ExecutionContext<'_>) -> Result<(), ExecutionError>,
+    {
+        let borrowed = self.inner.reborrow(self.inner.instance.clone());
+        let res = command_fn(borrowed);
+        if res.is_ok() && self.inner.call_error_flag.is_set() {
+            Err(CoreError::IncorrectCall.into())
+        } else {
+            res
+        }
     }
 }
 
@@ -328,7 +380,7 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
         runtime
             .execute(context, method_id, arguments)
             .map_err(|mut err| {
-                self.should_rollback();
+                self.set_should_rollback();
                 err.set_runtime_id(runtime_id).set_call_site(|| {
                     CallSite::new(
                         instance_id,
@@ -451,7 +503,7 @@ impl SupervisorExtensions<'_> {
                 params.into_bytes(),
             )
             .map_err(|mut err| {
-                self.0.should_rollback();
+                self.0.set_should_rollback();
                 err.set_runtime_id(spec.artifact.runtime_id)
                     .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
                 err

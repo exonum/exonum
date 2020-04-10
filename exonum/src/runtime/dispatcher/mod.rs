@@ -42,13 +42,14 @@ use crate::{
 use self::schema::{ArtifactAction, MigrationTransition, ModifiedInstanceInfo};
 use super::{
     error::{CallSite, CallType, CommonError, ErrorKind, ExecutionError, ExecutionFail},
+    execution_context::TopLevelContext,
     migrations::{
         InstanceMigration, MigrationContext, MigrationError, MigrationScript, MigrationStatus,
         MigrationType,
     },
-    ArtifactId, ExecutionContext, InstanceId, InstanceSpec, InstanceState, Runtime, RuntimeFeature,
+    ArtifactId, InstanceId, InstanceSpec, InstanceState, Runtime, RuntimeFeature,
+    RuntimeIdentifier,
 };
-use crate::runtime::RuntimeIdentifier;
 
 #[cfg(test)]
 mod migration_tests;
@@ -408,20 +409,9 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         // Start the built-in service instance.
         let name = spec.name.clone();
-
-        let mut should_rollback = false;
-        let mut res = ExecutionContext::for_block_call(
-            self,
-            fork,
-            &mut should_rollback,
-            InstanceDescriptor::new(spec.id, &name),
-        )
-        .initiate_adding_service(spec, constructor);
-
-        if should_rollback && res.is_ok() {
-            res = Err(CoreError::IncorrectCall.into());
-        }
-        res
+        let context =
+            TopLevelContext::for_block_call(self, fork, InstanceDescriptor::new(spec.id, &name));
+        context.call(|mut ctx| ctx.initiate_adding_service(spec, constructor))
     }
 
     /// Starts all the built-in instances, creating a `Patch` with persisted changes.
@@ -709,21 +699,9 @@ impl Dispatcher {
             CoreError::IncorrectInstanceId.with_description(msg)
         })?;
 
-        let mut should_rollback = false;
-        let context = ExecutionContext::for_transaction(
-            self,
-            fork,
-            &mut should_rollback,
-            instance,
-            tx.author(),
-            tx_id,
-        );
-
-        let mut res = runtime.execute(context, call_info.method_id, &tx.as_ref().arguments);
-        if should_rollback && res.is_ok() {
-            res = Err(CoreError::IncorrectCall.into());
-        }
-
+        let context = TopLevelContext::for_transaction(self, fork, instance, tx.author(), tx_id);
+        let mut res =
+            context.call(|ctx| runtime.execute(ctx, call_info.method_id, &tx.as_ref().arguments));
         if let Err(ref mut err) = res {
             fork.rollback();
 
@@ -745,24 +723,14 @@ impl Dispatcher {
         self.service_infos
             .active_instances()
             .filter_map(|(instance, runtime_id)| {
-                let mut should_rollback = false;
-                let context = ExecutionContext::for_block_call(
-                    self,
-                    fork,
-                    &mut should_rollback,
-                    instance.clone(),
-                );
+                let context = TopLevelContext::for_block_call(self, fork, instance.clone());
                 let call_fn = match &call_type {
                     CallType::BeforeTransactions => Runtime::before_transactions,
                     CallType::AfterTransactions => Runtime::after_transactions,
                     _ => unreachable!(),
                 };
 
-                let mut res = call_fn(self.runtimes[&runtime_id].as_ref(), context);
-                if should_rollback && res.is_ok() {
-                    res = Err(CoreError::IncorrectCall.into());
-                }
-
+                let res = context.call(|ctx| call_fn(self.runtimes[&runtime_id].as_ref(), ctx));
                 if let Err(mut err) = res {
                     fork.rollback();
                     err.set_runtime_id(runtime_id)
