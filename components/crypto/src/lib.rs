@@ -76,8 +76,10 @@ pub(crate) mod crypto_lib;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
+/// The size of ellipsis in debug messages.
+const BYTES_IN_ELLIPSIS: usize = 3;
 
-fn write_short_hex(f: &mut fmt::Formatter<'_>, slice: &[u8]) -> fmt::Result {
+fn write_short_hex(f: &mut impl fmt::Write, slice: &[u8]) -> fmt::Result {
     for byte in slice.iter().take(BYTES_IN_DEBUG) {
         write!(f, "{:02x}", byte)?;
     }
@@ -550,14 +552,22 @@ fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
 mod tests {
     use super::*;
 
+    use hex::FromHex;
     use serde::de::DeserializeOwned;
 
-    use hex::FromHex;
+    use std::str::FromStr;
 
     #[test]
     fn to_from_hex_hash() {
         let original = hash(&[]);
         let from_hex = Hash::from_hex(original.to_hex()).unwrap();
+        assert_eq!(original, from_hex);
+    }
+
+    #[test]
+    fn to_from_string_hash() {
+        let original = hash(&[]);
+        let from_hex = Hash::from_str(&original.to_string()).unwrap();
         assert_eq!(original, from_hex);
     }
 
@@ -576,6 +586,14 @@ mod tests {
 
         let sh = SecretKey::from_hex(s.to_hex()).unwrap();
         assert_eq!(s, sh);
+    }
+
+    #[test]
+    fn to_from_string_public_key() {
+        let p = gen_keypair().0;
+
+        let ph = PublicKey::from_str(&p.to_string()).unwrap();
+        assert_eq!(p, ph);
     }
 
     #[test]
@@ -607,22 +625,22 @@ mod tests {
     fn debug_format() {
         // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
-        assert_eq!(format!("{:?}", &hash), "Hash(01010101...)");
+        assert_eq!(format!("{:?}", &hash), "Hash(\"01010101...\")");
 
         let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &pk), "PublicKey(0f0f0f0f...)");
+        assert_eq!(format!("{:?}", &pk), "PublicKey(\"0f0f0f0f...\")");
         let sk = SecretKey::new([8; SECRET_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &sk), "SecretKey(08080808...)");
+        assert_eq!(format!("{:?}", &sk), "SecretKey(\"08080808...\")");
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
-        assert_eq!(format!("{:?}", &signature), "Signature(0a0a0a0a...)");
+        assert_eq!(format!("{:?}", &signature), "Signature(\"0a0a0a0a...\")");
         let seed = Seed::new([4; SEED_LENGTH]);
-        assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
+        assert_eq!(format!("{:?}", &seed), "Seed(\"04040404...\")");
 
         // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
-        assert_eq!(format!("{:?}", &hash), "Hash(80808080...)");
+        assert_eq!(format!("{:?}", &hash), "Hash(\"80808080...\")");
         let sk = SecretKey::new([255; SECRET_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &sk), "SecretKey(ffffffff...)");
+        assert_eq!(format!("{:?}", &sk), "SecretKey(\"ffffffff...\")");
     }
 
     // Note that only public values have Display impl.
@@ -630,16 +648,29 @@ mod tests {
     fn display_format() {
         // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
-        assert_eq!(format!("{}", &hash), "01010101...");
+        assert_eq!(
+            format!("{}", &hash),
+            "0101010101010101010101010101010101010101010101010101010101010101"
+        );
 
         let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
-        assert_eq!(format!("{}", &pk), "0f0f0f0f...");
+        assert_eq!(
+            format!("{}", &pk),
+            "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+        );
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
-        assert_eq!(format!("{}", &signature), "0a0a0a0a...");
+        assert_eq!(
+            format!("{}", &signature),
+            "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a\
+            0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+        );
 
         // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
-        assert_eq!(format!("{}", &hash), "80808080...");
+        assert_eq!(
+            format!("{}", &hash),
+            "8080808080808080808080808080808080808080808080808080808080808080"
+        );
     }
 
     #[test]

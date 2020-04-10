@@ -166,14 +166,17 @@ impl NodeHandler {
         if msg.payload().skip && !msg.payload().transactions.is_empty() {
             error!(
                 "Received no-op propose with non-empty transaction list: {:?}",
-                msg
+                msg.payload()
             );
             return;
         }
 
         // Check prev_hash
         if msg.payload().prev_hash != self.state.last_hash() {
-            error!("Received propose with wrong last_block_hash msg={:?}", msg);
+            error!(
+                "Received propose with wrong last_block_hash msg={:?}",
+                msg.payload()
+            );
             return;
         }
 
@@ -198,7 +201,7 @@ impl NodeHandler {
         ) {
             Ok(state) => state.has_unknown_txs(),
             Err(err) => {
-                warn!("{}, msg={:?}", err, msg);
+                warn!("{}, msg={:?}", err, msg.payload());
                 return;
             }
         };
@@ -226,15 +229,15 @@ impl NodeHandler {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received block intended for another peer, to={}, from={}",
-                msg.payload().to.to_hex(),
-                msg.author().to_hex()
+                msg.payload().to,
+                msg.author()
             );
         }
 
         if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             bail!(
                 "Received request message from peer = {} which not in ConnectList.",
-                msg.author().to_hex()
+                msg.author()
             );
         }
 
@@ -267,7 +270,10 @@ impl NodeHandler {
         }
 
         if self.state.incomplete_block().is_some() {
-            bail!("Already there is an incomplete block, msg={:?}", msg);
+            bail!(
+                "Already there is an incomplete block, msg={:?}",
+                msg.payload()
+            );
         }
         if block.get_header::<ProposerId>()?.is_none() {
             bail!("Received block without `proposer_id` header");
@@ -276,7 +282,10 @@ impl NodeHandler {
             bail!("Received block skip with non-empty transactions");
         }
         if !msg.payload().verify_tx_hash() {
-            bail!("Received block has invalid tx_hash, msg={:?}", msg);
+            bail!(
+                "Received block has invalid tx_hash, msg={:?}",
+                msg.payload()
+            );
         }
 
         let precommits = into_verified(&msg.payload().precommits)?;
@@ -906,15 +915,15 @@ impl NodeHandler {
         if msg.payload().to != self.state.keys().consensus_pk() {
             bail!(
                 "Received response intended for another peer, to={}, from={}",
-                msg.payload().to.to_hex(),
-                msg.author().to_hex()
+                msg.payload().to,
+                msg.author()
             )
         }
 
         if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             bail!(
                 "Received response message from peer = {} which not in ConnectList.",
-                msg.author().to_hex()
+                msg.author()
             )
         }
         for tx in &msg.payload().transactions {
@@ -1269,7 +1278,7 @@ impl NodeHandler {
             "Cannot save `Precommit` to message cache",
         );
 
-        trace!("Broadcast precommit: {:?}", precommit);
+        trace!("Broadcast precommit: {:?}", precommit.payload());
         self.broadcast(precommit);
     }
 
