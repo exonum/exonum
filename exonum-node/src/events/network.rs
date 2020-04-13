@@ -68,7 +68,7 @@ impl ErrorHandler<io::Error> for ErrorAction {
     type OutError = io::Error;
 
     fn handle(&mut self, attempt: usize, e: io::Error) -> RetryPolicy<io::Error> {
-        log::info!(
+        log::trace!(
             "{} failed [Attempt: {}/{}]: {}",
             self.description,
             attempt,

@@ -75,8 +75,9 @@ impl NodeHandler {
     /// Handles the `Disconnected` event. Node will try to connect to that address again if it was
     /// in the validators list.
     pub(crate) fn handle_disconnected(&mut self, key: PublicKey) {
-        info!("Disconnected from: {}", key);
-        self.remove_peer_with_addr(key);
+        if self.remove_peer_with_addr(key) {
+            info!("Disconnected from: {}", key);
+        }
     }
 
     /// Handles the `UnableConnectToPeer` event. Node will try to connect to that address again
@@ -87,9 +88,9 @@ impl NodeHandler {
     }
 
     /// Removes peer from the state and from the cache. Node will try to connect to that address
-    /// again if it was in the validators list.
-    fn remove_peer_with_addr(&mut self, key: PublicKey) {
-        self.state.remove_peer_with_pubkey(&key);
+    /// again if it was in the validators list. Returns true if the peer has been connected.
+    fn remove_peer_with_addr(&mut self, key: PublicKey) -> bool {
+        let has_connected = self.state.remove_peer_with_pubkey(&key).is_some();
 
         let fork = self.blockchain.fork();
         NodeSchema::new(&fork).remove_peer_with_pubkey(&key);
@@ -102,6 +103,8 @@ impl NodeHandler {
         if is_validator && in_connect_list {
             self.connect(key);
         }
+
+        has_connected
     }
 
     /// Handles the `Connect` message and connects to a peer as result.
