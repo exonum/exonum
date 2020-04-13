@@ -5,6 +5,7 @@ appveyor
 atomicity
 backend
 backends
+backtrace
 bigint
 bincode
 bitfury

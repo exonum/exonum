@@ -472,9 +472,9 @@ impl<T: Access> CallRecords<T> {
         let block_proof = Schema::new(self.access.clone())
             .block_and_precommits(self.height)
             .unwrap();
-        let error_description = self.errors_aux.get(&call).map(|aux| aux.description);
+        let error_aux = self.errors_aux.get(&call);
         let call_proof = self.errors.get_proof(call);
-        CallProof::new(block_proof, call_proof, error_description)
+        CallProof::new(block_proof, call_proof, error_aux)
     }
 }
 

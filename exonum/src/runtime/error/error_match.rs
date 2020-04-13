@@ -203,6 +203,7 @@ mod tests {
             description: "Panic!".to_string(),
             runtime_id: None,
             call_site: None,
+            backtrace: vec![],
         };
         let mut matcher = ErrorMatch {
             kind: ErrorKind::Unexpected,

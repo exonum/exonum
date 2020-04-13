@@ -46,6 +46,7 @@ impl ExecutionError {
             description: description.into(),
             runtime_id: None,
             call_site: None,
+            backtrace: vec![],
         }
     }
 
@@ -112,9 +113,17 @@ impl ExecutionError {
         self.call_site.as_ref()
     }
 
-    pub(crate) fn set_call_site(&mut self, call_site: impl FnOnce() -> CallSite) -> &mut Self {
+    /// Returns the error backtrace. The backtrace excludes the call in which the error has occurred
+    /// (it is recorded in [`call_site`](#method.call_site)). The most recent call is first.
+    pub fn backtrace(&self) -> &[CallSite] {
+        &self.backtrace
+    }
+
+    pub(crate) fn set_call_site(&mut self, call_site: CallSite) -> &mut Self {
         if self.call_site.is_none() {
-            self.call_site = Some(call_site());
+            self.call_site = Some(call_site);
+        } else {
+            self.backtrace.push(call_site);
         }
         self
     }
@@ -123,47 +132,82 @@ impl ExecutionError {
     pub(crate) fn split_aux(&mut self) -> ExecutionErrorAux {
         ExecutionErrorAux {
             description: mem::take(&mut self.description),
+            backtrace: mem::take(&mut self.backtrace),
         }
+    }
+
+    /// Checks if the error has auxiliary part removed.
+    pub(crate) fn has_empty_aux(&self) -> bool {
+        self.description.is_empty() && self.backtrace.is_empty()
     }
 
     /// Combines this error with the provided auxiliary information.
     pub(crate) fn recombine_with_aux(&mut self, aux: ExecutionErrorAux) {
-        debug_assert!(self.description.is_empty());
+        debug_assert!(self.has_empty_aux());
         self.description = aux.description;
+        self.backtrace = aux.backtrace;
     }
 }
 
-impl Display for ExecutionError {
+impl fmt::Debug for ExecutionError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if let Some(ref call_site) = self.call_site {
-            write!(
-                formatter,
-                "Execution error with code `{kind}` occurred in {site}",
-                kind = self.kind,
-                site = call_site
-            )?;
-        } else if let Some(runtime_id) = self.runtime_id {
-            write!(
-                formatter,
-                "Execution error with code `{kind}` occurred in {runtime}",
-                kind = self.kind,
-                runtime = if let Ok(runtime) = RuntimeIdentifier::transform(runtime_id) {
-                    runtime.to_string()
-                } else {
-                    format!("Non-default runtime with id {}", runtime_id)
-                }
-            )?;
+        if formatter.alternate() {
+            formatter
+                .debug_struct("ExecutionError")
+                .field("kind", &self.kind)
+                .field("descriptions", &self.description)
+                .field("runtime_id", &self.runtime_id)
+                .field("call_site", &self.call_site)
+                .field("backtrace", &self.backtrace)
+                .finish()
         } else {
             write!(
                 formatter,
                 "Execution error with code `{kind}` occurred",
                 kind = self.kind
             )?;
+            if !self.description.is_empty() {
+                write!(formatter, ": {}", self.description)?;
+            }
+
+            if self.call_site.is_some() {
+                writeln!(formatter, "\nError backtrace (most recent call first):")?;
+                let calls = self.call_site.as_ref().into_iter().chain(&self.backtrace);
+                for (i, backtrace_site) in calls.enumerate() {
+                    writeln!(formatter, "{i:>4}: {site}", i = i, site = backtrace_site)?;
+                }
+            }
+            Ok(())
+        }
+    }
+}
+
+impl Display for ExecutionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "Execution error with code `{kind}` occurred",
+            kind = self.kind
+        )?;
+
+        if let Some(ref call_site) = self.call_site {
+            write!(formatter, " in {site}", site = call_site)?;
+        } else if let Some(runtime_id) = self.runtime_id {
+            write!(
+                formatter,
+                " in {runtime}",
+                runtime = if let Ok(runtime) = RuntimeIdentifier::transform(runtime_id) {
+                    runtime.to_string()
+                } else {
+                    format!("non-default runtime with id {}", runtime_id)
+                }
+            )?;
         }
 
         if !self.description.is_empty() {
             write!(formatter, ": {}", self.description)?;
         }
+
         Ok(())
     }
 }
@@ -214,11 +258,18 @@ impl ProtobufConvert for ExecutionError {
             bail!("No call site info or no_call_site marker");
         };
 
+        let backtrace: Result<Vec<_>, _> = pb
+            .take_backtrace()
+            .into_iter()
+            .map(ProtobufConvert::from_pb)
+            .collect();
+
         Ok(Self {
             kind,
             description: pb.take_description(),
             runtime_id,
             call_site,
+            backtrace: backtrace?,
         })
     }
 }

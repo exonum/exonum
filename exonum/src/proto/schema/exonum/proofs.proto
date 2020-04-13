@@ -20,6 +20,7 @@ option java_package = "com.exonum.messages.core";
 
 import "exonum/blockchain.proto";
 import "exonum/messages.proto";
+import "exonum/runtime/errors.proto";
 import "exonum/proof/map_proof.proto";
 
 // Block with its `Precommit` messages.
@@ -55,4 +56,7 @@ message CallProof {
   proof.MapProof call_proof = 2;
   // Human-readable description of an error if the call status is erroneous.
   string error_description = 3;
+  // Error backtrace. The backtrace excludes the call in which the error has occurred
+  // (it is recorded directly in `ExecutionError`). The most recent call is first.
+  repeated runtime.CallSite error_backtrace = 4;
 }
