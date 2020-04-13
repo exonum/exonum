@@ -394,11 +394,12 @@ fn protobuf_generate(
         .expect("Unable to get OUT_DIR");
 
     // Converts paths to strings and adds input dir to includes.
-    let mut includes: Vec<_> = includes.iter().map(ProtoSources::path).collect();
-    includes.push(input_dir.to_owned());
-    let includes: Vec<&str> = includes.iter().map(String::as_str).collect();
+    let includes: Vec<_> = includes.iter().map(ProtoSources::path).collect();
+    let mut includes: Vec<&str> = includes.iter().map(String::as_str).collect();
+    includes.push(input_dir);
 
     let proto_files = get_proto_files(&input_dir);
+    
     if include_sources {
         let included_files = get_included_files(&includes);
         generate_mod_rs(&out_dir, &proto_files, &included_files, mod_file_name);
@@ -406,25 +407,16 @@ fn protobuf_generate(
         generate_mod_rs_without_sources(&out_dir, &proto_files, mod_file_name);
     }
 
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: out_dir
-            .to_str()
-            .expect("Out dir name is not convertible to &str"),
-        input: &proto_files
-            .iter()
-            .map(|s| {
-                s.full_path
-                    .to_str()
-                    .expect("File name is not convertible to &str")
-            })
-            .collect::<Vec<_>>(),
-        includes: &includes,
-        customize: Customize {
+    protoc_rust::Codegen::new()
+        .out_dir(out_dir)
+        .inputs(proto_files.into_iter().map(|f| f.full_path))
+        .includes(&includes)
+        .customize(Customize {
             serde_derive: Some(true),
             ..Default::default()
-        },
-    })
-    .expect("protoc");
+        })
+        .run()
+        .expect("protoc")
 }
 
 fn get_included_files(includes: &[&str]) -> Vec<ProtobufFile> {
