@@ -399,6 +399,7 @@ fn protobuf_generate(
     includes.push(input_dir);
 
     let proto_files = get_proto_files(&input_dir);
+    
     if include_sources {
         let included_files = get_included_files(&includes);
         generate_mod_rs(&out_dir, &proto_files, &included_files, mod_file_name);
