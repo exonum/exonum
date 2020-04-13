@@ -77,6 +77,10 @@ message ExecutionError {
     // There was no service to process an erroneous call.
     google.protobuf.Empty no_call_site = 7;
   }
+
+  // Error backtrace. The backtrace excludes the call in which the error has occurred
+  // (it is recorded in `call_site`). The most recent call is first.
+  repeated CallSite backtrace = 8;
 }
 
 // Additional details about an `ExecutionError` that do not influence
@@ -84,6 +88,9 @@ message ExecutionError {
 message ExecutionErrorAux {
   // Human-readable error description.
   string description = 1;
+  // Error backtrace. The backtrace excludes the call in which the error has occurred
+  // (it is recorded directly in `ExecutionError`). The most recent call is first.
+  repeated CallSite backtrace = 2;
 }
 
 // Call site associated with an error.

@@ -192,7 +192,7 @@ impl<'a> ExecutionContext<'a> {
             .map_err(|mut err| {
                 self.set_should_rollback();
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite::new(spec.id, CallType::Constructor));
+                    .set_call_site(CallSite::new(spec.id, CallType::Constructor));
                 err
             })?;
 
@@ -381,15 +381,13 @@ impl ExecutionContextUnstable for ExecutionContext<'_> {
             .execute(context, method_id, arguments)
             .map_err(|mut err| {
                 self.set_should_rollback();
-                err.set_runtime_id(runtime_id).set_call_site(|| {
-                    CallSite::new(
-                        instance_id,
-                        CallType::Method {
-                            interface: interface_name.to_owned(),
-                            id: method_id,
-                        },
-                    )
-                });
+                err.set_runtime_id(runtime_id).set_call_site(CallSite::new(
+                    instance_id,
+                    CallType::Method {
+                        interface: interface_name.to_owned(),
+                        id: method_id,
+                    },
+                ));
                 err
             })
     }
@@ -505,7 +503,7 @@ impl SupervisorExtensions<'_> {
             .map_err(|mut err| {
                 self.0.set_should_rollback();
                 err.set_runtime_id(spec.artifact.runtime_id)
-                    .set_call_site(|| CallSite::new(instance_id, CallType::Resume));
+                    .set_call_site(CallSite::new(instance_id, CallType::Resume));
                 err
             })
     }

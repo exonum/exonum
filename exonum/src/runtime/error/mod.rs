@@ -101,17 +101,27 @@ pub trait ExecutionFail {
 /// - an [error kind][`ErrorKind`]
 /// - call information (runtime ID and, if appropriate, [`CallSite`] where the error has occurred)
 /// - an optional description
+/// - an error backtrace
 ///
-/// Call information is added by the core automatically; it is impossible to add from the service
-/// code. It *is* possible to inspect the call info for an error that was returned by a service
-/// though.
+/// Call information and backtrace are added by the core automatically; they are impossible
+/// to add from the service code. It *is* possible to inspect the call info / backtrace for an error
+/// that was returned by a service though.
 ///
-/// The error kind and call info affect the blockchain state hash, while the description does not.
+/// The error kind and call info affect the blockchain state hash, while the description
+/// and backtrace do not.
 /// Therefore descriptions are mostly used for developer purposes, not for interaction with users.
+///
+/// # Display Formats
+///
+/// - The default debug format `{:?}` on an `ExecutionError` will output complete
+///   information about the error, including the error backtrace.
+/// - To output an ordinary debug structure, use the alternate debug format `{:#?}`.
+/// - The default display format `{}` does not include the backtrace, but includes
+///   other error details.
 ///
 /// [`ErrorKind`]: enum.ErrorKind.html
 /// [`CallSite`]: struct.CallSite.html
-#[derive(Clone, Debug, Error, BinaryValue)]
+#[derive(Clone, Error, BinaryValue)]
 #[cfg_attr(test, derive(PartialEq))]
 // ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
 // by the caller. It is useful for roundtrip tests, though.
@@ -120,6 +130,7 @@ pub struct ExecutionError {
     description: String,
     runtime_id: Option<u32>,
     call_site: Option<CallSite>,
+    backtrace: Vec<CallSite>,
 }
 
 /// Additional details about an `ExecutionError` that do not influence blockchain state hash.
@@ -128,6 +139,9 @@ pub struct ExecutionError {
 pub(crate) struct ExecutionErrorAux {
     /// Human-readable error description.
     pub description: String,
+    /// Backtrace. The backtrace excludes the call in which the error has occurred (it is recorded
+    /// in `ExecutionError.call_site`). The most recent call is first.
+    pub backtrace: Vec<CallSite>,
 }
 
 /// Invokes closure, capturing the cause of the unwinding panic if one occurs.

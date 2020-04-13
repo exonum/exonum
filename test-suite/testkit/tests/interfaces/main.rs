@@ -16,7 +16,8 @@ use exonum::{
     crypto::KeyPair,
     messages::{AnyTx, Verified},
     runtime::{
-        CallInfo, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError, SnapshotExt,
+        CallInfo, CallType, CommonError, CoreError, ErrorMatch, ExecutionContext, ExecutionError,
+        SnapshotExt,
     },
 };
 use exonum_rust_runtime::DefaultInstance;
@@ -79,6 +80,17 @@ fn test_create_wallet_fallthrough_auth() {
     )
     .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&Error::WrongInterfaceCaller));
+
+    let backtrace = err.backtrace();
+    assert_eq!(backtrace.len(), 1);
+    assert_eq!(backtrace[0].instance_id, AnyCallService::ID);
+    assert_eq!(
+        backtrace[0].call_type,
+        CallType::Method {
+            interface: String::new(),
+            id: 0
+        }
+    );
 
     // With fallthrough auth, the call should succeed.
     call.fallthrough_auth = true;
@@ -217,6 +229,19 @@ fn test_deposit_invalid_auth() {
     )
     .unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
+
+    let backtrace = err.backtrace();
+    assert_eq!(backtrace.len(), 11);
+    for call in backtrace {
+        assert_eq!(call.instance_id, AnyCallService::ID);
+        assert_eq!(
+            call.call_type,
+            CallType::Method {
+                interface: String::new(),
+                id: 0
+            }
+        );
+    }
 }
 
 #[test]
@@ -324,7 +349,13 @@ fn test_any_call_err_unknown_interface() {
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
-    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchInterface));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CommonError::NoSuchInterface).for_service(WalletService::ID)
+    );
+    let backtrace = err.backtrace();
+    assert_eq!(backtrace.len(), 1);
+    assert_eq!(backtrace[0].instance_id, AnyCallService::ID);
 }
 
 #[test]
@@ -343,7 +374,13 @@ fn test_any_call_err_unknown_method() {
     let err =
         execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
 
-    assert_eq!(err, ErrorMatch::from_fail(&CommonError::NoSuchMethod));
+    assert_eq!(
+        err,
+        ErrorMatch::from_fail(&CommonError::NoSuchMethod).for_service(WalletService::ID)
+    );
+    let backtrace = err.backtrace();
+    assert_eq!(backtrace.len(), 1);
+    assert_eq!(backtrace[0].instance_id, AnyCallService::ID);
 }
 
 #[test]
@@ -362,8 +399,12 @@ fn test_any_call_err_wrong_arg() {
     assert_eq!(
         err,
         ErrorMatch::from_fail(&CommonError::MalformedArguments)
+            .for_service(WalletService::ID)
             .with_description_containing("invalid utf-8 sequence")
     );
+    let backtrace = err.backtrace();
+    assert_eq!(backtrace.len(), 1);
+    assert_eq!(backtrace[0].instance_id, AnyCallService::ID);
 }
 
 #[test]
@@ -392,6 +433,10 @@ fn test_any_call_panic_recursion_limit() {
             "Maximum depth of call stack ({})",
             ExecutionContext::MAX_CALL_STACK_DEPTH
         ))
+    );
+    assert_eq!(
+        err.backtrace().len(),
+        ExecutionContext::MAX_CALL_STACK_DEPTH as usize - 1
     );
 }
 

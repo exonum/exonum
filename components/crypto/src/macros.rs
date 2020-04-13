@@ -46,7 +46,7 @@ macro_rules! implement_public_crypto_wrapper {
         /// Returns a hex representation of binary data.
         /// Lower case letters are used (e.g. `f9b4ca`).
         pub fn to_hex(&self) -> String {
-            encode_hex(self)
+            $crate::encode_hex(self)
         }
     }
 
@@ -64,18 +64,29 @@ macro_rules! implement_public_crypto_wrapper {
 
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, stringify!($name))?;
-            write!(f, "(")?;
-            write_short_hex(f, &self[..])?;
-            write!(f, ")")
+            let mut hex = String::with_capacity($crate::BYTES_IN_DEBUG + $crate::BYTES_IN_ELLIPSIS);
+            $crate::write_short_hex(&mut hex, &self[..])?;
+
+            f.debug_tuple(stringify!($name))
+                .field(&hex)
+                .finish()
         }
     }
 
     impl fmt::Display for $name {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write_short_hex(f, &self[..])
+            f.write_str(&self.to_hex())
         }
     }
+
+    impl std::str::FromStr for $name {
+        type Err = hex::FromHexError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            Self::from_hex(s)
+        }
+    }
+
     )
 }
 
@@ -112,10 +123,12 @@ macro_rules! implement_private_crypto_wrapper {
 
     impl fmt::Debug for $name {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, stringify!($name))?;
-            write!(f, "(")?;
-            write_short_hex(f, &self[..])?;
-            write!(f, ")")
+            let mut hex = String::with_capacity($crate::BYTES_IN_DEBUG + $crate::BYTES_IN_ELLIPSIS);
+            $crate::write_short_hex(&mut hex, &self[..])?;
+
+            f.debug_tuple(stringify!($name))
+                .field(&hex)
+                .finish()
         }
     }
 

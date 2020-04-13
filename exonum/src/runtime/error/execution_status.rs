@@ -99,6 +99,8 @@ pub mod serde {
         runtime_id: Option<u32>,
         #[serde(skip_serializing_if = "Option::is_none", default)]
         call_site: Option<CallSite>,
+        #[serde(skip_serializing_if = "Vec::is_empty", default)]
+        backtrace: Vec<CallSite>,
     }
 
     impl From<Result<(), &ExecutionError>> for ExecutionStatus {
@@ -118,6 +120,7 @@ pub mod serde {
                     code,
                     runtime_id: err.runtime_id,
                     call_site: err.call_site.clone(),
+                    backtrace: err.backtrace.clone(),
                 }
             } else {
                 Self {
@@ -126,6 +129,7 @@ pub mod serde {
                     code: None,
                     runtime_id: None,
                     call_site: None,
+                    backtrace: vec![],
                 }
             }
         }
@@ -165,6 +169,7 @@ pub mod serde {
                     description: self.description,
                     runtime_id: self.runtime_id,
                     call_site: self.call_site,
+                    backtrace: self.backtrace,
                 })
             })
         }

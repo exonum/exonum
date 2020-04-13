@@ -36,7 +36,7 @@ impl NodeHandler {
             Message::Service(Service::AnyTx(msg)) => {
                 if let Err(e) = self.handle_tx(msg.clone()) {
                     log::warn!(
-                        "Failed to process transaction {:?} (hash = {:?}): {}",
+                        "Failed to process transaction {:?} (hash = `{}`): {}",
                         msg.payload(),
                         msg.object_hash(),
                         e
@@ -50,7 +50,7 @@ impl NodeHandler {
             Message::Responses(Responses::TransactionsResponse(msg)) => {
                 if let Err(e) = self.handle_txs_batch(&msg) {
                     log::warn!(
-                        "Error processing `TransactionsResponse` from {:?}: {}",
+                        "Error processing `TransactionsResponse` from `{}`: {}",
                         msg.author(),
                         e
                     );
@@ -122,7 +122,7 @@ impl NodeHandler {
 
         if !self.state.connect_list().is_peer_allowed(&public_key) {
             error!(
-                "Received connect message from {:?} peer which not in ConnectList.",
+                "Received connect message from '{}' peer which not in ConnectList.",
                 public_key
             );
             return;
@@ -132,19 +132,19 @@ impl NodeHandler {
         let mut need_connect = true;
         if let Some(saved_message) = self.state.peers().get(&public_key) {
             if saved_message.payload().time() > message.payload().time() {
-                error!("Received outdated Connect message from {}", address);
+                error!("Received outdated Connect message from `{}`", address);
                 return;
             } else if saved_message.payload().time() < message.payload().time() {
                 need_connect = saved_message.payload().host != message.payload().host;
             } else if saved_message.payload().host == message.payload().host {
                 need_connect = false;
             } else {
-                error!("Received weird Connect message from {}", address);
+                error!("Received weird Connect message from `{}`", address);
                 return;
             }
             if saved_message.payload().host != message.payload().host {
                 info!(
-                    "Updating connect list for peer: {} with new addr: {}",
+                    "Updating connect list for peer: `{}` with new addr: `{}`",
                     public_key,
                     message.payload().host
                 );
@@ -156,7 +156,7 @@ impl NodeHandler {
 
         self.state.add_peer(public_key, message.clone());
         info!(
-            "Received Connect message from {}. Need to connect: {}",
+            "Received Connect message from `{}`. Need to connect: `{}`",
             address, need_connect,
         );
         let fork = self.blockchain.fork();
@@ -167,7 +167,7 @@ impl NodeHandler {
 
         if need_connect {
             // TODO: reduce double sending of connect message
-            info!("Send Connect message to {}", address);
+            info!("Send Connect message to `{}`", address);
             //TODO: remove responding connect [ECR-2385]
             self.connect(public_key);
         }
@@ -188,7 +188,7 @@ impl NodeHandler {
 
         if !self.state.connect_list().is_peer_allowed(&msg.author()) {
             error!(
-                "Received status message from peer = {:?} which not in ConnectList.",
+                "Received status message from peer = `{}` which not in ConnectList.",
                 msg.author()
             );
             return;
@@ -221,7 +221,7 @@ impl NodeHandler {
         let peers = self.state.peers().values().cloned().collect::<Vec<_>>();
 
         trace!(
-            "HANDLE REQUEST PEERS: Sending {:?} peers to {:?}",
+            "HANDLE REQUEST PEERS: Sending {:?} peers to `{}`",
             peers,
             msg.author()
         );
@@ -257,7 +257,7 @@ impl NodeHandler {
                 .unwrap();
             let msg = PeersRequest::new(peer.author());
             trace!(
-                "Request peers from peer with addr {:?}",
+                "Request peers from peer with addr `{}`",
                 peer.payload().host
             );
             let message = self.sign_message(msg);

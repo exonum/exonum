@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use anyhow::ensure;
 use exonum_crypto::{Hash, PublicKey};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::{
@@ -27,7 +28,7 @@ use crate::{
     helpers::{byzantine_quorum, Height, OrderedMap, ValidatorId},
     messages::{Precommit, Verified},
     proto::schema,
-    runtime::{ExecutionError, ExecutionErrorAux},
+    runtime::{CallSite, ExecutionError, ExecutionErrorAux},
 };
 
 /// Trait that represents a key in block header entry map. Provides
@@ -438,6 +439,12 @@ pub struct CallProof {
     /// If the call is successful, the error description should be `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_description: Option<String>,
+
+    /// Error backtrace. Like `error_description`, the backtrace is not authenticated
+    /// and should be used for diagnostic purposes only. If the call is successful,
+    /// the backtrace should be `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error_backtrace: Option<Vec<CallSite>>,
 }
 
 impl ProtobufConvert for CallProof {
@@ -448,22 +455,49 @@ impl ProtobufConvert for CallProof {
         inner.set_block_proof(self.block_proof.to_pb());
         inner.set_call_proof(self.call_proof.to_pb());
         inner.set_error_description(self.error_description.clone().unwrap_or_default());
+        if let Some(ref backtrace) = self.error_backtrace {
+            let backtrace: Vec<_> = backtrace.iter().map(ProtobufConvert::to_pb).collect();
+            inner.set_error_backtrace(backtrace.into());
+        }
         inner
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> Result<Self, anyhow::Error> {
         let block_proof = BlockProof::from_pb(pb.take_block_proof())?;
         let call_proof = MapProof::from_pb(pb.take_call_proof())?;
-        let error_description = pb.get_error_description();
-        let error_description = if error_description.is_empty() {
+        let successful_call = call_proof.missing_keys_unchecked().next().is_some();
+
+        let error_description = pb.take_error_description();
+        let error_description = if successful_call {
+            ensure!(
+                error_description.is_empty(),
+                "Non-empty error description for successful call"
+            );
             None
         } else {
-            Some(error_description.to_owned())
+            Some(error_description)
         };
+
+        let error_backtrace = pb.take_error_backtrace();
+        let error_backtrace = if successful_call {
+            ensure!(
+                error_backtrace.is_empty(),
+                "Non-empty error description for successful call"
+            );
+            None
+        } else {
+            let backtrace: Result<Vec<_>, _> = error_backtrace
+                .into_iter()
+                .map(ProtobufConvert::from_pb)
+                .collect();
+            Some(backtrace?)
+        };
+
         Ok(Self {
             block_proof,
             call_proof,
             error_description,
+            error_backtrace,
         })
     }
 }
@@ -472,12 +506,19 @@ impl CallProof {
     pub(super) fn new(
         block_proof: BlockProof,
         call_proof: MapProof<CallInBlock, ExecutionError>,
-        error_description: Option<String>,
+        error_aux: Option<ExecutionErrorAux>,
     ) -> Self {
+        let (error_description, error_backtrace) = if let Some(aux) = error_aux {
+            (Some(aux.description), Some(aux.backtrace))
+        } else {
+            (None, None)
+        };
+
         Self {
             block_proof,
             call_proof,
             error_description,
+            error_backtrace,
         }
     }
 
@@ -505,13 +546,19 @@ impl CallProof {
                 }
                 Ok(())
             }
+
             Some(e) => {
                 let mut full_error = e.to_owned();
-                if !full_error.description().is_empty() {
+                if !full_error.has_empty_aux() {
                     return Err(ProofError::MalformedStatus);
                 }
+
                 let description = self.error_description.clone().unwrap_or_default();
-                full_error.recombine_with_aux(ExecutionErrorAux { description });
+                let backtrace = self.error_backtrace.clone().unwrap_or_default();
+                full_error.recombine_with_aux(ExecutionErrorAux {
+                    description,
+                    backtrace,
+                });
                 Err(full_error)
             }
         };
@@ -974,7 +1021,12 @@ mod tests {
         let keys: Vec<_> = (0..4).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
         let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
-        let mut call_proof = CallProof::new(block_proof, call_proof, Some("huh?".to_owned()));
+
+        let error_aux = ExecutionErrorAux {
+            description: "huh?".to_owned(),
+            backtrace: vec![],
+        };
+        let mut call_proof = CallProof::new(block_proof, call_proof, Some(error_aux));
         let (call, res) = call_proof.verify(&public_keys).unwrap();
         assert_eq!(call, CallInBlock::transaction(2));
         assert_eq!(res, Err(ExecutionError::service(5, "huh?")));
@@ -1025,7 +1077,12 @@ mod tests {
         let keys: Vec<_> = (0..3).map(|_| KeyPair::random()).collect();
         let public_keys: Vec<_> = keys.iter().map(KeyPair::public_key).collect();
         let block_proof = create_block_proof(&keys, Hash::zero(), error_hash);
-        let call_proof = CallProof::new(block_proof, call_proof, Some("".to_owned()));
+
+        let error_aux = ExecutionErrorAux {
+            description: "".to_owned(),
+            backtrace: vec![],
+        };
+        let call_proof = CallProof::new(block_proof, call_proof, Some(error_aux));
         let err = call_proof.verify(&public_keys).unwrap_err();
         assert_matches!(err, ProofError::AmbiguousEntry);
     }
