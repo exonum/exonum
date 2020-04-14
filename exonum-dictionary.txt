@@ -27,6 +27,7 @@ ciphertext
 clippy
 cloneable
 codecov
+codegen
 compat
 concat
 consts

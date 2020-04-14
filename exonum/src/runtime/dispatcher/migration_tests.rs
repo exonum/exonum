@@ -27,10 +27,11 @@ use crate::{
     blockchain::{ApiSender, Block, BlockParams, BlockchainMut},
     helpers::{Height, ValidatorId},
     runtime::{
+        execution_context::TopLevelContext,
         migrations::{InitMigrationError, MigrationError},
         oneshot::Receiver,
-        BlockchainData, CoreError, DispatcherSchema, ErrorMatch, MethodId, RuntimeIdentifier,
-        SnapshotExt, WellKnownRuntime,
+        BlockchainData, CoreError, DispatcherSchema, ErrorMatch, ExecutionContext, MethodId,
+        RuntimeIdentifier, SnapshotExt, WellKnownRuntime,
     },
 };
 
@@ -307,17 +308,9 @@ impl Rig {
         self.next_service_id += 1;
 
         let mut fork = self.blockchain.fork();
-        let mut should_rollback = false;
-        let mut context = ExecutionContext::for_block_call(
-            self.dispatcher(),
-            &mut fork,
-            &mut should_rollback,
-            service.as_descriptor(),
-        );
-        context
-            .initiate_adding_service(service.clone(), vec![])
+        TopLevelContext::for_block_call(self.dispatcher(), &mut fork, service.as_descriptor())
+            .call(|mut ctx| ctx.initiate_adding_service(service.clone(), vec![]))
             .expect("`initiate_adding_service` failed");
-        assert!(!should_rollback);
         self.create_block(fork);
         service
     }
