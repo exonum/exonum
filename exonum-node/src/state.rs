@@ -691,11 +691,7 @@ impl State {
     /// indeed connected or `None` if there was no connection with given socket address.
     pub(super) fn remove_peer_with_pubkey(&mut self, key: &PublicKey) -> Option<Verified<Connect>> {
         self.connections.remove(key);
-        if let Some(c) = self.peers.remove(key) {
-            Some(c)
-        } else {
-            None
-        }
+        self.peers.remove(key)
     }
 
     /// Checks if this node considers a peer to be a validator.

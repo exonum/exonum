@@ -111,7 +111,7 @@ impl NodeHandler {
 
         // Warning for messages from previous and future height
         if msg.epoch() < self.state.epoch().previous() || msg.epoch() > self.state.epoch().next() {
-            warn!(
+            trace!(
                 "Received consensus message from other height: msg.height={}, self.height={}",
                 msg.epoch(),
                 self.state.epoch()
