@@ -51,7 +51,7 @@ rand = "0.7.0"
 serde_json = "1.0.0"
 
 [build-dependencies]
-exonum-build = { version = "1.0.0", path = "../../../components/build" }
+exonum-build = { version = "1.0.1", path = "../../../components/build" }
 
 [features]
 default = ["with-serde"]

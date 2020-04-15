@@ -40,7 +40,7 @@ exonum-testkit = { version = "1.0.0", path = "../../../test-suite/testkit" }
 pretty_assertions = "0.6.1"
 
 [build-dependencies]
-exonum-build = { version = "1.0.0", path = "../../../components/build" }
+exonum-build = { version = "1.0.1", path = "../../../components/build" }
 
 [features]
 default = ["with-serde"]

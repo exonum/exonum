@@ -33,4 +33,4 @@ with-protobuf = ["exonum-proto", "protobuf"]
 with-serde = []
 
 [build-dependencies]
-exonum-build = { version = "1.0.0", path = "../build" }
+exonum-build = { version = "1.0.1", path = "../build" }

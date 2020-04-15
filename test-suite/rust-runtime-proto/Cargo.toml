@@ -34,4 +34,4 @@ version = "0.2.13"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [build-dependencies]
-exonum-build = { version = "1.0.0", path = "../../components/build" }
+exonum-build = { version = "1.0.1", path = "../../components/build" }
