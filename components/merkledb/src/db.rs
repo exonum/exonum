@@ -470,6 +470,63 @@ enum NextIterValue {
 /// db.merge(fork.into_patch()).unwrap();
 /// ```
 ///
+/// # Merge Workflow
+///
+/// The user of a `Database` is responsible to ensure that forks are either created and merged
+/// sequentially or do not contain overlapping changes. By sequential creation we mean the following
+/// workflow:
+///
+/// ```
+/// # use exonum_merkledb::{Database, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let first_fork = db.fork();
+/// // Perform some operations on `first_fork`...
+/// db.merge(first_fork.into_patch()).unwrap();
+/// let second_fork = db.fork();
+/// // Perform some operations on `second_fork`...
+/// db.merge(second_fork.into_patch()).unwrap();
+/// ```
+///
+/// In contrast, this is a non-sequential workflow:
+///
+/// ```
+/// # use exonum_merkledb::{Database, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let first_fork = db.fork();
+/// // Perform some operations on `first_fork`...
+/// let second_fork = db.fork();
+/// // Perform some operations on `second_fork`...
+/// db.merge(first_fork.into_patch()).unwrap();
+/// db.merge(second_fork.into_patch()).unwrap();
+/// ```
+///
+/// In a non-sequential workflow, `first_fork` and `second_fork` **must not** contain overlapping
+/// changes (i.e., changes to the same index). If they do, the result of the merge may be
+/// unpredictable to the programmer and may break database invariants, e.g., that the length
+/// of an index is equal to the number of elements obtained by iterating over the index:
+///
+/// ```
+/// // NEVER USE THIS PATTERN!
+/// # use exonum_merkledb::{access::CopyAccessExt, Database, TemporaryDB};
+/// let db = TemporaryDB::new();
+/// let first_fork = db.fork();
+/// first_fork.get_list("list").extend(vec![1, 2, 3]);
+/// let second_fork = db.fork();
+/// second_fork.get_list("list").push(4);
+/// db.merge(first_fork.into_patch()).unwrap();
+/// db.merge(second_fork.into_patch()).unwrap();
+///
+/// let snapshot = db.snapshot();
+/// let list = snapshot.get_list::<_, i32>("list");
+/// assert_eq!(list.len(), 1);
+/// assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 2, 3]);
+/// // ^-- Oops, we got two phantom elements!
+/// ```
+///
+/// It is advised to create / merge patches sequentially whenever possible. The concurrent
+/// workflow should only be used for minor changes, for which the proof that a patch does not overlap
+/// with concurrent patches is tractable.
+///
 /// [`snapshot`]: #tymethod.snapshot
 /// [`fork`]: #method.fork
 /// [`merge`]: #tymethod.merge
@@ -496,6 +553,12 @@ pub trait Database: Send + Sync + 'static {
     /// Note that this method may be called concurrently from different threads, the
     /// onus to guarantee atomicity is on the implementor of the trait.
     ///
+    /// # Logical Safety
+    ///
+    /// Merging several patches which are not created sequentially and contain
+    /// overlapping changes may result in the unexpected storage state and lead to the hard-to debug
+    /// errors, storage leaks etc. See the [trait docs](#merge-workflow) for more details.
+    ///
     /// # Errors
     ///
     /// If this method encounters any form of I/O or other error during merging, an error variant
@@ -507,6 +570,12 @@ pub trait Database: Send + Sync + 'static {
     ///
     /// Note that this method may be called concurrently from different threads, the
     /// onus to guarantee atomicity is on the implementor of the trait.
+    ///
+    /// # Logical Safety
+    ///
+    /// Merging several patches which are not created sequentially and contain
+    /// overlapping changes may result in the unexpected storage state and lead to the hard-to debug
+    /// errors, storage leaks etc. See the [trait docs](#merge-workflow) for more details.
     ///
     /// # Errors
     ///
