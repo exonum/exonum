@@ -1011,38 +1011,6 @@ fn test_invalid_tombstone() {
 }
 
 #[test]
-#[ignore] // TODO: fix test [ECR-2869]
-fn multiple_patch() {
-    fn list_index(view: &Fork) -> ListIndex<&Fork, u64> {
-        view.get_list("list_index")
-    }
-
-    let db = TemporaryDB::new();
-    // create first patch
-    let fork = db.fork();
-    {
-        let mut index = list_index(&fork);
-        index.push(1);
-        index.push(3);
-        index.push(4);
-    }
-    let patch1 = fork.into_patch();
-    // create second patch
-    let fork = db.fork();
-    {
-        let mut index = list_index(&fork);
-        index.push(10);
-    }
-    let patch2 = fork.into_patch();
-
-    db.merge(patch1).unwrap();
-    db.merge(patch2).unwrap();
-    let snapshot = db.snapshot();
-    let index: ListIndex<_, u64> = snapshot.get_list("list_index");
-    assert_eq!(index.len() as usize, index.iter().count());
-}
-
-#[test]
 fn valid_index_name() {
     assert!(check_valid_name("index_name"));
     assert!(check_valid_name("_index_name"));
