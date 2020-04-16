@@ -32,7 +32,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
+use crate::{backends::actix::error_handlers, AllowOrigin, ApiAccess, ApiAggregator, ApiBuilder};
 
 /// Configuration parameters for a single web server.
 #[derive(Debug, Clone)]
@@ -356,6 +356,7 @@ impl ApiManager {
         let mut server_builder = HttpServer::new(move || {
             App::new()
                 .wrap(server_config.cors_factory())
+                .wrap(error_handlers())
                 .service(aggregator.extend_backend(access, web::scope("api")))
         })
         .listen(listener)?;
