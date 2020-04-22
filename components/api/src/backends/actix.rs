@@ -18,16 +18,25 @@
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
 pub use actix_cors::{Cors, CorsFactory};
-pub use actix_web::{http::Method as HttpMethod, web::Payload, HttpRequest, HttpResponse};
+pub use actix_web::{
+    http::{Method as HttpMethod, StatusCode as HttpStatusCode},
+    web::Payload,
+    HttpRequest, HttpResponse,
+};
 
 use actix_web::{
     body::Body,
+    dev::ServiceResponse,
     error::ResponseError,
     http::header,
+    middleware::errhandlers::{ErrorHandlerResponse, ErrorHandlers},
     web::{self, scope, Json, Query},
     FromRequest,
 };
-use futures::future::{Future, FutureExt, LocalBoxFuture};
+use futures::{
+    future::{Future, LocalBoxFuture},
+    prelude::*,
+};
 use serde::{de::DeserializeOwned, Serialize};
 
 use std::{fmt, sync::Arc};
@@ -199,7 +208,7 @@ async fn extract_query<Q>(
     request: HttpRequest,
     payload: Payload,
     mutability: EndpointMutability,
-) -> Result<Q, actix_web::error::Error>
+) -> Result<Q, ApiError>
 where
     Q: DeserializeOwned + 'static,
 {
@@ -207,12 +216,20 @@ where
         EndpointMutability::Immutable => Query::extract(&request)
             .await
             .map(Query::into_inner)
-            .map_err(From::from),
+            .map_err(|e| {
+                ApiError::bad_request()
+                    .title("Query parse error")
+                    .detail(e.to_string())
+            }),
 
         EndpointMutability::Mutable => Json::from_request(&request, &mut payload.into_inner())
             .await
             .map(Json::into_inner)
-            .map_err(From::from),
+            .map_err(|e| {
+                ApiError::bad_request()
+                    .title("JSON body parse error")
+                    .detail(e.to_string())
+            }),
     }
 }
 
@@ -233,7 +250,7 @@ where
 
             async move {
                 let query = extract_query(request, payload, mutability).await?;
-                let response = handler(query).await.map_err(actix_web::Error::from)?;
+                let response = handler(query).await?;
                 Ok(json_response(actuality, response))
             }
             .boxed_local()
@@ -266,6 +283,52 @@ impl From<AllowOrigin> for CorsFactory {
     fn from(origin: AllowOrigin) -> Self {
         Self::from(&origin)
     }
+}
+
+trait ErrorHandlersEx {
+    fn default_api_error<F: Fn(&ServiceResponse) -> ApiError + 'static>(
+        self,
+        status: HttpStatusCode,
+        handler: F,
+    ) -> Self;
+}
+
+impl ErrorHandlersEx for ErrorHandlers<actix_web::dev::Body> {
+    fn default_api_error<F: Fn(&ServiceResponse) -> ApiError + 'static>(
+        self,
+        status: HttpStatusCode,
+        handler: F,
+    ) -> Self {
+        self.handler(status, move |res| {
+            let res = match res.response().body().as_ref() {
+                // The response has no body, just set the default body.
+                None | Some(Body::Empty) | Some(Body::None) => {
+                    let error: actix_web::Error = handler(&res).into();
+                    res.into_response(error.as_response_error().error_response())
+                }
+
+                // Just use the provided body.
+                _ => res,
+            };
+
+            Ok(ErrorHandlerResponse::Response(res))
+        })
+    }
+}
+
+pub(crate) fn error_handlers() -> ErrorHandlers<actix_web::dev::Body> {
+    ErrorHandlers::new()
+        .default_api_error(HttpStatusCode::NOT_FOUND, |res| {
+            ApiError::not_found()
+                .title("Method not found")
+                .detail(format!(
+                    "API endpoint `{}` doesn't exist",
+                    res.request().uri().path()
+                ))
+        })
+        .default_api_error(HttpStatusCode::BAD_REQUEST, |_res| {
+            ApiError::bad_request().title("Bad request")
+        })
 }
 
 #[cfg(test)]

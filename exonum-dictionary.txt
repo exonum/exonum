@@ -60,6 +60,7 @@ doctest
 doctests
 emsp
 encodable
+errhandlers
 errored
 Exonum
 exonumhub
