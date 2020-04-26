@@ -12,22 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use bit_vec::BitVec;
 use chrono::{DateTime, TimeZone, Utc};
 use exonum::{
     crypto::{self, Hash, PublicKey},
     merkledb::BinaryValue,
 };
+use exonum_api::ErrorBody;
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 use pretty_assertions::assert_eq;
+use reqwest::{Client, StatusCode};
 
 use std::{borrow::Cow, collections::HashMap};
 
-use crate::{assert_exonum_core_protos, testkit_with_rust_service};
+use crate::{assert_exonum_core_protos, service::Transfer, testkit_with_rust_service};
 
 #[test]
 fn test_date_time_pb_convert() {
@@ -39,7 +40,7 @@ fn test_date_time_pb_convert() {
 
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "crate::proto::tests::Point")]
+#[protobuf_convert(source = "crate::proto::Point")]
 struct Point {
     x: u32,
     y: u32,
@@ -60,7 +61,7 @@ fn test_simple_struct_round_trip() {
 
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "crate::proto::tests::TestProtobufConvert")]
+#[protobuf_convert(source = "crate::proto::TestProtobufConvert")]
 struct StructWithScalarTypes {
     key: PublicKey,
     hash: Hash,
@@ -118,7 +119,7 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[protobuf_convert(source = "crate::proto::tests::TestProtobufConvertRepeated")]
+#[protobuf_convert(source = "crate::proto::TestProtobufConvertRepeated")]
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 struct StructWithRepeatedTypes {
@@ -151,7 +152,7 @@ fn test_repeated_struct_round_trip() {
 
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "crate::proto::tests::TestProtobufConvertMap")]
+#[protobuf_convert(source = "crate::proto::TestProtobufConvertMap")]
 struct StructWithMaps {
     num_map: HashMap<u32, u64>,
     string_map: HashMap<u32, String>,
@@ -191,7 +192,7 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[protobuf_convert(source = "crate::proto::tests::TestFixedArrays")]
+#[protobuf_convert(source = "crate::proto::TestFixedArrays")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 struct StructWithFixedArrays {
@@ -201,11 +202,13 @@ struct StructWithFixedArrays {
 }
 
 #[test]
-#[should_panic(expected = "wrong array size: actual 32, expected 64")]
 fn test_fixed_array_pb_convert_invalid_len() {
     let vec = vec![0_u8; 32];
     <[u8; 32]>::from_pb(vec.clone()).unwrap();
-    <[u8; 64]>::from_pb(vec).unwrap();
+    let err = <[u8; 64]>::from_pb(vec).map(drop).unwrap_err();
+    assert!(err
+        .to_string()
+        .contains("wrong array size: actual 32, expected 64"));
 }
 
 #[test]
@@ -233,7 +236,6 @@ async fn core_protos_with_service() {
 }
 
 #[tokio::test]
-#[should_panic] // TODO: Remove `should_panic` after fix (ECR-3948)
 async fn core_protos_without_services() {
     let mut testkit = TestKitBuilder::validator().build();
     assert_exonum_core_protos(&testkit.api()).await;
@@ -254,10 +256,10 @@ async fn service_protos_with_service() {
         .await
         .expect("Rust runtime Api unexpectedly failed");
 
-    const EXPECTED_CONTENT: &str = include_str!("proto/tests.proto");
+    const EXPECTED_CONTENT: &str = include_str!("proto/service.proto");
 
     assert_eq!(proto_files.len(), 1);
-    assert_eq!(proto_files[0].name, "tests.proto".to_string());
+    assert_eq!(proto_files[0].name, "service.proto".to_string());
     assert_eq!(proto_files[0].content, EXPECTED_CONTENT.to_string());
 }
 
@@ -290,4 +292,56 @@ async fn service_protos_with_incorrect_service() {
         error.body.detail,
         format!("Unable to find sources for artifact {}", artifact_id)
     );
+}
+
+#[tokio::test]
+async fn request_to_pb_endpoint() -> anyhow::Result<()> {
+    let (_, api) = testkit_with_rust_service();
+    let transfer = Transfer {
+        message: "test".to_owned(),
+        seed: 42,
+    };
+
+    // Send `Transfer` using standard JSON encoding.
+    let response: Transfer = api
+        .public(ApiKind::Service("test-runtime-api"))
+        .query(&transfer)
+        .post("transfer")
+        .await?;
+    assert_eq!(response, transfer);
+
+    // Send `Transfer` using Protobuf encoding manually.
+    let proto_bytes = transfer.to_bytes();
+    let url = api.public_url("api/services/test-runtime-api/transfer");
+    let response: Transfer = Client::new()
+        .post(&url)
+        .header("Content-Type", "application/octet-stream")
+        .body(proto_bytes)
+        .send()
+        .await?
+        .error_for_status()?
+        .json()
+        .await?;
+    assert_eq!(response, transfer);
+
+    // Send `Transfer` using testkit API.
+    let response: Transfer = api
+        .public(ApiKind::Service("test-runtime-api"))
+        .query(&transfer)
+        .post_pb("transfer")
+        .await?;
+    assert_eq!(response, transfer);
+
+    // Attempt to send `Transfer` using invalid encoding.
+    let err_response = Client::new()
+        .post(&url)
+        .header("Content-Type", "application/octet-stream")
+        .body(b"Not valid Protobuf!".to_vec())
+        .send()
+        .await?;
+    assert_eq!(err_response.status(), StatusCode::BAD_REQUEST);
+    let err_response: ErrorBody = err_response.json().await?;
+    assert_eq!(err_response.title, "Cannot parse Protobuf message");
+
+    Ok(())
 }

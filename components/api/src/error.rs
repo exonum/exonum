@@ -45,6 +45,7 @@ impl Default for Error {
     }
 }
 
+/// Body of an `Error` serialized into the body of erroneous server responses.
 #[derive(Debug, Serialize, Deserialize, Default)]
 #[non_exhaustive]
 pub struct ErrorBody {

@@ -19,16 +19,27 @@ use std::mem;
 
 use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
 use crate::events::{
-    Event, EventHandler, InternalEvent, InternalEventInner, InternalRequest, NetworkEvent,
+    Event, EventHandler, EventOutcome, InternalEvent, InternalEventInner, InternalRequest,
+    NetworkEvent,
 };
 
 impl EventHandler for NodeHandler {
-    fn handle_event(&mut self, event: Event) {
+    fn handle_event(&mut self, event: Event) -> EventOutcome {
         match event {
-            Event::Network(network) => self.handle_network_event(network),
-            Event::Transaction(tx) => self.handle_incoming_tx(tx),
+            Event::Network(network) => {
+                self.handle_network_event(network);
+                EventOutcome::Ok
+            }
+            Event::Transaction(tx) => {
+                self.handle_incoming_tx(tx);
+                EventOutcome::Ok
+            }
+            Event::Internal(internal) => {
+                self.handle_internal_event(internal);
+                EventOutcome::Ok
+            }
+
             Event::Api(api) => self.handle_api_event(api),
-            Event::Internal(internal) => self.handle_internal_event(internal),
         }
     }
 }
@@ -38,9 +49,6 @@ impl NodeHandler {
         match event.0 {
             InternalEventInner::Timeout(timeout) => self.handle_timeout(timeout),
             InternalEventInner::JumpToRound(height, round) => self.handle_new_round(height, round),
-            InternalEventInner::Shutdown => {
-                panic!("Shutdown should be processed in the event loop")
-            }
             InternalEventInner::MessageVerified(msg) => self.handle_message(*msg),
         }
     }
@@ -56,7 +64,7 @@ impl NodeHandler {
         }
     }
 
-    fn handle_api_event(&mut self, event: ExternalMessage) {
+    fn handle_api_event(&mut self, event: ExternalMessage) -> EventOutcome {
         match event {
             ExternalMessage::PeerAdd(info) => {
                 info!("Send Connect message to {}", info);
@@ -85,18 +93,23 @@ impl NodeHandler {
                 }
             }
 
-            ExternalMessage::Shutdown => self.handle_shutdown(),
+            ExternalMessage::Shutdown => {
+                self.handle_shutdown();
+                return EventOutcome::Terminated;
+            }
         }
+
+        EventOutcome::Ok
     }
 
     fn handle_timeout(&mut self, timeout: NodeTimeout) {
         match timeout {
-            NodeTimeout::Round(height, round) => self.handle_round_timeout(height, round),
+            NodeTimeout::Round(epoch, round) => self.handle_round_timeout(epoch, round),
             NodeTimeout::Request(data, peer) => self.handle_request_timeout(&data, peer),
-            NodeTimeout::Status(height) => self.handle_status_timeout(height),
+            NodeTimeout::Status(epoch) => self.handle_status_timeout(epoch),
             NodeTimeout::PeerExchange => self.handle_peer_exchange_timeout(),
             NodeTimeout::UpdateApiState => self.handle_update_api_state_timeout(),
-            NodeTimeout::Propose(height, round) => self.handle_propose_timeout(height, round),
+            NodeTimeout::Propose(epoch, round) => self.handle_propose_timeout(epoch, round),
             NodeTimeout::FlushPool => {
                 self.flush_txs_into_pool();
                 self.maybe_add_flush_pool_timeout();
@@ -111,12 +124,10 @@ impl NodeHandler {
 
     /// Shutdown current node.
     pub(crate) fn handle_shutdown(&mut self) {
-        // Send `Shutdown` to stop event-loop.
-        self.execute_later(InternalRequest::Shutdown);
+        log::info!("Shutting down node handler");
+
         // Flush transactions stored in tx_cache to persistent pool.
         self.flush_txs_into_pool();
-        // Notify the blockchain about the shutdown.
-        self.blockchain.shutdown();
     }
 
     pub(crate) fn flush_txs_into_pool(&mut self) {

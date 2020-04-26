@@ -14,7 +14,6 @@
 
 pub use crate::{proto::schema, runtime::AnyTx};
 
-use anyhow as failure; // FIXME: remove once `ProtobufConvert` derive is improved (ECR-4316)
 use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
@@ -69,7 +68,7 @@ pub struct Precommit {
     /// ID of the validator endorsing the block.
     pub validator: ValidatorId,
     /// The height to which the message is related.
-    pub height: Height,
+    pub epoch: Height,
     /// The round to which the message is related.
     pub round: Round,
     /// Hash of the block proposal. Note that the proposal format is not defined by the core.
@@ -84,7 +83,7 @@ impl Precommit {
     /// Create new `Precommit` message.
     pub fn new(
         validator: ValidatorId,
-        height: Height,
+        epoch: Height,
         round: Round,
         propose_hash: Hash,
         block_hash: Hash,
@@ -92,7 +91,7 @@ impl Precommit {
     ) -> Self {
         Self {
             validator,
-            height,
+            epoch,
             round,
             propose_hash,
             block_hash,

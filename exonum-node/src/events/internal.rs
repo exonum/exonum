@@ -78,11 +78,6 @@ impl InternalPart {
                     let event = InternalEvent::jump_to_round(height, round);
                     tokio::spawn(Self::send_event(internal_tx, event));
                 }
-
-                InternalRequest::Shutdown => {
-                    let event = InternalEvent::shutdown();
-                    tokio::spawn(Self::send_event(internal_tx, event));
-                }
             }
         }
     }
@@ -119,7 +114,7 @@ mod tests {
     fn get_signed_message() -> SignedMessage {
         let keys = KeyPair::random();
         Verified::from_value(
-            Status::new(Height(0), Hash::zero(), 0),
+            Status::new(Height(0), Height(0), Hash::zero(), 0),
             keys.public_key(),
             keys.secret_key(),
         )

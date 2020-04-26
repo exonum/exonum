@@ -27,7 +27,7 @@ Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:v1.0.0-rc.2
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:v1.0.0
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
@@ -118,22 +118,6 @@ exonum-cryptocurrency-advanced run \
   --master-key-pass pass
 
 # Similar commands for other 3 nodes, with adjusted paths and socket addresses
-```
-
-#### Deploy Service
-
-Before service deploy, make sure that you have pure Python implementation
-of Protobuf:
-
-```sh
-pip uninstall protobuf
-pip install --no-binary=protobuf protobuf
-```
-
-The service can be deployed as follows:
-
-```sh
-python3 -m exonum_launcher -i ../cryptocurrency_advanced.yaml
 ```
 
 #### Run Frontend

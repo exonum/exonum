@@ -48,8 +48,8 @@ message CoreMessage {
 message Precommit {
   // ID of the validator endorsing the block.
   uint32 validator = 1;
-  // The height to which the message is related.
-  uint64 height = 2;
+  // The consensus algorithm epoch to which the message is related.
+  uint64 epoch = 2;
   // The round to which the message is related.
   uint32 round = 3;
   // Hash of the block proposal. Note that the proposal format is not defined by the core.

@@ -12,8 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ProtobufConvert;
+// cspell:ignore AQIDBA
+
 use bit_vec::BitVec;
+use rand::{rngs::StdRng, Rng, SeedableRng};
+use serde_json::json;
+
+use crate::{ProtobufBase64, ProtobufConvert};
 
 #[test]
 fn test_bitvec_pb_convert() {
@@ -22,4 +27,75 @@ fn test_bitvec_pb_convert() {
     let pb_bv = bv.to_pb();
     let pb_round_trip: BitVec = ProtobufConvert::from_pb(pb_bv).unwrap();
     assert_eq!(pb_round_trip, bv);
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Test {
+    #[serde(with = "ProtobufBase64")]
+    bytes: Vec<u8>,
+}
+
+#[test]
+fn base64_serialization() {
+    let mut test = Test {
+        bytes: vec![1, 2, 3, 4],
+    };
+    let obj = serde_json::to_value(&test).unwrap();
+    assert_eq!(obj, json!({ "bytes": "AQIDBA" }));
+
+    test.bytes = vec![255, 255];
+    let obj = serde_json::to_value(&test).unwrap();
+    assert_eq!(obj, json!({ "bytes": "//8" }));
+}
+
+#[test]
+fn base64_deserialization() {
+    let test: Test = serde_json::from_value(json!({ "bytes": "//8=" })).unwrap();
+    assert_eq!(test.bytes, &[255, 255]);
+    let test: Test = serde_json::from_value(json!({ "bytes": "//8" })).unwrap();
+    assert_eq!(test.bytes, &[255, 255]);
+    let test: Test = serde_json::from_value(json!({ "bytes": "__8=" })).unwrap();
+    assert_eq!(test.bytes, &[255, 255]);
+    let test: Test = serde_json::from_value(json!({ "bytes": "__8" })).unwrap();
+    assert_eq!(test.bytes, &[255, 255]);
+}
+
+#[test]
+fn incorrect_base64_deserialization() {
+    let bogus_value = json!({ "bytes": "not base64!" });
+    let err = serde_json::from_value::<Test>(bogus_value).unwrap_err();
+    assert!(err.to_string().contains("Invalid byte 32"), "{}", err);
+}
+
+#[test]
+fn roundtrip_mini_fuzz() {
+    const SEED: u64 = 123_456;
+
+    let configs = [
+        base64::STANDARD,
+        base64::STANDARD_NO_PAD,
+        base64::URL_SAFE,
+        base64::URL_SAFE_NO_PAD,
+    ];
+
+    let mut rng = StdRng::seed_from_u64(SEED);
+    for _ in 0..10_000 {
+        let len = rng.gen_range(0, 64);
+        let mut bytes = vec![0_u8; len];
+        rng.fill(&mut bytes[..]);
+        let test = Test { bytes };
+
+        let json_string = serde_json::to_string(&test).unwrap();
+        let restored: Test = serde_json::from_str(&json_string).unwrap();
+        assert_eq!(restored.bytes, test.bytes);
+
+        for &config in &configs {
+            let json_string = format!(
+                r#"{{ "bytes": "{}" }}"#,
+                base64::encode_config(&test.bytes, config)
+            );
+            let restored: Test = serde_json::from_str(&json_string).unwrap();
+            assert_eq!(restored.bytes, test.bytes);
+        }
+    }
 }

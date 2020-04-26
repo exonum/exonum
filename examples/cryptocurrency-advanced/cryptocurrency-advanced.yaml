@@ -1,20 +1,20 @@
 networks:
   - host: "127.0.0.1"
     ssl: false
-    public-api-port: 8000
-    private-api-port: 8004
+    public-api-port: 8200
+    private-api-port: 8091
   - host: "127.0.0.1"
     ssl: false
-    public-api-port: 8001
-    private-api-port: 8005
+    public-api-port: 8201
+    private-api-port: 8092
   - host: "127.0.0.1"
     ssl: false
-    public-api-port: 8002
-    private-api-port: 8006
+    public-api-port: 8202
+    private-api-port: 8093
   - host: "127.0.0.1"
     ssl: false
-    public-api-port: 8003
-    private-api-port: 8007
+    public-api-port: 8203
+    private-api-port: 8094
 
 deadline_height: 10000
 supervisor_mode: "simple"
@@ -24,6 +24,9 @@ artifacts:
     runtime: rust
     name: "exonum-cryptocurrency-advanced"
     version: "0.2.0"
+    action: "none"
+
 instances:
   crypto:
     artifact: cryptocurrency
+    action: "freeze"

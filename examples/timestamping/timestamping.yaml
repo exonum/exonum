@@ -23,17 +23,20 @@ artifacts:
   time:
     runtime: rust
     name: "exonum-time"
-    version: "1.0.0-rc.2"
+    version: "1.0.0"
+    action: "none"
   timestamping:
     runtime: rust
     name: "exonum-timestamping"
-    version: "1.0.0-rc.2"
+    version: "1.0.0"
+    action: "none"
 
 instances:
   time:
     artifact: time
+    action: start
   timestamping:
     artifact: timestamping
+    action: start
     config:
       time_service_name: "time"
-      time_service_id: 2

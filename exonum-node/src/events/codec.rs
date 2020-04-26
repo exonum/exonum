@@ -182,7 +182,7 @@ mod test {
 
         let keys = KeyPair::random();
         let msg = Verified::from_value(
-            Status::new(Height(0), Hash::zero(), 0),
+            Status::new(Height(0), Height(0), Hash::zero(), 0),
             keys.public_key(),
             keys.secret_key(),
         );

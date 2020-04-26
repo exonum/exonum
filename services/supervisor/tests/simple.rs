@@ -34,8 +34,7 @@ use exonum_rust_runtime::{
 use exonum_testkit::{ApiKind, TestKit, TestKitBuilder};
 
 use exonum_supervisor::{
-    supervisor_name, ConfigPropose, Configure, DeployRequest, Schema, Supervisor,
-    SupervisorInterface,
+    ConfigPropose, Configure, DeployRequest, Schema, Supervisor, SupervisorInterface,
 };
 
 pub fn sign_config_propose_transaction(
@@ -118,7 +117,7 @@ impl Configure for ConfigChangeService {
 
 fn assert_config_change_is_applied(testkit: &TestKit) {
     let snapshot = testkit.snapshot();
-    let schema: Schema<_> = snapshot.service_schema(supervisor_name()).unwrap();
+    let schema: Schema<_> = snapshot.service_schema(Supervisor::NAME).unwrap();
     assert!(!schema.pending_proposal.exists());
 }
 
@@ -302,7 +301,7 @@ async fn test_send_proposal_with_api() {
 
     // Assert that config is now pending.
     let snapshot = testkit.snapshot();
-    let schema: Schema<_> = snapshot.service_schema(supervisor_name()).unwrap();
+    let schema: Schema<_> = snapshot.service_schema(Supervisor::NAME).unwrap();
     assert_eq!(
         schema.pending_proposal.get().unwrap().config_propose,
         config_propose

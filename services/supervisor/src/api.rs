@@ -20,9 +20,9 @@
 //!
 //! - Public API:
 //!
-//!     - [Obtaining consensus configuration](#obtaining-consensus-configuration)
-//!     - [Obtaining pending configuration proposal](#obtaining-pending-configuration-proposal)
-//!     - [Obtaining deployed artifacts and services](#obtaining-deployed-artifacts-and-services)
+//!     - [Obtain consensus configuration](#obtain-consensus-configuration)
+//!     - [Obtain pending configuration proposal](#obtain-pending-configuration-proposal)
+//!     - [Obtain deployed artifacts and services](#obtain-deployed-artifacts-and-services)
 //!
 //! - Private API:
 //!
@@ -31,13 +31,13 @@
 //!     - [Request to accept new configuration](#request-to-accept-new-configuration)
 //!     - [Vote for configuration proposal](#vote-for-configuration-proposal)
 //!     - [Obtain current configuration number](#obtain-current-configuration-number)
-//!     - [Obtain current supervisor operating mode](#obtain-current-supervisor-operating-mode)
-//!     - [Check the deployment status](#check-deployment-status)
-//!     - [Check the migration status](#check-migration-status)
+//!     - [Obtain supervisor configuration](#obtain-supervisor-configuration)
+//!     - [Check deployment status](#check-deployment-status)
+//!     - [Check migration status](#check-migration-status)
 //!
 //! # Public API
 //!
-//! ## Obtaining Consensus Configuration
+//! ## Obtain Consensus Configuration
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -71,7 +71,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Pending Configuration Proposal
+//! ## Obtain Pending Configuration Proposal
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -107,7 +107,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Deployed Artifacts And Services
+//! ## Obtain Deployed Artifacts And Services
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -253,11 +253,11 @@
 //! // Migration request creation skipped...
 //! let migration_request = // Migration of some service.
 //! #     // Request migration of supervisor for simplicity.
-//! #     MigrationRequest {
-//! #         new_artifact: Supervisor.artifact_id(),
-//! #         service: Supervisor::NAME.to_owned(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     MigrationRequest::new(
+//! #         Supervisor.artifact_id(),
+//! #         Supervisor::NAME,
+//! #         Height(10),
+//! #     );
 //!
 //! // `migration_request` will be automatically serialized to hexadecimal string.
 //! let tx_hash: Hash = testkit
@@ -458,7 +458,7 @@
 //! # }
 //! ```
 //!
-//! ## Obtaining Supervisor Configuration
+//! ## Obtain Supervisor Configuration
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -492,7 +492,7 @@
 //! # }
 //! ```
 //!
-//! ## Check the Deployment Status
+//! ## Check Deployment Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -553,7 +553,7 @@
 //! # }
 //! ```
 //!
-//! ## Check the Migration Status
+//! ## Check Migration Status
 //!
 //! | Property    | Value |
 //! |-------------|-------|
@@ -580,11 +580,11 @@
 //! let mut testkit = // Same as in previous example...
 //! #     TestKitBuilder::validator().with(Supervisor::simple()).build();
 //! let migration_request: MigrationRequest = // Some previously performed migration request.
-//! #     MigrationRequest {
-//! #         new_artifact: Supervisor.artifact_id(),
-//! #         service: Supervisor::NAME.to_owned(),
-//! #         deadline_height: Height(10),
-//! #     };
+//! #     MigrationRequest::new(
+//! #         Supervisor.artifact_id(),
+//! #         Supervisor::NAME,
+//! #         Height(10),
+//! #     );
 //! # // Request migration. It will fail, but we'll be able to request its state.
 //! # let _hash: Hash = testkit
 //! #     .api()
@@ -624,6 +624,7 @@ use super::{
     schema::SchemaImpl, transactions::SupervisorInterface, AsyncEventState, ConfigProposalWithHash,
     ConfigPropose, ConfigVote, DeployRequest, MigrationRequest, MigrationState, SupervisorConfig,
 };
+use exonum_proto::ProtobufBase64;
 
 /// Query for retrieving information about deploy state.
 /// This is flattened version of `DeployRequest` which can be
@@ -631,12 +632,16 @@ use super::{
 #[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct DeployInfoQuery {
-    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2".
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0".
     pub artifact: String,
-    /// Artifact spec bytes as hexadecimal string.
+    /// Artifact spec bytes serialized as any of four base64 variations supported by Protobuf
+    /// (standard or URL-safe, with or without padding).
     pub spec: String,
     /// Deadline height.
     pub deadline_height: u64,
+    /// Seed to distinguish among deploys with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl TryFrom<DeployInfoQuery> for DeployRequest {
@@ -648,7 +653,7 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
                 .title("Invalid deploy request query")
                 .detail(err.to_string())
         })?;
-        let spec = hex::decode(query.spec).map_err(|err| {
+        let spec = ProtobufBase64::decode(&query.spec).map_err(|err| {
             api::Error::bad_request()
                 .title("Invalid deploy request query")
                 .detail(err.to_string())
@@ -659,6 +664,7 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
             artifact,
             spec,
             deadline_height,
+            seed: query.seed,
         };
 
         Ok(request)
@@ -668,13 +674,14 @@ impl TryFrom<DeployInfoQuery> for DeployRequest {
 impl From<DeployRequest> for DeployInfoQuery {
     fn from(request: DeployRequest) -> Self {
         let artifact = request.artifact.to_string();
-        let spec = hex::encode(&request.spec);
+        let spec = base64::encode_config(&request.spec, base64::URL_SAFE_NO_PAD);
         let deadline_height = request.deadline_height.0;
 
         Self {
             artifact,
             spec,
             deadline_height,
+            seed: request.seed,
         }
     }
 }
@@ -685,12 +692,15 @@ impl From<DeployRequest> for DeployInfoQuery {
 #[derive(Debug, Clone, PartialEq)]
 #[derive(Serialize, Deserialize)]
 pub struct MigrationInfoQuery {
-    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0-rc.2"
+    /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0"
     pub new_artifact: String,
     /// Target service name.
     pub service: String,
     /// Deadline height.
     pub deadline_height: u64,
+    /// Seed to allow several migrations with the same params.
+    #[serde(default)]
+    pub seed: u64,
 }
 
 impl TryFrom<MigrationInfoQuery> for MigrationRequest {
@@ -708,6 +718,7 @@ impl TryFrom<MigrationInfoQuery> for MigrationRequest {
             new_artifact,
             service: query.service,
             deadline_height,
+            seed: query.seed,
         };
 
         Ok(request)
@@ -723,6 +734,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
             new_artifact,
             service: request.service,
             deadline_height,
+            seed: request.seed,
         }
     }
 }
@@ -792,10 +804,10 @@ impl PrivateApi {
     /// by the current node, and returns its hash.
     async fn deploy_artifact(
         state: ServiceApiState,
-        artifact: DeployRequest,
+        request: DeployRequest,
     ) -> Result<Hash, api::Error> {
         Self::broadcaster(&state)?
-            .request_artifact_deploy((), artifact)
+            .request_artifact_deploy((), request)
             .await
             .map_err(|err| api::Error::internal(err).title("Artifact deploy request failed"))
     }
@@ -877,14 +889,14 @@ impl PrivateApi {
     }
 }
 
-/// Wires Supervisor API endpoints.
+/// Wires supervisor API endpoints.
 pub(crate) fn wire(builder: &mut ServiceApiBuilder) {
     builder
         .private_scope()
-        .endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
-        .endpoint_mut("migrate", PrivateApi::migrate)
-        .endpoint_mut("propose-config", PrivateApi::propose_config)
-        .endpoint_mut("confirm-config", PrivateApi::confirm_config)
+        .pb_endpoint_mut("deploy-artifact", PrivateApi::deploy_artifact)
+        .pb_endpoint_mut("migrate", PrivateApi::migrate)
+        .pb_endpoint_mut("propose-config", PrivateApi::propose_config)
+        .pb_endpoint_mut("confirm-config", PrivateApi::confirm_config)
         .endpoint("configuration-number", PrivateApi::configuration_number)
         .endpoint("supervisor-config", PrivateApi::supervisor_config)
         .endpoint("deploy-status", PrivateApi::deploy_status)

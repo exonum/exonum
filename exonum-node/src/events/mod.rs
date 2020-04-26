@@ -100,10 +100,6 @@ impl InternalEvent {
     pub(crate) fn timeout(timeout: NodeTimeout) -> Self {
         Self(InternalEventInner::Timeout(timeout))
     }
-
-    pub(crate) fn shutdown() -> Self {
-        Self(InternalEventInner::Shutdown)
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -112,8 +108,6 @@ pub(crate) enum InternalEventInner {
     JumpToRound(Height, Round),
     /// Timeout event.
     Timeout(NodeTimeout),
-    /// Shutdown the node.
-    Shutdown,
     /// Message has been successfully verified.
     /// Message is boxed here so that enum variants have similar size.
     MessageVerified(Box<Message>),
@@ -124,7 +118,6 @@ pub(crate) enum InternalEventInner {
 pub enum InternalRequest {
     Timeout(TimeoutRequest),
     JumpToRound(Height, Round),
-    Shutdown,
     /// Async request to verify a message in the thread pool.
     VerifyMessage(Vec<u8>),
 }
@@ -152,8 +145,17 @@ pub enum Event {
     Internal(InternalEvent),
 }
 
+/// Denotes the execution status of an event.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum EventOutcome {
+    /// Event processing may continue normally.
+    Ok,
+    /// The event loop should terminate immediately.
+    Terminated,
+}
+
 pub trait EventHandler {
-    fn handle_event(&mut self, event: Event);
+    fn handle_event(&mut self, event: Event) -> EventOutcome;
 }
 
 #[derive(Debug)]
@@ -176,7 +178,9 @@ impl<H: EventHandler + 'static + Send> HandlerPart<H> {
         );
 
         while let Some(event) = aggregator.next().await {
-            handler.handle_event(event);
+            if handler.handle_event(event) == EventOutcome::Terminated {
+                break;
+            }
         }
     }
 }
@@ -273,7 +277,7 @@ where
         }
 
         match self.internal.poll_next_unpin(cx) {
-            Poll::Ready(None) | Poll::Ready(Some(InternalEvent(InternalEventInner::Shutdown))) => {
+            Poll::Ready(None) => {
                 self.done = true;
                 return Poll::Ready(None);
             }

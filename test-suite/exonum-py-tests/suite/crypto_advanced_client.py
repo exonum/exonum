@@ -7,35 +7,32 @@ from exonum_client import ModuleManager, ExonumClient, MessageGenerator
 class ExonumCryptoAdvancedClient:
     """Class provides an interface to simplify interaction with cryptocurrency-advanced service."""
 
-    def __init__(self, client: ExonumClient):
+    def __init__(self, client: ExonumClient, instance_name: str = "crypto", version: str = "0.2.0"):
         self.client = client
-        cryptocurrency_service_name = "exonum-cryptocurrency"
-        cryptocurrency_service_version = "0.2.0"
+        service_name = "exonum-cryptocurrency"
+        self.service_version = version
+        self.instance_name = instance_name
         self.loader = client.protobuf_loader()
         self.loader.initialize()
         self.loader.load_main_proto_files()
         self.loader.load_service_proto_files(
-            runtime_id=0,
-            artifact_name="exonum-supervisor",
-            artifact_version="1.0.0-rc.2",
+            runtime_id=0, artifact_name="exonum-supervisor", artifact_version="1.0.0",
         )
         self.loader.load_service_proto_files(
-            runtime_id=0,
-            artifact_name=cryptocurrency_service_name,
-            artifact_version=cryptocurrency_service_version,
+            runtime_id=0, artifact_name=service_name, artifact_version=self.service_version,
         )
 
         self.cryptocurrency_module = ModuleManager.import_service_module(
-            cryptocurrency_service_name, cryptocurrency_service_version, "service"
+            service_name, self.service_version, "service"
         )
         self.types_module = ModuleManager.import_service_module(
-            cryptocurrency_service_name, cryptocurrency_service_version, "exonum.crypto.types"
+            service_name, self.service_version, "exonum.crypto.types"
         )
-        instance_id = client.public_api.get_instance_id_by_name("crypto")
+        instance_id = client.public_api.get_instance_id_by_name(self.instance_name)
         self.msg_generator = MessageGenerator(
             instance_id=instance_id,
-            artifact_name=cryptocurrency_service_name,
-            artifact_version=cryptocurrency_service_version,
+            artifact_name=service_name,
+            artifact_version=self.service_version,
         )
 
     def __enter__(self):
@@ -46,7 +43,11 @@ class ExonumCryptoAdvancedClient:
 
     def create_wallet(self, keys, wallet_name):
         """Wrapper for create wallet operation."""
-        create_wallet = self.cryptocurrency_module.CreateWallet()
+        if self.service_version == "0.1.0":
+            create_wallet = self.cryptocurrency_module.TxCreateWallet()
+        else:
+            create_wallet = self.cryptocurrency_module.CreateWallet()
+
         create_wallet.name = wallet_name
         create_wallet_tx = self.msg_generator.create_message(create_wallet)
         create_wallet_tx.sign(keys)
@@ -63,14 +64,16 @@ class ExonumCryptoAdvancedClient:
 
     def get_wallet_info(self, keys):
         """Wrapper for get wallet info operation."""
-        public_service_api = self.client.service_public_api("crypto")
-        return public_service_api.get_service(
-            "v1/wallets/info?pub_key=" + keys.public_key.hex()
-        )
+        public_service_api = self.client.service_public_api(self.instance_name)
+        return public_service_api.get_service("v1/wallets/info?pub_key=" + keys.public_key.hex())
 
     def get_balance(self, keys):
         wallet = self.get_wallet_info(keys).json()
         return wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["balance"]
+
+    def get_history_len(self, keys):
+        wallet = self.get_wallet_info(keys).json()
+        return wallet["wallet_proof"]["to_wallet"]["entries"][0]["value"]["history_len"]
 
     def transfer(self, amount, from_wallet, to_wallet):
         """Wrapper for transfer operation."""

@@ -20,18 +20,18 @@
     "type": "git",
     "url": "git+https://github.com/exonum/exonum-testkit.git"
   },
-  "author": "Exonum Team <exonum@bitfury.com>",
+  "author": "The Exonum Team <contact@exonum.com>",
   "license": "Apache-2.0",
   "homepage": "https://github.com/exonum/exonum-testkit/tree/master/examples/server#readme",
   "dependencies": {
     "chai": "^4.2.0",
-    "exonum-client": "exonum/exonum-client#6d76441c",
-    "mocha": "^6.2.0",
+    "exonum-client": "github:exonum/exonum-client#6d76441c",
+    "mocha": "^6.2.3",
     "node-fetch": "^2.6.0",
-    "protobufjs": "^6.8.8",
-    "regenerator-runtime": "^0.13.3"
+    "protobufjs": "^6.8.9",
+    "regenerator-runtime": "^0.13.5"
   },
   "devDependencies": {
-    "standard": "^12.0.1"
+    "standard": "^14.3.3"
   }
 }

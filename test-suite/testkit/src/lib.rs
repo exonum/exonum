@@ -121,8 +121,8 @@ pub use exonum_rust_runtime::spec::Spec;
 
 use exonum::{
     blockchain::{
-        config::GenesisConfig, ApiSender, Blockchain, BlockchainBuilder, BlockchainMut,
-        ConsensusConfig,
+        config::GenesisConfig, ApiSender, BlockParams, Blockchain, BlockchainBuilder,
+        BlockchainMut, ConsensusConfig,
     },
     crypto::{self, Hash},
     helpers::{byzantine_quorum, Height, ValidatorId},
@@ -137,7 +137,6 @@ use exonum_explorer::{BlockWithTransactions, BlockchainExplorer};
 use exonum_rust_runtime::{RustRuntimeBuilder, ServiceFactory};
 use futures::{
     channel::mpsc,
-    future,
     prelude::*,
     stream::{self, BoxStream},
     StreamExt,
@@ -459,9 +458,9 @@ impl TestKit {
         let validator_id = self.leader().validator_id().unwrap();
 
         let guard = self.processing_lock.lock().unwrap();
-        let (block_hash, patch) =
-            self.blockchain
-                .create_patch(validator_id, new_block_height, tx_hashes, &());
+        let block_params = BlockParams::new(validator_id, new_block_height, tx_hashes);
+        let patch = self.blockchain.create_patch(block_params, &());
+        let block_hash = patch.block_hash();
 
         let precommits: Vec<_> = self
             .network()
@@ -471,7 +470,7 @@ impl TestKit {
             .collect();
 
         self.blockchain
-            .commit(patch, block_hash, precommits.into_iter())
+            .commit(patch, precommits.into_iter())
             .unwrap();
         drop(guard);
 
@@ -721,32 +720,32 @@ impl TestKit {
         &mut self.network
     }
 
+    #[allow(clippy::mut_mut)] // occurs withing `select!` macro
     async fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
-        let events_task = self.remove_events_stream();
-        let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
+        let events_task = self.remove_events_stream().fuse();
+        futures::pin_mut!(events_task);
 
+        let endpoints_rx = mem::replace(&mut self.api_notifier_channel.1, mpsc::channel(0).1);
         let (api_aggregator, actor_task) = TestKitActor::spawn(self).await;
+        let mut actor_task = actor_task.fuse();
+
         let mut servers = HashMap::new();
         servers.insert(ApiAccess::Public, WebServerConfig::new(public_api_address));
         servers.insert(
             ApiAccess::Private,
             WebServerConfig::new(private_api_address),
         );
-        let api_manager_config = ApiManagerConfig {
-            servers,
-            api_aggregator,
-            server_restart_max_retries: 5,
-            server_restart_retry_timeout: 500,
-        };
+        let api_manager_config = ApiManagerConfig::new(servers, api_aggregator);
+        let manager_task = ApiManager::new(api_manager_config).run(endpoints_rx).fuse();
+        futures::pin_mut!(manager_task);
 
-        let manager_task = ApiManager::new(api_manager_config)
-            .run(endpoints_rx)
-            .unwrap_or_else(|e| {
+        futures::select! {
+            () = events_task => (),
+            () = actor_task => (),
+            res = manager_task => if let Err(e) = res {
                 log::error!("Error running testkit server API: {}", e);
-            });
-
-        // FIXME: what's the appropriate strategy here?
-        future::join3(events_task, manager_task, actor_task).await;
+            }
+        }
     }
 
     /// Extracts the event stream from this testkit, replacing it with `futures::stream::empty()`.

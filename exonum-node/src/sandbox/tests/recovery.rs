@@ -30,37 +30,59 @@ use crate::sandbox::{sandbox_tests_helper::*, timestamping_sandbox, Sandbox, San
 /// - Node should recover to previous state: jump into the round before stop and does not send
 ///   `Propose` again.
 #[test]
-fn should_not_send_propose_and_prevote_after_node_restart() {
+fn should_not_send_propose_after_node_restart() {
     let sandbox = timestamping_sandbox();
 
-    // round happens
-    sandbox.add_time(Duration::from_millis(sandbox.current_round_timeout()));
-    sandbox.add_time(Duration::from_millis(
-        sandbox.current_round_timeout() + PROPOSE_TIMEOUT,
-    ));
+    // Round happens.
+    let round_timeout = sandbox.current_round_timeout();
+    sandbox.add_time(Duration::from_millis(round_timeout));
+    let new_round_timeout = sandbox.current_round_timeout();
+    sandbox.add_time(Duration::from_millis(new_round_timeout + PROPOSE_TIMEOUT));
 
     assert!(sandbox.is_leader());
     sandbox.assert_state(Height(1), Round(3));
 
-    // ok, we are leader
+    // OK, we are the leader.
     let propose = ProposeBuilder::new(&sandbox).build();
-
     let prevote = make_prevote_from_propose(&sandbox, &propose);
     sandbox.broadcast(&propose);
     sandbox.broadcast(&prevote);
 
-    let current_height = sandbox.current_height();
+    let current_epoch = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     let sandbox_restarted = sandbox.restart();
-
     sandbox_restarted.broadcast(&prevote);
     sandbox_restarted.assert_lock(NOT_LOCKED, None);
-    sandbox_restarted.assert_state(current_height, current_round);
+    sandbox_restarted.assert_state(current_epoch, current_round);
+    sandbox_restarted.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
 
     // Now we should be sure that node recovered its state but didn't send any messages.
-    // Here sandbox_restarted goes out of scope and sandbox_restarted.drop() will cause panic
-    // if there any sent messages
+    // Here `sandbox_restarted` goes out of scope and `sandbox_restarted.drop()` will cause panic
+    // if there any sent messages.
+}
+
+#[test]
+fn should_not_send_propose_after_node_restart_in_first_round() {
+    let sandbox = timestamping_sandbox();
+    let sandbox_state = SandboxState::new();
+    // Increase blockchain height so that our node is the leader in the first round.
+    add_one_height(&sandbox, &sandbox_state);
+    add_one_height(&sandbox, &sandbox_state);
+    sandbox.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
+
+    assert!(sandbox.is_leader());
+    sandbox.assert_state(Height(3), Round(1));
+    let propose = ProposeBuilder::new(&sandbox).build();
+    let prevote = make_prevote_from_propose(&sandbox, &propose);
+    sandbox.broadcast(&propose);
+    sandbox.broadcast(&prevote);
+
+    let sandbox_restarted = sandbox.restart();
+    sandbox_restarted.broadcast(&prevote);
+    sandbox_restarted.assert_lock(NOT_LOCKED, None);
+    sandbox_restarted.assert_state(Height(3), Round(1));
+    sandbox_restarted.add_time(Duration::from_millis(PROPOSE_TIMEOUT));
 }
 
 /// Idea:
@@ -108,7 +130,7 @@ fn should_not_vote_after_node_restart() {
     );
     sandbox.broadcast(&precommit);
     sandbox.assert_lock(Round(1), Some(propose.object_hash()));
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     // Simulate node restart.
@@ -173,7 +195,7 @@ fn should_save_precommit_to_consensus_cache() {
 
     sandbox.broadcast(&precommit);
 
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
     let current_round = sandbox.current_round();
 
     // Simulate node restart
@@ -266,7 +288,7 @@ fn test_recover_consensus_messages_in_other_round() {
     // make sure we broadcasted same Prevote for second round
     let first_updated_prevote = sandbox.create_prevote(
         first_prevote.payload().validator,
-        first_prevote.payload().height,
+        first_prevote.payload().epoch,
         Round(2),
         first_prevote.payload().propose_hash,
         Round(1),
@@ -331,7 +353,7 @@ fn test_recover_consensus_messages_in_other_round() {
 
     let first_precommit_new_time = sandbox_new.create_precommit(
         first_precommit.payload().validator,
-        first_precommit.payload().height,
+        first_precommit.payload().epoch,
         first_precommit.payload().round,
         first_precommit.payload().propose_hash,
         first_precommit.payload().block_hash,

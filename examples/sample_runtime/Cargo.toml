@@ -12,12 +12,12 @@ description = "Minimal Exonum blockchain example implementing a simple runtime."
 publish = false
 
 [dependencies]
-exonum = { version = "1.0.0-rc.2", path = "../../exonum" }
-exonum-derive = { version = "1.0.0-rc.2", path = "../../components/derive" }
-exonum-merkledb = { version = "1.0.0-rc.2", path = "../../components/merkledb" }
-exonum-node = { version = "1.0.0-rc.2", path = "../../exonum-node" }
-exonum-supervisor = { version = "1.0.0-rc.2", path = "../../services/supervisor" }
-exonum-rust-runtime = { version = "1.0.0-rc.2", path = "../../runtimes/rust" }
+exonum = { version = "1.0.0", path = "../../exonum" }
+exonum-derive = { version = "1.0.0", path = "../../components/derive" }
+exonum-merkledb = { version = "1.0.0", path = "../../components/merkledb" }
+exonum-node = { version = "1.0.0", path = "../../exonum-node" }
+exonum-supervisor = { version = "1.0.0", path = "../../services/supervisor" }
+exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 futures = "0.3.4"
 

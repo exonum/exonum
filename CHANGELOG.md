@@ -5,6 +5,104 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## 1.0.0 - 2020-03-31
+
+### Breaking Changes
+
+#### exonum-api
+
+- `ApiManagerConfig` was made non-exhaustive. (#1834)
+
+### New Features
+
+#### exonum-node
+
+- Exonum nodes now gracefully terminate on receiving SIGINT, SIGTERM
+  and SIGQUIT signals (on Unix platforms), or a `ctrl + c` break (on Windows).
+  These signal handlers may be switched off by using `NodeBuilder::disable_signals()`.
+  (#1834)
+
+### Bug Fixes
+
+#### exonum-cli
+
+- Fixed bug in `run-dev` command. Previously, using the existing configuration
+  files in `blockchain-path` led to an error. (#1827)
+
+## 1.0.0-rc.3 - 2020-03-25
+
+### Breaking changes
+
+#### exonum
+
+- `create_patch` and `commit` methods in `BlockchainMut` have been generalized
+  to support block skipping (see *New Features* section for more details). (#1820)
+
+#### exonum-cli
+
+- `run-dev` command has been reworked. It now does not clear database files
+  after the launch. `artifacts-dir` parameter has been renamed to
+  `blockchain-path`. Configuration files are now stored inside `config`
+  subdirectory. (#1822)
+
+#### exonum-supervisor
+
+- `MigrationRequest` was made non-exhaustive. (#1823)
+
+- `POST` endpoints now expect JSON-encoded input rather than
+  hex-encoded Protobuf. (#1823)
+
+- `supervisor_name` method was removed. Use `Supervisor::NAME` instead. (#1823)
+
+### New Features
+
+#### exonum-cli
+
+- Several constants in the `command` module became public. (#1821)
+
+#### exonum-node
+
+- Exonum nodes can now customize how they create block proposals. This can be
+  used to whitelist / blacklist transaction authors or services, prioritize
+  transactions by advanced criteria, implement complex rate limiting, etc.
+  The functionality is available via `proposer` module. (#1820)
+
+- Exonum nodes can now skip block generation at a certain epoch of the consensus
+  algorithm. This can be used to keep a "heartbeat" when the network load is low
+  without bloating the storage used by the nodes. (#1820)
+
+#### exonum-rust-runtime
+
+- `ServiceApiScope::pb_endpoint_mut` allows to accept Protobuf-encoded messages
+  with the request content type set to `application/octet-stream` in addition
+  to JSON-encoded messages. (#1829)
+
+#### exonum-testkit
+
+- Testkit can send Protobuf-encoded payloads to POST endpoints. (#1831)
+
+### Bug Fixes
+
+#### exonum-api
+
+- Introduced a workaround for the HTTP restart hanging up on Windows. (#1828)
+
+#### exonum-node
+
+- Fixed a bug when a node created a propose with incorrect transactions.
+  This could lead to consensus failure or weird error messages in the node log.
+  (#1820)
+
+#### exonum-rust-runtime
+
+- Fixed updating HTTP endpoints if the Rust runtime does not contain
+  active services during node start. (#1831)
+
+#### exonum-supervisor
+
+- `DeployRequest` and `MigrationRequest` now have cryptographic seeds
+  to retry the same request multiple times. (#1823)
+
 ## 1.0.0-rc.2 - 2020-03-13
 
 ### Breaking changes
@@ -43,7 +141,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
   error. (#1806)
 
-### exonum-api
+#### exonum-api
 
 - Data types were made non-exhaustive where appropriate. (#1799)
 
@@ -85,7 +183,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - API data types were made non-exhaustive where appropriate. (#1799)
 
-### exonum-testkit
+#### exonum-testkit
 
 - `TestKitBuilder` was refactored to use a more intuitive set of interfaces
   for adding built-in artifacts and services to the blockchain. (#1800)
@@ -312,6 +410,12 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Protobuf declarations were organized according to their packages. (#1756)
 
+#### exonum-explorer
+
+- The field `content` of the `CommittedTransaction` struct and
+  the `InPool` variant of the `TransactionInfo` enum has been renamed
+  to `message`. (#1721)
+
 #### exonum-supervisor
 
 - `Supervisor` structure isn't generic anymore. (#1587)
@@ -366,7 +470,7 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 
 - Service interface methods now can be marked as removed. (#1707)
 
-### exonum-testkit
+#### exonum-testkit
 
 - The following public APIs were removed/made private: (#1629)
 
@@ -379,16 +483,10 @@ Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#162
 - `TestNode` now returns `KeyPair` instead of a `(PublicKey, SecretKey)`
   tuple. (#1761)
 
-### exonum-time
+#### exonum-time
 
 - Modules were made private, crate now provides re-exports of necessary types
   instead. (#1716)
-
-### exonum-explorer
-
-- The field `content` of the `CommittedTransaction` struct and
-  the `InPool` variant of the `TransactionInfo` enum has been renamed
-  to `message`. (#1721)
 
 ### New features
 

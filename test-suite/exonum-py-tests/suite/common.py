@@ -9,7 +9,7 @@ from exonum_client import ExonumClient
 from suite import ExonumNetwork, ProcessOutput, ProcessExitResult
 from requests.exceptions import ConnectionError
 
-RETRIES_AMOUNT = 20
+RETRIES_AMOUNT = 30
 ARTIFACT_NAME = "exonum-cryptocurrency"
 ARTIFACT_VERSION = "0.2.0"
 
@@ -18,6 +18,7 @@ MIN_API_PORT = 8080
 # Range of ports to use. Since each test requires 4 peer ports and 8 API ports,
 # not restricting the port range can easily enumerate hundreds of ports.
 PORT_RANGE = 32
+
 
 def run_dev_node(application: str) -> ExonumNetwork:
     """Starts a single node in the run-dev mode and returns
@@ -32,8 +33,10 @@ def run_dev_node(application: str) -> ExonumNetwork:
 
     return network
 
+
 available_peer_port = MIN_PEER_PORT
 available_api_port = MIN_API_PORT
+
 
 def run_n_nodes(application: str, nodes_amount: int) -> ExonumNetwork:
     """Creates and runs a network with N validators and return an
@@ -86,15 +89,11 @@ def run_4_nodes(application: str) -> ExonumNetwork:
     return run_n_nodes(application, 4)
 
 
-def assert_processes_exited_successfully(
-    test: unittest.TestCase, outputs: List[ProcessOutput]
-) -> None:
+def assert_processes_exited_successfully(test: unittest.TestCase, outputs: List[ProcessOutput]) -> None:
     """Asserts that all the processes exited successfully."""
     for output in outputs:
         test.assertEqual(output.exit_result, ProcessExitResult.Ok)
-        test.assertEqual(
-            output.exit_code, 0, f"Process exited with non-zero code: {output.stderr}"
-        )
+        test.assertEqual(output.exit_code, 0, f"Process exited with non-zero code: {output.stderr}")
 
 
 def launcher_networks(network: ExonumNetwork) -> List[Dict[str, Any]]:
@@ -130,12 +129,13 @@ def wait_for_block(network: ExonumNetwork, height: int = 1) -> None:
         for _ in range(RETRIES_AMOUNT):
             try:
                 block = client.public_api.get_block(height)
-                if block.status_code == 200: break
+                if block.status_code == 200:
+                    break
             except ConnectionError:
                 pass
             time.sleep(0.5)
         else:
-            raise Exception(f'Waiting for block {height} failed for validator {validator_id}')
+            raise Exception(f"Waiting for block {height} failed for validator {validator_id}")
 
 
 def wait_api_to_start(network: ExonumNetwork) -> None:
@@ -151,20 +151,19 @@ def wait_api_to_start(network: ExonumNetwork) -> None:
             except ConnectionError:
                 time.sleep(0.5)
         else:
-            raise Exception(f'Waiting for start failed for validator {validator_id}')
+            raise Exception(f"Waiting for start failed for validator {validator_id}")
 
 
 def generate_config(
     network: ExonumNetwork,
     deadline_height: int = 10000,
     consensus: dict = None,
-    artifact_name: str = ARTIFACT_NAME,
     instances: dict = None,
-    deploy: bool = True
+    artifact_name: str = ARTIFACT_NAME,
+    artifact_version: str = ARTIFACT_VERSION,
+    artifact_action: str = "deploy",
 ) -> dict:
-    if instances is None:
-        instances = {}
-    cryptocurrency_advanced_config_dict = {
+    config_dict = {
         "networks": launcher_networks(network),
         "deadline_height": deadline_height,
         "consensus": consensus,
@@ -172,14 +171,20 @@ def generate_config(
             "cryptocurrency": {
                 "runtime": "rust",
                 "name": artifact_name,
-                "version": ARTIFACT_VERSION,
-                "deploy": deploy
+                "version": artifact_version,
+                "action": artifact_action,
             }
         },
-        "instances": instances,
+        "instances": instances if instances else {},
     }
 
-    return cryptocurrency_advanced_config_dict
+    return config_dict
+
+
+def generate_migration_config(network: ExonumNetwork, migrations: dict, deadline_height: int = 10000) -> dict:
+    config_dict = {"networks": launcher_networks(network), "deadline_height": deadline_height, "migrations": migrations}
+
+    return config_dict
 
 
 def find_service_status(available_service, service_name):

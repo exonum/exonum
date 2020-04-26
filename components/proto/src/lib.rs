@@ -63,8 +63,9 @@ pub mod proto;
 use anyhow::{ensure, format_err, Error};
 use chrono::{DateTime, TimeZone, Utc};
 use protobuf::well_known_types;
+use serde::{de::Visitor, Deserializer, Serializer};
 
-use std::{collections::HashMap, convert::TryFrom};
+use std::{collections::HashMap, convert::TryFrom, fmt};
 
 use crate::proto::bit_vec::BitVec;
 
@@ -266,4 +267,125 @@ impl_protobuf_convert_fixed_byte_array! {
     8, 16, 24, 32, 40, 48, 56, 64,
     72, 80, 88, 96, 104, 112, 120, 128,
     160, 256, 512, 1024, 2048
+}
+
+/// Marker type for use with `#[serde(with)]`, which provides Protobuf-compatible base64 encoding
+/// and decoding. For now, works only on `Vec<u8>` fields.
+///
+/// The encoder uses the standard base64 alphabet (i.e., `0..9A..Za..z+/`) with no padding.
+/// The decoder accepts any of the 4 possible combinations: the standard or the URL-safe alphabet
+/// with or without padding.
+///
+/// If the (de)serializer is not human-readable (e.g., CBOR or `bincode`), the bytes will be
+/// (de)serialized without base64 transform, directly as a byte slice.
+///
+/// # Examples
+///
+/// ```
+/// use exonum_proto::ProtobufBase64;
+/// # use serde_derive::*;
+/// # use serde_json::json;
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Test {
+///     /// Corresponds to a `bytes buffer = ...` field in Protobuf.
+///     #[serde(with = "ProtobufBase64")]
+///     buffer: Vec<u8>,
+///     // other fields...
+/// }
+///
+/// # fn main() -> anyhow::Result<()> {
+/// let test = Test {
+///     buffer: b"Hello!".to_vec(),
+///     // ...
+/// };
+/// let obj = serde_json::to_value(&test)?;
+/// assert_eq!(obj, json!({ "buffer": "SGVsbG8h", /* ... */ }));
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug)]
+pub struct ProtobufBase64(());
+
+impl ProtobufBase64 {
+    /// Serializes the provided `bytes` with the `serializer`.
+    pub fn serialize<S, T>(bytes: &T, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        T: AsRef<[u8]> + ?Sized,
+    {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&base64::encode_config(bytes, base64::STANDARD_NO_PAD))
+        } else {
+            serializer.serialize_bytes(bytes.as_ref())
+        }
+    }
+
+    /// Decodes bytes from any of four base64 variations supported as per Protobuf spec
+    /// (standard or URL-safe alphabet, with or without padding).
+    pub fn decode(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
+        // Remove padding if any.
+        let value_without_padding = if value.ends_with("==") {
+            &value[..value.len() - 2]
+        } else if value.ends_with('=') {
+            &value[..value.len() - 1]
+        } else {
+            value
+        };
+
+        let is_url_safe = value_without_padding.contains(|ch: char| ch == '-' || ch == '_');
+        let config = if is_url_safe {
+            base64::URL_SAFE_NO_PAD
+        } else {
+            base64::STANDARD_NO_PAD
+        };
+        base64::decode_config(value_without_padding, config)
+    }
+
+    /// Deserializes `Vec<u8>` using the provided serializer.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error as DeError;
+
+        struct Base64Visitor;
+
+        impl<'de> Visitor<'de> for Base64Visitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("base64-encoded byte array")
+            }
+
+            fn visit_str<E: DeError>(self, value: &str) -> Result<Self::Value, E> {
+                ProtobufBase64::decode(value).map_err(E::custom)
+            }
+
+            // Needed to guard against non-obvious serialization of flattened fields in `serde`.
+            fn visit_bytes<E: DeError>(self, value: &[u8]) -> Result<Self::Value, E> {
+                Ok(value.to_vec())
+            }
+        }
+
+        struct BytesVisitor;
+
+        impl<'de> Visitor<'de> for BytesVisitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("byte array")
+            }
+
+            fn visit_bytes<E: DeError>(self, value: &[u8]) -> Result<Self::Value, E> {
+                Ok(value.to_vec())
+            }
+        }
+
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(Base64Visitor)
+        } else {
+            deserializer.deserialize_bytes(BytesVisitor)
+        }
+    }
 }

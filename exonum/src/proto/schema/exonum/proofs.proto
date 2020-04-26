@@ -45,3 +45,14 @@ message IndexProof {
   // The root hash of the proof must be equal to the `state_hash` mentioned in `block_proof`.
   proof.MapProof index_proof = 2;
 }
+
+// Proof of authenticity for a single top-level call in a block, such as a transaction.
+message CallProof {
+  // Proof of authenticity for the block header.
+  BlockProof block_proof = 1;
+  // Proof from the error aggregator (i.e., a `ProofMapIndex` the Merkle root
+  // of which is recorded in the block header as `error_hash`).
+  proof.MapProof call_proof = 2;
+  // Human-readable description of an error if the call status is erroneous.
+  string error_description = 3;
+}

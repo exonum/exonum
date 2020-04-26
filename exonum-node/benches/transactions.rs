@@ -40,7 +40,8 @@ use std::sync::{Arc, RwLock};
 use exonum_node::{
     EventsPoolCapacity, ExternalMessage, NodeChannel,
     _bench_types::{
-        Event, EventHandler, HandlerPart, InternalPart, InternalRequest, NetworkEvent, PeerMessage,
+        Event, EventHandler, EventOutcome, HandlerPart, InternalPart, InternalRequest,
+        NetworkEvent, PeerMessage,
     },
 };
 
@@ -68,7 +69,7 @@ impl MessagesHandler {
 }
 
 impl EventHandler for MessagesHandler {
-    fn handle_event(&mut self, event: Event) {
+    fn handle_event(&mut self, event: Event) -> EventOutcome {
         if let Event::Internal(event) = event {
             if event.is_message_verified() {
                 assert!(!self.is_finished(), "unexpected `MessageVerified`");
@@ -84,6 +85,7 @@ impl EventHandler for MessagesHandler {
                 }
             }
         }
+        EventOutcome::Ok
     }
 }
 
@@ -120,8 +122,9 @@ impl MessagesHandlerRef {
 }
 
 impl EventHandler for MessagesHandlerRef {
-    fn handle_event(&mut self, event: Event) {
+    fn handle_event(&mut self, event: Event) -> EventOutcome {
         self.inner.write().unwrap().handle_event(event);
+        EventOutcome::Ok
     }
 }
 

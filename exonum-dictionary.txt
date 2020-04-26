@@ -17,6 +17,7 @@ btree
 bytearray
 byteorder
 canonicalize
+CBOR
 checkpointed
 chmod
 chrono
@@ -39,6 +40,7 @@ datetime
 deadlinks
 deallocated
 decodable
+deinitialize
 deployable
 deque
 deref
@@ -52,6 +54,7 @@ deserializing
 DESTDIR
 diffie
 discriminants
+doctest
 doctests
 emsp
 encodable
@@ -60,6 +63,7 @@ Exonum
 exonumhub
 fsync
 fuzzer
+getpgid
 gitter
 googleapis
 hashable
@@ -71,6 +75,7 @@ kdfparams
 keepalive
 keypair
 keypairs
+killpg
 leveldb
 libfuzzer
 librocksdb
@@ -81,6 +86,7 @@ lifecycle
 loopback
 maintainer's
 markdownlint
+mkdtemp
 memlimit
 memorydb
 mempool
@@ -110,6 +116,7 @@ openssl
 opslimit
 peekable
 permissioned
+popen
 postagainst
 postcondition
 postpropose
@@ -131,9 +138,11 @@ protobuf
 protoc
 protos
 proxying
+pthread
 pubkey
 pubkeys
 pwbox
+pylint
 quantile
 quux
 readonly
@@ -166,7 +175,11 @@ serializable
 serialize
 serializer
 sharded
+SIGHUP
+SIGINT
 signum
+SIGQUIT
+SIGTERM
 smallvec
 socketaddr
 sodiumoxide

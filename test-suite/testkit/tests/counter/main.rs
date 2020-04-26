@@ -388,7 +388,6 @@ async fn test_explorer_single_block() {
 
     let mut validators = HashSet::new();
     for precommit in block.precommits().iter() {
-        assert_eq!(precommit.payload().height, Height(1));
         assert_eq!(precommit.payload().block_hash, block.header().object_hash());
         let pk = testkit
             .network()

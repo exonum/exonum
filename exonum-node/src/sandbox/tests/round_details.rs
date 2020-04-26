@@ -19,13 +19,12 @@
 
 use bit_vec::BitVec;
 use exonum::{
-    blockchain::ProposerId,
+    blockchain::{Epoch, ProposerId},
     crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
     messages::Verified,
 };
-use log::info;
 
 use std::{collections::HashSet, convert::TryFrom, time::Duration};
 
@@ -59,8 +58,6 @@ fn positive_get_propose_send_prevote() {
         NOT_LOCKED,
         sandbox.secret_key(ValidatorId(0)),
     ));
-
-    info!("time: {:?}", sandbox.time());
 }
 
 // HANDLE FULL PROPOSE
@@ -1544,23 +1541,10 @@ fn do_not_send_precommit_if_has_incompatible_prevotes() {
     sandbox.add_time(Duration::from_millis(0));
 }
 
-/// scenario: // COMMIT:
-/// // - handle queued messages
-/// idea:
-/// - same as positive scenario, but
-///     - start from 1 height
-///     - one precommit get from 0 round and queue it
-/// - code is based on `handle_precommit_positive_scenario_commit()`
-/// with following updates:
-///     - use manually created tx because we need to know which tx will be used
-///       in `add_one_height()` function
-///         - take into account that in `add_one_height()` tx will be generated
-///         and in `add_one_height_with_transaction` tx is taken as param
-///     - predict & calculate blocks which would be created in
-///       `handle_precommit_positive_scenario_commit()` on zero and one heights
-///     - if we know block from 1st height we can construct valid precommit for 1st height and
-///       receive it earlier: on zero height.
-///     this early precommit will be queued and will be used after 1st height will be achieved
+/// Same as positive scenario, but
+///
+/// - Start from 1 height
+/// - One precommit is received from 0 round and queued.
 #[test]
 fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
     let sandbox = timestamping_sandbox();
@@ -1588,6 +1572,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         .build();
     second_block.height = Height(2);
     second_block.prev_hash = first_block.object_hash();
+    second_block.additional_headers.insert::<Epoch>(Height(2));
 
     let precommit_1 = sandbox.create_precommit(
         ValidatorId(1),
@@ -1617,7 +1602,7 @@ fn handle_precommit_positive_scenario_commit_with_queued_precommit() {
         sandbox.secret_key(ValidatorId(3)),
     );
 
-    sandbox.recv(&precommit_1); //early precommit from future height
+    sandbox.recv(&precommit_1); // Early precommit from future height
 
     sandbox.assert_state(Height(1), Round(1));
     add_one_height_with_transactions(&sandbox, &sandbox_state, &[tx]);
@@ -1693,12 +1678,12 @@ fn commit_as_leader_send_propose_round_timeout() {
         // here round 1 is just started
         sandbox.assert_state(Height(2), Round(1));
         {
-            assert_eq!(*sandbox_state.time_millis_since_round_start.borrow(), 0);
+            assert_eq!(*sandbox_state.time_since_round_start.borrow(), 0);
         }
         // assert!(sandbox.is_leader());
     }
     let current_round = sandbox.current_round();
-    let current_height = sandbox.current_height();
+    let current_height = sandbox.current_epoch();
 
     // this propose will be a valid one when 0 node will become a leader after last commit
     let propose = ProposeBuilder::new(&sandbox)
@@ -1785,7 +1770,7 @@ fn commit_as_leader_send_propose_round_timeout() {
     sandbox.add_time(Duration::from_millis(
         sandbox.current_round_timeout() - PROPOSE_TIMEOUT,
     ));
-    sandbox.assert_state(sandbox.current_height(), Round(2));
+    sandbox.assert_state(sandbox.current_epoch(), Round(2));
 }
 
 /// - if get full propose:
@@ -2176,8 +2161,7 @@ fn handle_precommit_remove_propose_request_ask_prevoters() {
 
 #[test]
 fn handle_precommit_remove_propose_request_ask_precommitters() {
-    let sandbox = timestamping_sandbox_builder().build();
-
+    let sandbox = timestamping_sandbox();
     let tx = gen_timestamping_tx();
 
     let propose = ProposeBuilder::new(&sandbox)

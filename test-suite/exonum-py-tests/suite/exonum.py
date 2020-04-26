@@ -14,7 +14,7 @@ NODE_SHUTDOWN_TIMEOUT = 100.0
 
 class ExonumNetwork:
     """Class representing runner of the Exonum network.
-    It provides an interface to start a network of N validatos in the separate threads.
+    It provides an interface to start a network of N validators in the separate threads.
 
     Application is expected to be installed and referenced by its name."""
 
@@ -29,28 +29,17 @@ class ExonumNetwork:
     def __enter__(self) -> "ExonumNetwork":
         return self
 
-    def __exit__(
-        self,
-        exc_type: Optional[type],
-        exc_value: Optional[Any],
-        exc_traceback: Optional[object],
-    ) -> None:
+    def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object],) -> None:
         self.deinitialize()
 
-    def generate_template(
-        self, validators_count: int, supervisor_mode: str = "simple"
-    ) -> None:
+    def generate_template(self, validators_count: int, supervisor_mode: str = "simple") -> None:
         """Runs `generate-template` command."""
         common_config = self._common_config()
 
-        # {exonum-app} generate-template example/common.toml \
-        #   --validators-count 4 --supervisor-mode simple
-        args = [common_config]
-        args.append(f"--validators-count {validators_count}")
-        args.append(f"--supervisor-mode {supervisor_mode}")
+        # {exonum-app} generate-template example/common.toml --validators-count 4 --supervisor-mode simple
+        args = [common_config, f"--validators-count {validators_count}", f"--supervisor-mode {supervisor_mode}"]
 
         self._run_command("generate-template", args)
-
         self._validators_count = validators_count
 
     def generate_config(self, validator_id: int, peer_address: str) -> None:
@@ -59,16 +48,11 @@ class ExonumNetwork:
         validator_config = self._validator_config_dir(validator_id)
 
         # {exonum_app} generate-config example/common.toml  example/1 --peer-address 127.0.0.1:6331 -n
-        args = [common_config]
-        args.append(validator_config)
-        args.append(f"--peer-address {peer_address}")
-        args.append("-n")
+        args = [common_config, validator_config, f"--peer-address {peer_address}", "-n"]
 
         self._run_command("generate-config", args)
 
-    def finalize(
-        self, validator_id: int, public_api_address: str, private_api_address: str
-    ) -> None:
+    def finalize(self, validator_id: int, public_api_address: str, private_api_address: str) -> None:
         """Runs `finalize` command."""
 
         sec_config = self._validator_config(validator_id, "sec")
@@ -77,11 +61,13 @@ class ExonumNetwork:
 
         # {exonum_app} finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 \
         # example/1/sec.toml example/1/node.toml --public-configs example/{1,2,3,4}/pub.toml
-        args = [f"--public-api-address {public_api_address}"]
-        args.append(f"--private-api-address {private_api_address}")
-        args.append(sec_config)
-        args.append(node_config)
-        args.append(f"--public-configs {public_configs}")
+        args = [
+            sec_config,
+            node_config,
+            f"--public-api-address {public_api_address}",
+            f"--private-api-address {private_api_address}",
+            f"--public-configs {public_configs}",
+        ]
 
         self._run_command("finalize", args)
 
@@ -97,10 +83,12 @@ class ExonumNetwork:
 
         # {exonum_app} run --node-config example/1/node.toml --db-path example/1/db \
         # --public-api-address 0.0.0.0:8200 --master-key-pass pass
-        args = [f"--node-config {node_config}"]
-        args.append(f"--db-path {db_path}")
-        args.append(f"--public-api-address {self._public_api_addresses[validator_id]}")
-        args.append(f"--master-key-pass pass")
+        args = [
+            f"--node-config {node_config}",
+            f"--db-path {db_path}",
+            f"--public-api-address {self._public_api_addresses[validator_id]}",
+            f"--master-key-pass pass",
+        ]
 
         command = f"{self._app_name} run " + " ".join(args)
 
@@ -113,8 +101,7 @@ class ExonumNetwork:
 
     def run_dev(self) -> None:
         """Runs the node in the `run-dev` mode."""
-        command = f"{self._app_name} run-dev -a {self._app_dir.path()}"
-
+        command = f"{self._app_name} run-dev -p {self._app_dir.path()} --clean"
         process = ProcessManager(command)
         process.start()
 
@@ -133,14 +120,12 @@ class ExonumNetwork:
         shutdown_endpoint = "http://{}/api/system/v1/shutdown"
         for private_address in self._private_api_addresses.values():
             url = shutdown_endpoint.format(private_address)
-            data = "null"
-            requests.post(url, data=data, headers={"content-type": "application/json"})
+            requests.post(url, headers={"content-type": "application/json"})
 
         # Join every process and collect outputs.
         outputs = []
-        kill_timeout = NODE_SHUTDOWN_TIMEOUT
         for process in self._processes:
-            output = process.join_process(kill_timeout)
+            output = process.join_process(NODE_SHUTDOWN_TIMEOUT)
             outputs.append(output)
 
         return outputs
@@ -160,9 +145,7 @@ class ExonumNetwork:
 
             return host, int(public_port), int(private_port)
 
-        raise RuntimeError(
-            f"Incorrect node ID, expected >= 0 and < {self._validators_count}, got {validator_id}"
-        )
+        raise RuntimeError(f"Incorrect node ID, expected >= 0 and < {self._validators_count}, got {validator_id}")
 
     def deinitialize(self) -> None:
         # Cleanup after use.

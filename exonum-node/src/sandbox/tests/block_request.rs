@@ -15,6 +15,8 @@
 //! Tests in this module are designed to test communication related to block requests.
 
 use exonum::{
+    blockchain::Epoch,
+    crypto::Hash,
     helpers::{Height, Round, ValidatorId},
     merkledb::ObjectHash,
 };
@@ -25,90 +27,6 @@ use crate::{
     sandbox::{sandbox_tests_helper::*, timestamping_sandbox, Sandbox},
     state::{BLOCK_REQUEST_TIMEOUT, TRANSACTIONS_REQUEST_TIMEOUT},
 };
-
-/// Handle block response:
-///
-/// - should process block even if tx in pool
-///
-/// The idea of test is:
-///
-/// - receive some tx A
-/// - getting `Status` from other node with later height, send a `BlockRequest` to this node
-/// - receive `BlockResponse` with already known tx A
-/// - Block should be executed and committed
-#[test]
-fn handle_block_response_tx_in_pool() {
-    let sandbox = timestamping_sandbox();
-    let tx = gen_timestamping_tx();
-    let propose = ProposeBuilder::new(&sandbox).build();
-    let block = sandbox.create_block(&[tx.clone()]);
-
-    let precommit_1 = sandbox.create_precommit(
-        ValidatorId(1),
-        Height(1),
-        Round(1),
-        propose.object_hash(),
-        block.object_hash(),
-        sandbox.time().into(),
-        sandbox.secret_key(ValidatorId(1)),
-    );
-    let precommit_2 = sandbox.create_precommit(
-        ValidatorId(2),
-        Height(1),
-        Round(1),
-        propose.object_hash(),
-        block.object_hash(),
-        sandbox.time().into(),
-        sandbox.secret_key(ValidatorId(2)),
-    );
-    let precommit_3 = sandbox.create_precommit(
-        ValidatorId(3),
-        Height(1),
-        Round(1),
-        propose.object_hash(),
-        block.object_hash(),
-        sandbox.time().into(),
-        sandbox.secret_key(ValidatorId(3)),
-    );
-
-    sandbox.recv(&Sandbox::create_status(
-        sandbox.public_key(ValidatorId(3)),
-        Height(2),
-        block.object_hash(),
-        0,
-        sandbox.secret_key(ValidatorId(3)),
-    ));
-
-    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
-    sandbox.send(
-        sandbox.public_key(ValidatorId(3)),
-        &Sandbox::create_block_request(
-            sandbox.public_key(ValidatorId(0)),
-            sandbox.public_key(ValidatorId(3)),
-            Height(1),
-            sandbox.secret_key(ValidatorId(0)),
-        ),
-    );
-    sandbox.recv(&tx);
-
-    sandbox.recv(&Sandbox::create_block_response(
-        sandbox.public_key(ValidatorId(3)),
-        sandbox.public_key(ValidatorId(0)),
-        block.clone(),
-        vec![precommit_1, precommit_2, precommit_3],
-        vec![tx.object_hash()],
-        sandbox.secret_key(ValidatorId(3)),
-    ));
-
-    sandbox.assert_state(Height(2), Round(1));
-    sandbox.broadcast(&Sandbox::create_status(
-        sandbox.public_key(ValidatorId(0)),
-        Height(2),
-        block.object_hash(),
-        0,
-        sandbox.secret_key(ValidatorId(0)),
-    ));
-}
 
 /// - get `Status` from other node with later height, send `BlockRequest` to this node
 /// - receive `BlockResponse` with unknown tx A
@@ -991,4 +909,307 @@ fn transactions_request_to_multiple_nodes() {
         0,
         sandbox.secret_key(ValidatorId(0)),
     ));
+}
+
+/// Checks processing of a block from a future epoch, but the appropriate height.
+fn test_block_request_with_epoch(
+    epoch: Height,
+    precommit_epoch: Height,
+    tx_known_before_block: bool,
+) {
+    let sandbox = timestamping_sandbox();
+    let tx = gen_timestamping_tx();
+    let propose_hash = Hash::zero();
+
+    let mut block = sandbox.create_block(&[tx.clone()]);
+    block.additional_headers.insert::<Epoch>(epoch);
+    let block_hash = block.object_hash();
+
+    let precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            precommit_epoch,
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    let status = sandbox.create_status_with_custom_epoch(ValidatorId(3), Height(2), Height(10));
+    sandbox.recv(&status);
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &Sandbox::create_block_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            Height(1),
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+
+    if tx_known_before_block {
+        sandbox.recv(&tx);
+    }
+    sandbox.recv(&Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        block,
+        precommits,
+        vec![tx.object_hash()],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+    if !tx_known_before_block {
+        sandbox.recv(&tx);
+    }
+
+    if precommit_epoch == epoch {
+        sandbox.assert_state(epoch.next(), Round(1));
+        assert_eq!(sandbox.node_state().blockchain_height(), Height(2));
+        let our_status = sandbox.create_our_status(epoch.next(), Height(2), 0);
+        sandbox.broadcast(&our_status);
+    } else {
+        assert_eq!(sandbox.current_epoch(), Height(1));
+    }
+}
+
+#[test]
+fn block_request_with_immediate_epoch() {
+    test_block_request_with_epoch(Height(1), Height(1), false);
+}
+
+#[test]
+fn block_request_with_distanced_epoch() {
+    test_block_request_with_epoch(Height(7), Height(7), true);
+}
+
+#[test]
+fn block_request_with_distanced_epoch_and_unknown_tx() {
+    test_block_request_with_epoch(Height(7), Height(7), false);
+}
+
+#[test]
+fn block_request_with_invalid_precommits() {
+    test_block_request_with_epoch(Height(7), Height(5), true);
+}
+
+fn test_skip_request(sandbox: &TimestampingSandbox, epoch: Height, precommit_epoch: Height) {
+    let propose_hash = Hash::zero();
+    let mut block = sandbox.create_block_skip();
+    block.additional_headers.insert::<Epoch>(epoch);
+    let block_hash = block.object_hash();
+
+    let precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            precommit_epoch,
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    let status = sandbox.create_status_with_custom_epoch(ValidatorId(3), Height(1), Height(10));
+    sandbox.recv(&status);
+
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &Sandbox::create_full_block_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            Height(1),
+            Height(1),
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+
+    sandbox.recv(&Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        block,
+        precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+
+    if precommit_epoch == epoch {
+        sandbox.assert_state(epoch.next(), Round(1));
+        assert_eq!(sandbox.node_state().blockchain_height(), Height(1));
+        let our_status = sandbox.create_our_status(epoch.next(), Height(1), 0);
+        sandbox.broadcast(&our_status);
+    } else {
+        assert_eq!(sandbox.current_epoch(), Height(1));
+    }
+}
+
+#[test]
+fn skip_request() {
+    test_skip_request(&timestamping_sandbox(), Height(7), Height(7));
+}
+
+#[test]
+fn skip_request_with_invalid_precommits() {
+    test_skip_request(&timestamping_sandbox(), Height(7), Height(6));
+}
+
+#[test]
+fn sequential_skip_requests() {
+    let sandbox = timestamping_sandbox();
+    test_skip_request(&sandbox, Height(4), Height(4));
+
+    // Since the node doesn't achieve the epoch indicated in the peer status (10),
+    // it should ask the node again, this time with a greater epoch (5 instead of 1).
+    sandbox.add_time(Duration::from_millis(BLOCK_REQUEST_TIMEOUT));
+    sandbox.send(
+        sandbox.public_key(ValidatorId(3)),
+        &Sandbox::create_full_block_request(
+            sandbox.public_key(ValidatorId(0)),
+            sandbox.public_key(ValidatorId(3)),
+            Height(1),
+            Height(5),
+            sandbox.secret_key(ValidatorId(0)),
+        ),
+    );
+}
+
+#[test]
+fn skip_request_with_small_epoch() {
+    let sandbox = timestamping_sandbox();
+    add_one_height(&sandbox, &SandboxState::new());
+
+    let propose_hash = Hash::zero();
+    let past_epoch = Height(1);
+    let mut block = sandbox.create_block_skip();
+    block.additional_headers.insert::<Epoch>(past_epoch);
+    let block_hash = block.object_hash();
+
+    let precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            past_epoch,
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    sandbox.recv(&Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(3)),
+        sandbox.public_key(ValidatorId(0)),
+        block,
+        precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(3)),
+    ));
+    sandbox.assert_state(Height(2), Round(1));
+}
+
+fn send_skip_request(block_height: Height, epoch: Height) -> TimestampingSandbox {
+    let sandbox = timestamping_sandbox();
+    let propose_hash = Hash::zero();
+    let block_epoch = Height(8);
+    let mut block = sandbox.create_block_skip();
+    block.additional_headers.insert::<Epoch>(block_epoch);
+    let block_hash = block.object_hash();
+
+    let precommits = (1..4).map(|i| {
+        let validator = ValidatorId(i);
+        sandbox.create_precommit(
+            validator,
+            block_epoch,
+            Round(1),
+            propose_hash,
+            block_hash,
+            sandbox.time().into(),
+            sandbox.secret_key(validator),
+        )
+    });
+
+    // Reach some large epoch (9).
+    let block_response = Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(0)),
+        block,
+        precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    sandbox.recv(&block_response);
+    sandbox.broadcast(&sandbox.create_our_status(block_epoch.next(), Height(1), 0));
+
+    let request = Sandbox::create_full_block_request(
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(0)),
+        block_height,
+        epoch,
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    sandbox.recv(&request);
+    sandbox
+}
+
+#[test]
+fn handle_skip_request() {
+    let sandbox = send_skip_request(Height(1), Height(3));
+
+    let proof = sandbox.block_skip_and_precommits().unwrap();
+    let response = Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(1)),
+        proof.block,
+        proof.precommits,
+        vec![],
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.send(sandbox.public_key(ValidatorId(1)), &response);
+}
+
+#[test]
+fn ignoring_skip_request_with_future_epoch() {
+    let _sandbox = send_skip_request(Height(1), Height(20));
+    // The sandbox will panic on drop if it sent a response.
+}
+
+#[test]
+fn ignoring_skip_request_with_future_height() {
+    let _sandbox = send_skip_request(Height(2), Height(7));
+    // The sandbox will panic on drop if it sent a response.
+}
+
+#[test]
+fn handle_outdated_skip_request() {
+    let sandbox = timestamping_sandbox();
+    let tx = gen_timestamping_tx();
+    add_one_height_with_transactions(&sandbox, &SandboxState::new(), vec![&tx]);
+
+    let request = Sandbox::create_full_block_request(
+        sandbox.public_key(ValidatorId(1)),
+        sandbox.public_key(ValidatorId(0)),
+        Height(1),
+        Height(1),
+        sandbox.secret_key(ValidatorId(1)),
+    );
+    sandbox.recv(&request);
+
+    let proof = sandbox.block_and_precommits(Height(1)).unwrap();
+    let response = Sandbox::create_block_response(
+        sandbox.public_key(ValidatorId(0)),
+        sandbox.public_key(ValidatorId(1)),
+        proof.block,
+        proof.precommits,
+        vec![tx.object_hash()],
+        sandbox.secret_key(ValidatorId(0)),
+    );
+    sandbox.send(sandbox.public_key(ValidatorId(1)), &response);
 }
