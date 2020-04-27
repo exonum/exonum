@@ -5,7 +5,7 @@ The extended version of the
 implementing data proofs. This project demonstrates how to bootstrap your own
 cryptocurrency with [Exonum blockchain](https://github.com/exonum/exonum).
 
-See [the documentation](https://exonum.com/doc/get-started/data-proofs/)
+See [the documentation](https://exonum.com/doc/version/latest/get-started/data-proofs/)
 for a detailed step-by-step guide how to approach this example.
 
 ![Cryptocurrency demo](Screenshot.png)
@@ -13,21 +13,21 @@ for a detailed step-by-step guide how to approach this example.
 Exonum blockchain keeps balances of users and handles secure
 transactions between them.
 
-It implements most basic operations:
+It implements the following basic operations:
 
 - Create a new user
 - Add funds to the user's balance
 - Transfer funds between users
 
-## Install and run
+## Install and Run
 
-### Using docker
+### Using Docker
 
 Simply run the following command to start the cryptocurrency service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:demo
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-cryptocurrency-advanced:v1.0.0
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
@@ -38,17 +38,18 @@ and private ones at `127.0.0.1:8004`, ..., `127.0.0.1:8007`.
 
 To stop docker container, use `docker stop <container id>` command.
 
-### Manually
+### Manual Installation
 
-#### Getting started
+#### Prerequisites
 
 Be sure you installed necessary packages:
 
 - [git](https://git-scm.com/downloads)
 - [Node.js with npm](https://nodejs.org/en/download/)
 - [Rust compiler](https://rustup.rs/)
+- [Exonum launcher](https://github.com/exonum/exonum-launcher)
 
-#### Install and run
+#### Install and Run
 
 Below you will find a step-by-step guide to starting the cryptocurrency
 service on 4 nodes on the local machine.
@@ -56,64 +57,75 @@ service on 4 nodes on the local machine.
 Build the project:
 
 ```sh
-cd examples/cryptocurrency-advanced/backend
-
-cargo install
+git clone https://github.com/exonum/exonum
+cd exonum/examples/cryptocurrency-advanced/backend
+cargo install --path .
 ```
 
-Generate template:
-
-<!-- markdownlint-disable MD013 -->
+Generate node configuration template:
 
 ```sh
 mkdir example
-
-exonum-cryptocurrency-advanced generate-template example/common.toml --validators-count 4
+exonum-cryptocurrency-advanced generate-template \
+  example/common.toml \
+  --validators-count 4
 ```
 
-Generate public and secrets keys for each node:
+Generate public and secret keys for each node:
 
 ```sh
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
+exonum-cryptocurrency-advanced generate-config \
+  example/common.toml example/1 \
+  --peer-address 127.0.0.1:6331 -n
+exonum-cryptocurrency-advanced generate-config \
+  example/common.toml example/2 \
+  --peer-address 127.0.0.1:6332 -n
+exonum-cryptocurrency-advanced generate-config \
+  example/common.toml example/3 \
+  --peer-address 127.0.0.1:6333 -n
+exonum-cryptocurrency-advanced generate-config \
+  example/common.toml example/4 \
+  --peer-address 127.0.0.1:6334 -n
+```
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
+Note that in case of copying file with master key to the other machines,
+you must change the access permissions of this file for every machine.
+For example:
 
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
-
-exonum-cryptocurrency-advanced generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
+```sh
+sudo chmod 600 master.key.toml
 ```
 
 Finalize configs:
 
 ```sh
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-cryptocurrency-advanced finalize \
+  --public-api-address 0.0.0.0:8200 \
+  --private-api-address 0.0.0.0:8091 \
+  example/1/sec.toml example/1/node.toml \
+  --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
-
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
-
-exonum-cryptocurrency-advanced finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+# Similar commands for other 3 nodes, with adjusted paths and socket addresses
 ```
 
 Run nodes:
 
 ```sh
-exonum-cryptocurrency-advanced run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
+exonum-cryptocurrency-advanced run \
+  --node-config example/1/node.toml \
+  --db-path example/1/db \
+  --public-api-address 0.0.0.0:8200 \
+  --master-key-pass pass
 
-exonum-cryptocurrency-advanced run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
-
-exonum-cryptocurrency-advanced run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
-
-exonum-cryptocurrency-advanced run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
+# Similar commands for other 3 nodes, with adjusted paths and socket addresses
 ```
 
-<!-- markdownlint-enable MD013 -->
+#### Run Frontend
 
 Install frontend dependencies:
 
 ```sh
 cd ../frontend
-
 npm install
 ```
 
@@ -123,25 +135,23 @@ Build sources:
 npm run build
 ```
 
-Run the application:
+Run the frontend:
 
 ```sh
 npm start -- --port=8280 --api-root=http://127.0.0.1:8200
 ```
 
-`--port` is a port for Node.JS app.
-
-`--api-root` is a root URL of public API address of one of nodes.
+- `--port` is a port for Node.JS app.
+- `--api-root` is a root URL of public API address of one of nodes.
 
 Ready! Find demo at [http://127.0.0.1:8280](http://127.0.0.1:8280).
 
-## Tutorials
-
-- Read the
-  [frontend tutorial](https://github.com/exonum/exonum/blob/master/examples/cryptocurrency-advanced/tutorial/frontend.md)
-  to get detailed information about the interaction of the client with Exonum blockchain.
+Read the [frontend tutorial] to get detailed information about the interaction
+of the client with the Exonum blockchain.
 
 ## License
 
 Cryptocurrency demo is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
+
+[frontend tutorial]: https://exonum.com/doc/version/latest/get-started/light-client/

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 //! for use in production.
 //!
 //! [exonum]: https://github.com/exonum/exonum
-//! [docs]: https://exonum.com/doc/get-started/create-service
+//! [docs]: https://exonum.com/doc/version/latest/get-started/create-service
 //! [readme]: https://github.com/exonum/cryptocurrency#readme
 
 #![deny(
@@ -31,30 +31,36 @@
 )]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
 pub mod proto;
+#[cfg(test)]
+mod tx_tests;
 
 /// Persistent data.
 pub mod schema {
     use exonum::{
         crypto::PublicKey,
-        storage::{Fork, MapIndex, Snapshot},
+        merkledb::{
+            access::{Access, FromAccess},
+            MapIndex,
+        },
     };
+    use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+    use exonum_proto::ProtobufConvert;
 
     use super::proto;
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.
     //
-    // [1]: https://exonum.com/doc/architecture/serialization
+    // [1]: https://exonum.com/doc/version/latest/architecture/serialization
+
     /// Wallet struct used to persist data within the service.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::Wallet")]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+    #[protobuf_convert(source = "proto::Wallet")]
     pub struct Wallet {
         /// Public key of the wallet owner.
         pub pub_key: PublicKey,
@@ -90,68 +96,56 @@ pub mod schema {
     }
 
     /// Schema of the key-value storage used by the demo cryptocurrency service.
-    #[derive(Debug)]
-    pub struct CurrencySchema<T> {
-        view: T,
+    #[derive(Debug, FromAccess)]
+    pub struct CurrencySchema<T: Access> {
+        /// Correspondence of public keys of users to the account information.
+        pub wallets: MapIndex<T::Base, PublicKey, Wallet>,
     }
 
-    /// Declare the layout of data managed by the service. An instance of [`MapIndex`] is used
-    /// to keep wallets in the storage. Index values are serialized [`Wallet`] structs.
-    ///
-    /// [`MapIndex`]: https://exonum.com/doc/architecture/storage#mapindex
-    /// [`Wallet`]: struct.Wallet.html
-    impl<T: AsRef<dyn Snapshot>> CurrencySchema<T> {
-        /// Creates a new schema instance.
-        pub fn new(view: T) -> Self {
-            CurrencySchema { view }
-        }
-
-        /// Returns an immutable version of the wallets table.
-        pub fn wallets(&self) -> MapIndex<&dyn Snapshot, PublicKey, Wallet> {
-            MapIndex::new("cryptocurrency.wallets", self.view.as_ref())
-        }
-
-        /// Gets a specific wallet from the storage.
-        pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-            self.wallets().get(pub_key)
-        }
-    }
-
-    /// A mutable version of the schema with an additional method to persist wallets
-    /// to the storage.
-    impl<'a> CurrencySchema<&'a mut Fork> {
-        /// Returns a mutable version of the wallets table.
-        pub fn wallets_mut(&mut self) -> MapIndex<&mut Fork, PublicKey, Wallet> {
-            MapIndex::new("cryptocurrency.wallets", &mut self.view)
+    impl<T: Access> CurrencySchema<T> {
+        /// Creates a new schema.
+        pub fn new(access: T) -> Self {
+            Self::from_root(access).unwrap()
         }
     }
 }
 
 /// Transactions.
 pub mod transactions {
+    use exonum::crypto::PublicKey;
+    use exonum_derive::{BinaryValue, ObjectHash};
+    use exonum_proto::ProtobufConvert;
+
     use super::proto;
-    use super::service::SERVICE_ID;
-    use exonum::{
-        crypto::{PublicKey, SecretKey},
-        messages::{Message, RawTransaction, Signed},
-    };
+
     /// Transaction type for creating a new wallet.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxCreateWallet` transactions are processed.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::TxCreateWallet")]
-    pub struct TxCreateWallet {
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+    #[protobuf_convert(source = "proto::TxCreateWallet")]
+    pub struct CreateWallet {
         /// UTF-8 string with the owner's name.
         pub name: String,
+    }
+
+    impl CreateWallet {
+        /// Creates a wallet with the specified name.
+        pub fn new(name: impl Into<String>) -> Self {
+            Self { name: name.into() }
+        }
     }
 
     /// Transaction type for transferring tokens between two wallets.
     ///
     /// See [the `Transaction` trait implementation](#impl-Transaction) for details how
     /// `TxTransfer` transactions are processed.
-    #[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-    #[exonum(pb = "proto::TxTransfer")]
+    #[derive(Clone, Debug)]
+    #[derive(Serialize, Deserialize)]
+    #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+    #[protobuf_convert(source = "proto::TxTransfer")]
     pub struct TxTransfer {
         /// Public key of the receiver.
         pub to: PublicKey,
@@ -162,190 +156,143 @@ pub mod transactions {
         /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
         pub seed: u64,
     }
-
-    /// Transaction group.
-    #[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-    pub enum CurrencyTransactions {
-        /// Create wallet transaction.
-        CreateWallet(TxCreateWallet),
-        /// Transfer tokens transaction.
-        Transfer(TxTransfer),
-    }
-
-    impl TxCreateWallet {
-        #[doc(hidden)]
-        pub fn sign(name: &str, pk: &PublicKey, sk: &SecretKey) -> Signed<RawTransaction> {
-            Message::sign_transaction(
-                Self {
-                    name: name.to_owned(),
-                },
-                SERVICE_ID,
-                *pk,
-                sk,
-            )
-        }
-    }
-
-    impl TxTransfer {
-        #[doc(hidden)]
-        pub fn sign(
-            to: &PublicKey,
-            amount: u64,
-            seed: u64,
-            pk: &PublicKey,
-            sk: &SecretKey,
-        ) -> Signed<RawTransaction> {
-            Message::sign_transaction(
-                Self {
-                    to: *to,
-                    amount,
-                    seed,
-                },
-                SERVICE_ID,
-                *pk,
-                sk,
-            )
-        }
-    }
 }
 
 /// Contract errors.
 pub mod errors {
-    // Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-    // ECR-1771 for the details.
-    #![allow(bare_trait_objects)]
-
-    use exonum::blockchain::ExecutionError;
+    use exonum_derive::ExecutionFail;
 
     /// Error codes emitted by `TxCreateWallet` and/or `TxTransfer` transactions during execution.
-    #[derive(Debug, Fail)]
-    #[repr(u8)]
+    #[derive(Debug, ExecutionFail)]
     pub enum Error {
         /// Wallet already exists.
         ///
         /// Can be emitted by `TxCreateWallet`.
-        #[fail(display = "Wallet already exists")]
         WalletAlreadyExists = 0,
-
         /// Sender doesn't exist.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Sender doesn't exist")]
         SenderNotFound = 1,
-
         /// Receiver doesn't exist.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Receiver doesn't exist")]
         ReceiverNotFound = 2,
-
         /// Insufficient currency amount.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Insufficient currency amount")]
         InsufficientCurrencyAmount = 3,
-
         /// Sender same as receiver.
         ///
         /// Can be emitted by `TxTransfer`.
-        #[fail(display = "Sender same as receiver")]
         SenderSameAsReceiver = 4,
-    }
-
-    impl From<Error> for ExecutionError {
-        fn from(value: Error) -> ExecutionError {
-            let description = format!("{}", value);
-            ExecutionError::with_description(value as u8, description)
-        }
     }
 }
 
 /// Contracts.
 pub mod contracts {
-    use exonum::blockchain::{ExecutionResult, Transaction, TransactionContext};
+    use exonum::runtime::{ExecutionContext, ExecutionError};
+    use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
+    use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
     use crate::{
+        api::CryptocurrencyApi,
         errors::Error,
         schema::{CurrencySchema, Wallet},
-        transactions::{TxCreateWallet, TxTransfer},
+        transactions::{CreateWallet, TxTransfer},
     };
 
     /// Initial balance of a newly created wallet.
     const INIT_BALANCE: u64 = 100;
 
-    impl Transaction for TxCreateWallet {
-        /// If a wallet with the specified public key is not registered, then creates a new wallet
-        /// with the specified public key and name, and an initial balance of 100.
-        /// Otherwise, performs no op.
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-            let author = context.author();
-            let view = context.fork();
-            let mut schema = CurrencySchema::new(view);
-            if schema.wallet(&author).is_none() {
-                let wallet = Wallet::new(&author, &self.name, INIT_BALANCE);
-                println!("Create the wallet: {:?}", wallet);
-                schema.wallets_mut().put(&author, wallet);
-                Ok(())
-            } else {
-                Err(Error::WalletAlreadyExists)?
-            }
-        }
+    /// Cryptocurrency service transactions.
+    #[exonum_interface]
+    pub trait CryptocurrencyInterface<Ctx> {
+        /// Output of the methods in this interface.
+        type Output;
+
+        /// Creates wallet with the given `name`.
+        #[interface_method(id = 0)]
+        fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+        /// Transfers `amount` of the currency from one wallet to another.
+        #[interface_method(id = 1)]
+        fn transfer(&self, ctx: Ctx, arg: TxTransfer) -> Self::Output;
     }
 
-    impl Transaction for TxTransfer {
-        /// Retrieves two wallets to apply the transfer; they should be previously registered
-        /// with the help of [`TxCreateWallet`] transactions. Checks the sender's
-        /// balance and applies changes to the balances of the wallets if the sender's balance
-        /// is sufficient. Otherwise, performs no op.
-        ///
-        /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
-        fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-            let author = context.author();
-            let view = context.fork();
+    /// Cryptocurrency service implementation.
+    #[derive(Debug, ServiceFactory, ServiceDispatcher)]
+    #[service_dispatcher(implements("CryptocurrencyInterface"))]
+    #[service_factory(proto_sources = "crate::proto")]
+    pub struct CryptocurrencyService;
 
-            if author == self.to {
-                Err(Error::SenderSameAsReceiver)?
+    impl CryptocurrencyInterface<ExecutionContext<'_>> for CryptocurrencyService {
+        type Output = Result<(), ExecutionError>;
+
+        fn create_wallet(&self, context: ExecutionContext<'_>, arg: CreateWallet) -> Self::Output {
+            let author = context
+                .caller()
+                .author()
+                .expect("Wrong `TxCreateWallet` initiator");
+
+            let mut schema = CurrencySchema::new(context.service_data());
+            if schema.wallets.get(&author).is_none() {
+                let wallet = Wallet::new(&author, &arg.name, INIT_BALANCE);
+                println!("Created wallet: {:?}", wallet);
+                schema.wallets.put(&author, wallet);
+                Ok(())
+            } else {
+                Err(Error::WalletAlreadyExists.into())
+            }
+        }
+
+        fn transfer(&self, context: ExecutionContext<'_>, arg: TxTransfer) -> Self::Output {
+            let author = context
+                .caller()
+                .author()
+                .expect("Wrong 'TxTransfer' initiator");
+            if author == arg.to {
+                return Err(Error::SenderSameAsReceiver.into());
             }
 
-            let mut schema = CurrencySchema::new(view);
+            let mut schema = CurrencySchema::new(context.service_data());
+            let sender = schema.wallets.get(&author).ok_or(Error::SenderNotFound)?;
+            let receiver = schema.wallets.get(&arg.to).ok_or(Error::ReceiverNotFound)?;
 
-            let sender = match schema.wallet(&author) {
-                Some(val) => val,
-                None => Err(Error::SenderNotFound)?,
-            };
-
-            let receiver = match schema.wallet(&self.to) {
-                Some(val) => val,
-                None => Err(Error::ReceiverNotFound)?,
-            };
-
-            let amount = self.amount;
+            let amount = arg.amount;
             if sender.balance >= amount {
                 let sender = sender.decrease(amount);
                 let receiver = receiver.increase(amount);
                 println!("Transfer between wallets: {:?} => {:?}", sender, receiver);
-                let mut wallets = schema.wallets_mut();
-                wallets.put(&author, sender);
-                wallets.put(&self.to, receiver);
+                schema.wallets.put(&author, sender);
+                schema.wallets.put(&arg.to, receiver);
                 Ok(())
             } else {
-                Err(Error::InsufficientCurrencyAmount)?
+                Err(Error::InsufficientCurrencyAmount.into())
             }
         }
     }
+
+    impl Service for CryptocurrencyService {
+        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
+            CryptocurrencyApi::wire(builder);
+        }
+    }
+
+    // Specify default instantiation parameters for the service.
+    impl DefaultInstance for CryptocurrencyService {
+        const INSTANCE_ID: u32 = 101;
+        const INSTANCE_NAME: &'static str = "cryptocurrency";
+    }
 }
 
-/// REST API.
+/// Cryptocurrency API implementation.
 pub mod api {
-    use exonum::{
-        api::{self, ServiceApiBuilder, ServiceApiState},
-        crypto::PublicKey,
-    };
+    use exonum::crypto::PublicKey;
+    use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
     use crate::schema::{CurrencySchema, Wallet};
 
     /// Public service API description.
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Copy)]
     pub struct CryptocurrencyApi;
 
     /// The structure describes the query parameters for the `get_wallet` endpoint.
@@ -357,24 +304,21 @@ pub mod api {
 
     impl CryptocurrencyApi {
         /// Endpoint for getting a single wallet.
-        pub fn get_wallet(state: &ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
-            let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(snapshot);
+        pub async fn get_wallet(state: ServiceApiState, query: WalletQuery) -> api::Result<Wallet> {
+            let schema = CurrencySchema::new(state.service_data());
             schema
-                .wallet(&query.pub_key)
-                .ok_or_else(|| api::Error::NotFound("\"Wallet not found\"".to_owned()))
+                .wallets
+                .get(&query.pub_key)
+                .ok_or_else(|| api::Error::not_found().title("Wallet not found"))
         }
 
         /// Endpoint for dumping all wallets from the storage.
-        pub fn get_wallets(state: &ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
-            let snapshot = state.snapshot();
-            let schema = CurrencySchema::new(snapshot);
-            let idx = schema.wallets();
-            let wallets = idx.values().collect();
-            Ok(wallets)
+        pub async fn get_wallets(state: ServiceApiState, _query: ()) -> api::Result<Vec<Wallet>> {
+            let schema = CurrencySchema::new(state.service_data());
+            Ok(schema.wallets.values().collect())
         }
 
-        /// 'ServiceApiBuilder' facilitates conversion between read requests and REST
+        /// `ServiceApiBuilder` facilitates conversion between read requests and REST
         /// endpoints.
         pub fn wire(builder: &mut ServiceApiBuilder) {
             // Binds handlers to specific routes.
@@ -382,91 +326,6 @@ pub mod api {
                 .public_scope()
                 .endpoint("v1/wallet", Self::get_wallet)
                 .endpoint("v1/wallets", Self::get_wallets);
-        }
-    }
-}
-
-/// Service declaration.
-pub mod service {
-    use exonum::{
-        api::ServiceApiBuilder,
-        blockchain::{Service, Transaction, TransactionSet},
-        crypto::Hash,
-        messages::RawTransaction,
-        storage::Snapshot,
-    };
-
-    use crate::{api::CryptocurrencyApi, transactions::CurrencyTransactions};
-
-    /// Service ID for the `Service` trait.
-    pub const SERVICE_ID: u16 = 1;
-
-    /// Demo cryptocurrency service.
-    ///
-    /// See [the crate documentation](index.html) for context.
-    ///
-    /// # Public REST API
-    ///
-    /// In all APIs, the request body (if applicable) and response are JSON-encoded.
-    ///
-    /// ## Retrieve single wallet
-    ///
-    /// GET `api/services/cryptocurrency/v1/wallet/?pub_key={hash}`
-    ///
-    /// Returns information about a wallet with the specified public key (hex-encoded).
-    /// If a wallet with the specified pubkey is not in the storage, returns a string
-    /// `"Wallet not found"` with the HTTP 404 status.
-    ///
-    /// ## Dump wallets
-    ///
-    /// GET `api/services/cryptocurrency/v1/wallets`
-    ///
-    /// Returns an array of all wallets in the storage.
-    ///
-    /// ## Transactions endpoint
-    ///
-    /// POST `api/explorer/v1/transactions`
-    ///
-    /// Accepts a [`TxTransfer`] and [`TxCreateWallet`] transaction from an external client.
-    /// Transaction should be serialized into protobuf binary form and placed into signed
-    /// transaction message according to specification, endpoint accepts hex of this signed
-    /// transaction message as an object: `{ "tx_body": <hex> }`.
-    ///
-    /// Returns the hex-encoded hash of the transaction
-    /// encumbered in an object: `{ "tx_hash": <hash> }`.
-    ///
-    /// [`TxCreateWallet`]: ../transactions/struct.TxCreateWallet.html
-    /// [`TxTransfer`]: ../transactions/struct.TxTransfer.html
-    #[derive(Debug)]
-    pub struct CurrencyService;
-
-    impl Service for CurrencyService {
-        fn service_name(&self) -> &'static str {
-            "cryptocurrency"
-        }
-
-        fn service_id(&self) -> u16 {
-            SERVICE_ID
-        }
-
-        // Implement a method to deserialize transactions coming to the node.
-        fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-            let tx = CurrencyTransactions::tx_from_raw(raw)?;
-            Ok(tx.into())
-        }
-
-        // Hashes for the service tables that will be included into the state hash.
-        // To simplify things, we don't have [Merkelized tables][merkle] in the service storage
-        // for now, so we return an empty vector.
-        //
-        // [merkle]: https://exonum.com/doc/architecture/storage/#merklized-indices
-        fn state_hash(&self, _: &dyn Snapshot) -> Vec<Hash> {
-            vec![]
-        }
-
-        // Links the service api implementation to the Exonum.
-        fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-            CryptocurrencyApi::wire(builder);
         }
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,62 +12,68 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Exonum global variables which are stored in the blockchain as UTF-8 encoded
-//! JSON.
+//! Exonum blockchain configuration.
 //!
-//! This module includes all the elements of the `StoredConfiguration` which is
-//! used as the global configuration of the blockchain and should be the same for
-//! all validators in the network. The configuration includes the public keys of
-//! validators, consensus related parameters, hash of the previous configuration,
-//! etc.
+//! This module includes the components of the global configuration of the blockchain
+//! The configuration includes the public keys of validators, consensus related parameters,
+//! and built-in services (services deployed at the blockchain start).
 
-use serde::de::Error;
-use serde_json::Error as JsonError;
+use anyhow::{bail, ensure};
+use exonum_derive::{BinaryValue, ObjectHash};
+use exonum_proto::ProtobufConvert;
+use log::warn;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
-use crate::helpers::{Height, Milliseconds};
-use crate::messages::EMPTY_SIGNED_MESSAGE_SIZE;
-use crate::storage::StorageValue;
+use crate::{
+    crypto::PublicKey,
+    helpers::{Milliseconds, ValidateInput, ValidatorId},
+    keys::Keys,
+    merkledb::BinaryValue,
+    messages::SIGNED_MESSAGE_MIN_SIZE,
+    proto::schema,
+    runtime::{ArtifactId, ArtifactSpec, InstanceId, InstanceSpec},
+};
 
 /// Public keys of a validator. Each validator has two public keys: the
 /// `consensus_key` is used for internal operations in the consensus process,
 /// while the `service_key` is used in services.
-#[derive(Copy, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert)]
+#[protobuf_convert(source = "schema::blockchain::ValidatorKeys")]
+#[non_exhaustive]
 pub struct ValidatorKeys {
     /// Consensus key is used for messages related to the consensus algorithm.
     pub consensus_key: PublicKey,
-    /// Service key is used for services, for example, the configuration
-    /// updater service, the anchoring service, etc.
+    /// Service key is used to sign transactions broadcast by the services.
     pub service_key: PublicKey,
 }
 
-/// Exonum blockchain global configuration. Services
-/// and their parameters are also included into this configuration.
-///
-/// This configuration must be the same for any Exonum node in a certain
-/// network on the given height.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StoredConfiguration {
-    /// Hash of the previous configuration, which can be used to find that
-    /// configuration. For the configuration in the genesis block,
-    /// `hash` is just an array of zeros.
-    pub previous_cfg_hash: Hash,
-    /// The height, starting from which this configuration becomes actual. Note
-    /// that this height should be big enough for the nodes to accept the new
-    /// configuration before this height is reached. Otherwise, the new
-    /// configuration will not take effect at all; the old configuration will
-    /// remain actual.
-    pub actual_from: Height,
-    /// List of validators consensus and service public keys.
-    pub validator_keys: Vec<ValidatorKeys>,
-    /// Consensus algorithm parameters.
-    pub consensus: ConsensusConfig,
-    /// Services specific variables.
-    /// Keys are `service_name` from the `Service` trait and values are the serialized JSON.
-    #[serde(default)]
-    pub services: BTreeMap<String, serde_json::Value>,
+impl ValidatorKeys {
+    /// Creates a new `ValidatorKeys` object.
+    ///
+    /// # Stability
+    ///
+    /// Since more keys may be added to `ValidatorKeys` in the future, this method is considered
+    /// unstable.
+    pub fn new(consensus_key: PublicKey, service_key: PublicKey) -> Self {
+        Self {
+            consensus_key,
+            service_key,
+        }
+    }
+}
+
+impl ValidateInput for ValidatorKeys {
+    type Error = anyhow::Error;
+
+    fn validate(&self) -> Result<(), Self::Error> {
+        if self.consensus_key == self.service_key {
+            bail!("Consensus and service keys must be different.");
+        }
+        Ok(())
+    }
 }
 
 /// Consensus algorithm parameters.
@@ -76,26 +82,30 @@ pub struct StoredConfiguration {
 /// which can later be edited as required.
 /// The parameters in this configuration should be the same for all nodes in the network and can
 /// be changed using the
-/// [configuration updater service](https://exonum.com/doc/advanced/configuration-updater/).
+/// [configuration update service](https://exonum.com/doc/version/latest/advanced/configuration-updater/).
 ///
 /// Default propose timeout value, along with the threshold, is chosen for maximal performance. In order
 /// to slow down block generation,hence consume less disk space, these values can be increased.
 ///
 /// For additional information on the Exonum consensus algorithm, refer to
-/// [Consensus in Exonum](https://exonum.com/doc/architecture/consensus/).
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+/// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
+#[protobuf_convert(source = "schema::blockchain::Config")]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[non_exhaustive]
 pub struct ConsensusConfig {
+    /// List of validators public keys.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub validator_keys: Vec<ValidatorKeys>,
     /// Interval between first two rounds. This interval defines the time that passes
     /// between the moment a new block is committed to the blockchain and the
     /// time when second round starts, regardless of whether a new block has
     /// been committed during this period or not.
-    /// Each consecutive round will be longer then previous by constant factor determined
-    /// by ConsensusConfig::TIMEOUT_LINEAR_INCREASE_PERCENT constant.
+    /// Each consecutive round will be longer then previous by a constant factor, 10%.
     ///
-    /// Note that rounds in Exonum
-    /// do not have a defined end time. Nodes in a new round can
-    /// continue to vote for proposals and process messages related to previous
-    /// rounds.
+    /// Note that rounds in Exonum do not have a defined end time. Nodes in a new round can
+    /// continue to vote for proposals and process messages related to previous rounds.
     pub first_round_timeout: Milliseconds,
     /// Period of sending a Status message. This parameter defines the frequency
     /// with which a node broadcasts its status message to the network.
@@ -123,19 +133,130 @@ pub struct ConsensusConfig {
     pub propose_timeout_threshold: u32,
 }
 
+impl Default for ConsensusConfig {
+    fn default() -> Self {
+        Self {
+            validator_keys: Vec::default(),
+            first_round_timeout: 3_000,
+            status_timeout: 5_000,
+            peers_timeout: 10_000,
+            txs_block_limit: 1_000,
+            max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
+            min_propose_timeout: 10,
+            max_propose_timeout: 200,
+            propose_timeout_threshold: 500,
+        }
+    }
+}
+
 impl ConsensusConfig {
-    /// Default value for max_message_len.
+    /// Default value for `max_message_len`.
     pub const DEFAULT_MAX_MESSAGE_LEN: u32 = 1024 * 1024; // 1 MB
+    /// Time that will be added to round timeout for each next round in terms of percent of `first_round_timeout`.
+    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
 
-    /// Time that will be added to round timeout for each next round in terms of percent of first_round_timeout.
-    pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; //default value 10%
+    /// Replaces validator keys in existing object with provided ones.
+    pub fn with_validator_keys(mut self, validator_keys: Vec<ValidatorKeys>) -> Self {
+        self.validator_keys = validator_keys;
+        self
+    }
 
-    /// Produces warnings if configuration contains non-optimal values.
+    /// Generates a consensus configuration for testing and returns it together with the keys
+    /// for the first validator.
+    pub fn for_tests(validator_count: u16) -> (Self, Keys) {
+        assert!(
+            validator_count > 0,
+            "Cannot create network without validators"
+        );
+
+        let mut node_keys = None;
+        let validator_keys = (0..validator_count)
+            .map(|i| {
+                let keys = Keys::random();
+                let consensus_pk = keys.consensus_pk();
+                let service_pk = keys.service_pk();
+                if i == 0 {
+                    node_keys = Some(keys);
+                }
+                ValidatorKeys::new(consensus_pk, service_pk)
+            })
+            .collect();
+        let config = Self {
+            validator_keys,
+            ..Self::default()
+        };
+        (config, node_keys.unwrap())
+    }
+
+    /// Check that validator keys is correct. Configuration should have at least
+    /// a single validator key. And each key should meet only once.
+    fn validate_keys(&self) -> anyhow::Result<()> {
+        ensure!(
+            !self.validator_keys.is_empty(),
+            "Consensus configuration must have at least one validator."
+        );
+
+        let mut exist_keys = HashSet::with_capacity(self.validator_keys.len() * 2);
+        for validator_keys in &self.validator_keys {
+            validator_keys.validate()?;
+            if exist_keys.contains(&validator_keys.consensus_key)
+                || exist_keys.contains(&validator_keys.service_key)
+            {
+                bail!("Duplicated keys are found: each consensus and service key must be unique");
+            }
+
+            exist_keys.insert(validator_keys.consensus_key);
+            exist_keys.insert(validator_keys.service_key);
+        }
+
+        Ok(())
+    }
+
+    /// Search for identifier of the validator which satisfies the condition in predicate.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use exonum::{
+    ///     blockchain::{ConsensusConfig, ValidatorKeys},
+    ///     crypto,
+    ///     helpers::ValidatorId,
+    /// };
+    ///
+    /// let config = ConsensusConfig::default()
+    ///     .with_validator_keys(
+    ///         (0..4)
+    ///             .map(|_| ValidatorKeys::new(
+    ///                 crypto::gen_keypair().0,
+    ///                 crypto::gen_keypair().0,
+    ///             ))
+    ///             .collect(),
+    ///     );
+    ///
+    /// let some_validator_consensus_key = config.validator_keys[2].consensus_key;
+    /// // Try to find validator ID for this key.
+    /// assert_eq!(
+    ///     config.find_validator(|validator_keys| {
+    ///         validator_keys.consensus_key == some_validator_consensus_key
+    ///     }),
+    ///     Some(ValidatorId(2)),
+    /// );
+    /// ```
+    pub fn find_validator(
+        &self,
+        predicate: impl Fn(&ValidatorKeys) -> bool,
+    ) -> Option<ValidatorId> {
+        self.validator_keys
+            .iter()
+            .position(predicate)
+            .map(|id| ValidatorId(id as u16))
+    }
+
+    /// Produce warnings if configuration contains non-optimal values.
     ///
     /// Validation for logical correctness is performed in the `StoredConfiguration::try_deserialize`
     /// method, but some values can decrease consensus performance.
-    #[doc(hidden)]
-    pub fn warn_if_nonoptimal(&self) {
+    fn warn_if_nonoptimal(&self) {
         const MIN_TXS_BLOCK_LIMIT: u32 = 100;
         const MAX_TXS_BLOCK_LIMIT: u32 = 10_000;
 
@@ -165,223 +286,478 @@ impl ConsensusConfig {
     }
 }
 
-impl Default for ConsensusConfig {
-    fn default() -> Self {
+/// Builder for `ConsensusConfig`.
+///
+/// Initially, `ConsensusConfig` in this builder is generated via `ConsensusConfig::default()`.
+/// Only the necessary fields can be updated before obtaining the build config via `build` method.
+///
+/// # Examples
+///
+/// ```
+/// # use exonum::blockchain::{ConsensusConfig, ConsensusConfigBuilder};
+/// let consensus_config = ConsensusConfigBuilder::new()
+///     .first_round_timeout(3010)
+///     .min_propose_timeout(20)
+///     .build();
+///
+/// assert_eq!(consensus_config.first_round_timeout, 3010);
+/// assert_eq!(consensus_config.min_propose_timeout, 20);
+/// assert_eq!(consensus_config.status_timeout, ConsensusConfig::default().status_timeout);
+/// ```
+#[derive(Debug, Default)]
+pub struct ConsensusConfigBuilder {
+    config: ConsensusConfig,
+}
+
+impl ConsensusConfigBuilder {
+    /// Creates a new `ConsensusConfigBuilder` with `ConsensusConfig` initialized to its default value.
+    pub fn new() -> Self {
         Self {
-            first_round_timeout: 3000,
-            status_timeout: 5000,
-            peers_timeout: 10_000,
-            txs_block_limit: 1000,
-            max_message_len: Self::DEFAULT_MAX_MESSAGE_LEN,
-            min_propose_timeout: 10,
-            max_propose_timeout: 200,
-            propose_timeout_threshold: 500,
+            config: ConsensusConfig::default(),
         }
+    }
+
+    /// Finishes the building process, returning the `ConsensusConfig` object.
+    pub fn build(self) -> ConsensusConfig {
+        self.config
+    }
+
+    /// Sets the `validator_keys` field of `ConsensusConfig`.
+    pub fn validator_keys(self, validator_keys: Vec<ValidatorKeys>) -> Self {
+        let config = ConsensusConfig {
+            validator_keys,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `first_round_timeout` field of `ConsensusConfig`.
+    pub fn first_round_timeout(self, first_round_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            first_round_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `status_timeout` field of `ConsensusConfig`.
+    pub fn status_timeout(self, status_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            status_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `peers_timeout` field of `ConsensusConfig`.
+    pub fn peers_timeout(self, peers_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            peers_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `txs_block_limit` field of `ConsensusConfig`.
+    pub fn txs_block_limit(self, txs_block_limit: u32) -> Self {
+        let config = ConsensusConfig {
+            txs_block_limit,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `min_propose_timeout` field of `ConsensusConfig`.
+    pub fn min_propose_timeout(self, min_propose_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            min_propose_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `max_propose_timeout` field of `ConsensusConfig`.
+    pub fn max_propose_timeout(self, max_propose_timeout: Milliseconds) -> Self {
+        let config = ConsensusConfig {
+            max_propose_timeout,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `max_message_len` field of `ConsensusConfig`.
+    pub fn max_message_len(self, max_message_len: u32) -> Self {
+        let config = ConsensusConfig {
+            max_message_len,
+            ..self.config
+        };
+
+        Self { config }
+    }
+
+    /// Sets the `propose_timeout_threshold` field of `ConsensusConfig`.
+    pub fn propose_timeout_threshold(self, propose_timeout_threshold: u32) -> Self {
+        let config = ConsensusConfig {
+            propose_timeout_threshold,
+            ..self.config
+        };
+
+        Self { config }
     }
 }
 
-impl StoredConfiguration {
-    /// Tries to serialize the given configuration into a UTF-8 encoded JSON.
-    /// The method returns either the result of execution or an error.
-    pub fn try_serialize(&self) -> Result<Vec<u8>, JsonError> {
-        serde_json::to_vec(&self)
-    }
+impl ValidateInput for ConsensusConfig {
+    type Error = anyhow::Error;
 
-    /// Tries to deserialize `StorageConfiguration` from the given UTF-8 encoded
-    /// JSON. Additionally, this method performs a logic validation of the
-    /// configuration. The method returns either the result of execution or an error.
-    pub fn try_deserialize(serialized: &[u8]) -> Result<Self, JsonError> {
+    fn validate(&self) -> Result<(), Self::Error> {
         const MINIMAL_BODY_SIZE: usize = 256;
-        const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + EMPTY_SIGNED_MESSAGE_SIZE) as u32;
+        const MINIMAL_MESSAGE_LENGTH: u32 = (MINIMAL_BODY_SIZE + SIGNED_MESSAGE_MIN_SIZE) as u32;
 
-        let config: Self = serde_json::from_slice(serialized)?;
-
-        // Check that there are no duplicated keys.
-        {
-            let mut keys = HashSet::with_capacity(config.validator_keys.len() * 2);
-            for k in &config.validator_keys {
-                keys.insert(k.consensus_key);
-                keys.insert(k.service_key);
-            }
-            if keys.len() != config.validator_keys.len() * 2 {
-                return Err(JsonError::custom(
-                    "Duplicated keys are found: each consensus and service key must be unique",
-                ));
-            }
-        }
+        self.validate_keys()?;
 
         // Check timeouts.
-        if config.consensus.min_propose_timeout > config.consensus.max_propose_timeout {
-            return Err(JsonError::custom(format!(
+        if self.min_propose_timeout > self.max_propose_timeout {
+            bail!(
                 "Invalid propose timeouts: min_propose_timeout should be less or equal then \
                  max_propose_timeout: min = {}, max = {}",
-                config.consensus.min_propose_timeout, config.consensus.max_propose_timeout
-            )));
+                self.min_propose_timeout,
+                self.max_propose_timeout
+            );
         }
 
-        if config.consensus.first_round_timeout <= config.consensus.max_propose_timeout {
-            return Err(JsonError::custom(format!(
+        if self.first_round_timeout <= self.max_propose_timeout {
+            bail!(
                 "first_round_timeout({}) must be strictly larger than max_propose_timeout({})",
-                config.consensus.first_round_timeout, config.consensus.max_propose_timeout
-            )));
+                self.first_round_timeout,
+                self.max_propose_timeout
+            );
         }
 
         // Check transactions limit.
-        if config.consensus.txs_block_limit == 0 {
-            return Err(JsonError::custom(
-                "txs_block_limit should not be equal to zero",
-            ));
+        if self.txs_block_limit == 0 {
+            bail!("txs_block_limit should not be equal to zero",);
         }
 
         // Check maximum message length for sanity.
-        if config.consensus.max_message_len < MINIMAL_MESSAGE_LENGTH {
-            return Err(JsonError::custom(format!(
+        if self.max_message_len < MINIMAL_MESSAGE_LENGTH {
+            bail!(
                 "max_message_len ({}) must be at least {}",
-                config.consensus.max_message_len, MINIMAL_MESSAGE_LENGTH
-            )));
+                self.max_message_len,
+                MINIMAL_MESSAGE_LENGTH
+            );
         }
 
-        Ok(config)
+        // Print warning if configuration is not optimal
+        self.warn_if_nonoptimal();
+
+        Ok(())
     }
 }
 
-impl CryptoHash for StoredConfiguration {
-    fn hash(&self) -> Hash {
-        let vec_bytes = self.try_serialize().unwrap();
-        hash(&vec_bytes)
+/// Genesis config parameters.
+///
+/// Information from this entity get saved to the genesis block.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::lifecycle::GenesisConfig")]
+#[non_exhaustive]
+pub struct GenesisConfig {
+    /// Blockchain configuration used to create the genesis block.
+    pub consensus_config: ConsensusConfig,
+
+    /// Artifacts specification of the built-in services.
+    pub artifacts: Vec<ArtifactSpec>,
+
+    /// List of services with their configuration parameters that are created directly
+    /// in the genesis block.
+    pub builtin_instances: Vec<InstanceInitParams>,
+}
+
+/// Data that is required for initialization of a service instance.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::lifecycle::InstanceInitParams")]
+#[non_exhaustive]
+pub struct InstanceInitParams {
+    /// Instance specification.
+    pub instance_spec: InstanceSpec,
+    /// Constructor argument for the instance.
+    pub constructor: Vec<u8>,
+}
+
+impl InstanceInitParams {
+    /// Generic constructor.
+    pub fn new(
+        id: InstanceId,
+        name: impl Into<String>,
+        artifact: ArtifactId,
+        constructor: impl BinaryValue,
+    ) -> Self {
+        Self {
+            instance_spec: InstanceSpec::from_raw_parts(id, name.into(), artifact),
+            constructor: constructor.into_bytes(),
+        }
+    }
+
+    /// Converts into `InstanceInitParams` with specific constructor.
+    pub fn with_constructor(self, constructor: impl BinaryValue) -> Self {
+        Self {
+            instance_spec: self.instance_spec,
+            constructor: constructor.into_bytes(),
+        }
     }
 }
 
-impl StorageValue for StoredConfiguration {
-    fn into_bytes(self) -> Vec<u8> {
-        self.try_serialize().unwrap()
+impl From<InstanceSpec> for InstanceInitParams {
+    fn from(instance_spec: InstanceSpec) -> Self {
+        Self {
+            instance_spec,
+            constructor: Vec::new(),
+        }
+    }
+}
+
+/// Creates `GenesisConfig` from components.
+#[derive(Debug, Default)]
+pub struct GenesisConfigBuilder {
+    /// Consensus config.
+    consensus_config: ConsensusConfig,
+    /// Artifacts specifications for builtin services.
+    artifacts: HashMap<ArtifactId, Vec<u8>>,
+    /// Instances of builtin services.
+    builtin_instances: Vec<InstanceInitParams>,
+}
+
+impl GenesisConfigBuilder {
+    /// Creates a new builder instance based on the `ConsensusConfig`.
+    pub fn with_consensus_config(consensus_config: ConsensusConfig) -> Self {
+        Self {
+            consensus_config,
+            artifacts: HashMap::new(),
+            builtin_instances: vec![],
+        }
     }
 
-    fn from_bytes(v: ::std::borrow::Cow<[u8]>) -> Self {
-        Self::try_deserialize(v.as_ref()).unwrap()
+    /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
+    /// already added.
+    pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
+        self.with_parametric_artifact(artifact, ())
+    }
+
+    /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
+    /// given id is already added.
+    pub fn with_parametric_artifact(
+        mut self,
+        artifact: impl Into<ArtifactId>,
+        payload: impl BinaryValue,
+    ) -> Self {
+        let artifact = artifact.into();
+        self.artifacts
+            .entry(artifact)
+            .or_insert_with(|| payload.into_bytes());
+        self
+    }
+
+    /// Adds service instance initialization parameters.
+    pub fn with_instance(mut self, instance_params: InstanceInitParams) -> Self {
+        self.builtin_instances.push(instance_params);
+        self
+    }
+
+    /// Produces `GenesisConfig` from collected components.
+    pub fn build(self) -> GenesisConfig {
+        let artifacts = self
+            .artifacts
+            .into_iter()
+            .map(|(artifact, payload)| ArtifactSpec::new(artifact, payload))
+            .collect::<Vec<_>>();
+        GenesisConfig {
+            consensus_config: self.consensus_config,
+            artifacts,
+            builtin_instances: self.builtin_instances,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use pretty_assertions::assert_eq;
+
+    use std::fmt::Display;
+
     use super::*;
-    use crate::crypto::{gen_keypair_from_seed, Seed, SEED_LENGTH};
+    use crate::crypto::{self, gen_keypair_from_seed, Seed, SEED_LENGTH};
 
-    // TOML doesn't support all rust types, but `StoredConfiguration` must be able to save as TOML.
-    #[test]
-    fn stored_configuration_toml() {
-        let original = create_test_configuration();
-        let toml = toml::to_string(&original).unwrap();
-        let deserialized: StoredConfiguration = toml::from_str(&toml).unwrap();
-        assert_eq!(original, deserialized);
+    fn assert_err_contains(actual: impl Display, expected: impl AsRef<str>) {
+        let actual = actual.to_string();
+        let expected = expected.as_ref();
+        assert!(
+            actual.contains(expected),
+            "Actual is {}, expected: {}",
+            actual,
+            expected
+        );
     }
 
-    #[test]
-    fn stored_configuration_parse_from_toml() {
-        let toml_content = r#"
-            previous_cfg_hash = "0000000000000000000000000000000000000000000000000000000000000000"
-            actual_from = 42
-
-            [[validator_keys]]
-            consensus_key = "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c"
-            service_key = "43a72e714401762df66b68c26dfbdf2682aaec9f2474eca4613e424a0fbafd3c"
-
-            [[validator_keys]]
-            consensus_key = "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
-            service_key = "20828bf5c5bdcacb684863336c202fb5599da48be5596615742170705beca9f7"
-
-            [[validator_keys]]
-            consensus_key = "ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1"
-            service_key = "acdb0e29743f0ccb8686d0a104cb96e05abefec1538765e7595869f7dc8c49aa"
-
-            [consensus]
-            first_round_timeout = 3000
-            status_timeout = 5000
-            peers_timeout = 10000
-            txs_block_limit = 1000
-            max_message_len = 1048576
-            min_propose_timeout = 10
-            max_propose_timeout = 200
-            propose_timeout_threshold = 500
-            "#;
-
-        let origin = create_test_configuration();
-        let from_toml = toml::from_str(toml_content).unwrap();
-        assert_eq!(origin, from_toml);
+    fn gen_validator_keys(i: u8) -> ValidatorKeys {
+        ValidatorKeys::new(
+            gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
+            gen_keypair_from_seed(&Seed::new([u8::max_value() - i; SEED_LENGTH])).0,
+        )
     }
 
-    #[test]
-    fn stored_configuration_serialize_deserialize() {
-        let configuration = create_test_configuration();
-        assert_eq!(configuration, serialize_deserialize(&configuration));
+    fn gen_keys_pool(count: usize) -> Vec<PublicKey> {
+        (0..count)
+            .map(|_| crypto::gen_keypair().0)
+            .collect::<Vec<_>>()
     }
 
-    #[test]
-    #[should_panic(expected = "Duplicated keys are found")]
-    fn duplicated_validators_keys() {
-        let mut configuration = create_test_configuration();
-        configuration.validator_keys.push(ValidatorKeys {
-            consensus_key: PublicKey::zero(),
-            service_key: PublicKey::zero(),
-        });
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "Invalid propose timeouts: min_propose_timeout should be less or")]
-    fn min_max_propose_timeouts() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.min_propose_timeout = 10;
-        configuration.consensus.max_propose_timeout = 0;
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(
-        expected = "round_timeout(50) must be strictly larger than max_propose_timeout(50)"
-    )]
-    fn invalid_round_timeout() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.first_round_timeout = 50;
-        configuration.consensus.max_propose_timeout = 50;
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "txs_block_limit should not be equal to zero")]
-    fn invalid_txs_block_limit() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.txs_block_limit = 0;
-        serialize_deserialize(&configuration);
-    }
-
-    #[test]
-    #[should_panic(expected = "max_message_len (128) must be at least")]
-    fn too_small_max_message_len() {
-        let mut configuration = create_test_configuration();
-        configuration.consensus.max_message_len = 128;
-        serialize_deserialize(&configuration);
-    }
-
-    fn create_test_configuration() -> StoredConfiguration {
-        let validator_keys = (1..4)
-            .map(|i| ValidatorKeys {
-                consensus_key: gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
-                service_key: gen_keypair_from_seed(&Seed::new([i * 10; SEED_LENGTH])).0,
-            })
-            .collect();
-
-        StoredConfiguration {
-            previous_cfg_hash: Hash::zero(),
-            actual_from: Height(42),
-            validator_keys,
-            consensus: ConsensusConfig::default(),
-            services: BTreeMap::new(),
+    fn gen_consensus_config() -> ConsensusConfig {
+        ConsensusConfig {
+            validator_keys: (0..4).map(gen_validator_keys).collect(),
+            ..ConsensusConfig::default()
         }
     }
 
-    fn serialize_deserialize(configuration: &StoredConfiguration) -> StoredConfiguration {
-        let serialized = configuration.try_serialize().unwrap();
-        StoredConfiguration::try_deserialize(&serialized).unwrap()
+    #[test]
+    fn validate_validator_keys_err_same() {
+        let pk = crypto::gen_keypair().0;
+
+        let keys = ValidatorKeys::new(pk, pk);
+        let e = keys.validate().unwrap_err();
+        assert_err_contains(e, "Consensus and service keys must be different");
+    }
+
+    #[test]
+    fn consensus_config_validate_ok() {
+        let cfg = ConsensusConfig {
+            validator_keys: (0..4).map(gen_validator_keys).collect(),
+            ..ConsensusConfig::default()
+        };
+
+        cfg.validate().expect("Expected valid consensus config");
+    }
+
+    #[test]
+    fn consensus_config_validate_err_round_trip() {
+        let keys = gen_keys_pool(4);
+
+        let cases = [
+            (
+                ConsensusConfig::default(),
+                "Consensus configuration must have at least one validator",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![ValidatorKeys::new(keys[0], keys[0])],
+                    ..ConsensusConfig::default()
+                },
+                "Consensus and service keys must be different",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![
+                        ValidatorKeys::new(keys[0], keys[1]),
+                        ValidatorKeys::new(keys[0], keys[2]),
+                    ],
+                    ..ConsensusConfig::default()
+                },
+                "Duplicated keys are found",
+            ),
+            (
+                ConsensusConfig {
+                    validator_keys: vec![
+                        ValidatorKeys::new(keys[0], keys[1]),
+                        ValidatorKeys::new(keys[2], keys[1]),
+                    ],
+                    ..ConsensusConfig::default()
+                },
+                "Duplicated keys are found",
+            ),
+            (
+                ConsensusConfig {
+                    min_propose_timeout: 10,
+                    max_propose_timeout: 5,
+                    ..gen_consensus_config()
+                },
+                "min_propose_timeout should be less or",
+            ),
+            (
+                ConsensusConfig {
+                    first_round_timeout: 10,
+                    max_propose_timeout: 15,
+                    ..gen_consensus_config()
+                },
+                "first_round_timeout(10) must be strictly larger than max_propose_timeout(15)",
+            ),
+            (
+                ConsensusConfig {
+                    txs_block_limit: 0,
+                    ..gen_consensus_config()
+                },
+                "txs_block_limit should not be equal to zero",
+            ),
+            (
+                ConsensusConfig {
+                    max_message_len: 0,
+                    ..gen_consensus_config()
+                },
+                "max_message_len (0) must be at least",
+            ),
+        ];
+
+        for (cfg, expected_msg) in &cases {
+            assert_err_contains(cfg.validate().unwrap_err(), expected_msg);
+        }
+    }
+
+    #[test]
+    fn genesis_config_creation() {
+        let consensus = gen_consensus_config();
+        let version = "1.0.0".parse().unwrap();
+        let artifact1 = ArtifactId::from_raw_parts(42, "test_artifact1".into(), version);
+        let version = "0.2.8".parse().unwrap();
+        let artifact2 = ArtifactId::from_raw_parts(42, "test_artifact2".into(), version);
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus.clone())
+            .with_artifact(artifact1.clone())
+            .with_parametric_artifact(artifact2.clone(), vec![1_u8, 2, 3])
+            .with_instance(artifact1.clone().into_default_instance(1, "art1_inst1"))
+            .with_instance(
+                artifact1
+                    .into_default_instance(2, "art1_inst2")
+                    .with_constructor(vec![4_u8, 5, 6]),
+            )
+            .with_instance(artifact2.into_default_instance(1, "art2_inst1"))
+            .build();
+
+        assert_eq!(genesis_config.consensus_config, consensus);
+        assert_eq!(genesis_config.artifacts.len(), 2);
+        assert_eq!(genesis_config.builtin_instances.len(), 3);
+    }
+
+    #[test]
+    fn genesis_config_check_artifacts_duplication() {
+        let consensus = gen_consensus_config();
+        let version = "1.1.5-rc.3".parse().unwrap();
+        let artifact = ArtifactId::new(42_u32, "test_artifact", version).unwrap();
+        let correct_payload = vec![1_u8, 2, 3];
+
+        let genesis_config = GenesisConfigBuilder::with_consensus_config(consensus)
+            .with_parametric_artifact(artifact.clone(), correct_payload.clone())
+            .with_parametric_artifact(artifact, vec![4_u8, 5, 6])
+            .build();
+
+        assert_eq!(genesis_config.artifacts.len(), 1);
+        assert_eq!(genesis_config.artifacts[0].payload, correct_payload);
     }
 }

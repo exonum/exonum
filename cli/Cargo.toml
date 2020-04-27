@@ -1,0 +1,43 @@
+[package]
+name = "exonum-cli"
+version = "1.0.0"
+edition = "2018"
+authors = ["The Exonum Team <contact@exonum.com>"]
+homepage = "https://exonum.com/"
+repository = "https://github.com/exonum/exonum"
+documentation = "https://docs.rs/exonum-cli"
+readme = "README.md"
+license = "Apache-2.0"
+keywords = ["exonum", "cli", "library"]
+categories = ["command-line-interface", "command-line-utilities", "config"]
+description = "Helper crate for secure and convenient configuration of the Exonum nodes."
+
+[dependencies]
+exonum = { version = "1.0.0", path = "../exonum" }
+exonum-node = { version = "1.0.0", path = "../exonum-node" }
+exonum-explorer-service = { version = "1.0.0", path = "../services/explorer" }
+exonum-supervisor = { version = "1.0.0", path = "../services/supervisor" }
+exonum-system-api = { version = "1.0.0", path = "../components/system-api" }
+exonum-rust-runtime = { version = "1.0.0", path = "../runtimes/rust" }
+
+anyhow = "1.0.26"
+log = "0.4"
+rpassword = "4.0"
+serde = "1.0"
+serde_derive = "1.0"
+structopt = "0.3"
+tempfile = "3.1"
+toml = "0.5"
+zeroize = "1.1.0"
+
+[dev-dependencies]
+exonum-derive = { version = "1.0.0", path = "../components/derive" }
+
+futures = "0.3.4"
+lazy_static = "1.4.0"
+pretty_assertions = "0.6"
+reqwest = { version = "0.10.2", features = ["json"] }
+
+[dev-dependencies.tokio]
+version = "0.2.13"
+features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

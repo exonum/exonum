@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,306 +12,204 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Handling messages received from P2P node network.
+//! Tools for messages authenticated with the Ed25519 public-key crypto system.
+//! These messages are used by the P2P networking and for transaction authentication by external
+//! clients.
 //!
 //! Every message passes through three phases:
 //!
-//!   * `Vec<u8>`: raw bytes as received from the network
-//!   * `SignedMessage`: integrity and signature of the message has been verified
-//!   * `Message`: the message has been completely parsed and has correct structure
+//! 1. `Vec<u8>`: raw bytes as received from the network
+//! 2. `SignedMessage`: integrity and the signature of the message has been verified
+//! 3. `impl IntoMessage`:  the message has been completely parsed
 //!
 //! Graphical representation of the message processing flow:
 //!
 //! ```text
-//! +---------+             +---------------+                  +----------+
-//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| Message |-->(handle)
-//! +---------+     |       +---------------+        |         +----------+
+//! +---------+             +---------------+                  +------------------+
+//! | Vec<u8> |--(verify)-->| SignedMessage |--(deserialize)-->| impl IntoMessage |-->(handle)
+//! +---------+     |       +---------------+        |         +------------------+
 //!                 |                                |
 //!                 V                                V
 //!              (drop)                           (drop)
+//!
+//! ```
+//!
+//! # Examples
+//!
+//! A new signed message can be created as follows.
+//!
+//! ```
+//! # use chrono::Utc;
+//! # use exonum::{
+//! #     crypto::{hash, Hash, KeyPair},
+//! #     helpers::{Height, Round, ValidatorId},
+//! #     messages::{Precommit, Verified},
+//! # };
+//! # fn send<T>(_: T) {}
+//! let keypair = KeyPair::random();
+//! // For example, let's create a `Precommit` message.
+//! let payload = Precommit::new(
+//!     ValidatorId(0),
+//!     Height(15),
+//!     Round::first(),
+//!     hash(b"propose_hash"),
+//!     hash(b"block_hash"),
+//!     Utc::now(),
+//! );
+//! // Sign the message with some keypair to get a trusted `Precommit` message.
+//! let signed_payload = Verified::from_value(payload, keypair.public_key(), keypair.secret_key());
+//! // Further, convert the trusted message into a raw signed message and send
+//! // it through the network.
+//! let raw_signed_message = signed_payload.into_raw();
+//! send(raw_signed_message);
+//! ```
+//!
+//! A signed message can be verified as follows:
+//!
+//! ```
+//! # use assert_matches::assert_matches;
+//! # use chrono::Utc;
+//! # use exonum::{
+//! #     crypto::{hash, Hash, KeyPair},
+//! #     helpers::{Height, Round, ValidatorId},
+//! #     messages::{CoreMessage, Precommit, Verified, SignedMessage},
+//! # };
+//! # fn get_signed_message() -> SignedMessage {
+//! #     let keypair = KeyPair::random();
+//! #     let payload = Precommit::new(
+//! #         ValidatorId(0),
+//! #         Height(15),
+//! #         Round::first(),
+//! #         hash(b"propose_hash"),
+//! #         hash(b"block_hash"),
+//! #         Utc::now(),
+//! #     );
+//! #     Verified::from_value(payload, keypair.public_key(), keypair.secret_key()).into_raw()
+//! # }
+//! // Assume you have some signed message.
+//! let raw: SignedMessage = get_signed_message();
+//! // You know that this is a type of `CoreMessage`, so you can
+//! // verify its signature and convert it into `CoreMessage`.
+//! let verified = raw.into_verified::<CoreMessage>().expect("verification failed");
+//! // Further, check whether it is a `Precommit` message.
+//! assert_matches!(
+//!     verified.payload(),
+//!     CoreMessage::Precommit(ref precommit) if precommit.epoch == Height(15)
+//! );
 //! ```
 
-use byteorder::{ByteOrder, LittleEndian};
-use failure::Error;
-use hex::{FromHex, ToHex};
-use serde::de::{self, Deserialize, Deserializer};
-use serde::ser::{Serialize, Serializer};
-
-use std::{borrow::Cow, cmp::PartialEq, fmt, mem, ops::Deref};
-
-use crate::crypto::{hash, CryptoHash, Hash, PublicKey};
-use crate::storage::StorageValue;
-
-pub(crate) use self::{authorization::SignedMessage, helpers::HexStringRepresentation};
 pub use self::{
-    helpers::{to_hex_string, BinaryForm},
-    protocol::*,
+    signed::{IntoMessage, Verified},
+    types::*,
 };
 
-mod authorization;
-mod helpers;
-mod protocol;
+use crate::crypto::{PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
+
+mod signed;
+mod types;
+
+/// Lower bound on the size of the correct `SignedMessage`.
+/// This is the size of message fields + Protobuf overhead.
+#[doc(hidden)]
+pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH + 8;
+
 #[cfg(test)]
-mod tests;
+mod tests {
+    use chrono::Utc;
+    use exonum_crypto::{self as crypto, KeyPair};
+    use exonum_merkledb::BinaryValue;
+    use exonum_proto::ProtobufConvert;
+    use protobuf::Message;
 
-/// Version of the protocol. Different versions are incompatible.
-pub const PROTOCOL_MAJOR_VERSION: u8 = 1;
-pub(crate) const RAW_TRANSACTION_HEADER: usize = mem::size_of::<u16>() * 2;
+    use super::*;
+    use crate::{
+        helpers::{Height, Round, ValidatorId},
+        proto::schema::messages as proto,
+    };
 
-/// Transaction raw buffer.
-/// This struct is used to transfer transactions in network.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct RawTransaction {
-    service_id: u16,
-    service_transaction: ServiceTransaction,
-}
-
-/// Concrete raw transaction transaction inside `TransactionSet`.
-/// This type is used inside `#[derive(TransactionSet)]`
-/// to return raw transaction payload as part of service transaction set.
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct ServiceTransaction {
-    transaction_id: u16,
-    payload: Vec<u8>,
-}
-
-impl ServiceTransaction {
-    /// Creates `ServiceTransaction` from unchecked raw data.
-    pub fn from_raw_unchecked(transaction_id: u16, payload: Vec<u8>) -> Self {
-        ServiceTransaction {
-            transaction_id,
-            payload,
-        }
+    #[test]
+    fn test_signed_message_min_size() {
+        let keys = KeyPair::random();
+        let msg = SignedMessage::new(vec![], keys.public_key(), keys.secret_key());
+        assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.into_bytes().len())
     }
 
-    /// Converts `ServiceTransaction` back to raw data.
-    pub fn into_raw_parts(self) -> (u16, Vec<u8>) {
-        (self.transaction_id, self.payload)
-    }
-}
+    #[test]
+    fn test_message_roundtrip() {
+        let keys = KeyPair::random();
+        let ts = Utc::now();
 
-impl RawTransaction {
-    /// Creates a new instance of RawTransaction.
-    // `pub` because new used in benches.
-    pub fn new(service_id: u16, service_transaction: ServiceTransaction) -> RawTransaction {
-        RawTransaction {
-            service_id,
-            service_transaction,
-        }
-    }
-
-    /// Returns the user defined data that should be used for deserialization.
-    pub fn service_transaction(self) -> ServiceTransaction {
-        self.service_transaction
-    }
-
-    /// Returns `service_id` specified for current transaction.
-    pub fn service_id(&self) -> u16 {
-        self.service_id
-    }
-}
-
-impl BinaryForm for RawTransaction {
-    fn encode(&self) -> Result<Vec<u8>, Error> {
-        let mut buffer = vec![0; mem::size_of::<u16>()];
-        LittleEndian::write_u16(&mut buffer[0..2], self.service_id);
-        let value = self.service_transaction.encode()?;
-        buffer.extend_from_slice(&value);
-        Ok(buffer)
-    }
-
-    /// Converts a serialized byte array into a transaction.
-    fn decode(buffer: &[u8]) -> Result<Self, Error> {
-        ensure!(
-            buffer.len() >= mem::size_of::<u16>(),
-            "Buffer too short in RawTransaction deserialization."
+        let msg = Verified::from_value(
+            Precommit::new(
+                ValidatorId(123),
+                Height(15),
+                Round(25),
+                crypto::hash(&[1, 2, 3]),
+                crypto::hash(&[3, 2, 1]),
+                ts,
+            ),
+            keys.public_key(),
+            keys.secret_key(),
         );
-        let service_id = LittleEndian::read_u16(&buffer[0..2]);
-        let service_transaction = ServiceTransaction::decode(&buffer[2..])?;
-        Ok(RawTransaction {
-            service_id,
-            service_transaction,
-        })
-    }
-}
 
-impl BinaryForm for ServiceTransaction {
-    fn encode(&self) -> Result<Vec<u8>, Error> {
-        let mut buffer = vec![0; mem::size_of::<u16>()];
-        LittleEndian::write_u16(&mut buffer[0..2], self.transaction_id);
-        buffer.extend_from_slice(&self.payload);
-        Ok(buffer)
+        let bytes = msg.to_bytes();
+        let message =
+            SignedMessage::from_bytes(bytes.into()).expect("Cannot deserialize signed message");
+        let msg_roundtrip = message
+            .into_verified::<Precommit>()
+            .expect("Failed to check precommit");
+        assert_eq!(msg, msg_roundtrip);
     }
 
-    fn decode(buffer: &[u8]) -> Result<Self, Error> {
-        ensure!(
-            buffer.len() >= mem::size_of::<u16>(),
-            "Buffer too short in ServiceTransaction deserialization."
+    #[test]
+    fn test_signed_message_unusual_protobuf() {
+        let keys = KeyPair::random();
+
+        let mut ex_msg = proto::CoreMessage::new();
+        let precommit_msg = Precommit::new(
+            ValidatorId(123),
+            Height(15),
+            Round(25),
+            crypto::hash(&[1, 2, 3]),
+            crypto::hash(&[3, 2, 1]),
+            Utc::now(),
         );
-        let transaction_id = LittleEndian::read_u16(&buffer[0..2]);
-        let payload = buffer[2..].to_vec();
-        Ok(ServiceTransaction {
-            transaction_id,
-            payload,
-        })
-    }
-}
+        ex_msg.set_precommit(precommit_msg.to_pb());
+        let mut payload = ex_msg.write_to_bytes().unwrap();
+        // Duplicate pb serialization to create unusual but correct protobuf message.
+        payload.append(&mut payload.clone());
 
-/// Wraps a `Payload` together with the corresponding `SignedMessage`.
-///
-/// Usually one wants to work with fully parsed messages (i.e., `Payload`). However, occasionally
-/// we need to retransmit the message into the network or save its serialized form. We could
-/// serialize the `Payload` back, but Protobuf does not have a canonical form so the resulting
-/// payload may have different binary representation (thus invalidating the message signature).
-///
-/// So we use `Signed` to keep the original byte buffer around with the parsed `Payload`.
-#[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
-pub struct Signed<T> {
-    // TODO: inner T duplicate data in SignedMessage, we can use owning_ref,
-    // if our serialization format allows us (ECR-2315).
-    payload: T,
-    message: SignedMessage,
-}
+        let signed = SignedMessage::new(payload, keys.public_key(), keys.secret_key());
 
-impl<T: ProtocolMessage> Signed<T> {
-    /// Creates a new instance of the message.
-    pub(in crate::messages) fn new(payload: T, message: SignedMessage) -> Signed<T> {
-        Signed { payload, message }
+        let bytes = signed.into_bytes();
+        let message =
+            SignedMessage::from_bytes(bytes.into()).expect("Cannot deserialize signed message");
+        let deserialized_precommit = message
+            .into_verified::<Precommit>()
+            .expect("Failed to check precommit");
+        assert_eq!(precommit_msg, *deserialized_precommit.payload())
     }
 
-    /// Returns hash of the full message.
-    pub fn hash(&self) -> Hash {
-        hash(self.message.raw())
-    }
+    #[test]
+    fn test_precommit_serde_correct() {
+        let keys = KeyPair::random();
+        let ts = Utc::now();
 
-    /// Returns a serialized buffer.
-    pub fn serialize(self) -> Vec<u8> {
-        self.message.raw
-    }
+        let precommit = Verified::from_value(
+            Precommit::new(
+                ValidatorId(123),
+                Height(15),
+                Round(25),
+                crypto::hash(&[1, 2, 3]),
+                crypto::hash(&[3, 2, 1]),
+                ts,
+            ),
+            keys.public_key(),
+            keys.secret_key(),
+        );
 
-    /// Returns reference to the payload.
-    pub fn payload(&self) -> &T {
-        &self.payload
-    }
-
-    /// Returns reference to the signed message.
-    pub fn signed_message(&self) -> &SignedMessage {
-        &self.message
-    }
-
-    /// Returns public key of the message creator.
-    pub fn author(&self) -> PublicKey {
-        self.message.author()
-    }
-}
-
-impl fmt::Debug for ServiceTransaction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("Transaction")
-            .field("message_id", &self.transaction_id)
-            .field("payload_len", &self.payload.len())
-            .finish()
-    }
-}
-
-impl<T> ToHex for Signed<T> {
-    fn write_hex<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.raw().write_hex(w)
-    }
-
-    fn write_hex_upper<W: fmt::Write>(&self, w: &mut W) -> fmt::Result {
-        self.message.raw().write_hex_upper(w)
-    }
-}
-
-impl<X: ProtocolMessage> FromHex for Signed<X> {
-    type Error = Error;
-
-    fn from_hex<T: AsRef<[u8]>>(v: T) -> Result<Self, Error> {
-        let bytes = Vec::<u8>::from_hex(v)?;
-        let protocol = Message::deserialize(SignedMessage::from_raw_buffer(bytes)?)?;
-        ProtocolMessage::try_from(protocol)
-            .map_err(|_| format_err!("Couldn't deserialize message."))
-    }
-}
-
-impl<T: ProtocolMessage> AsRef<SignedMessage> for Signed<T> {
-    fn as_ref(&self) -> &SignedMessage {
-        &self.message
-    }
-}
-
-impl<T: ProtocolMessage> AsRef<T> for Signed<T> {
-    fn as_ref(&self) -> &T {
-        &self.payload
-    }
-}
-
-impl<T> From<Signed<T>> for SignedMessage {
-    fn from(message: Signed<T>) -> Self {
-        message.message
-    }
-}
-
-impl<T: ProtocolMessage> Deref for Signed<T> {
-    type Target = T;
-    fn deref(&self) -> &T {
-        &self.payload
-    }
-}
-
-impl<T: ProtocolMessage> StorageValue for Signed<T> {
-    fn into_bytes(self) -> Vec<u8> {
-        self.message.raw
-    }
-
-    fn from_bytes(value: Cow<[u8]>) -> Self {
-        let message = SignedMessage::from_vec_unchecked(value.into_owned());
-        // TODO: Remove additional deserialization. [ECR-2315]
-        let msg = Message::deserialize(message).unwrap();
-        T::try_from(msg).unwrap()
-    }
-}
-
-impl<T: ProtocolMessage> CryptoHash for Signed<T> {
-    fn hash(&self) -> Hash {
-        self.hash()
-    }
-}
-
-impl PartialEq<Signed<RawTransaction>> for SignedMessage {
-    fn eq(&self, other: &Signed<RawTransaction>) -> bool {
-        self.eq(other.signed_message())
-    }
-}
-
-impl<T> Serialize for Signed<T> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        HexStringRepresentation::serialize(&self.message, serializer)
-    }
-}
-
-impl<'de, T> Deserialize<'de> for Signed<T>
-where
-    T: ProtocolMessage,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let signed_message: SignedMessage = HexStringRepresentation::deserialize(deserializer)?;
-        Message::deserialize(signed_message)
-            .map_err(|e| de::Error::custom(format!("Unable to deserialize signed message: {}", e)))
-            .and_then(|msg| {
-                T::try_from(msg).map_err(|e| {
-                    de::Error::custom(format!(
-                        "Unable to decode signed message into payload: {:?}",
-                        e
-                    ))
-                })
-            })
+        let precommit_json = serde_json::to_string(&precommit).unwrap();
+        let precommit2: Verified<Precommit> = serde_json::from_str(&precommit_json).unwrap();
+        assert_eq!(precommit2, precommit);
     }
 }

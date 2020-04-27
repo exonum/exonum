@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,83 +14,55 @@
 
 //! Cryptocurrency implementation example using [exonum](http://exonum.com/).
 
-#![deny(
-    missing_debug_implementations,
-    missing_docs,
-    unsafe_code,
-    bare_trait_objects
-)]
+#![deny(unsafe_code, bare_trait_objects)]
+#![warn(missing_docs, missing_debug_implementations)]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
-pub use crate::schema::Schema;
+pub use crate::{schema::Schema, transactions::CryptocurrencyInterface};
 
 pub mod api;
+pub mod migrations;
 pub mod proto;
 pub mod schema;
 pub mod transactions;
 pub mod wallet;
 
-use exonum::{
-    api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
-    crypto::Hash,
-    helpers::fabric::{self, Context},
-    messages::RawTransaction,
-    storage::Snapshot,
-};
+use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId};
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
 
-use crate::transactions::WalletTransactions;
+use crate::{api::PublicApi as CryptocurrencyApi, schema::SchemaImpl};
 
-/// Unique service ID.
-const CRYPTOCURRENCY_SERVICE_ID: u16 = 128;
-/// Name of the service.
-const SERVICE_NAME: &str = "cryptocurrency";
 /// Initial balance of the wallet.
-const INITIAL_BALANCE: u64 = 100;
+pub const INITIAL_BALANCE: u64 = 100;
 
-/// Exonum `Service` implementation.
-#[derive(Default, Debug)]
-pub struct Service;
+/// Cryptocurrency service implementation.
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("CryptocurrencyInterface"))]
+#[service_factory(artifact_name = "exonum-cryptocurrency", proto_sources = "proto")]
+pub struct CryptocurrencyService;
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        CRYPTOCURRENCY_SERVICE_ID
-    }
-
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(view);
-        schema.state_hash()
-    }
-
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        WalletTransactions::tx_from_raw(raw).map(Into::into)
+impl Service for CryptocurrencyService {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        _params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        // Initialize indexes. Not doing this may lead to errors in HTTP API, since it relies on
+        // `wallets` indexes being initialized for returning corresponding proofs.
+        SchemaImpl::new(context.service_data());
+        Ok(())
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        api::PublicApi::wire(builder);
+        CryptocurrencyApi::wire(builder);
     }
 }
 
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug)]
-pub struct ServiceFactory;
-
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
-    }
-
-    fn make_service(&mut self, _: &Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service)
-    }
+/// Use predefined instance name and id for frontend.
+impl DefaultInstance for CryptocurrencyService {
+    const INSTANCE_ID: InstanceId = 3;
+    const INSTANCE_NAME: &'static str = "crypto";
 }

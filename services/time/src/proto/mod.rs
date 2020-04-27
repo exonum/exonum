@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,9 +14,8 @@
 
 //! Module of the rust-protobuf generated files.
 
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+#![allow(bare_trait_objects, clippy::pedantic, clippy::nursery)]
 
-pub use self::time::TxTime;
+pub use self::service::TxTime;
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));

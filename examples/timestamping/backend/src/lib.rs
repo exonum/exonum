@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,77 +18,86 @@
 
 #![deny(
     missing_debug_implementations,
-    missing_docs,
+    // missing_docs,
     unsafe_code,
     bare_trait_objects
 )]
 
 #[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate failure;
-#[macro_use]
-extern crate log;
-#[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
-pub mod api;
+mod api;
+#[doc(hidden)]
 pub mod proto;
-pub mod schema;
-pub mod transactions;
+mod schema;
+mod transactions;
 
-use exonum::{
-    api::ServiceApiBuilder,
-    blockchain::{self, Transaction, TransactionSet},
-    crypto::Hash,
-    helpers::fabric,
-    messages::RawTransaction,
-    storage::Snapshot,
+pub use crate::{
+    api::{TimestampProof, TimestampQuery},
+    schema::{Timestamp, TimestampEntry},
+    transactions::{Config, Error, TimestampingInterface},
 };
 
-use crate::{api::PublicApi, schema::Schema, transactions::TimeTransactions};
+use exonum::{
+    merkledb::BinaryValue,
+    runtime::{CommonError, ExecutionContext, ExecutionError},
+};
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
+use exonum_rust_runtime::{api::ServiceApiBuilder, Service};
+use exonum_supervisor::Configure;
+use exonum_time::TimeSchema;
 
-const TIMESTAMPING_SERVICE: u16 = 130;
-const SERVICE_NAME: &str = "timestamping";
+use crate::{api::PublicApi as TimestampingApi, schema::Schema};
 
-/// Exonum `Service` implementation.
-#[derive(Debug, Default)]
-pub struct Service;
+#[derive(Debug, ServiceDispatcher, ServiceFactory)]
+#[service_dispatcher(implements("TimestampingInterface", raw = "Configure<Params = Config>"))]
+#[service_factory(proto_sources = "proto")]
+pub struct TimestampingService;
 
-impl blockchain::Service for Service {
-    fn service_id(&self) -> u16 {
-        TIMESTAMPING_SERVICE
-    }
+fn verify_config(context: &ExecutionContext<'_>, config: &Config) -> Result<(), ExecutionError> {
+    let _time_schema: TimeSchema<_> = context
+        .data()
+        .service_schema(config.time_service_name.as_str())?;
 
-    fn service_name(&self) -> &'static str {
-        SERVICE_NAME
-    }
+    Ok(())
+}
 
-    fn state_hash(&self, view: &dyn Snapshot) -> Vec<Hash> {
-        let schema = Schema::new(view);
-        schema.state_hash()
-    }
+impl Service for TimestampingService {
+    fn initialize(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Vec<u8>,
+    ) -> Result<(), ExecutionError> {
+        let config = Config::from_bytes(params.into()).map_err(CommonError::malformed_arguments)?;
+        verify_config(&context, &config)?;
 
-    fn tx_from_raw(&self, raw: RawTransaction) -> Result<Box<dyn Transaction>, failure::Error> {
-        let tx = TimeTransactions::tx_from_raw(raw)?;
-        Ok(tx.into())
+        Schema::new(context.service_data()).config.set(config);
+        Ok(())
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        PublicApi::wire(builder);
+        TimestampingApi.wire(builder);
     }
 }
 
-/// A configuration service creator for the `NodeBuilder`.
-#[derive(Debug, Clone, Copy)]
-pub struct ServiceFactory;
+impl Configure for TimestampingService {
+    type Params = Config;
 
-impl fabric::ServiceFactory for ServiceFactory {
-    fn service_name(&self) -> &str {
-        SERVICE_NAME
+    fn verify_config(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        verify_config(&context, &params)
     }
 
-    fn make_service(&mut self, _: &fabric::Context) -> Box<dyn blockchain::Service> {
-        Box::new(Service)
+    fn apply_config(
+        &self,
+        context: ExecutionContext<'_>,
+        params: Self::Params,
+    ) -> Result<(), ExecutionError> {
+        let mut schema = Schema::new(context.service_data());
+        schema.config.set(params);
+        Ok(())
     }
 }

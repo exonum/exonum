@@ -1,0 +1,166 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.supervisor;
+
+import "exonum/crypto/types.proto";
+import "exonum/blockchain.proto";
+import "exonum/runtime/base.proto";
+import "exonum/runtime/errors.proto";
+import "exonum/runtime/lifecycle.proto";
+import "google/protobuf/empty.proto";
+
+// Transactions
+
+// Request for the artifact deployment.
+message DeployRequest {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Additional information for Runtime to deploy.
+  bytes spec = 2;
+  // The height until which the deployment procedure should be completed.
+  uint64 deadline_height = 3;
+  // Seed to allow several deployments with the same params.
+  uint64 seed = 4;
+}
+
+// Confirmation that artifact deployment has ended for a validator.
+// Result can be either successful or unsuccessful.
+message DeployResult {
+  // Corresponding request.
+  DeployRequest request = 1;
+  // Result of deployment.
+  exonum.runtime.ExecutionStatus result = 2;
+}
+
+// Request to start a new service instance.
+message StartService {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact = 1;
+  // Instance name.
+  string name = 2;
+  // Instance configuration.
+  bytes config = 3;
+}
+
+// Request to stop an existing service instance.
+message StopService {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+}
+
+// Request to freeze an existing service instance.
+message FreezeService {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+}
+
+// Configuration parameters of the certain service instance.
+message ServiceConfig {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+  // Raw bytes representation of service configuration parameters.
+  bytes params = 2;
+}
+
+// Request to resume a previously stopped service instance.
+message ResumeService {
+  // Corresponding service instance ID.
+  uint32 instance_id = 1;
+  // Raw bytes representation of service resume parameters.
+  bytes params = 3;
+}
+
+// Request to unload an unused artifact.
+message UnloadArtifact {
+  // Artifact identifier.
+  exonum.runtime.ArtifactId artifact_id = 1;
+}
+
+// This message contains one atomic configuration change.
+message ConfigChange {
+  oneof kind {
+    // New consensus config.
+    exonum.Config consensus = 1;
+    // New service instance config.
+    ServiceConfig service = 2;
+    // Request to start a new service instance.
+    StartService start_service = 3;
+    // Request to stop an existing service instance.
+    StopService stop_service = 4;
+    // Request to resume a previously stopped service instance.
+    ResumeService resume_service = 5;
+    // Request to freeze an existing service instance.
+    FreezeService freeze_service = 6;
+    // Request to unload an unused artifact.
+    UnloadArtifact unload_artifact = 7;
+  }
+}
+
+// Request for the configuration change
+message ConfigPropose {
+  // The height until which the update configuration procedure should be
+  // completed.
+  uint64 actual_from = 1;
+  // New configuration proposition.
+  repeated ConfigChange changes = 2;
+  // Configuration proposal number to avoid conflicting proposals.
+  // For every proposal, this field should be equal to the amount of
+  // valid processed proposals (no matter accepted or not).
+  // Appropriate value for this field can be obtained via "configuration-number"
+  // API endpoint.
+  uint64 configuration_number = 3;
+}
+
+// Confirmation vote for the configuration change
+message ConfigVote {
+  // Hash of configuration proposition.
+  exonum.crypto.Hash propose_hash = 1;
+}
+
+// Supervisor operating mode.
+enum SupervisorMode {
+  SIMPLE = 0;
+  DECENTRALIZED = 1;
+}
+
+// Request for the service data migration.
+message MigrationRequest {
+  // New artifact identifier.
+  exonum.runtime.ArtifactId new_artifact = 1;
+  // Name of service for a migration.
+  string service = 2;
+  // The height until which the migration procedure should be completed.
+  uint64 deadline_height = 3;
+  // Seed to allow several migrations with the same params.
+  uint64 seed = 4;
+}
+
+// Confirmation that migration has ended for a validator.
+// Status can be either successful or unsuccessful.
+message MigrationResult {
+  // Corresponding request.
+  MigrationRequest request = 1;
+  // Status of migration.
+  exonum.runtime.MigrationStatus status = 2;
+}
+
+// Supervisor service configuration (not to be confused with `ConfigPropose`,
+// which contains core/service configuration change proposal).
+message Config {
+  // Supervisor operating mode.
+  SupervisorMode mode = 1;
+}

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,106 +14,79 @@
 
 //! Cryptocurrency database schema.
 
-use exonum::{
-    crypto::{Hash, PublicKey},
-    storage::{Fork, ProofListIndex, ProofMapIndex, Snapshot},
+use exonum::crypto::Hash;
+use exonum::merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    Group, ObjectHash, ProofListIndex, RawProofMapIndex,
 };
+use exonum::runtime::CallerAddress as Address;
+use exonum_derive::{FromAccess, RequireArtifact};
 
 use crate::{wallet::Wallet, INITIAL_BALANCE};
 
 /// Database schema for the cryptocurrency.
-#[derive(Debug)]
-pub struct Schema<T> {
-    view: T,
+///
+/// Note that the schema is crate-private, but it has a public part.
+#[derive(Debug, FromAccess)]
+pub(crate) struct SchemaImpl<T: Access> {
+    /// Public part of the schema.
+    #[from_access(flatten)]
+    pub public: Schema<T>,
+    /// History for specific wallets.
+    pub wallet_history: Group<T, Address, ProofListIndex<T::Base, Hash>>,
 }
 
-impl<T> AsMut<T> for Schema<T> {
-    fn as_mut(&mut self) -> &mut T {
-        &mut self.view
+/// Public part of the cryptocurrency schema.
+#[derive(Debug, FromAccess, RequireArtifact)]
+#[require_artifact(name = "exonum-cryptocurrency")]
+pub struct Schema<T: Access> {
+    /// Map of wallet keys to information about the corresponding account.
+    pub wallets: RawProofMapIndex<T::Base, Address, Wallet>,
+}
+
+impl<T: Access> SchemaImpl<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
+    }
+
+    pub fn wallet(&self, address: Address) -> Option<Wallet> {
+        self.public.wallets.get(&address)
     }
 }
 
-impl<T> Schema<T>
+impl<T> SchemaImpl<T>
 where
-    T: AsRef<dyn Snapshot>,
+    T: Access,
+    T::Base: RawAccessMut,
 {
-    /// Creates a new schema from the database view.
-    pub fn new(view: T) -> Self {
-        Schema { view }
+    /// Increases balance of the wallet and append new record to its history.
+    pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
+        let mut history = self.wallet_history.get(&wallet.owner);
+        history.push(transaction);
+        let history_hash = history.object_hash();
+        let balance = wallet.balance;
+        let wallet = wallet.set_balance(balance + amount, &history_hash);
+        let wallet_key = wallet.owner;
+        self.public.wallets.put(&wallet_key, wallet);
     }
 
-    /// Returns `ProofMapIndex` with wallets.
-    pub fn wallets(&self) -> ProofMapIndex<&T, PublicKey, Wallet> {
-        ProofMapIndex::new("cryptocurrency.wallets", &self.view)
+    /// Decreases balance of the wallet and append new record to its history.
+    pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
+        let mut history = self.wallet_history.get(&wallet.owner);
+        history.push(transaction);
+        let history_hash = history.object_hash();
+        let balance = wallet.balance;
+        let wallet = wallet.set_balance(balance - amount, &history_hash);
+        let wallet_key = wallet.owner;
+        self.public.wallets.put(&wallet_key, wallet);
     }
 
-    /// Returns history of the wallet with the given public key.
-    pub fn wallet_history(&self, public_key: &PublicKey) -> ProofListIndex<&T, Hash> {
-        ProofListIndex::new_in_family("cryptocurrency.wallet_history", public_key, &self.view)
-    }
-
-    /// Returns wallet for the given public key.
-    pub fn wallet(&self, pub_key: &PublicKey) -> Option<Wallet> {
-        self.wallets().get(pub_key)
-    }
-
-    /// Returns the state hash of cryptocurrency service.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.wallets().merkle_root()]
-    }
-}
-
-/// Implementation of mutable methods.
-impl<'a> Schema<&'a mut Fork> {
-    /// Returns mutable `ProofMapIndex` with wallets.
-    pub fn wallets_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, Wallet> {
-        ProofMapIndex::new("cryptocurrency.wallets", &mut self.view)
-    }
-
-    /// Returns history for the wallet by the given public key.
-    pub fn wallet_history_mut(
-        &mut self,
-        public_key: &PublicKey,
-    ) -> ProofListIndex<&mut Fork, Hash> {
-        ProofListIndex::new_in_family("cryptocurrency.wallet_history", public_key, &mut self.view)
-    }
-
-    /// Increase balance of the wallet and append new record to its history.
-    ///
-    /// Panics if there is no wallet with given public key.
-    pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
-        let wallet = {
-            let mut history = self.wallet_history_mut(&wallet.pub_key);
-            history.push(*transaction);
-            let history_hash = history.merkle_root();
-            let balance = wallet.balance;
-            wallet.set_balance(balance + amount, &history_hash)
-        };
-        self.wallets_mut().put(&wallet.pub_key, wallet.clone());
-    }
-
-    /// Decrease balance of the wallet and append new record to its history.
-    ///
-    /// Panics if there is no wallet with given public key.
-    pub fn decrease_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: &Hash) {
-        let wallet = {
-            let mut history = self.wallet_history_mut(&wallet.pub_key);
-            history.push(*transaction);
-            let history_hash = history.merkle_root();
-            let balance = wallet.balance;
-            wallet.set_balance(balance - amount, &history_hash)
-        };
-        self.wallets_mut().put(&wallet.pub_key, wallet.clone());
-    }
-
-    /// Create new wallet and append first record to its history.
-    pub fn create_wallet(&mut self, key: &PublicKey, name: &str, transaction: &Hash) {
-        let wallet = {
-            let mut history = self.wallet_history_mut(key);
-            history.push(*transaction);
-            let history_hash = history.merkle_root();
-            Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash)
-        };
-        self.wallets_mut().put(key, wallet);
+    /// Creates a new wallet and append first record to its history.
+    pub fn create_wallet(&mut self, key: Address, name: &str, transaction: Hash) {
+        let mut history = self.wallet_history.get(&key);
+        history.push(transaction);
+        let history_hash = history.object_hash();
+        let wallet = Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash);
+        self.public.wallets.put(&key, wallet);
     }
 }

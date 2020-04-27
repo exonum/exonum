@@ -1,30 +1,42 @@
 <template>
   <div>
-    <navbar/>
+    <navbar />
 
     <div class="container">
       <div class="row">
         <div class="col-md-6">
           <div class="card mt-5">
-            <div class="card-header">User summary</div>
+            <div class="card-header">
+              User summary
+            </div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
                 <div class="row">
-                  <div class="col-sm-3"><strong>Name:</strong></div>
-                  <div class="col-sm-9">{{ name }}</div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
-                  <div class="col-sm-3"><strong>Public key:</strong></div>
-                  <div class="col-sm-9"><code>{{ keyPair.publicKey }}</code></div>
-                </div>
-              </li>
-              <li class="list-group-item">
-                <div class="row">
-                  <div class="col-sm-3"><strong>Balance:</strong></div>
+                  <div class="col-sm-3">
+                    <strong>Name:</strong>
+                  </div>
                   <div class="col-sm-9">
-                    <span v-numeral="balance"/>
+                    {{ name }}
+                  </div>
+                </div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3">
+                    <strong>Public key:</strong>
+                  </div>
+                  <div class="col-sm-9">
+                    <code>{{ keyPair.publicKey }}</code>
+                  </div>
+                </div>
+              </li>
+              <li class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-3">
+                    <strong>Balance:</strong>
+                  </div>
+                  <div class="col-sm-9">
+                    <span v-numeral="balance" />
                   </div>
                 </div>
               </li>
@@ -32,11 +44,15 @@
           </div>
 
           <div class="card mt-5">
-            <div class="card-header">Transactions</div>
+            <div class="card-header">
+              Transactions
+            </div>
             <ul class="list-group list-group-flush">
               <li class="list-group-item font-weight-bold">
                 <div class="row">
-                  <div class="col-sm-12">Description</div>
+                  <div class="col-sm-12">
+                    Description
+                  </div>
                 </div>
               </li>
               <!-- eslint-disable-next-line vue/require-v-for-key -->
@@ -46,13 +62,13 @@
                     <router-link :to="{ name: 'transaction', params: { hash: transaction.hash } }">
                       <span v-if="transaction.name">Wallet created</span>
                       <span v-else-if="transaction.to && transaction.to === keyPair.publicKey">
-                        <strong v-numeral="transaction.amount"/> funds received
+                        <strong v-numeral="transaction.amount" /> funds received
                       </span>
                       <span v-else-if="transaction.to">
-                        <strong v-numeral="transaction.amount"/> funds sent
+                        <strong v-numeral="transaction.amount" /> funds sent
                       </span>
                       <span v-else>
-                        <strong v-numeral="transaction.amount"/> funds added
+                        <strong v-numeral="transaction.amount" /> funds added
                       </span>
                     </router-link>
                   </div>
@@ -63,23 +79,29 @@
         </div>
         <div class="col-md-6">
           <div class="card mt-5">
-            <div class="card-header">Add funds</div>
+            <div class="card-header">
+              Add funds
+            </div>
             <div class="card-body">
               <form @submit.prevent="addFunds">
                 <div class="form-group">
                   <label class="d-block">Select amount to be added:</label>
                   <div v-for="variant in variants" :key="variant.id" class="form-check form-check-inline">
-                    <input :id="variant.id" :value="variant.amount" :checked="amountToAdd == variant.amount" v-model="amountToAdd" class="form-check-input" type="radio">
+                    <input :id="variant.id" v-model="amountToAdd" :value="variant.amount" :checked="amountToAdd == variant.amount" class="form-check-input" type="radio">
                     <label :for="variant.id" class="form-check-label">${{ variant.amount }}</label>
                   </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Add funds</button>
+                <button type="submit" class="btn btn-primary">
+                  Add funds
+                </button>
               </form>
             </div>
           </div>
 
           <div class="card mt-5">
-            <div class="card-header">Transfer funds</div>
+            <div class="card-header">
+              Transfer funds
+            </div>
             <div class="card-body">
               <form @submit.prevent="transfer">
                 <div class="form-group">
@@ -90,12 +112,16 @@
                   <label>Amount:</label>
                   <div class="input-group">
                     <div class="input-group-prepend">
-                      <div class="input-group-text">$</div>
+                      <div class="input-group-text">
+                        $
+                      </div>
                     </div>
                     <input v-model="amountToTransfer" type="number" class="form-control" placeholder="Enter amount" min="0" required>
                   </div>
                 </div>
-                <button type="submit" class="btn btn-primary">Transfer funds</button>
+                <button type="submit" class="btn btn-primary">
+                  Transfer funds
+                </button>
               </form>
             </div>
           </div>
@@ -103,7 +129,7 @@
       </div>
     </div>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
@@ -113,9 +139,8 @@
   import Navbar from '../components/Navbar.vue'
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
-      Modal,
       Navbar,
       Spinner
     },
@@ -142,6 +167,11 @@
     }, mapState({
       keyPair: state => state.keyPair
     })),
+    mounted() {
+      this.$nextTick(function() {
+        this.loadUser()
+      })
+    },
     methods: {
       async loadUser() {
         if (this.keyPair === null) {
@@ -207,11 +237,6 @@
           this.$notify('error', error.toString())
         }
       }
-    },
-    mounted() {
-      this.$nextTick(function() {
-        this.loadUser()
-      })
     }
   }
 </script>

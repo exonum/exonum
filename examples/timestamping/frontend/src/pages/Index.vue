@@ -15,20 +15,22 @@
               <input v-model="metadata" type="text" class="form-control" placeholder="Enter metadata">
               <small class="form-text text-muted">Optional field.</small>
             </div>
-            <button type="submit" class="btn btn-lg btn-block btn-primary">Make a timestamp</button>
+            <button type="submit" class="btn btn-lg btn-block btn-primary">
+              Make a timestamp
+            </button>
           </form>
         </div>
       </div>
     </div>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
 <script>
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
       Spinner
     },

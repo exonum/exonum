@@ -1,0 +1,42 @@
+networks:
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8000
+    private-api-port: 8004
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8001
+    private-api-port: 8005
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8002
+    private-api-port: 8006
+  - host: "127.0.0.1"
+    ssl: false
+    public-api-port: 8003
+    private-api-port: 8007
+
+deadline_height: 10000
+supervisor_mode: "simple"
+
+artifacts:
+  time:
+    runtime: rust
+    name: "exonum-time"
+    version: "1.0.0"
+    action: "none"
+  timestamping:
+    runtime: rust
+    name: "exonum-timestamping"
+    version: "1.0.0"
+    action: "none"
+
+instances:
+  time:
+    artifact: time
+    action: "start"
+  timestamping:
+    artifact: timestamping
+    action: "start"
+    config:
+      time_service_name: "time"

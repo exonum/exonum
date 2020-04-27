@@ -1,0 +1,128 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// The messages collection for the default Exonum consensus implementation.
+
+syntax = "proto3";
+
+package exonum.consensus;
+
+option java_package = "com.exonum.messages.consensus";
+
+import "exonum/crypto/types.proto";
+import "exonum/common/bit_vec.proto";
+import "exonum/blockchain.proto";
+import "exonum/messages.proto";
+import "exonum/runtime/base.proto";
+
+import "google/protobuf/timestamp.proto";
+
+message Connect {
+  string host = 1;
+  google.protobuf.Timestamp time = 2;
+  string user_agent = 3;
+}
+
+message Status {
+  uint64 epoch = 1;
+  exonum.crypto.Hash last_hash = 2;
+  uint64 pool_size = 3;
+  uint64 blockchain_height = 4;
+}
+
+message Propose {
+  uint32 validator = 1;
+  uint64 epoch = 2;
+  uint32 round = 3;
+  exonum.crypto.Hash prev_hash = 4;
+  repeated exonum.crypto.Hash transactions = 5;
+  bool skip = 6;
+}
+
+message Prevote {
+  uint32 validator = 1;
+  uint64 epoch = 2;
+  uint32 round = 3;
+  exonum.crypto.Hash propose_hash = 4;
+  uint32 locked_round = 5;
+}
+
+message BlockResponse {
+  exonum.crypto.PublicKey to = 1;
+  exonum.Block block = 2;
+  repeated bytes precommits = 3;
+  repeated exonum.crypto.Hash transactions = 4;
+}
+
+message TransactionsResponse {
+  exonum.crypto.PublicKey to = 1;
+  repeated bytes transactions = 2;
+}
+
+message ProposeRequest {
+  exonum.crypto.PublicKey to = 1;
+  uint64 epoch = 2;
+  exonum.crypto.Hash propose_hash = 3;
+}
+
+message TransactionsRequest {
+  exonum.crypto.PublicKey to = 1;
+  repeated exonum.crypto.Hash txs = 2;
+}
+
+message PrevotesRequest {
+  exonum.crypto.PublicKey to = 1;
+  uint64 epoch = 2;
+  uint32 round = 3;
+  exonum.crypto.Hash propose_hash = 4;
+  exonum.common.BitVec validators = 5;
+}
+
+message PeersRequest { exonum.crypto.PublicKey to = 1; }
+
+message BlockRequest {
+  exonum.crypto.PublicKey to = 1;
+  uint64 height = 2;
+  uint64 epoch = 3;
+}
+
+message PoolTransactionsRequest {
+  exonum.crypto.PublicKey to = 1;
+}
+
+// Messages exchanged by Exonum nodes over the P2P network.
+// Note that this is a superset of `CoreMessage` defined in core;
+// the tags for the types in core *must* match the tags here.
+message ExonumMessage {
+  oneof kind {
+    exonum.runtime.AnyTx any_tx = 1;
+    exonum.Precommit precommit = 2;
+
+    Status status = 3;
+    Connect connect = 4;
+
+    Propose propose = 5;
+    Prevote prevote = 6;
+
+    TransactionsResponse transactions_response = 7;
+    BlockResponse block_response = 8;
+
+    ProposeRequest propose_request = 9;
+    TransactionsRequest transactions_request = 10;
+    PrevotesRequest prevotes_request = 11;
+    PeersRequest peers_request = 12;
+    BlockRequest block_request = 13;
+    PoolTransactionsRequest pool_transactions_request = 14;
+  }
+}

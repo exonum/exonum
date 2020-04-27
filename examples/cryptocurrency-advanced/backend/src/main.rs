@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,16 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::fabric::NodeBuilder;
-use exonum_configuration as configuration;
-use exonum_cryptocurrency_advanced as cryptocurrency;
+use exonum_cli::{NodeBuilder, Spec};
 
-fn main() {
-    exonum::crypto::init();
-    exonum::helpers::init_logger().unwrap();
+use exonum_cryptocurrency_advanced::CryptocurrencyService;
 
-    let node = NodeBuilder::new()
-        .with_service(Box::new(configuration::ServiceFactory))
-        .with_service(Box::new(cryptocurrency::ServiceFactory));
-    node.run();
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    exonum::helpers::init_logger()?;
+
+    NodeBuilder::new()
+        // Starts cryptocurrency instance with the default identifiers
+        // immediately after genesis block creation.
+        .with(Spec::new(CryptocurrencyService).with_default_instance())
+        .run()
+        .await
 }

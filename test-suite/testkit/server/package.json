@@ -1,0 +1,37 @@
+{
+  "name": "testkit-server",
+  "version": "0.0.0",
+  "description": "Client-side testkit-based service testing",
+  "main": "test/index.js",
+  "engines": {
+    "node": ">=8"
+  },
+  "private": true,
+  "scripts": {
+    "proto": "pbjs -t static-module -r test -p node_modules/exonum-client/proto ../../../examples/cryptocurrency/src/proto/service.proto -o ./test/stubs.js",
+    "prepare": "npm run proto",
+    "lint": "standard",
+    "pretest:unix": "npm run posttest:unix && cargo build; (cargo run > /dev/null 2>&1) & sleep 5",
+    "test": "mocha test/index.js",
+    "test:unix": "mocha test/index.js",
+    "posttest:unix": "lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == \"*:8000\") { print $2 } }' | xargs -r kill -KILL"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/exonum/exonum-testkit.git"
+  },
+  "author": "The Exonum Team <contact@exonum.com>",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/exonum/exonum-testkit/tree/master/examples/server#readme",
+  "dependencies": {
+    "chai": "^4.2.0",
+    "exonum-client": "0.18.3",
+    "mocha": "^6.2.3",
+    "node-fetch": "^2.6.0",
+    "protobufjs": "^6.8.9",
+    "regenerator-runtime": "^0.13.5"
+  },
+  "devDependencies": {
+    "standard": "^14.3.3"
+  }
+}

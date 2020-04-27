@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,13 +47,12 @@ pub const SECRET_KEY_LENGTH: usize = 32;
 /// converts it to pair of Curve25519 keys.
 ///
 /// ```
-/// # extern crate exonum_crypto;
 /// # exonum_crypto::init();
 ///
 /// let (pk, sk) = exonum_crypto::gen_keypair();
 /// let (public_key, secret_key) = exonum_crypto::x25519::into_x25519_keypair(pk, sk).unwrap();
 /// ```
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
+#[allow(clippy::needless_pass_by_value)]
 pub fn into_x25519_keypair(
     pk: crypto_PublicKey,
     sk: crypto_SecretKey,
@@ -88,8 +87,7 @@ pub fn scalarmult_base(sc: &SecretKey) -> PublicKey {
 
 /// Converts Ed25519 public key to Curve25519 public key.
 ///
-/// See: [`into_x25519_keypair()`][1]
-/// [1]: fn.into_x25519_public_key.html
+/// See also: [`into_x25519_keypair()`](fn.into_x25519_public_key.html)
 pub fn into_x25519_public_key(pk: crypto_PublicKey) -> PublicKey {
     let mut public_key = [0; PUBLIC_KEY_LENGTH];
     public_key.clone_from_slice(&pk[..PUBLIC_KEY_LENGTH]);
@@ -135,7 +133,7 @@ macro_rules! implement_x25519_type {
     }
 
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, stringify!($name))?;
             write!(f, "(")?;
             write_short_hex(f, &self.0[..])?;

@@ -1,15 +1,34 @@
 [workspace]
 members = [
+    "cli",
     "exonum",
+    "exonum-node",
+
     "examples/cryptocurrency",
     "examples/cryptocurrency-advanced/backend",
+    "examples/sample_runtime",
     "examples/timestamping/backend",
-    "services/configuration",
+
+    "services/explorer",
+    "services/middleware",
     "services/time",
-    "testkit",
-    "testkit/server",
+    "services/supervisor",
+
+    "test-suite/testkit",
+    "test-suite/testkit/server",
+    "test-suite/rust-runtime-proto",
+    "test-suite/soak-tests",
+
+    "runtimes/rust",
+
+    "components/api",
     "components/build",
     "components/crypto",
     "components/derive",
+    "components/explorer",
+    "components/keys",
+    "components/merkledb",
+    "components/proto",
+    "components/system-api",
 ]
 exclude = [ "exonum/fuzz" ]

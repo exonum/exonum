@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,74 +12,52 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate exonum_testkit;
-#[macro_use]
-extern crate pretty_assertions;
-
 use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
-    blockchain::{Schema, TransactionErrorType, TransactionResult},
-    crypto::{gen_keypair, PublicKey},
-    helpers::{Height, ValidatorId},
-    messages::{RawTransaction, Signed},
-    storage::Snapshot,
+    crypto::{KeyPair, PublicKey},
+    helpers::Height,
+    merkledb::{access::Access, Snapshot},
+    runtime::{CommonError, ErrorMatch, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_testkit::{ApiKind, TestKitApi, TestKitBuilder, TestNode};
-use exonum_time::{
-    api::ValidatorTime, schema::TimeSchema, time_provider::MockTimeProvider, transactions::Error,
-    transactions::TxTime, TimeService,
-};
+use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
+use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder, TestNode};
+use pretty_assertions::assert_eq;
 
 use std::{collections::HashMap, iter::FromIterator};
 
-fn assert_storage_times_eq<T: AsRef<dyn Snapshot>>(
-    snapshot: T,
+use exonum_time::{
+    Error, MockTimeProvider, TimeOracleInterface, TimeSchema, TimeServiceFactory, TxTime,
+    ValidatorTime,
+};
+
+const INSTANCE_ID: InstanceId = 112;
+const INSTANCE_NAME: &str = "my-time";
+
+fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> TimeSchema<impl Access + 'a> {
+    snapshot.service_schema(INSTANCE_NAME).unwrap()
+}
+
+fn assert_storage_times_eq(
+    snapshot: &dyn Snapshot,
     validators: &[TestNode],
     expected_current_time: Option<DateTime<Utc>>,
     expected_validators_times: &[Option<DateTime<Utc>>],
 ) {
-    let schema = TimeSchema::new(snapshot);
+    let schema = get_schema(snapshot);
+    assert_eq!(schema.time.get(), expected_current_time);
 
-    assert_eq!(schema.time().get(), expected_current_time);
-
-    let validators_times = schema.validators_times();
     for (i, validator) in validators.iter().enumerate() {
         let public_key = &validator.public_keys().service_key;
-
         assert_eq!(
-            validators_times.get(public_key),
+            schema.validators_times.get(&public_key),
             expected_validators_times[i]
         );
     }
 }
 
-fn assert_transaction_result<S: AsRef<dyn Snapshot>>(
-    snapshot: S,
-    transaction: &Signed<RawTransaction>,
-    expected_code: u8,
-) -> Option<String> {
-    let result = Schema::new(snapshot)
-        .transaction_results()
-        .get(&transaction.hash());
-    match result {
-        Some(TransactionResult(Err(e))) => {
-            assert_eq!(e.error_type(), TransactionErrorType::Code(expected_code));
-            e.description().map(str::to_string)
-        }
-        _ => {
-            panic!("Expected Err(), found None or Ok()");
-        }
-    }
-}
-
 #[test]
 fn test_exonum_time_service_with_3_validators() {
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(3)
-        .with_service(TimeService::new())
-        .create();
-
+    let mut testkit = create_testkit_with_validators(3);
     let validators = testkit.network().validators().to_vec();
 
     // Validators time, that is saved in storage, look like this:
@@ -88,7 +66,7 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time is None.
 
-    assert_storage_times_eq(testkit.snapshot(), &validators, None, &[None, None, None]);
+    assert_storage_times_eq(&testkit.snapshot(), &validators, None, &[None, None, None]);
 
     // Add first transaction `tx0` from first validator with time `time0`.
     // After that validators time look like this:
@@ -98,14 +76,13 @@ fn test_exonum_time_service_with_3_validators() {
     // Consolidated time will have the value `time0`.
 
     let time0 = Utc::now();
-    let tx0 = {
-        let (pub_key, sec_key) = validators[0].service_keypair();
-        TxTime::sign(time0, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx0]);
+    let tx0 = validators[0]
+        .service_keypair()
+        .report_time(INSTANCE_ID, TxTime::new(time0));
+    testkit.create_block_with_transaction(tx0);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time0),
         &[Some(time0), None, None],
@@ -120,14 +97,13 @@ fn test_exonum_time_service_with_3_validators() {
     // Consolidated time will have the value `time1`.
 
     let time1 = time0 + Duration::seconds(10);
-    let tx1 = {
-        let (pub_key, sec_key) = validators[1].service_keypair();
-        TxTime::sign(time1, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx1]);
+    let tx1 = validators[1]
+        .service_keypair()
+        .report_time(INSTANCE_ID, TxTime::new(time1));
+    testkit.create_block_with_transaction(tx1);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time1),
         &[Some(time0), Some(time1), None],
@@ -136,11 +112,7 @@ fn test_exonum_time_service_with_3_validators() {
 
 #[test]
 fn test_exonum_time_service_with_4_validators() {
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(4)
-        .with_service(TimeService::new())
-        .create();
-
+    let mut testkit = create_testkit_with_validators(4);
     let validators = testkit.network().validators().to_vec();
 
     // Validators time, that is saved in storage, look like this:
@@ -152,7 +124,7 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time is None.
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         None,
         &[None, None, None, None],
@@ -166,14 +138,13 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time doesn't change.
 
     let time0 = Utc::now();
-    let tx0 = {
-        let (pub_key, sec_key) = validators[0].service_keypair();
-        TxTime::sign(time0, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx0]);
+    let tx0 = validators[0]
+        .service_keypair()
+        .report_time(INSTANCE_ID, TxTime::new(time0));
+    testkit.create_block_with_transaction(tx0);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         None,
         &[Some(time0), None, None, None],
@@ -188,14 +159,13 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time doesn't change.
 
     let time1 = time0 + Duration::seconds(10);
-    let tx1 = {
-        let (pub_key, sec_key) = validators[1].service_keypair();
-        TxTime::sign(time1, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx1]);
+    let tx1 = validators[1]
+        .service_keypair()
+        .report_time(INSTANCE_ID, TxTime::new(time1));
+    testkit.create_block_with_transaction(tx1);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         None,
         &[Some(time0), Some(time1), None, None],
@@ -210,14 +180,13 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time will have the value `time1`.
 
     let time2 = time1 + Duration::seconds(10);
-    let tx2 = {
-        let (pub_key, sec_key) = validators[2].service_keypair();
-        TxTime::sign(time2, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx2]);
+    let tx2 = validators[2]
+        .service_keypair()
+        .report_time(INSTANCE_ID, TxTime::new(time2));
+    testkit.create_block_with_transaction(tx2);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time1),
         &[Some(time0), Some(time1), Some(time2), None],
@@ -232,14 +201,13 @@ fn test_exonum_time_service_with_4_validators() {
     // Consolidated time will have the value `time2`.
 
     let time3 = time2 + Duration::seconds(10);
-    let tx3 = {
-        let (pub_key, sec_key) = validators[3].service_keypair();
-        TxTime::sign(time3, pub_key, sec_key)
-    };
-    testkit.create_block_with_transactions(txvec![tx3]);
+    let tx3 = validators[3]
+        .service_keypair()
+        .report_time(INSTANCE_ID, TxTime::new(time3));
+    testkit.create_block_with_transaction(tx3);
 
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(time2),
         &[Some(time0), Some(time1), Some(time2), Some(time3)],
@@ -248,15 +216,11 @@ fn test_exonum_time_service_with_4_validators() {
 
 #[test]
 fn test_exonum_time_service_with_7_validators() {
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(7)
-        .with_service(TimeService::new())
-        .create();
-
+    let mut testkit = create_testkit_with_validators(7);
     let validators = testkit.network().validators().to_vec();
     let mut validators_times = vec![None; 7];
 
-    assert_storage_times_eq(testkit.snapshot(), &validators, None, &validators_times);
+    assert_storage_times_eq(&testkit.snapshot(), &validators, None, &validators_times);
 
     let time = Utc::now();
     let times = (0..7)
@@ -273,22 +237,15 @@ fn test_exonum_time_service_with_7_validators() {
     ];
 
     for (i, validator) in validators.iter().enumerate() {
-        let tx = {
-            let (pub_key, sec_key) = validator.service_keypair();
-            TxTime::sign(times[i], pub_key, sec_key)
-        };
-        testkit.create_block_with_transactions(txvec![tx.clone()]);
-        assert_eq!(
-            Schema::new(testkit.snapshot())
-                .transaction_results()
-                .get(&tx.hash()),
-            Some(TransactionResult(Ok(())))
-        );
+        let tx = validator
+            .service_keypair()
+            .report_time(INSTANCE_ID, TxTime::new(times[i]));
+        let block = testkit.create_block_with_transaction(tx);
+        block[0].status().unwrap();
 
         validators_times[i] = Some(times[i]);
-
         assert_storage_times_eq(
-            testkit.snapshot(),
+            &testkit.snapshot(),
             &validators,
             expected_storage_times[i],
             &validators_times,
@@ -299,14 +256,15 @@ fn test_exonum_time_service_with_7_validators() {
 #[test]
 fn test_mock_provider() {
     let mock_provider = MockTimeProvider::default();
+    let time_service = TimeServiceFactory::with_provider(mock_provider.clone());
     let mut testkit = TestKitBuilder::validator()
-        .with_service(TimeService::with_provider(mock_provider.clone()))
-        .create();
+        .with(Spec::new(time_service).with_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .build();
 
     let validators = testkit.network().validators().to_vec();
     let assert_storage_times = |snapshot: Box<dyn Snapshot>| {
         assert_storage_times_eq(
-            snapshot,
+            &snapshot,
             &validators,
             Some(mock_provider.time()),
             &[Some(mock_provider.time())],
@@ -332,7 +290,7 @@ fn test_mock_provider() {
     assert_eq!(Utc.timestamp(30, 0), mock_provider.time());
     testkit.create_blocks_until(Height(8));
     assert_storage_times_eq(
-        testkit.snapshot(),
+        &testkit.snapshot(),
         &validators,
         Some(Utc.timestamp(70, 0)),
         &[Some(Utc.timestamp(70, 0))],
@@ -341,153 +299,167 @@ fn test_mock_provider() {
 
 #[test]
 fn test_selected_time_less_than_time_in_storage() {
+    let time_service = TimeServiceFactory::default();
     let mut testkit = TestKitBuilder::validator()
         .with_validators(1)
-        .with_service(TimeService::new())
-        .create();
+        .with(Spec::new(time_service).with_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with(Supervisor::simple())
+        .build();
 
     let validators = testkit.network().validators().to_vec();
-
-    let (pub_key_0, _) = validators[0].service_keypair();
+    let old_keypair = validators[0].service_keypair();
 
     let cfg_change_height = Height(5);
     let new_cfg = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_validators(vec![TestNode::new_validator(ValidatorId(0))]);
-        cfg.set_actual_from(cfg_change_height);
-        cfg
+        let validator_keys = vec![testkit.network_mut().add_node().public_keys()];
+        testkit
+            .consensus_config()
+            .with_validator_keys(validator_keys)
     };
-    testkit.commit_configuration_change(new_cfg);
-    testkit.create_blocks_until(cfg_change_height.previous());
 
-    let validators = testkit.network().validators().to_vec();
-    let (pub_key_1, sec_key_1) = validators[0].service_keypair();
+    let change = ConfigPropose::new(0, cfg_change_height).consensus_config(new_cfg);
+    let change = old_keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    testkit.create_block_with_transaction(change);
+    testkit.create_blocks_until(cfg_change_height);
 
+    let validators = testkit.network().validators();
+    let new_keypair = validators[0].service_keypair();
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
+    let schema = get_schema(&snapshot);
 
-    assert!(schema.time().get().is_some());
-    assert!(schema.validators_times().get(pub_key_0).is_some());
-    assert!(schema.validators_times().get(pub_key_1).is_none());
+    assert!(schema.time.get().is_some());
+    assert!(schema
+        .validators_times
+        .get(&old_keypair.public_key())
+        .is_some());
+    assert!(schema
+        .validators_times
+        .get(&new_keypair.public_key())
+        .is_none());
     assert_eq!(
-        schema.time().get(),
-        schema.validators_times().get(pub_key_0)
+        schema.time.get(),
+        schema.validators_times.get(&old_keypair.public_key())
     );
 
-    if let Some(time_in_storage) = schema.time().get() {
+    if let Some(time_in_storage) = schema.time.get() {
         let time_tx = time_in_storage - Duration::seconds(10);
-        let tx = { TxTime::sign(time_tx, pub_key_1, sec_key_1) };
-        testkit.create_block_with_transactions(txvec![tx.clone()]);
-        assert_eq!(
-            Schema::new(testkit.snapshot())
-                .transaction_results()
-                .get(&tx.hash()),
-            Some(TransactionResult(Ok(())))
-        );
+        let tx = new_keypair.report_time(INSTANCE_ID, TxTime::new(time_tx));
+        let block = testkit.create_block_with_transaction(tx);
+        block[0].status().unwrap();
     }
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
-    assert!(schema.time().get().is_some());
-    assert!(schema.validators_times().get(pub_key_0).is_some());
-    assert!(schema.validators_times().get(pub_key_1).is_some());
+    let schema = get_schema(&snapshot);
+    assert!(schema.time.get().is_some());
+    assert!(schema
+        .validators_times
+        .get(&old_keypair.public_key())
+        .is_some());
+    assert!(schema
+        .validators_times
+        .get(&new_keypair.public_key())
+        .is_some());
     assert_eq!(
-        schema.time().get(),
-        schema.validators_times().get(pub_key_0)
+        schema.time.get(),
+        schema.validators_times.get(&old_keypair.public_key())
     );
 }
 
 #[test]
 fn test_creating_transaction_is_not_validator() {
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(1)
-        .with_service(TimeService::new())
-        .create();
+    let mut testkit = create_testkit_with_validators(1);
 
-    let (pub_key, sec_key) = gen_keypair();
-    let tx = TxTime::sign(Utc::now(), &pub_key, &sec_key);
-    testkit.create_block_with_transactions(txvec![tx.clone()]);
-    assert_transaction_result(testkit.snapshot(), &tx, Error::UnknownSender as u8);
+    let keypair = KeyPair::random();
+    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(Utc::now()));
+    let block = testkit.create_block_with_transaction(tx);
+    assert_eq!(
+        *block[0].status().unwrap_err(),
+        ErrorMatch::from_fail(&CommonError::UnauthorizedCaller).for_service(INSTANCE_ID)
+    );
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
-    assert!(schema.time().get().is_none());
-    assert!(schema.validators_times().get(&pub_key).is_none());
+    let schema = get_schema(&snapshot);
+    assert!(schema.time.get().is_none());
+    assert!(schema.validators_times.get(&keypair.public_key()).is_none());
 }
 
 #[test]
 fn test_transaction_time_less_than_validator_time_in_storage() {
-    let mut testkit = TestKitBuilder::validator()
-        .with_validators(1)
-        .with_service(TimeService::new())
-        .create();
-
-    let validator = &testkit.network().validators().to_vec()[0];
-    let (pub_key, sec_key) = validator.service_keypair();
+    let mut testkit = create_testkit_with_validators(1);
+    let validator = testkit.network().validators()[0].service_keypair();
 
     let time0 = Utc::now();
-    let tx0 = TxTime::sign(time0, pub_key, sec_key);
-
-    testkit.create_block_with_transactions(txvec![tx0.clone()]);
-    assert_eq!(
-        Schema::new(testkit.snapshot())
-            .transaction_results()
-            .get(&tx0.hash()),
-        Some(TransactionResult(Ok(())))
-    );
+    let tx0 = validator.report_time(INSTANCE_ID, TxTime::new(time0));
+    let block = testkit.create_block_with_transaction(tx0);
+    block[0].status().unwrap();
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
-
-    assert_eq!(schema.time().get(), Some(time0));
-    assert_eq!(schema.validators_times().get(pub_key), Some(time0));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.time.get(), Some(time0));
+    assert_eq!(
+        schema.validators_times.get(&validator.public_key()),
+        Some(time0)
+    );
 
     let time1 = time0 - Duration::seconds(10);
-    let tx1 = TxTime::sign(time1, pub_key, sec_key);
-
-    testkit.create_block_with_transactions(txvec![tx1.clone()]);
-    assert_transaction_result(
-        testkit.snapshot(),
-        &tx1,
-        Error::ValidatorTimeIsGreater as u8,
+    let tx1 = validator.report_time(INSTANCE_ID, TxTime::new(time1));
+    let block = testkit.create_block_with_transaction(tx1);
+    assert_eq!(
+        *block[0].status().unwrap_err(),
+        ErrorMatch::from_fail(&Error::ValidatorTimeIsGreater).for_service(INSTANCE_ID),
     );
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(snapshot);
-
-    assert_eq!(schema.time().get(), Some(time0));
-    assert_eq!(schema.validators_times().get(pub_key), Some(time0));
+    let schema = get_schema(&snapshot);
+    assert_eq!(schema.time.get(), Some(time0));
+    assert_eq!(
+        schema.validators_times.get(&validator.public_key()),
+        Some(time0)
+    );
 }
 
-fn get_current_time(api: &mut TestKitApi) -> Option<DateTime<Utc>> {
-    api.public(ApiKind::Service("exonum_time"))
+fn create_testkit_with_validators(validators_count: u16) -> TestKit {
+    let time_service =
+        Spec::new(TimeServiceFactory::default()).with_instance(INSTANCE_ID, INSTANCE_NAME, ());
+    TestKitBuilder::validator()
+        .with_validators(validators_count)
+        .with(time_service)
+        .build()
+}
+
+async fn get_current_time(api: &mut TestKitApi) -> Option<DateTime<Utc>> {
+    api.public(ApiKind::Service(INSTANCE_NAME))
         .get("v1/current_time")
+        .await
         .unwrap()
 }
 
-fn get_current_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
-    api.private(ApiKind::Service("exonum_time"))
+async fn get_current_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
+    api.private(ApiKind::Service(INSTANCE_NAME))
         .get("v1/validators_times")
+        .await
         .unwrap()
 }
 
-fn get_all_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
-    api.private(ApiKind::Service("exonum_time"))
+async fn get_all_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
+    api.private(ApiKind::Service(INSTANCE_NAME))
         .get("v1/validators_times/all")
+        .await
         .unwrap()
 }
 
-fn assert_current_time_eq(api: &mut TestKitApi, expected_time: Option<DateTime<Utc>>) {
-    let current_time = get_current_time(api);
+async fn assert_current_time_eq(api: &mut TestKitApi, expected_time: Option<DateTime<Utc>>) {
+    let current_time = get_current_time(api).await;
     assert_eq!(expected_time, current_time);
 }
 
-fn assert_current_validators_times_eq(
+async fn assert_current_validators_times_eq(
     api: &mut TestKitApi,
     expected_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
 ) {
     let validators_times = HashMap::from_iter(
         get_current_validators_times(api)
+            .await
             .iter()
             .map(|validator| (validator.public_key, validator.time)),
     );
@@ -495,12 +467,13 @@ fn assert_current_validators_times_eq(
     assert_eq!(*expected_times, validators_times);
 }
 
-fn assert_all_validators_times_eq(
+async fn assert_all_validators_times_eq(
     api: &mut TestKitApi,
     expected_validators_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
 ) {
     let validators_times = HashMap::from_iter(
         get_all_validators_times(api)
+            .await
             .iter()
             .map(|validator| (validator.public_key, validator.time)),
     );
@@ -508,93 +481,100 @@ fn assert_all_validators_times_eq(
     assert_eq!(*expected_validators_times, validators_times);
 }
 
-#[test]
-fn test_endpoint_api() {
+#[tokio::test]
+async fn test_endpoint_api() {
+    let time_service =
+        Spec::new(TimeServiceFactory::default()).with_instance(INSTANCE_ID, INSTANCE_NAME, ());
     let mut testkit = TestKitBuilder::validator()
         .with_validators(3)
-        .with_service(TimeService::new())
-        .create();
+        .with(time_service)
+        .with(Supervisor::simple())
+        .build();
 
     let mut api = testkit.api();
-    let validators = testkit.network().validators().to_vec();
-    let mut current_validators_times: HashMap<PublicKey, Option<DateTime<Utc>>> =
-        HashMap::from_iter(
-            validators
-                .iter()
-                .map(|validator| (*validator.service_keypair().0, None)),
-        );
+    let validators = testkit.network().validators();
+    let mut current_validators_times: HashMap<_, _> = validators
+        .iter()
+        .map(|validator| (validator.service_keypair().public_key(), None))
+        .collect();
     let mut all_validators_times = HashMap::new();
 
-    assert_current_time_eq(&mut api, None);
-    assert_current_validators_times_eq(&mut api, &current_validators_times);
-    assert_all_validators_times_eq(&mut api, &all_validators_times);
+    assert_current_time_eq(&mut api, None).await;
+    assert_current_validators_times_eq(&mut api, &current_validators_times).await;
+    assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 
     let time0 = Utc::now();
-    let (pub_key, sec_key) = validators[0].service_keypair();
-    testkit.create_block_with_transactions(txvec![TxTime::sign(time0, pub_key, sec_key)]);
-    current_validators_times.insert(*pub_key, Some(time0));
-    all_validators_times.insert(*pub_key, Some(time0));
+    let keypair = validators[0].service_keypair();
+    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(time0));
+    testkit.create_block_with_transaction(tx);
+    current_validators_times.insert(keypair.public_key(), Some(time0));
+    all_validators_times.insert(keypair.public_key(), Some(time0));
 
-    assert_current_time_eq(&mut api, Some(time0));
-    assert_current_validators_times_eq(&mut api, &current_validators_times);
-    assert_all_validators_times_eq(&mut api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time0)).await;
+    assert_current_validators_times_eq(&mut api, &current_validators_times).await;
+    assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 
     let time1 = time0 + Duration::seconds(10);
-    let (pub_key, sec_key) = validators[1].service_keypair();
-    testkit.create_block_with_transactions(txvec![TxTime::sign(time1, pub_key, sec_key)]);
-    current_validators_times.insert(*pub_key, Some(time1));
-    all_validators_times.insert(*pub_key, Some(time1));
+    let keypair = validators[1].service_keypair();
+    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(time1));
+    testkit.create_block_with_transaction(tx);
+    current_validators_times.insert(keypair.public_key(), Some(time1));
+    all_validators_times.insert(keypair.public_key(), Some(time1));
 
-    assert_current_time_eq(&mut api, Some(time1));
-    assert_current_validators_times_eq(&mut api, &current_validators_times);
-    assert_all_validators_times_eq(&mut api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time1)).await;
+    assert_current_validators_times_eq(&mut api, &current_validators_times).await;
+    assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 
     let time2 = time1 + Duration::seconds(10);
-    let (pub_key, sec_key) = validators[2].service_keypair();
-    testkit.create_block_with_transactions(txvec![TxTime::sign(time2, pub_key, sec_key)]);
-    current_validators_times.insert(*pub_key, Some(time2));
-    all_validators_times.insert(*pub_key, Some(time2));
+    let keypair = validators[2].service_keypair();
+    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(time2));
+    testkit.create_block_with_transaction(tx);
+    current_validators_times.insert(keypair.public_key(), Some(time2));
+    all_validators_times.insert(keypair.public_key(), Some(time2));
 
-    assert_current_time_eq(&mut api, Some(time2));
-    assert_current_validators_times_eq(&mut api, &current_validators_times);
-    assert_all_validators_times_eq(&mut api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time2)).await;
+    assert_current_validators_times_eq(&mut api, &current_validators_times).await;
+    assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 
-    let public_key_0 = validators[0].service_keypair().0;
     let cfg_change_height = Height(10);
     let new_cfg = {
-        let mut cfg = testkit.configuration_change_proposal();
-        cfg.set_validators(vec![
-            TestNode::new_validator(ValidatorId(3)),
-            validators[1].clone(),
-            validators[2].clone(),
-        ]);
-        cfg.set_actual_from(cfg_change_height);
-        cfg
+        let validator_keys = vec![
+            testkit.network_mut().add_node().public_keys(),
+            validators[1].public_keys(),
+            validators[2].public_keys(),
+        ];
+        testkit
+            .consensus_config()
+            .with_validator_keys(validator_keys)
     };
-    testkit.commit_configuration_change(new_cfg);
-    testkit.create_blocks_until(cfg_change_height.previous());
+    let change = ConfigPropose::new(0, cfg_change_height).consensus_config(new_cfg);
+    let keypair = validators[0].service_keypair();
+    let change = keypair.propose_config_change(SUPERVISOR_INSTANCE_ID, change);
+    testkit.create_block_with_transaction(change);
+    testkit.create_blocks_until(cfg_change_height);
 
-    current_validators_times.remove(public_key_0);
+    current_validators_times.remove(&keypair.public_key());
     let validators = testkit.network().validators().to_vec();
-    current_validators_times.insert(*validators[0].service_keypair().0, None);
+    current_validators_times.insert(validators[0].service_keypair().public_key(), None);
 
     let snapshot = testkit.snapshot();
-    let schema = TimeSchema::new(&snapshot);
-    if let Some(time) = schema.validators_times().get(public_key_0) {
-        all_validators_times.insert(*public_key_0, Some(time));
+    let schema = get_schema(&snapshot);
+    if let Some(time) = schema.validators_times.get(&keypair.public_key()) {
+        all_validators_times.insert(keypair.public_key(), Some(time));
     }
 
-    assert_current_time_eq(&mut api, Some(time2));
-    assert_current_validators_times_eq(&mut api, &current_validators_times);
-    assert_all_validators_times_eq(&mut api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time2)).await;
+    assert_current_validators_times_eq(&mut api, &current_validators_times).await;
+    assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 
     let time3 = time2 + Duration::seconds(10);
-    let (pub_key, sec_key) = validators[0].service_keypair();
-    testkit.create_block_with_transactions(txvec![TxTime::sign(time3, pub_key, sec_key)]);
-    current_validators_times.insert(*pub_key, Some(time3));
-    all_validators_times.insert(*pub_key, Some(time3));
+    let keypair = validators[0].service_keypair();
+    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(time3));
+    testkit.create_block_with_transaction(tx);
+    current_validators_times.insert(keypair.public_key(), Some(time3));
+    all_validators_times.insert(keypair.public_key(), Some(time3));
 
-    assert_current_time_eq(&mut api, Some(time3));
-    assert_current_validators_times_eq(&mut api, &current_validators_times);
-    assert_all_validators_times_eq(&mut api, &all_validators_times);
+    assert_current_time_eq(&mut api, Some(time3)).await;
+    assert_current_validators_times_eq(&mut api, &current_validators_times).await;
+    assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 }

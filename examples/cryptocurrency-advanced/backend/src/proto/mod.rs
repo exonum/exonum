@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@
 
 //! Module of the rust-protobuf generated files.
 
+// For protobuf generated files.
 #![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
 
-pub use self::cryptocurrency::{CreateWallet, Issue, Transfer, Wallet};
+pub use self::service::{CreateWallet, Issue, Transfer, Wallet};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 
-use exonum::proto::schema::*;
+use exonum::crypto::proto::*;

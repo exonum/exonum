@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,18 +14,18 @@
 
 //! Common widely used type definitions.
 
-use std::{fmt, num::ParseIntError, ops::Deref, ops::DerefMut, str::FromStr};
-
+use exonum_derive::ObjectHash;
+use exonum_merkledb::{impl_binary_key_for_binary_value, BinaryValue};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use zeroize::Zeroize;
 
-use crate::crypto::{CryptoHash, Hash};
+use std::{borrow::Cow, fmt, num::ParseIntError, str::FromStr};
 
 /// Number of milliseconds.
 pub type Milliseconds = u64;
 
-/// Blockchain height (number of blocks).
+/// Blockchain height, that is, the number of committed blocks in it.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(ObjectHash)]
 pub struct Height(pub u64);
 
 impl Height {
@@ -40,7 +40,7 @@ impl Height {
     /// assert_eq!(0, height.0);
     /// ```
     pub fn zero() -> Self {
-        Height(0)
+        Self(0)
     }
 
     /// Returns next value of the height.
@@ -55,7 +55,7 @@ impl Height {
     /// assert_eq!(11, next_height.0);
     /// ```
     pub fn next(self) -> Self {
-        Height(self.0 + 1)
+        Self(self.0 + 1)
     }
 
     /// Returns previous value of the height.
@@ -75,7 +75,7 @@ impl Height {
     /// ```
     pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
-        Height(self.0 - 1)
+        Self(self.0 - 1)
     }
 
     /// Increments the height value.
@@ -114,8 +114,62 @@ impl Height {
     }
 }
 
+impl BinaryValue for Height {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
+        let value = <u64 as BinaryValue>::from_bytes(value)?;
+        Ok(Self(value))
+    }
+}
+
+impl_binary_key_for_binary_value! { Height }
+
+impl fmt::Display for Height {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Height> for u64 {
+    fn from(val: Height) -> Self {
+        val.0
+    }
+}
+
+// Serialization/deserialization is implemented manually because TOML round-trip for the tuple
+// structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
+impl Serialize for Height {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Height {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Ok(Self(u64::deserialize(deserializer)?))
+    }
+}
+
+impl FromStr for Height {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, ParseIntError> {
+        u64::from_str(s).map(Self)
+    }
+}
+
 /// Consensus round index.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize, ObjectHash)]
 pub struct Round(pub u32);
 
 impl Round {
@@ -130,7 +184,7 @@ impl Round {
     /// assert_eq!(0, round.0);
     /// ```
     pub fn zero() -> Self {
-        Round(0)
+        Self(0)
     }
 
     /// Returns first value of the round.
@@ -144,7 +198,7 @@ impl Round {
     /// assert_eq!(1, round.0);
     /// ```
     pub fn first() -> Self {
-        Round(1)
+        Self(1)
     }
 
     /// Returns next value of the round.
@@ -159,7 +213,7 @@ impl Round {
     /// assert_eq!(21, next_round.0);
     /// ```
     pub fn next(self) -> Self {
-        Round(self.0 + 1)
+        Self(self.0 + 1)
     }
 
     /// Returns previous value of the round.
@@ -179,7 +233,7 @@ impl Round {
     /// ```
     pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
-        Round(self.0 - 1)
+        Self(self.0 - 1)
     }
 
     /// Increments the round value.
@@ -230,16 +284,43 @@ impl Round {
     /// assert_eq!(Some(Round(1)), iter.next());
     /// assert_eq!(None, iter.next());
     /// ```
-    pub fn iter_to(self, to: Self) -> RoundRangeIter {
-        RoundRangeIter {
-            next: self,
-            last: to,
-        }
+    pub fn iter_to(self, to: Self) -> impl Iterator<Item = Self> {
+        (self.0..to.0).map(Self)
+    }
+}
+
+impl BinaryValue for Round {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.into_bytes()
+    }
+
+    fn from_bytes(value: Cow<'_, [u8]>) -> anyhow::Result<Self> {
+        let value = <u32 as BinaryValue>::from_bytes(value)?;
+        Ok(Self(value))
+    }
+}
+
+impl fmt::Display for Round {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<Round> for u32 {
+    fn from(val: Round) -> Self {
+        val.0
+    }
+}
+
+impl From<Round> for u64 {
+    fn from(val: Round) -> Self {
+        Self::from(val.0)
     }
 }
 
 /// Validators identifier.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Serialize, Deserialize)]
 pub struct ValidatorId(pub u16);
 
 impl ValidatorId {
@@ -254,48 +335,22 @@ impl ValidatorId {
     /// assert_eq!(0, id.0);
     /// ```
     pub fn zero() -> Self {
-        ValidatorId(0)
+        Self(0)
     }
 }
 
-impl fmt::Display for Height {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
+impl BinaryValue for ValidatorId {
+    fn to_bytes(&self) -> Vec<u8> {
+        self.0.to_bytes()
     }
-}
 
-impl From<Height> for u64 {
-    fn from(val: Height) -> Self {
-        val.0
-    }
-}
-
-impl fmt::Display for Round {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-impl CryptoHash for Round {
-    fn hash(&self) -> Hash {
-        self.0.hash()
-    }
-}
-
-impl From<Round> for u32 {
-    fn from(val: Round) -> Self {
-        val.0
-    }
-}
-
-impl From<Round> for u64 {
-    fn from(val: Round) -> Self {
-        u64::from(val.0)
+    fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
+        u16::from_bytes(bytes).map(Self)
     }
 }
 
 impl fmt::Display for ValidatorId {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -308,80 +363,6 @@ impl From<ValidatorId> for u16 {
 
 impl From<ValidatorId> for usize {
     fn from(val: ValidatorId) -> Self {
-        val.0 as usize
-    }
-}
-
-// Serialization/deserialization is implemented manually because TOML round-trip for the tuple
-// structs is broken currently. See https://github.com/alexcrichton/toml-rs/issues/194 for details.
-impl Serialize for Height {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        self.0.serialize(serializer)
-    }
-}
-
-impl<'de> Deserialize<'de> for Height {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        Ok(Height(u64::deserialize(deserializer)?))
-    }
-}
-
-impl FromStr for Height {
-    type Err = ParseIntError;
-
-    fn from_str(s: &str) -> Result<Self, ParseIntError> {
-        u64::from_str(s).map(Height)
-    }
-}
-
-/// Iterator over rounds range.
-#[derive(Debug)]
-pub struct RoundRangeIter {
-    next: Round,
-    last: Round,
-}
-
-// TODO: Add (or replace by) `Step` implementation. (ECR-165)
-impl Iterator for RoundRangeIter {
-    type Item = Round;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.next < self.last {
-            let res = Some(self.next);
-            self.next.increment();
-            res
-        } else {
-            None
-        }
-    }
-}
-
-/// Struct used to call zeroize on inner type on drop.
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
-pub struct ZeroizeOnDrop<T: Zeroize>(pub T);
-
-impl<T: Zeroize> Drop for ZeroizeOnDrop<T> {
-    fn drop(&mut self) {
-        self.0.zeroize()
-    }
-}
-
-impl<T: Zeroize> Deref for ZeroizeOnDrop<T> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
-
-impl<T: Zeroize> DerefMut for ZeroizeOnDrop<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        &mut self.0
+        val.0 as Self
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,29 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate criterion;
-#[macro_use]
-extern crate exonum_derive;
-#[macro_use]
-extern crate serde_derive;
+use criterion::{criterion_group, criterion_main};
 
-use crate::block::bench_block;
-use crate::crypto::bench_crypto;
-use crate::storage::bench_storage;
-use crate::transactions::bench_verify_transactions;
+use crate::{check_tx::bench_check_tx, crypto::bench_crypto};
 
-mod block;
+mod check_tx;
 mod crypto;
-mod proto;
-mod storage;
-mod transactions;
 
-criterion_group!(
-    benches,
-    bench_crypto,
-    bench_block,
-    bench_storage,
-    bench_verify_transactions
-);
+criterion_group!(benches, bench_check_tx, bench_crypto);
 criterion_main!(benches);

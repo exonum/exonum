@@ -1,12 +1,11 @@
-# exonum-time
+# Exonum Time Oracle
 
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
-![CircleCI Build Status](https://img.shields.io/circleci/project/github/exonum/exonum.svg?label=MacOS%20Build)
 [![Docs.rs](https://docs.rs/exonum-time/badge.svg)](https://docs.rs/exonum-time)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.30.0+ required](https://img.shields.io/badge/rust-1.30.0+-blue.svg?label=Required%20Rust)
+![rust 1.42.0+ required](https://img.shields.io/badge/rust-1.42.0+-blue.svg?label=Required%20Rust)
 
-Exonum-time is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
+`exonum-time` is a time oracle service for [Exonum blockchain framework](https://exonum.com/).
 This service allows to determine time,
 import it from the external world to the blockchain
 and keep its current value in the blockchain.
@@ -17,87 +16,34 @@ Include `exonum-time` as a dependency in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-exonum = "0.10.0"
-exonum-time = "0.10.0"
+exonum = "1.0.0"
+exonum-cli = "1.0.0"
+exonum-time = "1.0.0"
 ```
 
-Add the time oracle service to the blockchain in the main project file:
+## Examples
 
-```rust
-extern crate exonum;
-extern crate exonum_time;
+Examples of the node with `exonum-time` service, and service using
+`exonum-time` service to obtain current time can be found in
+the [examples](examples) folder:
 
-use exonum::helpers::fabric::NodeBuilder;
-use exonum_time::TimeServiceFactory;
+- [node example]
+- [service example]
 
-fn main() {
-    exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_service(Box::new(TimeServiceFactory))
-        .run();
-}
-```
+## Further Reading
 
-### Importing the data schema
-
-Typical usage of the service boils down to importing the schema and calling its
-`time()` or `validators_time()` methods.
-
-Below is an example of a method for processing a transaction,
-which must be executed no later than the specified time
-(this time is written in the transaction body in a separate field):
-
-```rust
-#[derive(Serialize, Deserialize, Debug, Clone, ProtobufConvert)]
-#[exonum(pb = "proto::TimeTx")]
-/// Transaction, which must be executed no later than the specified time (field `time`).
-struct TimeTx {
-    time: DateTime<Utc>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, TransactionSet)]
-enum TimeTransactions {
-    TimeTx(TimeTx),
-}
-
-impl Transaction for TimeTx {
-    fn execute(&self, view: &mut Fork) {
-        // Import schema.
-        let time_schema = exonum_time::TimeSchema::new(&view);
-        // The time in the transaction should be less than in the blockchain.
-        match time_schema.time().get() {
-            Some(current_time) if current_time <= self.time => {
-                // Execute transaction business logic.
-            }
-            _ => {}
-        }
-    }
-}
-```
-
-See the full implementation of the [service][service], which uses the time oracle.
-
-You can get the time of each validator node in the same manner
-the consolidated time of the system is obtained:
-
-```rust
-let time_schema = exonum_time::TimeSchema::new(&view);
-// Gets the times of all validators.
-let validators_time = time_schema.validators_time();
-// Gets the time of validator with a public key equal to `public_key`.
-let validator_time = time_schema.validators_time().get(&public_key);
-```
-
-## Further reading
-
-Consult [the crate docs](https://docs.rs/exonum-time) for more details about
-the service Rust API, and the [service description in Exonum docs](https://exonum.com/doc/advanced/time)
+Consult the [service description in Exonum docs](https://exonum.com/doc/version/latest/advanced/time)
 for a more high-level perspective, in particular, the design rationale
 and the proof of correctness.
+
+## Other languages support
+
+- [Java Time Oracle](https://github.com/exonum/exonum-java-binding/tree/master/exonum-java-binding/time-oracle)
 
 ## License
 
 `exonum-time` is licensed under the Apache License (Version 2.0).
 See [LICENSE](LICENSE) for details.
 
-[service]: examples/simple_service/main.rs
+[node example]: examples/exonum_time.rs
+[service example]: examples/simple_service/main.rs

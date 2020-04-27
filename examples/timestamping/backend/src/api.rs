@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,15 +15,15 @@
 //! REST API.
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof},
+    blockchain::{BlockProof, IndexProof},
     crypto::Hash,
-    storage::MapProof,
 };
+use exonum_merkledb::{proof_map::Raw, MapProof};
+use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
 use crate::{
     schema::{Schema, TimestampEntry},
-    TIMESTAMPING_SERVICE,
+    transactions::Config,
 };
 
 /// Describes query parameters for `handle_timestamp` and `handle_timestamp_proof` endpoints.
@@ -46,9 +46,9 @@ pub struct TimestampProof {
     /// Proof of the last block.
     pub block_info: BlockProof,
     /// Actual state hashes of the timestamping service with their proofs.
-    pub state_proof: MapProof<Hash, Hash>,
+    pub state_proof: MapProof<String, Hash>,
     /// Actual state of the timestamping database with proofs.
-    pub timestamp_proof: MapProof<Hash, TimestampEntry>,
+    pub timestamp_proof: MapProof<Hash, TimestampEntry, Raw>,
 }
 
 /// Public service API.
@@ -57,42 +57,60 @@ pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting a single timestamp.
-    pub fn handle_timestamp(
-        state: &ServiceApiState,
-        query: TimestampQuery,
+    pub async fn handle_timestamp(
+        self,
+        state: ServiceApiState,
+        hash: Hash,
     ) -> api::Result<Option<TimestampEntry>> {
-        let snapshot = state.snapshot();
-        let schema = Schema::new(&snapshot);
-        Ok(schema.timestamps().get(&query.hash))
+        let schema = Schema::new(state.service_data());
+        Ok(schema.timestamps.get(&hash))
     }
 
     /// Endpoint for getting the proof of a single timestamp.
-    pub fn handle_timestamp_proof(
-        state: &ServiceApiState,
-        query: TimestampQuery,
+    pub async fn handle_timestamp_proof(
+        self,
+        state: ServiceApiState,
+        hash: Hash,
     ) -> api::Result<TimestampProof> {
-        let snapshot = state.snapshot();
-        let (state_proof, block_info) = {
-            let core_schema = blockchain::Schema::new(&snapshot);
-            let last_block_height = state.blockchain().last_block().height();
-            let block_proof = core_schema.block_and_precommits(last_block_height).unwrap();
-            let state_proof = core_schema.get_proof_to_service_table(TIMESTAMPING_SERVICE, 0);
-            (state_proof, block_proof)
-        };
-        let schema = Schema::new(&snapshot);
-        let timestamp_proof = schema.timestamps().get_proof(query.hash);
+        let IndexProof {
+            block_proof,
+            index_proof,
+            ..
+        } = state.data().proof_for_service_index("timestamps").unwrap();
+
+        let schema = Schema::new(state.service_data());
+        let timestamp_proof = schema.timestamps.get_proof(hash);
         Ok(TimestampProof {
-            block_info,
-            state_proof,
+            block_info: block_proof,
+            state_proof: index_proof,
             timestamp_proof,
         })
     }
 
+    /// Endpoint for getting service configuration.
+    pub async fn get_service_configuration(self, state: ServiceApiState) -> api::Result<Config> {
+        Schema::new(state.service_data())
+            .config
+            .get()
+            .ok_or_else(|| api::Error::not_found().title("Configuration not found"))
+    }
+
     /// Wires the above endpoints to public API scope of the given `ServiceApiBuilder`.
-    pub fn wire(builder: &mut ServiceApiBuilder) {
+    pub fn wire(self, builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
-            .endpoint("v1/timestamps/value", Self::handle_timestamp)
-            .endpoint("v1/timestamps/proof", Self::handle_timestamp_proof);
+            .endpoint("v1/timestamps/value", {
+                move |state: ServiceApiState, query: TimestampQuery| {
+                    self.handle_timestamp(state, query.hash)
+                }
+            })
+            .endpoint("v1/timestamps/proof", {
+                move |state: ServiceApiState, query: TimestampQuery| {
+                    self.handle_timestamp_proof(state, query.hash)
+                }
+            })
+            .endpoint("v1/timestamps/config", {
+                move |state: ServiceApiState, _query: ()| self.get_service_configuration(state)
+            });
     }
 }

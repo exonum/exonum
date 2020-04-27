@@ -12,6 +12,7 @@ Be sure you installed necessary packages:
 * [git](https://git-scm.com/downloads)
 * [Rust](https://rustup.rs/)
 * [Node.js & npm](https://nodejs.org/en/download/)
+* [Exonum launcher](https://github.com/exonum/exonum-launcher)
 
 ## Install and run
 
@@ -21,7 +22,7 @@ Simply run the following command to start the timestamping service on 4 nodes
 on the local machine:
 
 ```bash
-docker run -p 8000-8008:8000-8008 exonumhub/exonum-timestamping:demo
+docker run -p 8000-8008:8000-8008 exonumhub/exonum-timestamping:v1.0.0
 ```
 
 Ready! Find demo at [http://127.0.0.1:8008](http://127.0.0.1:8008).
@@ -54,7 +55,7 @@ git clone https://github.com/exonum/exonum
 
 cd exonum/examples/timestamping/backend
 
-cargo install
+cargo install --path .
 ```
 
 Generate blockchain configuration:
@@ -70,37 +71,57 @@ Generate templates of nodes configurations:
 <!-- markdownlint-disable MD013 -->
 
 ```sh
-exonum-timestamping generate-config example/common.toml  example/pub_1.toml example/sec_1.toml --peer-address 127.0.0.1:6331
+exonum-timestamping generate-config example/common.toml  example/1 --peer-address 127.0.0.1:6331 -n
 
-exonum-timestamping generate-config example/common.toml  example/pub_2.toml example/sec_2.toml --peer-address 127.0.0.1:6332
+exonum-timestamping generate-config example/common.toml  example/2 --peer-address 127.0.0.1:6332 -n
 
-exonum-timestamping generate-config example/common.toml  example/pub_3.toml example/sec_3.toml --peer-address 127.0.0.1:6333
+exonum-timestamping generate-config example/common.toml  example/3 --peer-address 127.0.0.1:6333 -n
 
-exonum-timestamping generate-config example/common.toml  example/pub_4.toml example/sec_4.toml --peer-address 127.0.0.1:6334
+exonum-timestamping generate-config example/common.toml  example/4 --peer-address 127.0.0.1:6334 -n
+```
+
+Note that in case of copying file with master key to the other machines, you must change the access permissions of this file for every machine.
+For example:
+
+```sh
+sudo chmod 600 master.key.toml
 ```
 
 Finalize generation of nodes configurations:
 
 ```sh
-exonum-timestamping finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/sec_1.toml example/node_1_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8200 --private-api-address 0.0.0.0:8091 example/1/sec.toml example/1/node.toml --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-timestamping finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/sec_2.toml example/node_2_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8201 --private-api-address 0.0.0.0:8092 example/2/sec.toml example/2/node.toml --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-timestamping finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/sec_3.toml example/node_3_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8202 --private-api-address 0.0.0.0:8093 example/3/sec.toml example/3/node.toml --public-configs example/{1,2,3,4}/pub.toml
 
-exonum-timestamping finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/sec_4.toml example/node_4_cfg.toml --public-configs example/pub_1.toml example/pub_2.toml example/pub_3.toml example/pub_4.toml
+exonum-timestamping finalize --public-api-address 0.0.0.0:8203 --private-api-address 0.0.0.0:8094 example/4/sec.toml example/4/node.toml --public-configs example/{1,2,3,4}/pub.toml
 ```
 
 Run nodes:
 
 ```sh
-exonum-timestamping run --node-config example/node_1_cfg.toml --db-path example/db1 --public-api-address 0.0.0.0:8200
+exonum-timestamping run --node-config example/1/node.toml --db-path example/1/db --public-api-address 0.0.0.0:8200 --master-key-pass pass
 
-exonum-timestamping run --node-config example/node_2_cfg.toml --db-path example/db2 --public-api-address 0.0.0.0:8201
+exonum-timestamping run --node-config example/2/node.toml --db-path example/2/db --public-api-address 0.0.0.0:8201 --master-key-pass pass
 
-exonum-timestamping run --node-config example/node_3_cfg.toml --db-path example/db3 --public-api-address 0.0.0.0:8202
+exonum-timestamping run --node-config example/3/node.toml --db-path example/3/db --public-api-address 0.0.0.0:8202 --master-key-pass pass
 
-exonum-timestamping run --node-config example/node_4_cfg.toml --db-path example/db4 --public-api-address 0.0.0.0:8203
+exonum-timestamping run --node-config example/4/node.toml --db-path example/4/db --public-api-address 0.0.0.0:8203 --master-key-pass pass
+```
+
+Before service deploy make sure that you have pure python implementation of protobuf:
+
+```sh
+pip uninstall protobuf
+pip install --no-binary=protobuf protobuf
+```
+
+Deploy timestamping service.
+
+```sh
+python3 -m exonum_launcher -i ../timestamping.yaml
 ```
 
 <!-- markdownlint-enable MD013 -->

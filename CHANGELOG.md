@@ -3,7 +3,1420 @@
 All notable changes to this project will be documented in this file.
 The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [Unreleased]
+
+### New Features
+
+#### exonum-node
+
+- Functionality of the `proposer` module was extended. Now, it can also be used
+  for removing transactions from the pool of unconfirmed transactions.
+  The module was renamed to `pool` and related names were updated accordingly.
+  (#1840)
+
+### Internal Improvements
+
+#### exonum
+
+- It is now possible cache results of transaction correctness verification,
+  which leads to a moderate improvement in node performance. (#1844)
+
+- Backtrace is now included into `ExecutionError`s. (#1850)
+
+## 1.0.0 - 2020-03-31
+
+### Breaking Changes
+
+#### exonum-api
+
+- `ApiManagerConfig` was made non-exhaustive. (#1834)
+
+### New Features
+
+#### exonum-node
+
+- Exonum nodes now gracefully terminate on receiving SIGINT, SIGTERM
+  and SIGQUIT signals (on Unix platforms), or a `ctrl + c` break (on Windows).
+  These signal handlers may be switched off by using `NodeBuilder::disable_signals()`.
+  (#1834)
+
+### Bug Fixes
+
+#### exonum-cli
+
+- Fixed bug in `run-dev` command. Previously, using the existing configuration
+  files in `blockchain-path` led to an error. (#1827)
+
+## 1.0.0-rc.3 - 2020-03-25
+
+### Breaking changes
+
+#### exonum
+
+- `create_patch` and `commit` methods in `BlockchainMut` have been generalized
+  to support block skipping (see *New Features* section for more details). (#1820)
+
+#### exonum-cli
+
+- `run-dev` command has been reworked. It now does not clear database files
+  after the launch. `artifacts-dir` parameter has been renamed to
+  `blockchain-path`. Configuration files are now stored inside `config`
+  subdirectory. (#1822)
+
+#### exonum-supervisor
+
+- `MigrationRequest` was made non-exhaustive. (#1823)
+
+- `POST` endpoints now expect JSON-encoded input rather than
+  hex-encoded Protobuf. (#1823)
+
+- `supervisor_name` method was removed. Use `Supervisor::NAME` instead. (#1823)
+
+### New Features
+
+#### exonum-cli
+
+- Several constants in the `command` module became public. (#1821)
+
+#### exonum-node
+
+- Exonum nodes can now customize how they create block proposals. This can be
+  used to whitelist / blacklist transaction authors or services, prioritize
+  transactions by advanced criteria, implement complex rate limiting, etc.
+  The functionality is available via `pool` module. (#1820)
+
+- Exonum nodes can now skip block generation at a certain epoch of the consensus
+  algorithm. This can be used to keep a "heartbeat" when the network load is low
+  without bloating the storage used by the nodes. (#1820)
+
+#### exonum-rust-runtime
+
+- `ServiceApiScope::pb_endpoint_mut` allows to accept Protobuf-encoded messages
+  with the request content type set to `application/octet-stream` in addition
+  to JSON-encoded messages. (#1829)
+
+#### exonum-testkit
+
+- Testkit can send Protobuf-encoded payloads to POST endpoints. (#1831)
+
+### Bug Fixes
+
+#### exonum-api
+
+- Introduced a workaround for the HTTP restart hanging up on Windows. (#1828)
+
+#### exonum-node
+
+- Fixed a bug when a node created a propose with incorrect transactions.
+  This could lead to consensus failure or weird error messages in the node log.
+  (#1820)
+
+#### exonum-rust-runtime
+
+- Fixed updating HTTP endpoints if the Rust runtime does not contain
+  active services during node start. (#1831)
+
+#### exonum-supervisor
+
+- `DeployRequest` and `MigrationRequest` now have cryptographic seeds
+  to retry the same request multiple times. (#1823)
+
+## 1.0.0-rc.2 - 2020-03-13
+
+### Breaking changes
+
+#### General
+
+- Error handling is now performed with the `anyhow` crate instead of `failure`.
+  (#1805)
+
+- APIs which previously used futures from the `futures 0.1` crate are now
+  made `async`, or are using `Future`s from the standard library. (#1796, #1804)
+  The main affected APIs are as follows:
+  
+  - Endpoint definitions in the `exonum-api` crate and their counterparts
+    in `exonum-rust-runtime`
+  - Transaction sending with `ApiSender` from the `exonum` crate
+  - Node start-up with `Node::run` (`exonum-node` crate) and `NodeBuilder::run`
+    (`exonum-cli` crate), and shutdown with `ShutdownHandle` (`exonum-node` crate)
+  - HTTP API testing with `TestKitApi` (`exonum-testkit` crate)
+
+#### exonum
+
+- Testkit now does not include incorrect transactions into blocks or memory pool,
+  similar to real Exonum nodes. (#1785)
+
+- `Runtime::deploy_artifact` no longer returns `Box<dyn Future<...>>`. Instead a
+  special communication channel is used to send deployment status from the
+  runtime to the dispatcher. (#1788)
+
+- `Schema::call_errors` was removed in favor of more comprehensive
+  `call_records` method. (#1792)
+
+- `Blockchain::create_patch` and `Blockchain::commit` signatures were changed
+  due to unsoundness of the previous implementation; see "Bug Fixes" section
+  for more details. (#1809)
+- Replaced `CoreError::ServiceNotStopped` with the more general `InvalidServiceTransition`
+  error. (#1806)
+
+#### exonum-api
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-cli
+
+- `NodeBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+- Submodules of the `command` module were made private; the relevant data types
+  are now exported from the `command` module directly. Similarly,
+  `io` module was made private. (#1799)
+
+#### exonum-explorer
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-proto
+
+- `impl_binary_value_for_pb_message` macro was removed. Use the `BinaryValue`
+  derive macro from the `exonum-derive` crate instead. (#1805)
+
+#### exonum-rust-runtime
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-supervisor
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-system-api
+
+- Public api module has been removed. List of endpoints from private api has
+  been changed. (#1790) Current list of the endpoints:
+
+  - `v1/info` - obtains information about the node;
+  - `v1/stats` - obtains statistics of the node;
+  - `v1/peers` - adds a peer to the Exonum node;
+  - `v1/consensus_status` - enables or disables consensus on the node;
+  - `v1/shutdown` - shuts down the node.
+
+- API data types were made non-exhaustive where appropriate. (#1799)
+
+#### exonum-testkit
+
+- `TestKitBuilder` was refactored to use a more intuitive set of interfaces
+  for adding built-in artifacts and services to the blockchain. (#1800)
+
+- Data types were made non-exhaustive where appropriate. (#1799)
+
+### New Features
+
+#### exonum
+
+- Exonum now supports service freezing. A frozen service has fixed state (i.e.,
+  does not process transactions and service hooks), but, unlike stopped services,
+  the service HTTP API remains active. (#1780)
+
+- Core and the explorer service now support retrieving call status with
+  a cryptographic proof of authenticity. (#1792)
+  
+- Exonum now supports unloading of unused service artifacts. This operation
+  may be used to free resources associated with artifacts in the runtime
+  hosting them. (#1794)
+
+#### exonum-supervisor
+
+- Supervisor service supports service freezing. (#1781)
+
+- `supervisor/services` endpoint has been added which obtains information
+  about deployed artifacts and available services. (#1790)
+
+- Supervisor service supports artifact unloading. (#1798)
+
+#### exonum-rust-runtime
+
+- Rust services support freezing. (#1780)
+
+- HTTP API of Rust services is now switched on during data migrations. (#1780)
+
+#### exonum-testkit
+
+- Testkit server now returns info on emulated nodes. (#1799)
+
+### Internal Improvements
+
+#### exonum
+
+- Core now provides more thorough / context-dependent error descriptions
+  related to service lifecycle. (#1806)
+
+#### exonum-merkledb
+
+- Index clearing now uses range deletions for RocksDB, providing
+  a significant performance boost for this operation. (#1791)
+
+### Bug Fixes
+
+#### exonum
+
+- Fixed bug related to nodes forgetting transactions after executing
+  a block with them. Previously, nodes forgot all transactions
+  in the executed blocks; such transactions were removed from
+  the ephemeral transaction cache, but were not flushed to the DB
+  or anywhere else. This could lead to consensus hang-up. (#1809)
+
+#### exonum-node
+
+- Fixed potential node hang-up if the node received a proposal and
+  a supermajority of transactions approving it before all transactions
+  in the proposal are known. (#1781)
+
+- Switched off broadcasting of transactions which the node considers
+  incorrect. (#1781)
+
+- Fixed incorrect invalidation of block proposals. (#1782)
+
+- Provided clear coherence period for the transaction pool
+  by introducing the `mempool.flush_config_strategy` configuration parameter.
+  Previously, transactions were flushed to the persistent pool
+  only on block commit. This led to the unexpected behavior of some APIs,
+  such as the transaction getter endpoint in the explorer service. (#1809)
+
+- Fixed race condition when two nodes try to establish outgoing connections
+  to each other at the same time. (#1804)
+
+#### exonum-testkit
+
+- Testkit now does not include incorrect transactions into blocks or memory pool,
+  similar to real Exonum nodes. (#1785)
+
+- Added a method to get reference to the underlying API client for the `TestKitApi`.
+  (#1811)
+
+## 1.0.0-rc.1 - 2020-02-07
+
+### Breaking changes
+
+#### exonum
+
+- `before_commit` hook was renamed to the `after_transactions`. (#1577)
+
+- `before_transactions` and `after_transactions` hooks in Rust services
+  now return a `Result`. The semantics is the same as for transactions;
+  an error or panic in the hook will lead to the rollback of the blockchain
+  state. (#1576)
+
+- Errors occurring while executing transactions and `before_transactions` /
+  `after_transactions` hooks are now aggregated within each block, rather than
+  globally. Errors can be retrieved using `BlockWithTransactions`. (#1576)
+
+- The Rust interface and Protobuf presentation of `ExecutionError` have been reworked.
+  Error fields were made private and information about a failing call
+  was added. (#1585)
+
+- `IntoExecutionError` macro was reworked into a separate trait, `ExecutionFail`,
+  and a corresponding derive macro. (#1585)
+
+- State hash aggregation is now performed automatically by MerkleDB.
+  The relevant methods in `Runtime` and `Service` in Rust runtime
+  have been removed. (#1553)
+
+- `commit_service` has been renamed to the `update_service_status` and now takes
+  `InstanceStatus` as an additional argument.
+  `start_adding_service` has been renamed to `initiate_adding_service` to
+  better distinguish between starting and stopping a service. (#1605)
+
+- `after_transactions` hook is now invoked on the genesis block for the builtin
+  services. Note that calling `blockchain::Schema::height` within `after_transactions`
+  hook will cause a panic for a builtin service. (#1619)
+- `proposer_id` field in `Block` has been moved to additional block headers. (#1602)
+
+- Interaction with services from the Rust runtime has been changed. Instead of
+  using the `Transaction` trait, it is now possible to use service interfaces
+  directly as Rust traits. These interface traits can be applied to a keypair
+  (to generate signed transactions), to `CallContext` (to call another service)
+  and some other types. See Rust runtime docs for more details. (#1606)
+
+- The following public APIs were removed/made private: (#1629, #1671)
+
+  - `blockchain::{error reexports}` (available from `runtime::`);
+  - `blockchain::FatalError` public re-export;
+  - `blockchain::InstanceCollection` structure;
+  - `Blockchain::pool_size`, `Blockchain::get_saved_peers` and
+    `Blockchain::remove_peer_with_pubkey` methods;
+  - `helpers::path_relative_from` function;
+  - `helpers::ZeroizeOnDrop` trait;
+  - `helpers::Milliseconds` type;
+  - `helpers::config` and `helpers::user_agent` modules;
+  - `helpers::generate_testnet_config`, `helpers::create_rust_runtime_and_genesis_config`
+    and `helpers::clear_consensus_messages_cache` functions;
+  - `impl_serde_hex_for_binary_value` macro (moved to `merkledb`);
+  - `proto` module;
+  - `runtime::error` module (`catch_panic` was added to the list of public
+    re-exports from `runtime::error`).
+
+- `node` module and P2P messages from the `message` module (except for
+  `AnyTx` and `Precommit`) were moved to a separate crate, `exonum-node`.
+  The moved P2P messages were made private along with types / methods
+  logically related to the consensus algorithm implementation
+  (i.e., `NodeHandler` and types used by it). (#1698)
+
+- The artifact identifier now has first-class semantic version. Previously, it was
+  specific to the Rust runtime. (#1590)
+
+- The `name` field of the artifact identifier cannot contain `:` symbol. (#1590)
+
+- The format of the `proto-sources` endpoint in the Rust runtime has been changed.
+  To get the core Protobuf sources, use the endpoint with the `type=core` query.
+  To get the sources of an artifact, use query `type=artifact&name=$name&version=$version`,
+  where `$name` and `$version` are replaced with appropriate values. (#1590)
+
+- Rust runtime module was moved from the `exonum` crate into the separate
+  `exonum-rust-runtime` crate. (#1641)
+
+- `update_service_status` now does not return a value. (#1659)
+
+- `BlockchainBuilder::build` now returns `BlockchainMut` instead of `Result`. (#1659)
+
+- A type for a position of transaction in the block has been changed for `u32`. (#1668)
+
+- `DispatcherError` has been split into two different types: `CoreError`
+  and `CommonError`. (#1680)
+
+- `Common` variant has been added to the `ErrorKind` enum. (#1680)
+
+- `api` module of the `exonum` crate has been moved to 2 separate crates (#1690):
+
+  - `exonum-api` crate defining the base HTTP wrapper
+  - `exonum-system-api` crate implementing system API endpoints
+
+- Added a new method `initiate_resuming_service` to the `Runtime` trait.
+  This method is used to resume a previously stopped services.
+  (#1693)
+
+- `ExecutionContext` has been reworked (#1711)
+
+  - `ExecutionContext` has been extended by the methods from the
+   `exonum_rust_runtime::CallContext` so there is no need to use `CallContext`
+    anymore.
+    Public fields in `ExecutionData` has been replaced by the corresponding
+    getters.
+  - Direct `fork` access in `ExecutionContext` has been replaced by the
+    `BlockchainData::unstructured_access` which returns readonly access to
+    whole blockchain data.
+
+- Public structures and enums were made non-exhaustive. (#1710)
+
+- Blockchain data access from the `ExecutionContext` after an error in a nested
+  call is prohibited. (#1733)
+
+- Protobuf declarations were organized according to their packages and, in case
+  of the `exonum.runtime` package, split into smaller chunks. The core messages
+  were moved from `exonum.messages` to `exonum` package. (#1756)
+
+- `BlockchainBuilder` now accepts `GenesisConfig` as a separate argument,
+  rather than a part of `new` constructor. The config may be skipped if
+  the blockchain is guaranteed to be initialized. (#1761)
+
+#### exonum-cli
+
+- `supervisor-mode` parameter has been added for `generate-template` subcommand.
+  (#1598)
+
+- `NodeBuilder::with_service` has been renamed to the `with_rust_service`. (#1765)
+
+#### exonum-crypto
+
+- Protobuf declarations were organized according to their packages. (#1756)
+
+#### exonum-explorer
+
+- The field `content` of the `CommittedTransaction` struct and
+  the `InPool` variant of the `TransactionInfo` enum has been renamed
+  to `message`. (#1721)
+
+#### exonum-supervisor
+
+- `Supervisor` structure isn't generic anymore. (#1587)
+
+- `DeployConfirmation` structure was renamed to `DeployResult` and extended with
+  `success` field. (#1648)
+
+- Error code values were changed and split into several enum
+  representing sub-groups. (#1680)
+
+#### exonum-merkledb
+
+- The crate has been restructured, indexes are now located in separate module.
+Indexes iterators names has been shortened to `Iter`, `Keys` and `Values`. (#1628)
+
+- `SparseListIndex::indices` method was renamed to `SparseListIndex::indexes`. (#1629)
+
+- `AccessExt::touch_index` method has been replaced with `index_type`. (#1630)
+
+- Public structures and enums were made non-exhaustive. (#1710)
+
+- `CopyAccessExt` trait has been introduced. This trait is helpful for references
+  implementing `Access`, such as `&Fork` or `&dyn Snapshot`. Methods from `AccessExt`
+  trait accept `self` by reference now. (#1739)
+
+- `ProofPath` serialization during map hash computations was unified.
+  It now uses `LEB128(bit_length) || bytes` format, which was previously used
+  for branches, but not for a single-entry maps. (#1743)
+
+- Serialization of `ProofPath`s within `MapProof` Protobuf messages
+  was changed to a more compact and implementation-independent format. (#1743)
+
+- `MapProof` Protobuf messages now serialize keys according to their
+  `BinaryValue` implementation, rather than `BinaryKey`. (#1743)
+
+- All index types now share a common set of iterators: `Entries`, `Keys`
+  and `Values`. (#1762)
+
+- `KeySetIndex::insert` now takes the element by reference. (#1762)
+
+- `KeySetIndex` now supports unsized keys. Its getter methods are no longer
+  parameterized by the key type, similar to `MapIndex` / `ProofMapIndex`. (#1762)
+
+#### exonum-proto
+
+- Protobuf declarations were organized according to their packages. (#1756)
+
+#### exonum-rust-runtime
+
+- Service interfaces now have to specify method IDs with either `interface_method`
+  attribute or `auto_ids` option. (#1701)
+
+- Service interface methods now can be marked as removed. (#1707)
+
+#### exonum-testkit
+
+- The following public APIs were removed/made private: (#1629)
+
+  - `compare` module;
+  - `txvec` macro;
+  - `TestKit::probe_all` and `TestKit::probe` methods.
+
+- `TestKitBuilder::create` method was renamed to `build`. (#1740)
+
+- `TestNode` now returns `KeyPair` instead of a `(PublicKey, SecretKey)`
+  tuple. (#1761)
+
+#### exonum-time
+
+- Modules were made private, crate now provides re-exports of necessary types
+  instead. (#1716)
+
+### New features
+
+#### exonum
+
+- `before_transactions` hook for services was introduced. (#1577)
+
+- `ErrorMatch` was introduced to test (e.g., using the testkit) that
+  an `ExecutionError` has an expected type, error message and/or location. (#1585)
+
+- We introduced a set of public endpoints to retrieve the status of calls
+  executed within a block:
+  - `v1/call_status/transaction` - gets the status of a transaction,
+  - `v1/call_status/before_transactions` - gets the status of a `before_transactions`
+   hook,
+  - `v1/call_status/after_transactions` - gets the status of an `after_transactions`
+   hook.
+  (#1612)
+
+- Service instances can now be stopped.
+
+  Active service instance can be stopped by the corresponding request to the
+  `Supervisor`. Stopped service no more participates in the business logic,
+  i.e. it does not execute transactions, process events, provide user APIs, etc.
+  Service data becomes unavailable to other services, but still exists. The name
+  and identifier remain reserved for the stopped service and cannot be used again
+  for adding new services. (#1605)
+
+- New `blockchain::Schema` method `next_height` was added as a non-panicking
+  alternative to `height`. (#1619)
+
+- New method `in_genesis_block` was added to the `CallContext` to check if the service
+  hook is being executed for the genesis block. (#1619)
+
+- New `api::Error` variants were added: `Gone` and `MovedPermanently`. (#1607)
+
+- API endpoints are now can be marked as deprecated. (#1607)
+
+- Added `ProtobufConvert` for `Verified`, `BlockProof` and `IndexProof`. (#1643)
+
+- Slash (`/`) is now allowed to be a part of artifact/instance name. (#1681)
+
+#### exonum-build
+
+- `exonum-build` now fully supports hierarchical paths to Protobuf files. (#1756)
+
+- It is possible to opt out of including file sources into the output
+  generated by the crate. (#1756)
+
+- `Blockchain::new` now supports any type convertible to `KeyPair`. (#1761)
+
+#### exonum-cli
+
+- Added maintenance command `restart-migration` to restart migration script. (#1728)
+
+- Added `with_instance` and `with_default_rust_service` methods to `NodeBuilder`,
+  which start service instances immediately after genesis block creation. (#1765)
+
+- Added `NodeBuilder::development_node` constructor, which can be used
+  to quickly set up a single-node development network. (#1765)
+
+#### exonum-crypto
+
+- `KeyPair` now can has constructors for generating a random keypair and
+  generating a keypair from the specified seed. (#1761)
+
+#### exonum-merkledb
+
+- MerkleDB now performs automated state aggregation allowing to construct proofs
+  for its contents. Hashed indexes which are not a part of a group participate
+  in this aggregation. Consult crate docs for more details on how
+  aggregation works. (#1553)
+
+- Added hashed version of `Entry` called `ProofEntry`, which participates
+  in the state aggregation. (#1553)
+
+- Added support of unsized keys to `MapIndex` and `ProofMapIndex`. (#1621, #1626)
+
+- Added mechanism to extend block header. Block now contains
+  key-value storage `additional_headers` which can contain binary data. (#1602)
+
+- `TemporaryDB` can now be cleared. This will remove contents of all indexes
+  and erase index metadata. (#1630)
+
+- `impl_serde_hex_for_binary_value` macro was moved from core to `merkledb`. (#1629)
+
+- It is now possible to iterate over keys of the indexes within a group. (#1662)
+
+- Unsafe optimizations / experimental features are now behind a `yolo` feature,
+  which is off by default. (#1740)
+
+- MerkleDB now provides enumerations for all supported types of DB accesses
+  which can be used to simplify generic code (e.g., in bindings). (#1747)
+
+- It is now possible to obtain readonly access to fork data with static lifetime.
+  (#1763)
+
+#### exonum-node
+
+- Node logic (including P2P networking and consensus algorithm) was moved
+  from the `exonum` crate into the separate `exonum-node` crate. (#1698)
+
+#### exonum-rust-runtime
+
+- Rust runtime module was moved from the `exonum` crate into the separate
+  `exonum-rust-runtime` crate. (#1641)
+
+- `CallContext` has been replaced by the `ExecutionContext`. (#1711)
+
+#### exonum-supervisor
+
+- `Supervisor` service now can have initial configuration and implements
+  `Configure` interface. (#1587)
+  
+- `ConfigChange::StopService` has been added to make requests to stop the service
+  instance. (#1605)
+
+- New private endpoint `deploy-status` was added. (#1648)
+
+- Added support for resuming previously stopped services. (#1706)
+  - Added `resume_service` method to the `ConfigPropose`.
+  - Added `ResumeService` variant to the `ConfigChange` enumeration.
+
+- Supervisor now supports migrations. (#1727)
+
+#### exonum-middleware-service
+
+- Added *middleware* service that can batch transactions and perform checked calls
+  (calls that are executed if the target service corresponds to a specific
+  artifact and version requirement). (#1590)
+
+### Internal Improvements
+
+#### exonum
+
+- `sandbox` module was moved to the `test-suite/consensus-tests`. (#1627)
+
+- Some of general-purpose tests were moved to the `test-suite/node-tests`. (#1633)
+
+### Bug Fixes
+
+#### exonum-merkledb
+
+- `Snapshot` implementation for `Patch` has been fixed. The previous implementation
+  could lead to stale reads from a `Patch` or a `Fork`. (#1611)
+
+- Maximum height in `ProofListIndex` was fixed from the bogus value 58 to 56. (#1762)
+
+- Bogus setting of the empty key was removed for `ListIndex`. (#1762)
+
+- `ProofListIndex` now properly processes all index values; previously,
+  some of its methods panicked if called with an index exceeding `2 ** 56`. (#1768)
+
+## 0.13.0-rc.2 - 2019-12-04
+
+### Breaking changes
+
+#### exonum
+
+- **Most important**: new Dynamic Services feature was introduced. For details see
+  the [Dynamic Services](#dynamic-services-feature) section of the changelog.
+
+- Used `rust` version is updated to 1.38.0. (#1481)
+
+- Transaction serialization format was changed to `protobuf`. (#1283)
+
+- `create_checkpoint` method has been implemented for the `RocksDB` struct.
+  This method uses
+  [RocksDB checkpoints](https://github.com/facebook/rocksdb/wiki/Checkpoints)
+  functionality under the hood.
+
+- `NotFound` error message for `explorer/v1/block` endpoint now includes
+  the actual blockchain height. (#1498)
+
+- `system/v1/rebroadcast` endpoint has been removed. (#1445)
+
+- Added a possibility to specify compression algorithm for the database. (#1447)
+
+- Updated `hex` dependency with changes in the methods signatures of the `ToHex`
+  trait. (#1468)
+
+- Validator keys are now derived from single master key. Master key is
+  stored in encrypted file. (#1459)
+
+- Command line parameters `--service-key-pass` and `--consensus-key-pass` was
+  removed in favor of `--master-key-pass` parameter. For example now you can
+  run the node with the command below. (#1459)
+
+    ```bash
+    cargo run -- run -d 0/db/ -c 0/node.toml --master-key-pass pass:123
+    ```
+
+  - `StoppedTestKit::resume` accepts list of runtimes instead of a list of services.
+
+  - Removed obsolete `TestKit::blockchain_mut` method and `TestKit::blockchain`
+  now returns value instead of reference.
+  
+- Dot symbol is not allowed in service names anymore. (#1558)
+
+- Services can now use `BlockchainData` and `SnapshotExt` types to access data
+  from the blockchain in a more structured manner. (#1523)
+
+- `GenesisConfig` is extracted into separate entity. `BlockchainBuilder`, `Node`
+ and `Testkit` explicitly accepts it during creation. (#1541)
+
+- Added `DefaultInstance` trait for declaration of builtin services. (#1541)
+
+#### exonum-merkledb
+
+- Nested proofs for `ProofListIndex` are replaced with a flat
+  (non-recursive) format. (#1450)
+
+- Differentiated (read-only / read-write) access to the database
+  was introduced. (#1523)
+
+- It is now possible to have readonly access to indexes given a `Fork`
+  via a `ReadonlyFork` wrapper. Readonly access works like `RefCell::borrow`
+  (vs `RefCell::borrow_mut` for `Fork`); it is possible to create an
+  unlimited number of indexes with readonly access based on the same fork.
+  (#1523)
+  
+- Service schemas can now use a declarative layout, in which every field
+  corresponds to a separate index or a group of indexes. It is possible
+  to derive a constructor for such schemas via `FromAccess` derive macro.
+  (#1523, #1562)
+
+- New index name restrictions has been added. (#1558)
+
+  - Dot symbol is not allowed anymore in indexes with prefixed access.
+
+  - Index names starting from `__` and not containing a dot `.` are reserved and
+    used only for system indexes.
+
+#### exonum-proto
+
+- Introduced a new crate `exonum-proto`. Trait `ProtobufConvert` is moved
+  to this crate. (#1496)
+
+#### exonum-protobuf-convert
+
+- Introduced a new crate `exonum-protobuf-convert`. Derive macro
+  `ProtobufConvert` is moved to this crate. (#1501)
+
+- Derive macro `ProtobufConvert` now does not derive the `BinaryValue` and
+  `ObjectHash` traits. There are separate derive macros for them in
+  the `exonum-derive` crate. (#1501)
+
+#### exonum-build
+
+- Method `protobuf_generate` is now private, use `exonum_build::ProtobufGenerator`
+  instead (#1496).
+  
+- Method `ProtobufGenerator::frequently_used` has been removed (#1581).
+
+#### exonum-crypto
+
+- Methods `read_keys_from_file` and `generate_keys` are moved to new `keys`
+  module in the `exonum`. (#1459)
+
+- Protobuf serialization for crypto types is now implemented in the `exonum-crypto`
+  crate. (#1496)
+
+### Dynamic Services Feature
+
+#### Overview
+
+In `exonum` 0.13, a new service workflow is introduced, named
+"Dynamic Services".
+
+Key points of this feature are the following:
+
+- `exonum` now supports different environments of code execution (runtimes).
+  Only native `rust` runtime is enabled by default, but support of
+  different programming languages can be added quite easily.
+
+  For details see the [`Runtime` trait docs][runtime-trait] and the
+  [`sample_runtime` example][sample-runtime].
+
+  [runtime-trait]: https://docs.rs/exonum/0.13.0-rc.2/exonum/runtime/trait.Runtime.html
+  [sample-runtime]: https://github.com/exonum/exonum/tree/v0.13.0-rc.2/examples/sample_runtime
+
+- Services are not statically tied to the compiled binary anymore. There is
+  support of adding new service types (aka artifacts) dynamically and starting new
+  instances of services.
+
+  For details see [`runtime` module docs][runtime-docs].
+
+  [runtime-docs]: https://docs.rs/exonum/0.13.0-rc.2/exonum/runtime/index.html
+
+- Services now can have initialization parameters, provided within service start
+  procedure.
+
+- Services now support configuration changes via `Configure` interface.
+
+- `configuration` service was replaced with the `supervisor` service, which is
+  capable of not only changing configuration, but of deploying and starting
+  services as well. For details see [`supervisor` service][supervisor].
+
+  [supervisor]: https://github.com/exonum/exonum/tree/v0.13.0-rc.2/services/supervisor
+
+#### Migration Guide
+
+There are a lot of backward-incompatible changes introduced within 0.13 release.
+So to make the changes apparent, compare the `Cryptocurrency` example service versions
+for [0.12.1][crypt-0-12] and [0.13.0][crypt-0-13] releases.
+
+[crypt-0-12]: https://github.com/exonum/exonum/blob/v0.12.1/examples/cryptocurrency/
+[crypt-0-13]: https://github.com/exonum/exonum/blob/v0.13.0-rc.2/examples/cryptocurrency/
+
+Key points:
+
+- Merkledb schema is now declarative and can contain indices as fields.
+
+- Access to the database is now isolated for services.
+  A service cannot get the write access to another service or the blockchain schema.
+
+- Transactions do not have the `execute` method anymore. Instead, a service defines
+  and implements an interface trait which contains all the business logic.
+
+- Services do not launch at the node start by default. For launching a
+  service, use an [`exonum-launcher`][launcher] tool.
+
+  [launcher]: https://github.com/exonum/exonum-launcher
+
+#### Important PRs for Dynamic Services
+
+<!-- markdownlint-disable no-inline-html -->
+<details>
+    <summary>Below you can find a list of pull requests
+    which have significant meaning for the implementation of the Dynamic Services
+    feature.
+    Pull requests are ordered chronologically.</summary>
+
+- #1253: Interface mocks for dynamic services
+
+- #1263: Add new rust services interface
+
+- #1261: Basic dispatcher functionality
+
+- #1275: Dynamic services integration
+
+- #1345: Implement a new `Transaction` trait [ECR-3222]
+
+- #1361: First step of persistent dynamic services implementation [ECR-3276]
+
+- #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
+
+- #1376: Restore system API endpoints
+
+- #1389: Check and improve messages verification procedure [ECR-3272]
+
+- #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
+
+- #1467: Implement Configure interface [ECR-3306]
+
+- #1473: Extract supervisor service from core
+
+- #1482: Add shutdown method into runtime trait
+
+- #1484: Implement configuration update logic in Supervisor [ECR-3583]
+
+- #1492: Do start and initialize service at single step [ECR-3222]
+
+- #1537: Finalize Exonum-derive macros [ECR-3800]
+
+- #1538: Supervisor modes [ECR-3794] [ECR-3771]
+
+</details>
+<!-- markdownlint-enable no-inline-html -->
+
+#### Full History of the Dynamic Services Implementation
+
+<!-- markdownlint-disable no-inline-html -->
+<details>
+    <summary>Below you can find a list of all pull requests related
+    to the implementation of the Dynamic Services feature.
+    Pull requests are ordered chronologically.</summary>
+
+- #1243: Old behavior dispatcher
+
+- #1509: Make dispatcher mostly synchronous
+
+- #1245: Add basic runtime env interface + rust implementation
+
+- #1253: Interface mocks for dynamic services
+
+- #1261: Basic dispatcher functionality
+
+- #1263: Add new rust services interface
+
+- #1267: Move configuration service to the core
+
+- #1269: Rust artifact and additional functionality for rust runtime.
+
+- #1270: Dynamic configuration service
+
+- #1275: Dynamic services integration
+
+- #1287: Remove macro from service interface trait definition
+
+- #1290: Add support of state hash calculation into runtimes & services
+
+- #1291: Change service builder and web api.
+
+- #1325: Dynamic services: fix time service compilation
+
+- #1326: Remove genesis_init from dynamic services [ECR-3226]
+
+- #1327: Remove unsafe code from runtimes
+
+- #1330: A small amount of code improvements. [ECR-3222]
+
+- #1331: Rename dispatch to call_info
+
+- #1332: Fix tests in blockchain module
+
+- #1334: Fix sandbox tests in dynamic services [ECR-3230]
+
+- #1336: Rename traits methods in dynamic services  [ECR-3222]
+
+- #1337: Fix a lot of tests in dynamic services
+
+- #1338: Refine `start_service` logic [ECR-3222, ECR-3235]
+
+- #1340: Fix testkit [ECR-3229]
+
+- #1343: Add service name and id to `Service` trait methods. [ECR-3235]
+
+- #1345: Implement a new `Transaction` trait [ECR-3222]
+
+- #1346: Fix transactions benchmarks in dynamic services
+
+- #1348: Fix big performance regression in dynamic services
+
+- #1349: Don't verify SignedMessage during the deserialization
+
+- #1350: Refactor signature verification code [ECR-3222]
+
+- #1353: Rework blockchain explorer [ECR-3259]
+
+- #1354: Fix `cargo test --all` compilation
+
+- #1357: Some refactoring by clippy suggestion
+
+- #1361: FIrst step of persistent dynamic services implementation [ECR-3276]
+
+- #1367: Rename ArtifactSpec to ArtifactId [ECR-3291]
+
+- #1371: Basic supervisor service implementation [ECR-3291], [ECR-3298]
+
+- #1374: Polish code and make travis almost happy
+
+- #1375: Add deadline_height to StartService transaction [ECR-3298]
+
+- #1376: Restore system API endpoints
+
+- #1378: Finalize artifact deployment logic [ECR-3291]
+
+- #1379: Implement state_hash computation for dispatcher.
+
+- #1380: Make tests green again.
+
+- #1381: Include proto file sources in artifact information. [ECR-3309]
+
+- #1382: Replace impl_service_dispatcher by the attribute in
+  service_interface [ECR-3222]
+
+- #1387: Improve execution error handling for dynamic services [ECR-3236]
+
+- #1389: Check and improve messages verification procedure [ECR-3272]
+
+- #1392: Implement verification for ArtifactId and InstanceSpec
+  with the unit tests [ECR-3360]
+
+- #1393: Add macro to implement hex serde representation
+  for the BinaryValue types [ECR-3222]
+
+- #1394: Update documentation of the messages module [ECR-3275]
+
+- #1396: Document runtime life cycle [ECR-3275]
+
+- #1405: Dynamic services supervisor tests [ECR-3266]
+
+- #1411: Refine Runtime trait [ECR-3412]
+
+- #1427: Try to re deploy artifact before registration.
+
+- #1429: Review unwraps in dynamic services [ECR-3419]
+
+- #1430: Expand documentation on configuration parameters usage [ECR-3463]
+
+- #1431: Update dispatcher info to show changes in list
+  of deployed artifacts
+
+- #1432: Refine exonum-derive crate on top of darling [ECR-3343]
+
+- #1434: Replace `dispatcher` attribute in `exonum_service`
+  by the `service_interface` in `ServiceFactory` [ECR-3474]
+
+- #1438: Remove dispatcher reference from Runtime trait
+
+- #1443: Replace fabric module with exonum-cli crate [ECR-3457]
+
+- #1446: Service interfaces MVP. [ECR-3474], [ECR-3484]
+
+- #1451: Add the service interface name option to the proto files
+
+- #1452: Remove default state_hash implementation
+
+- #1454: Simplify blockchain configuration [ECR-3357]
+
+- #1462: Fix API Freeze on startup
+
+- #1465: Improve ProtobufConvert for enum variants
+
+- #1467: Implement Configure interface [ECR-3306]
+
+- #1472: Fix some of the testkit ignored doctests
+
+- #1473: Extract supervisor service from core
+
+- #1476: Improve support for additional runtimes in TestKit [ECR-3444]
+
+- #1482: Add shutdown method into runtime trait
+
+- #1483: Use strings for protobuf files
+
+- #1484: Implement configuration update logic in Supervisor [ECR-3583]
+
+- #1488: Add support of external runtimes to exonum-cli
+
+- #1489: Avoid waiting in the `add_transaction` endpoint [ECR-3222]
+
+- #1490: Fix supervisor creation
+
+- #1491: Polish testkit [ECR-3222]
+
+- #1492: Do start and initialize service at single step [ECR-3222]
+
+- #1493: Document Rust runtime services traits [ECR-3275]
+
+- #1494: Enhancements in Testkit
+
+- #1495: Implement API endpoints that shows config
+  proposals in Supervisor [ECR-3610]
+
+- #1504: Clarify runtime shutdown method [ECR-3696]
+
+- #1505: Proto optimization [ECR-3472]
+
+- #1508: Remove validator_id method from AfterCommitContext
+
+- #1509: Make dispatcher mostly synchronous
+
+- #1511: Add includes to proto-sources
+
+- #1514: Use enum to represent ErrorKind [ECR-3717]
+
+- #1515: Introduce test-suite directory
+
+- #1517: Clarify SignedMessage documentation [ECR-3478]
+
+- #1518: Remove data duplication from DeployConfirmation [ECR-3770]
+
+- #1519: Add anonymous lifetimes [ECR-3757]
+
+- #1520: SimpleSupervisor: Verify that config proposal
+  is sent by validator [ECR-3742]
+
+- #1521: Implement ObjectHash for SignedMessage
+
+- #1522: Remove ApiContext structure [ECR-3745]
+
+- #1525: Make protobuf artifacts implementation detail
+
+  of Rust runtime [ECR-3776]
+
+- #1526: Sending an empty POST request to /shutdown endpoint
+  doesn't work [ECR-3756]
+
+- #1528: Document parts of Rust runtime [ECR-3285]
+
+- #1530: Improve `Runtime` docs
+
+- #1531: ProofMapIndex variants for hashed and raw keys [ECR-3777]
+
+- #1537: Finalize Exonum-derive macros [ECR-3800]
+
+- #1538: Supervisor modes [ECR-3794] [ECR-3771]
+
+- #1539: Restore warn(missing_docs) in the Exonum crate [ECR-3821]
+
+- #1540: Deploy workflow
+
+- #1542: Write proper examples for the Exonum traits derivation [ECR-3822]
+
+- #1544: Remove atty dependency
+
+- #1546: Move multisig module to the supervisor crate [ECR-3823]
+
+- #1547: Remove metrics module
+
+- #1548: Remove TransactionMessage alias [ECR-3222]
+
+- #1549: Encapsulate Blockchain fields [ECR-3222]
+
+- #1550: Remove isolate method [ECR-3820]
+
+- #1552: Assign instance IDs in the Supervisor [ECR-3746]
+
+- #1555: Update MerkleDB docs
+
+- #1568: Make DispatcherSchema merkelized again [ECR-3810]
+
+- #1592: Fix node freeze after re-enabling consensus [ERC-3111]
+
+</details>
+<!-- markdownlint-enable no-inline-html -->
+
+### New Features
+
+#### exonum
+
+- New config params `http_backend_config.server_restart_max_retries` and
+  `http_backend_config.server_restart_retry_timeout` added into `NetworkConfiguration`.
+  They are intended to configure restart settings of the HTTP-server (#1536).
+
+- `exonum` now has a `python` library for implementing integration tests. (#1516)
+
+- `BlockchainMut` now has a `check_tx` method used to verify transactions before
+  adding them to the transactions pool. Transactions for which `check_tx` fails
+  are considered invalid and can't be included to the block. (#1579)
+
+#### exonum-merkledb
+
+- `ProofListIndex` now implements `truncate()` and `pop()` methods, allowing
+  to eject elements from the list. (#1455)
+
+- `IndexAccess` trait is implemented for several new types, notably,
+  `Rc<dyn Snapshot>`, `Arc<dyn Snapshot>` and `Rc<Fork>`. (#1455)
+
+- `HashTag::hash_list()` was extended to support values of any appropriate type,
+  not only `Hash`. (#1455)
+
+- `ProtobufConvert` has been implemented for `MapProof` (#1512) and `ListProof` (#1513).
+
+- New variant of the `ProofMapIndex` have been introduced - `RawProofMapIndex`.
+  It is used for keys that maps directly to `ProofPath`, for example `Hash` and
+  `PublicKey`. (#1531)
+
+  - By default `ProofMapIndex` is used for keys that implement `ObjectHash`.
+
+  - For `Hash` keys both map variants works the same, because `ObjectHash`
+  implementation for `Hash` returns the hash itself.
+
+#### exonum-cli
+
+- Old `fabric` module is replaced with new `exonum-cli` crate. (#1443)
+
+- `exonum-cli` provides a public reexport of `structopt` crate. (#1461)
+
+### Internal Improvements
+
+#### exonum
+
+- `system/v1/shutdown` endpoint has been modified and now accepts empty POST
+  requests. (#1526)
+
+- `exonum-protobuf-convert` has been replaced with external `protobuf-convert`
+  crate. (#1561)
+
+- `keys` module has been moved into `exonum-keys` crate. (#1497)
+
+#### exonum-merkledb
+
+- `ProofListIndex::extend()` method has been refactored, leading to up to 10x
+  performance improvements for large lists. (#1455)
+
+- Proofs building mechanisms have been heavily refactored. (#1460)
+
+#### exonum-testkit
+
+- Configuration change example has been moved to `exonum-supervisor` crate. (#1582)
+
+#### exonum-build
+
+- Now input directory is always added to includes to reduce boilerplate
+  code. (#1581)
+
+### Bug Fixes
+
+#### exonum
+
+- Localhost ports 8080/8081 are now allowed in CORS within the `run-dev` mode. (#1415)
+
+#### exonum-merkledb
+
+- `index_metadata` now correctly loads the provided index address name (#1478).
+
+## 0.12.1 - 2019-09-19
+
+### Bug Fixes
+
+#### exonum
+
+- A message length checking has been fixed (#1463)
+
+## 0.12.0 - 2019-08-14
+
+### Breaking changes
+
+#### exonum
+
+- Module `storage` has been replace by `exonum-merkledb` crate. See related section
+- Signatures of methods `Service::initialize` and `Service::before_commit` has been
+  changed. Now they take immutable reference to `Fork` instead of mutable. (#1293)
+
+- Trait `BinaryForm` has been replaced by `BinaryValue`. (#1298)
+
+  To implement `BinaryValue` for types that implements `Protobuf::Message` use
+  `impl_binary_value_for_pb_message` macros.
+
+- Module `storage` has been replaced by `exonum-merkledb` crate. See related section
+  in changelog for details. (#1293)
+
+- Bootstrapping workflow has been simplified (#1292)
+
+  `generate-config` subcommand now uses single `OUTPUT_DIR` instead of set of options.
+  So to generate node config you should write something like example bellow.
+
+  ```bash
+  cargo run --bin exonum-timestamping -- \
+    generate-template /tmp/exonum/template.toml --validators-count 4
+
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/0 \
+      --peer-address 0.0.0.0:8000
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/1 \
+      --peer-address 0.0.0.0:8001
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/2 \
+      --peer-address 0.0.0.0:8002
+  cargo run --bin exonum-timestamping -- \
+    generate-config /tmp/exonum/template.toml /tmp/exonum/cfg/3 \
+      --peer-address 0.0.0.0:8003
+
+  cargo run --bin exonum-timestamping -- \
+    finalize /tmp/exonum/nodes/0/sec.toml /tmp/exonum/nodes/0/node.toml \
+      --public-configs /tmp/exonum/cfg/{0,1,2,3}/pub.toml
+
+  cargo run --bin exonum-timestamping -- \
+    run -d /tmp/exonum/db/0 -c /tmp/exonum/nodes/0/node.toml
+  ```
+
+- `explorer/v1/block` endpoint returns a response in a "flat" format. (#1386)
+
+- `explorer/v1/blocks` endpoint with `add_blocks_time` param switched on now returns
+  median precommit times in the `time` field within each returned block,
+  rather than in a separate array. (#1278)
+
+- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
+  An additional field in the response of the endpoint was added. The field
+  corresponds to the total number of transactions in the blockchain. (#1289)
+
+- `system/v1/mempool` endpoint has been renamed into `system/v1/stats`.
+  An additional field in the response of the endpoint was added. The field
+  corresponds to the total number of transactions in the blockchain. (#1289)
+
+#### exonum-merkledb
+
+- Added restrictions to index names. Allowable characters in index name: ASCII
+  characters, digits, underscores and dashes. (#1388)
+
+- Added `Debug` implementation for `Database`, `Snapshot`, `Iterator` dynamic
+  traits (#1363)
+
+- Changed storage layout (#1293)
+
+  - Changed indexes metadata layout in the database.
+
+  - Introduced a generic `IndexState` structure that can be used to store global
+    index properties like total number of items.
+
+- Changed `ProofMapIndex` hashing rules for branch nodes and root node.
+  Branch nodes is hashing now with 0x04 prefix, root node with 0x03 (#1293).
+
+- Renamed method `merkle_root` of `ProofMapIndex` and `ProofListIndex` to
+  `object_hash` (#1293).
+
+- Several mutable indexes now can be create from immutable reference to `Fork` (#1293)
+
+- Relaxed trait bounds for the `ProofMapIndex` keys (#1293)
+
+  Now keys should just implement `BinaryKey` trait instead of the
+  `ProofMapKey`, which will be ordered according to their binary
+  representation, as in the `MapIndex`.
+
+- Changed `ProofListIndex` hashing rules for leaf nodes and branch nodes according
+    to the [certificate transparency](https://tools.ietf.org/html/rfc6962#section-2.1)
+    specification. Leaf nodes contain hashes with 0x00 prefix, branch nodes - with
+    0x01. (#1293)
+
+- `StorageValue` and `StorageKey` have been renamed to the `BinaryValue`
+  and `BinaryKey`. (#1293)
+
+  - Added `to_bytes` method to the `BinaryValue` trait which doesn't consume
+    original value instead of the `into_bytes`.
+  - `BinaryKey::write` now returns total number of written bytes.
+  - `CryptoHash` has been replaced by the `ObjectHash`.
+
+- Changed the hash algorithm of the intermediate nodes in `ProofMapIndex`. (#1293)
+
+  `ProofPath` now uses compact binary representation in the `BranchNode`
+  hash calculation.
+
+  Binary representation is `|bits_len|bytes|`, where:
+
+  - **bits_len** - total length of the given `ProofPath` in bits compressed
+    by the `leb128` algorithm
+  - **bytes** - non-null bytes of the given `ProofPath`, i.e. the first
+    `(bits_len + 7) / 8` bytes.
+
+#### exonum-crypto
+
+- Removed deprecated `CryptoHash` trait, use `exonum-merkledb::ObjectHash`
+  instead (#1361)
+
+### New features
+
+#### exonum
+
+- New endpoint: `v1/transactions/subscribe`, which subscribe to new transaction events.
+  This endpoint accept optional parameters: `service_id` and `message_id`
+  (`message_id` as in derive macro `TransactionSet`). (#1335)
+
+- New endpoint: `v1/ws`, which open websocket connection and allow to set multiple
+  subscription (for blocks and transaction, filtered by service and transaction id)
+  and send transactions (in hex, like in explorer) to blockchain
+  (examples can be found in related pull request). (#1335)
+
+### Bug Fixes
+
+#### exonum-testkit
+
+- Fixed `TestKit::add_tx()` method, which previously did not persist
+  transactions. (#1278)
+
+### Internal improvements
+
+#### exonum
+
+- `explorer/v1/blocks` endpoint supports `add_precommits` param, which supplies
+  each returned block with the `precommits` field. (#1278)
+
+- `explorer/v1/blocks` endpoint allows to specify the lower bound on the returned
+  block height with the `earliest` query param. (#1278)
+
+- Added `ProtobufConvert` implementation for byte array with fixed sizes (#1279)
+
+- Added `service_name` getter to the `TransactionContext`. (#1274)
+
+- Allowed to use symbol `-` in index names. (#1277)
+
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added a new endpoint `system/v1/services` for displaying information
+  about available services. (#1288)
+
+- Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
+  with adding additional fields `service_id` and `time`. (#1386)
+
+- Added `tx_cache` field to `State` to cache incoming transactions before
+  adding them to persistent pool. (#1398)
+
+- Added new request message `PoolTransactionsRequest` to obtain pool transactions
+ from another peers. (#1404)
+
+- Endpoints `explorer/v1/block` and `explorer/v1/transactions` were extended
+  with adding additional fields `service_id` and `time`. (#1386)
+
+#### exonum-merkledb
+
+- Updated `ProofMapIndex` data layout. (#1293)
+
+  Path to the root node in merkle patricia tree now has been stored in the index
+  state.
+
+- New API for getting and creating indexes. (#1293)
+
+  - Now indexes can be accessed via immutable references from `Snapshot` and
+    mutable/immutable references from `Fork`.
+
+  - Introduced method `fork::get_object` to get or create object by address.
+
+  - `get_object_existed` and `get_object_existed_mut` methods of `Fork` and `Snapshot`
+    returns optional references to index.
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added a new endpoint `system/v1/services` for displaying information
+  about available services. (#1288)
+
+- `rocksdb` crate is now used instead of `exonum_rocksdb`. (#1286)
+
+- Added `From<Patch>` trait implementation to `Fork`. (#1403)
+
+#### exonum-testkit
+
+- Implemented "stopping" and "resuming" a `TestKit`, allowing to emulate node
+  restarts. (#1278)
+
+## 0.11.0 - 2019-03-15
 
 ### Breaking Changes
 
@@ -12,6 +1425,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Node secret keys are now stored in separate files in a secure way.
   CLI for generating node configs and starting nodes has been extended
   in order to reflect these changes. (#1222, #1096, #1235)
+
+- Changed a response for `/healthcheck` endpoint. (#1252)
+
+- Changed a response code for the `/block` endpoint for the case when
+  the requested block doesn't exist. (#1262)
+
+- Removed a sub-command `generate-testnet` from CLI. (#1264)
 
 #### exonum-crypto
 
@@ -366,6 +1786,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   - Remove old dependencies on `iron` and its companions `bodyparser`, `router`
     and others.
   - Simplify the API handlers as follows:
+
     ```rust
     fn my_handler(state: &ServiceApiState, query: MyQueryType)
     -> Result<MyResponse, ApiError>
@@ -373,6 +1794,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
       // ...
     }
     ```
+
     where `MyQueryType` type implements `Deserialize` trait and `MyResponse`
     implements `Serialize` trait.
   - Replace old methods `public_api_handler` and `private_api_handler` of

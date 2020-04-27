@@ -5,28 +5,13 @@
 #
 
 # Base URL for demo service endpoints
-$BASE_URL = 'http://127.0.0.1:8000/api/services/cryptocurrency/v1';
-$TRANSACTION_URL = 'http://127.0.0.1:8000/api/explorer/v1/transactions';
+$BASE_URL = 'http://127.0.0.1:8080/api/services/cryptocurrency/v1';
+$TRANSACTION_URL = 'http://127.0.0.1:8080/api/explorer/v1/transactions';
 # Directory with the current script
 $wd = $myinvocation.mycommand.path | Split-Path;
 
-# Creates a wallet using a transaction stored in the specified file.
-function Create-Wallet ($jsonFilename) {
-  $body = cat $jsonFilename;
-  $resp = Invoke-WebRequest "$TRANSACTION_URL" `
-    -Method POST `
-    -ContentType 'application/json' `
-    -Body $body;
-
-  if ($resp.StatusCode -eq 200) {
-    return ($resp.Content | ConvertFrom-Json).tx_hash;
-  } else {
-    return '';
-  }
-}
-
-# Performs a transfer using a transaction stored in the specified file.
-function Transfer ($jsonFilename) {
+# Sends a transaction stored in the specified file.
+function Send-Tx ($jsonFilename) {
   $body = cat $jsonFilename;
   $resp = Invoke-WebRequest "$TRANSACTION_URL" `
     -Method POST `
@@ -42,15 +27,15 @@ function Transfer ($jsonFilename) {
 
 # Checks that a `CreateWallet` transaction is committed to the blockchain.
 function Check-CreateTx ($tx) {
-  $resp = Invoke-WebRequest "http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$($tx.hash)";
+  $resp = Invoke-WebRequest "$($TRANSACTION_URL)?hash=$($tx.hash)";
   $error = $False;
   if ($resp.StatusCode -eq 200) {
     $respJson = $resp.Content | ConvertFrom-Json;
-    if (($respJson.type -ne 'Committed') -or ($respJson.content.body.name -ne $tx.name)) {
-      $error = true;
+    if ($respJson.type -ne 'committed') {
+      $error = $True;
     }
   } else {
-    $error = true;
+    $error = $True;
   }
 
   if ($error) {
@@ -83,18 +68,18 @@ function Main () {
     @{
       name = 'Alice';
       json = "$wd/create-wallet-1.json";
-      hash = '75a9d95694f22823ae01a6feafb3d4e27b55b83bd6897aa581456ea5da382dde';
+      hash = 'abe9ac1eef23b4cda7fc408ce488b233c3446331ac0f8195b7d21a210908b447';
     },
     @{
       name = 'Bob';
       json = "$wd/create-wallet-2.json";
-      hash = '7a09053aa590704332b7a18f552150caa8b6e4f777afa4005d169038f481b7f7';
+      hash = '59198ccaba93d0dcf2081f3820e54e5233d7eaf223f13c147df88ccfc351ac27';
     }
   );
 
   foreach ($tx in $txs) {
     echo "Creating wallet for $($tx.name)";
-    $hash = Create-Wallet $tx.json;
+    $hash = Send-Tx $tx.json;
     if ($hash -eq $tx.hash) {
       echo "OK, got expected transaction hash $($tx.hash)";
     } else {
@@ -111,8 +96,8 @@ function Main () {
   }
 
   echo 'Transferring tokens between Alice and Bob...';
-  $transferHash = 'ae3afbe35f1bfd102daea2f3f72884f04784a10aabe9d726749b1188a6b9fe9b';
-  $hash = Transfer("$wd/transfer-funds.json");
+  $transferHash = 'b5d68015cb47f1b1f909e7667c219f1c63a0b7c978cdd6e8ffc279d05ba66fec';
+  $hash = Send-Tx("$wd/transfer-funds.json");
   if ($hash -ne $transferHash) {
     throw "Unexpected transaction hash: $hash";
   }
@@ -125,12 +110,12 @@ function Main () {
   # Wallet records in the response are deterministically ordered by increasing
   # public key. As Alice's pubkey is lexicographically lesser than Bob's, it is possible to
   # determine his wallet as .[0] and hers as .[1].
-  Check-Wallet $resp[0] 'Alice' '85';
-  Check-Wallet $resp[1] 'Bob' '115';
+  Check-Wallet $resp[0] 'Alice' '95';
+  Check-Wallet $resp[1] 'Bob' '105';
   echo "Retrieving info on Alice's wallet...";
-  $pubkey = '114e49a764813f2e92609d103d90f23dc5b7e94e74b3e08134c1272441614bd9';
+  $pubkey = '070122b6eb3f63a14b25aacd7a1922c418025e04b1be9d1febdfdbcf67615799';
   $resp = (Invoke-WebRequest "$BASE_URL/wallet?pub_key=$pubkey").Content | ConvertFrom-Json;
-  Check-Wallet $resp 'Alice' '85';
+  Check-Wallet $resp 'Alice' '95';
 }
 
 Compile-Server;

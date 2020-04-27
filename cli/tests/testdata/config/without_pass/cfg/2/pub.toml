@@ -1,0 +1,19 @@
+address = "127.0.0.1:5402"
+
+[consensus]
+first_round_timeout = 3000
+max_message_len = 1048576
+max_propose_timeout = 200
+min_propose_timeout = 10
+peers_timeout = 10000
+propose_timeout_threshold = 500
+status_timeout = 5000
+txs_block_limit = 1000
+
+[general]
+supervisor_mode = "simple"
+validators_count = 4
+
+[validator_keys]
+consensus_key = "242a4e1fc9d0f5ba2003189bded859153aaa9e86f033a7cadb213ec4328601bf"
+service_key = "e9a180d443c054d63797acbb61b7cee23e01522e39a58e7761923773fabecc4e"

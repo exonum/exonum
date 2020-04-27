@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,79 +14,68 @@
 
 //! Timestamping transactions.
 
-// Workaround for `failure` see https://github.com/rust-lang-nursery/failure/issues/223 and
-// ECR-1771 for the details.
-#![allow(bare_trait_objects)]
+use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
+use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
+use exonum_proto::ProtobufConvert;
+use exonum_time::TimeSchema;
+use log::trace;
 
-use exonum::{
-    blockchain::{ExecutionError, ExecutionResult, Transaction, TransactionContext},
-    crypto::{PublicKey, SecretKey},
-    messages::{Message, RawTransaction, Signed},
-};
-use exonum_time::schema::TimeSchema;
-
-use super::proto;
 use crate::{
-    schema::{Schema, Timestamp, TimestampEntry},
-    TIMESTAMPING_SERVICE,
+    proto,
+    schema::{Schema, Timestamp},
+    TimestampEntry, TimestampingService,
 };
 
 /// Error codes emitted by wallet transactions during execution.
-#[derive(Debug, Fail)]
-#[repr(u8)]
+#[derive(Debug, ExecutionFail)]
 pub enum Error {
     /// Content hash already exists.
-    #[fail(display = "Content hash already exists")]
     HashAlreadyExists = 0,
+    /// Time service with the specified name doesn't exist.
+    TimeServiceNotFound = 1,
+    /// Timestamping configuration is invalid.
+    InvalidConfig = 2,
 }
 
-impl From<Error> for ExecutionError {
-    fn from(value: Error) -> ExecutionError {
-        let description = value.to_string();
-        ExecutionError::with_description(value as u8, description)
-    }
+/// Timestamping configuration parameters.
+#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Config")]
+pub struct Config {
+    /// Time oracle service name.
+    pub time_service_name: String,
 }
 
-/// Timestamping transaction.
-#[derive(Serialize, Deserialize, Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::TxTimestamp")]
-pub struct TxTimestamp {
-    /// Timestamp content.
-    pub content: Timestamp,
+#[exonum_interface]
+pub trait TimestampingInterface<Ctx> {
+    type Output;
+    #[interface_method(id = 0)]
+    fn timestamp(&self, ctx: Ctx, arg: Timestamp) -> Self::Output;
 }
 
-/// Transaction group.
-#[derive(Serialize, Deserialize, Clone, Debug, TransactionSet)]
-pub enum TimeTransactions {
-    /// A timestamp transaction.
-    TxTimestamp(TxTimestamp),
-}
+impl TimestampingInterface<ExecutionContext<'_>> for TimestampingService {
+    type Output = Result<(), ExecutionError>;
 
-impl TxTimestamp {
-    #[doc(hidden)]
-    pub fn sign(author: &PublicKey, content: Timestamp, key: &SecretKey) -> Signed<RawTransaction> {
-        Message::sign_transaction(Self { content }, TIMESTAMPING_SERVICE, *author, key)
-    }
-}
+    fn timestamp(&self, context: ExecutionContext<'_>, arg: Timestamp) -> Self::Output {
+        let tx_hash = context
+            .transaction_hash()
+            .ok_or(CommonError::UnauthorizedCaller)?;
 
-impl Transaction for TxTimestamp {
-    fn execute(&self, mut context: TransactionContext) -> ExecutionResult {
-        let tx_hash = context.tx_hash();
-        let time = TimeSchema::new(&context.fork())
-            .time()
-            .get()
-            .expect("Can't get the time");
+        let mut schema = Schema::new(context.service_data());
+        let config = schema.config.get().expect("Can't read service config");
 
-        let hash = &self.content.content_hash;
+        let data = context.data();
+        let time_schema: TimeSchema<_> = data.service_schema(config.time_service_name.as_str())?;
+        let time = time_schema.time.get().ok_or(Error::TimeServiceNotFound)?;
 
-        let mut schema = Schema::new(context.fork());
-        if let Some(_entry) = schema.timestamps().get(hash) {
-            Err(Error::HashAlreadyExists)?;
+        if schema.timestamps.get(&arg.content_hash).is_some() {
+            Err(Error::HashAlreadyExists.into())
+        } else {
+            trace!("Timestamp added: {:?}", arg);
+            let entry = TimestampEntry::new(arg, tx_hash, time);
+            schema.add_timestamp(entry);
+            Ok(())
         }
-
-        trace!("Timestamp added: {:?}", self);
-        let entry = TimestampEntry::new(self.content.clone(), &tx_hash, time);
-        schema.add_timestamp(entry);
-        Ok(())
     }
 }

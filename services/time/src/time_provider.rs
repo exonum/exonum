@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ use chrono::{DateTime, Duration, TimeZone, Utc};
 use std::sync::{Arc, RwLock};
 
 /// A helper trait that provides the node with a current time.
-pub trait TimeProvider: Send + Sync + ::std::fmt::Debug {
+pub trait TimeProvider: Send + Sync + std::fmt::Debug {
     /// Returns the current time.
     fn current_time(&self) -> DateTime<Utc>;
 }
@@ -43,35 +43,35 @@ impl TimeProvider for SystemTimeProvider {
 /// # Examples
 ///
 /// ```
-/// # extern crate exonum;
-/// # extern crate exonum_testkit;
-/// # extern crate exonum_time;
-/// # extern crate chrono;
 /// use chrono::{Utc, Duration, TimeZone};
-/// use exonum::helpers::Height;
-/// use exonum_testkit::TestKitBuilder;
-/// use exonum_time::{time_provider::MockTimeProvider, schema::TimeSchema, TimeService};
+/// use exonum::{helpers::Height, runtime::SnapshotExt};
+/// use exonum_testkit::TestKit;
+/// use exonum_time::{MockTimeProvider, TimeSchema, TimeServiceFactory};
 ///
-/// # fn main() {
+/// let service_name = "time";
+/// let service_id = 12;
+///
 /// let mock_provider = MockTimeProvider::default();
-/// let mut testkit = TestKitBuilder::validator()
-///     .with_service(TimeService::with_provider(mock_provider.clone()))
-///     .create();
+/// let mut testkit = TestKit::for_rust_service(
+///     TimeServiceFactory::with_provider(mock_provider.clone()),
+///     service_name,
+///     service_id,
+///     ()
+/// );
 /// mock_provider.add_time(Duration::seconds(15));
 /// testkit.create_blocks_until(Height(2));
 ///
 /// // The time reported by the mock time provider is reflected by the service.
 /// let snapshot = testkit.snapshot();
-/// let schema = TimeSchema::new(snapshot);
+/// let schema: TimeSchema<_> = snapshot.service_schema(service_name).unwrap();
 /// assert_eq!(
-///     Some(Utc.timestamp(15, 0)),
-///     schema.time().get().map(|time| time)
+///     Utc.timestamp(15, 0),
+///     schema.time.get().unwrap()
 /// );
-/// # }
 /// ```
 ///
 /// [`Arc`]: https://doc.rust-lang.org/std/sync/struct.Arc.html
-/// [`TimeService`]: ../struct.TimeService.html
+/// [`TimeService`]: struct.TimeService.html
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
@@ -117,8 +117,16 @@ impl TimeProvider for MockTimeProvider {
     }
 }
 
-impl From<MockTimeProvider> for Box<dyn TimeProvider> {
-    fn from(mock_time_provider: MockTimeProvider) -> Self {
-        Box::new(mock_time_provider) as Box<dyn TimeProvider>
+#[allow(clippy::use_self)] // false positive
+impl From<MockTimeProvider> for Arc<dyn TimeProvider> {
+    fn from(time_provider: MockTimeProvider) -> Self {
+        Arc::new(time_provider)
+    }
+}
+
+#[allow(clippy::use_self)] // false positive
+impl From<SystemTimeProvider> for Arc<dyn TimeProvider> {
+    fn from(time_provider: SystemTimeProvider) -> Self {
+        Arc::new(time_provider)
     }
 }

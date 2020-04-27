@@ -1,0 +1,59 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+import "exonum/crypto/types.proto";
+
+package exonum.proof;
+
+option java_package = "com.exonum.messages.proof";
+
+// Subset of ProofList elements coupled with a proof. ListProof` can assert existence of
+// certain elements and that the list is shorter than the requested range of indexes.
+message ListProof {
+  // Array of { ProofListKey, Hash } objects.
+  repeated HashedEntry proof = 1;
+  // Array with list elements and their indexes.
+  repeated ListProofEntry entries = 2;
+  // Length of the underlying `ProofListIndex`.
+  uint64 length = 3;
+}
+
+// Represents list key and corresponding hash value.
+message HashedEntry {
+  // Location of the node within the Merkle tree.
+  ProofListKey key = 1;
+  // Hash associated with the node.
+  exonum.crypto.Hash hash = 2;
+}
+
+// Index of the list element and its value.
+message ListProofEntry {
+  // Zero-based index of the element.
+  uint64 index = 1;
+  // Value serialized per `BinaryValue` implementation (usually as
+  // a Protobuf message, except for primitive types).
+  bytes value = 2;
+}
+
+// Node position in the Merkle tree.
+message ProofListKey {
+  // Zero-based index of the node on the level.
+  uint64 index = 1;
+  // Height of the element. Should always be greater than 0.
+  // 1 corresponds to the hashes of single elements, 2 to hashes
+  // obtained by hashing together pairs of hashes at height 1, etc.
+  uint32 height = 2;
+}

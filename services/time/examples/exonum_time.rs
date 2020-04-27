@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::fabric::NodeBuilder;
+//! This example shows how to run the Exonum node with the time service available.
+//!
+//! Though the time service artifact will be available within node, it should be
+//! deployed and instantiated before it will become available for interaction.
+//!
+//! For details on deploy & init process, see the [runtime docs].
+//!
+//! [runtime docs]: https://docs.rs/exonum/latest/exonum/runtime/index.html
+
+use exonum_cli::{NodeBuilder, Spec};
 use exonum_time::TimeServiceFactory;
 
-fn main() {
-    exonum::helpers::init_logger().unwrap();
-    NodeBuilder::new()
-        .with_service(Box::new(TimeServiceFactory))
-        .run();
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    exonum::helpers::init_logger()?;
+
+    let time_service = TimeServiceFactory::default();
+    NodeBuilder::new().with(Spec::new(time_service)).run().await
 }

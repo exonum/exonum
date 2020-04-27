@@ -11,13 +11,13 @@
 Minimal [Exonum](https://github.com/exonum/exonum) blockchain example implementing
 a simple cryptocurrency.
 
-See [the documentation](https://exonum.com/doc/get-started/create-service)
+See [the documentation](https://exonum.com/doc/version/latest/get-started/create-service)
 for a detailed step-by-step guide how to approach this example.
 
 ## Prerequisites
 
 To run this example you need to install [Rust](https://www.rust-lang.org/en-US/)
-compiler and [third-party libraries](http://exonum.com/doc/get-started/install/).
+compiler and [third-party libraries](https://exonum.com/doc/version/latest/get-started/install/).
 
 ## Build & Run
 
@@ -55,4 +55,4 @@ handy way to do this).
 Cryptocurrency is licensed under the Apache License (Version 2.0). See
 [LICENSE](LICENSE) for details.
 
-[the transaction endpoint]: http://127.0.0.1:8000/api/services/cryptocurrency/v1/wallets
+[the transaction endpoint]: http://127.0.0.1:8000/api/explorer/v1/transactions

@@ -3,37 +3,33 @@ import axios from 'axios'
 import * as proto from '../../proto/stubs.js'
 
 const PER_PAGE = 10
-const SERVICE_ID = 130
+const SERVICE_ID = 4
 const TX_ID = 0
-const TABLE_INDEX = 0
 const TimestampEntry = Exonum.newType(proto.exonum.examples.timestamping.TimestampEntry)
 
-module.exports = {
-  install(Vue) {
+export default {
+  install (Vue) {
     Vue.prototype.$blockchain = {
-      generateKeyPair() {
+      generateKeyPair () {
         return Exonum.keyPair()
       },
 
       createTimestamp: (keyPair, hash, metadata) => {
         // Describe transaction
-        const transaction = Exonum.newTransaction({
-          author: keyPair.publicKey,
-          service_id: SERVICE_ID,
-          message_id: TX_ID,
-          schema: proto.exonum.examples.timestamping.TxTimestamp
+        const transaction = new Exonum.Transaction({
+          serviceId: SERVICE_ID,
+          methodId: TX_ID,
+          schema: proto.exonum.examples.timestamping.Timestamp
         })
 
         // Transaction data
         const data = {
-          content: {
-            content_hash: { data: Exonum.hexadecimalToUint8Array(hash) },
-            metadata: metadata
-          }
+          content_hash: { data: Exonum.hexadecimalToUint8Array(hash) },
+          metadata
         }
 
         // Send transaction into blockchain
-        return transaction.send('/api/explorer/v1/transactions', data, keyPair.secretKey)
+        return Exonum.send('/api/explorer/v1/transactions', transaction.create(data, keyPair).serialize())
       },
 
       getTimestamp: hash => {
@@ -41,50 +37,43 @@ module.exports = {
       },
 
       getTimestampProof: hash => {
-        return axios.get('/api/services/configuration/v1/configs/actual').then(response => {
+        return axios.get('/api/services/supervisor/consensus-config').then(response => {
           // actual list of public keys of validators
-          const validators = response.data.config.validator_keys.map(validator => validator.consensus_key)
+          const validators = response.data.validator_keys.map(validator => validator.consensus_key)
 
           return axios.get(`/api/services/timestamping/v1/timestamps/proof?hash=${hash}`)
             .then(response => response.data)
-            .then(data => {
-              return Exonum.verifyBlock(data.block_info, validators).then(() => {
-                // verify table timestamps in the root tree
-                const tableRootHash = Exonum.verifyTable(data.state_proof, data.block_info.block.state_hash, SERVICE_ID, TABLE_INDEX)
+            .then(({ timestamp_proof, state_proof, block_info }) => {
+              Exonum.verifyBlock(block_info, validators)
+              const tableRootHash = Exonum.verifyTable(state_proof, block_info.block.state_hash, 'timestamping.timestamps')
+              const timestampProof = new Exonum.MapProof(timestamp_proof, Exonum.MapProof.rawKey(Exonum.PublicKey), TimestampEntry)
+              if (timestampProof.merkleRoot !== tableRootHash) throw new Error('Timestamp proof is corrupted')
 
-                // find timestamp in the tree of all timestamps
-                const timestampProof = new Exonum.MapProof(data.timestamp_proof, Exonum.Hash, TimestampEntry)
-                if (timestampProof.merkleRoot !== tableRootHash) {
-                  throw new Error('Timestamp proof is corrupted')
-                }
-                const timestampEntry = timestampProof.entries.get(hash)
-                if (typeof timestampEntry === 'undefined') {
-                  throw new Error('Timestamp not found')
-                }
+              const timestampEntry = timestampProof.entries.get(hash)
+              if (typeof timestampEntry === 'undefined') throw new Error('Timestamp not found')
 
-                return {
-                  timestamp: {
-                    content_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.timestamp.content_hash.data)),
-                    metadata: timestampEntry.timestamp.metadata
-                  },
-                  tx_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.tx_hash.data)),
-                  time: timestampEntry.time
-                }
-              })
+              return {
+                timestamp: {
+                  content_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.timestamp.content_hash.data)),
+                  metadata: timestampEntry.timestamp.metadata
+                },
+                tx_hash: Exonum.uint8ArrayToHexadecimal(new Uint8Array(timestampEntry.tx_hash.data)),
+                time: timestampEntry.time
+              }
             })
         })
       },
 
-      getBlocks(latest) {
+      getBlocks (latest) {
         const suffix = !isNaN(latest) ? '&latest=' + latest : ''
         return axios.get(`/api/explorer/v1/blocks?count=${PER_PAGE}${suffix}`).then(response => response.data)
       },
 
-      getBlock(height) {
+      getBlock (height) {
         return axios.get(`/api/explorer/v1/block?height=${height}`).then(response => response.data)
       },
 
-      getTransaction(hash) {
+      getTransaction (hash) {
         return axios.get(`/api/explorer/v1/transactions?hash=${hash}`).then(response => response.data)
       }
     }

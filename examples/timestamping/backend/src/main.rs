@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum::helpers::fabric::NodeBuilder;
+use exonum_cli::{NodeBuilder, Spec};
+use exonum_time::TimeServiceFactory;
 
-fn main() {
-    exonum::helpers::init_logger().unwrap();
+use exonum_timestamping::TimestampingService;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    exonum::helpers::init_logger()?;
+
     NodeBuilder::new()
-        .with_service(Box::new(exonum_configuration::ServiceFactory))
-        .with_service(Box::new(exonum_time::TimeServiceFactory))
-        .with_service(Box::new(exonum_timestamping::ServiceFactory))
-        .run();
+        .with(Spec::new(TimeServiceFactory::default()))
+        .with(Spec::new(TimestampingService))
+        .run()
+        .await
 }

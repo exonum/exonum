@@ -2,7 +2,7 @@
 
 # Script running cspell checks on all the specified project directories.
 
-# Copyright 2019 The Exonum Team
+# Copyright 2020 The Exonum Team
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,5 +18,5 @@
 
 set -e
 
-find . -not -path "*/target/*" -name "*.rs" | xargs ./node_modules/.bin/cspell
-find . -not -path "./3rdparty/*" -and -not -path "./node_modules/*" -name "*.md" | xargs ./node_modules/.bin/cspell
+find . -not -path "*/target/*" -and -not -path "*/node_modules/*" \( -name "*.rs" -or -name "*.md" -or -name "*.py" \)\
+ | xargs ./node_modules/.bin/cspell

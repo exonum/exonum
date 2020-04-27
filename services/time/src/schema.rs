@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,51 +13,84 @@
 // limitations under the License.
 
 use chrono::{DateTime, Utc};
-use exonum::{
-    crypto::{Hash, PublicKey},
-    storage::{Entry, Fork, ProofMapIndex, Snapshot},
+
+use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
+use exonum_derive::*;
+use exonum_merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    ProofEntry, ProofMapIndex,
 };
 
-/// `Exonum-time` service database schema.
-#[derive(Debug)]
-pub struct TimeSchema<T> {
-    view: T,
+/// Database schema of the time service. The schema is fully public.
+#[derive(Debug, FromAccess, RequireArtifact)]
+pub struct TimeSchema<T: Access> {
+    /// `DateTime` for every validator. May contain keys corresponding to past validators.
+    pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
+    /// Consolidated blockchain time, approved by validators.
+    pub time: ProofEntry<T::Base, DateTime<Utc>>,
 }
 
-impl<T: AsRef<dyn Snapshot>> TimeSchema<T> {
-    /// Constructs schema for the given `snapshot`.
-    pub fn new(view: T) -> Self {
-        TimeSchema { view }
-    }
-
-    /// Returns the table that stores `DateTime` for every validator.
-    pub fn validators_times(&self) -> ProofMapIndex<&dyn Snapshot, PublicKey, DateTime<Utc>> {
-        ProofMapIndex::new("exonum_time.validators_times", self.view.as_ref())
-    }
-
-    /// Returns stored time.
-    pub fn time(&self) -> Entry<&dyn Snapshot, DateTime<Utc>> {
-        Entry::new("exonum_time.time", self.view.as_ref())
-    }
-
-    /// Returns hashes for stored tables.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.validators_times().merkle_root(), self.time().hash()]
+impl<T: Access> TimeSchema<T> {
+    pub(crate) fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
     }
 }
 
-impl<'a> TimeSchema<&'a mut Fork> {
-    /// Mutable reference to the ['validators_times'][1] index.
-    ///
-    /// [1]: struct.TimeSchema.html#method.validators_times
-    pub fn validators_times_mut(&mut self) -> ProofMapIndex<&mut Fork, PublicKey, DateTime<Utc>> {
-        ProofMapIndex::new("exonum_time.validators_times", self.view)
+impl<T: Access> TimeSchema<T>
+where
+    T::Base: RawAccessMut,
+{
+    /// Returns an error if the currently registered validator time is greater than `time`.
+    pub(crate) fn update_validator_time(
+        &mut self,
+        author: PublicKey,
+        time: DateTime<Utc>,
+    ) -> Result<(), ()> {
+        match self.validators_times.get(&author) {
+            // The validator time in the storage should be less than in the transaction.
+            Some(val_time) if val_time >= time => Err(()),
+            // Write the time for the validator.
+            _ => {
+                self.validators_times.put(&author, time);
+                Ok(())
+            }
+        }
     }
 
-    /// Mutable reference to the ['time'][1] index.
-    ///
-    /// [1]: struct.TimeSchema.html#method.time
-    pub fn time_mut(&mut self) -> Entry<&mut Fork, DateTime<Utc>> {
-        Entry::new("exonum_time.time", self.view)
+    pub(crate) fn update_consolidated_time(&mut self, validator_keys: &[ValidatorKeys]) {
+        // Find all known times for the validators.
+        let validator_times = {
+            let mut times = self
+                .validators_times
+                .iter()
+                .filter_map(|(public_key, time)| {
+                    validator_keys.iter().find_map(|validator| {
+                        if validator.service_key == public_key {
+                            Some(time)
+                        } else {
+                            None
+                        }
+                    })
+                })
+                .collect::<Vec<_>>();
+            // Ordering time from highest to lowest.
+            times.sort_by(|a, b| b.cmp(a));
+            times
+        };
+
+        // The largest number of Byzantine nodes.
+        let max_byzantine_nodes = (validator_keys.len() - 1) / 3;
+        if validator_times.len() <= 2 * max_byzantine_nodes {
+            return;
+        }
+
+        match self.time.get() {
+            // Selected time should be greater than the time in the storage.
+            Some(current_time) if current_time >= validator_times[max_byzantine_nodes] => {}
+            _ => {
+                // Change the time in the storage.
+                self.time.set(validator_times[max_byzantine_nodes]);
+            }
+        }
     }
 }

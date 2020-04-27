@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,8 +20,27 @@
 //! cryptography applied in the system and add abstractions best
 //! suited for Exonum.
 
+#![warn(
+    missing_debug_implementations,
+    missing_docs,
+    unsafe_code,
+    bare_trait_objects
+)]
+#![warn(clippy::pedantic, clippy::nursery)]
+#![allow(
+    // Next `cast_*` lints don't give alternatives.
+    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
+    // Next lints produce too much noise/false positives.
+    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
+    clippy::pub_enum_variant_names,
+    // '... may panic' lints.
+    clippy::indexing_slicing,
+    // Too much work to fix.
+    clippy::missing_errors_doc, clippy::missing_const_for_fn
+)]
+
 #[macro_use]
-extern crate serde_derive;
+extern crate serde_derive; // Required for Protobuf.
 
 #[doc(inline)]
 pub use self::crypto_impl::{
@@ -29,25 +48,22 @@ pub use self::crypto_impl::{
 };
 #[cfg(feature = "sodiumoxide-crypto")]
 pub use self::crypto_lib::sodiumoxide::x25519;
-pub use self::utils::{generate_keys_file, read_keys_from_file};
 
-use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Duration, Utc};
-use rust_decimal::Decimal;
+#[cfg(feature = "with-protobuf")]
+#[doc(hidden)]
+pub mod proto;
+
+use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 use serde::{
     de::{self, Deserialize, Deserializer, Visitor},
     Serialize, Serializer,
 };
-use uuid::Uuid;
 
 use std::{
     default::Default,
     fmt,
     ops::{Index, Range, RangeFrom, RangeFull, RangeTo},
-    time::{SystemTime, UNIX_EPOCH},
 };
-
-use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 
 // A way to set an active cryptographic backend is to export it as `crypto_impl`.
 #[cfg(feature = "sodiumoxide-crypto")]
@@ -57,12 +73,13 @@ use self::crypto_lib::sodiumoxide as crypto_impl;
 mod macros;
 
 pub(crate) mod crypto_lib;
-pub(crate) mod utils;
 
 /// The size to crop the string in debug messages.
 const BYTES_IN_DEBUG: usize = 4;
+/// The size of ellipsis in debug messages.
+const BYTES_IN_ELLIPSIS: usize = 3;
 
-fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
+fn write_short_hex(f: &mut impl fmt::Write, slice: &[u8]) -> fmt::Result {
     for byte in slice.iter().take(BYTES_IN_DEBUG) {
         write!(f, "{:02x}", byte)?;
     }
@@ -83,8 +100,6 @@ fn write_short_hex(f: &mut fmt::Formatter, slice: &[u8]) -> fmt::Result {
 /// secret key.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// let data = [1, 2, 3];
@@ -104,7 +119,6 @@ pub fn sign(data: &[u8], secret_key: &SecretKey) -> Signature {
 /// Indicating the same seed value always results in the same keypair.
 ///
 /// ```
-/// # extern crate exonum_crypto;
 /// use exonum_crypto::{SEED_LENGTH, Seed};
 ///
 /// # exonum_crypto::init();
@@ -123,8 +137,6 @@ pub fn gen_keypair_from_seed(seed: &Seed) -> (PublicKey, SecretKey) {
 /// The example below generates a unique keypair.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// ```
@@ -143,8 +155,6 @@ pub fn gen_keypair() -> (PublicKey, SecretKey) {
 /// verifies that the data have been signed with the corresponding secret key.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// let data = [1, 2, 3];
@@ -164,8 +174,6 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 /// The example below calculates the hash of the indicated data.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let data = [1, 2, 3];
 /// let hash = exonum_crypto::hash(&data);
@@ -173,16 +181,6 @@ pub fn verify(sig: &Signature, data: &[u8], pubkey: &PublicKey) -> bool {
 pub fn hash(data: &[u8]) -> Hash {
     let dig = crypto_impl::hash(data);
     Hash(dig)
-}
-
-/// A common trait for the ability to compute a cryptographic hash.
-pub trait CryptoHash {
-    /// Returns a hash of the value.
-    ///
-    /// The hashing strategy must satisfy the basic requirements of cryptographic hashing:
-    /// equal values must have the same hash and not equal values must have different hashes
-    /// (except for negligible probability).
-    fn hash(&self) -> Hash;
 }
 
 /// Initializes the cryptographic backend.
@@ -194,8 +192,6 @@ pub trait CryptoHash {
 /// # Examples
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// exonum_crypto::init();
 /// ```
 pub fn init() {
@@ -217,7 +213,6 @@ pub fn init() {
 /// and calculates the resulting hash of the system.
 ///
 /// ```rust
-/// # extern crate exonum_crypto;
 /// use exonum_crypto::HashStream;
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
@@ -233,7 +228,7 @@ pub struct HashStream(crypto_impl::HashState);
 impl HashStream {
     /// Creates a new instance of `HashStream`.
     pub fn new() -> Self {
-        HashStream(crypto_impl::HashState::init())
+        Self(crypto_impl::HashState::init())
     }
 
     /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
@@ -261,7 +256,6 @@ impl HashStream {
 /// of random public and secret keys, signs the data and verifies the signature.
 ///
 /// ```rust
-/// # extern crate exonum_crypto;
 /// use exonum_crypto::{SignStream, gen_keypair};
 ///
 /// let data: Vec<[u8; 5]> = vec![[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]];
@@ -284,13 +278,12 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum_crypto;
     /// use exonum_crypto::SignStream;
     ///
     /// let stream = SignStream::new();
     /// ```
     pub fn new() -> Self {
-        SignStream(crypto_impl::SignState::init())
+        Self(crypto_impl::SignState::init())
     }
 
     /// Adds a new `chunk` to the message that will eventually be signed and/or verified.
@@ -298,7 +291,6 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum_crypto;
     /// use exonum_crypto::SignStream;
     ///
     /// let mut stream = SignStream::new();
@@ -319,7 +311,6 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum_crypto;
     /// use exonum_crypto::{SignStream, gen_keypair};
     ///
     /// let mut stream = SignStream::new();
@@ -342,7 +333,6 @@ impl SignStream {
     /// # Examples
     ///
     /// ```
-    /// # extern crate exonum_crypto;
     /// use exonum_crypto::{SignStream, gen_keypair};
     ///
     /// let mut stream = SignStream::new();
@@ -380,8 +370,6 @@ implement_public_crypto_wrapper! {
 /// secret keys.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let (public_key, _) = exonum_crypto::gen_keypair();
 /// ```
@@ -405,8 +393,6 @@ implement_private_crypto_wrapper! {
 /// secret keys.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let (_, secret_key) = exonum_crypto::gen_keypair();
 /// ```
@@ -425,7 +411,6 @@ implement_public_crypto_wrapper! {
 /// The example below generates the hash of the indicated data.
 ///
 /// ```
-/// # extern crate exonum_crypto;
 /// use exonum_crypto::Hash;
 ///
 /// let data = [1, 2, 3];
@@ -450,8 +435,6 @@ implement_public_crypto_wrapper! {
 /// that the data have been signed with that secret key.
 ///
 /// ```
-/// # extern crate exonum_crypto;
-///
 /// # exonum_crypto::init();
 /// let (public_key, secret_key) = exonum_crypto::gen_keypair();
 /// let data = [1, 2, 3];
@@ -478,7 +461,6 @@ implement_private_crypto_wrapper! {
 /// generation of the same keypair.
 ///
 /// ```
-/// # extern crate exonum_crypto;
 /// use exonum_crypto::{SEED_LENGTH, Seed};
 ///
 /// # exonum_crypto::init();
@@ -499,190 +481,93 @@ implement_index_traits! {SecretKey}
 implement_index_traits! {Seed}
 implement_index_traits! {Signature}
 
-/// Returns a hash consisting of zeros.
-impl Default for Hash {
-    fn default() -> Self {
-        Self::zero()
+/// Pair of matching secret and public keys.
+///
+/// Prefer using this struct to `(PublicKey, SecretKey)`, since it asserts that public
+/// and secret keys necessarily match.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct KeyPair {
+    public_key: PublicKey,
+    secret_key: SecretKey,
+}
+
+impl KeyPair {
+    /// Creates a keypair from the provided keys, checking that they correspond to each other.
+    ///
+    /// # Panics
+    ///
+    /// - If the keys do not match.
+    pub fn from_keys(public_key: PublicKey, secret_key: SecretKey) -> Self {
+        assert!(
+            verify_keys_match(&public_key, &secret_key),
+            "Public key does not match the secret key."
+        );
+
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    /// Generates a random keypair using the random number generator provided by the crypto backend.
+    pub fn random() -> Self {
+        let (public_key, secret_key) = gen_keypair();
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    /// Generates a keypair from the provided seed.
+    pub fn from_seed(seed: &Seed) -> Self {
+        let (public_key, secret_key) = gen_keypair_from_seed(seed);
+        Self {
+            public_key,
+            secret_key,
+        }
+    }
+
+    /// Gets the public key.
+    pub fn public_key(&self) -> PublicKey {
+        self.public_key
+    }
+
+    /// Gets a reference to the secret key.
+    pub fn secret_key(&self) -> &SecretKey {
+        &self.secret_key
     }
 }
 
-impl CryptoHash for Hash {
-    fn hash(&self) -> Hash {
-        *self
+impl From<(PublicKey, SecretKey)> for KeyPair {
+    fn from(keys: (PublicKey, SecretKey)) -> Self {
+        Self::from_keys(keys.0, keys.1)
     }
 }
 
-impl CryptoHash for bool {
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
-    }
-}
-
-impl CryptoHash for u8 {
-    fn hash(&self) -> Hash {
-        hash(&[*self])
-    }
-}
-
-impl CryptoHash for u16 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_u16(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u32 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_u32(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u64 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_u64(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for u128 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 16];
-        LittleEndian::write_u128(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i8 {
-    fn hash(&self) -> Hash {
-        hash(&[*self as u8])
-    }
-}
-
-impl CryptoHash for i16 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 2];
-        LittleEndian::write_i16(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i32 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 4];
-        LittleEndian::write_i32(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i64 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 8];
-        LittleEndian::write_i64(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for i128 {
-    fn hash(&self) -> Hash {
-        let mut v = [0; 16];
-        LittleEndian::write_i128(&mut v, *self);
-        hash(&v)
-    }
-}
-
-impl CryptoHash for () {
-    fn hash(&self) -> Hash {
-        Hash(crypto_impl::EMPTY_SLICE_HASH)
-    }
-}
-
-impl CryptoHash for PublicKey {
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}
-
-impl CryptoHash for Vec<u8> {
-    fn hash(&self) -> Hash {
-        hash(self)
-    }
-}
-
-impl CryptoHash for String {
-    fn hash(&self) -> Hash {
-        hash(self.as_ref())
-    }
-}
-
-impl CryptoHash for SystemTime {
-    fn hash(&self) -> Hash {
-        let duration = self
-            .duration_since(UNIX_EPOCH)
-            .expect("time value is later than 1970-01-01 00:00:00 UTC.");
-        let secs = duration.as_secs();
-        let nanos = duration.subsec_nanos();
-
-        let mut buffer = [0_u8; 12];
-        LittleEndian::write_u64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        hash(&buffer)
-    }
-}
-
-impl CryptoHash for DateTime<Utc> {
-    fn hash(&self) -> Hash {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
-        buffer.hash()
-    }
-}
-
-// TODO: think about move it anywhere (ECR-2217).
-impl CryptoHash for Duration {
-    fn hash(&self) -> Hash {
-        let secs = self.num_seconds();
-        let nanos_as_duration = *self - Self::seconds(secs);
-        let nanos = nanos_as_duration.num_nanoseconds().unwrap() as i32;
-
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_i32(&mut buffer[8..12], nanos);
-        buffer.hash()
-    }
-}
-
-impl CryptoHash for Uuid {
-    fn hash(&self) -> Hash {
-        hash(self.as_bytes())
-    }
-}
-
-impl CryptoHash for Decimal {
-    fn hash(&self) -> Hash {
-        hash(&self.serialize())
-    }
+fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+    crypto_impl::verify_keys_match(&public_key.0, &secret_key.0)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use hex::FromHex;
     use serde::de::DeserializeOwned;
 
-    use hex::FromHex;
+    use std::str::FromStr;
 
     #[test]
     fn to_from_hex_hash() {
         let original = hash(&[]);
         let from_hex = Hash::from_hex(original.to_hex()).unwrap();
+        assert_eq!(original, from_hex);
+    }
+
+    #[test]
+    fn to_from_string_hash() {
+        let original = hash(&[]);
+        let from_hex = Hash::from_str(&original.to_string()).unwrap();
         assert_eq!(original, from_hex);
     }
 
@@ -701,6 +586,14 @@ mod tests {
 
         let sh = SecretKey::from_hex(s.to_hex()).unwrap();
         assert_eq!(s, sh);
+    }
+
+    #[test]
+    fn to_from_string_public_key() {
+        let p = gen_keypair().0;
+
+        let ph = PublicKey::from_str(&p.to_string()).unwrap();
+        assert_eq!(p, ph);
     }
 
     #[test]
@@ -732,22 +625,22 @@ mod tests {
     fn debug_format() {
         // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
-        assert_eq!(format!("{:?}", &hash), "Hash(01010101...)");
+        assert_eq!(format!("{:?}", &hash), "Hash(\"01010101...\")");
 
         let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &pk), "PublicKey(0f0f0f0f...)");
+        assert_eq!(format!("{:?}", &pk), "PublicKey(\"0f0f0f0f...\")");
         let sk = SecretKey::new([8; SECRET_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &sk), "SecretKey(08080808...)");
+        assert_eq!(format!("{:?}", &sk), "SecretKey(\"08080808...\")");
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
-        assert_eq!(format!("{:?}", &signature), "Signature(0a0a0a0a...)");
+        assert_eq!(format!("{:?}", &signature), "Signature(\"0a0a0a0a...\")");
         let seed = Seed::new([4; SEED_LENGTH]);
-        assert_eq!(format!("{:?}", &seed), "Seed(04040404...)");
+        assert_eq!(format!("{:?}", &seed), "Seed(\"04040404...\")");
 
         // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
-        assert_eq!(format!("{:?}", &hash), "Hash(80808080...)");
+        assert_eq!(format!("{:?}", &hash), "Hash(\"80808080...\")");
         let sk = SecretKey::new([255; SECRET_KEY_LENGTH]);
-        assert_eq!(format!("{:?}", &sk), "SecretKey(ffffffff...)");
+        assert_eq!(format!("{:?}", &sk), "SecretKey(\"ffffffff...\")");
     }
 
     // Note that only public values have Display impl.
@@ -755,23 +648,29 @@ mod tests {
     fn display_format() {
         // Check zero padding.
         let hash = Hash::new([1; HASH_SIZE]);
-        assert_eq!(format!("{}", &hash), "01010101...");
+        assert_eq!(
+            format!("{}", &hash),
+            "0101010101010101010101010101010101010101010101010101010101010101"
+        );
 
         let pk = PublicKey::new([15; PUBLIC_KEY_LENGTH]);
-        assert_eq!(format!("{}", &pk), "0f0f0f0f...");
+        assert_eq!(
+            format!("{}", &pk),
+            "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+        );
         let signature = Signature::new([10; SIGNATURE_LENGTH]);
-        assert_eq!(format!("{}", &signature), "0a0a0a0a...");
+        assert_eq!(
+            format!("{}", &signature),
+            "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a\
+            0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
+        );
 
         // Check no padding.
         let hash = Hash::new([128; HASH_SIZE]);
-        assert_eq!(format!("{}", &hash), "80808080...");
-    }
-
-    #[test]
-    fn range_sodium() {
-        let h = hash(&[]);
-        let sub_range = &h[10..20];
-        assert_eq!(&crypto_impl::EMPTY_SLICE_HASH[10..20], sub_range);
+        assert_eq!(
+            format!("{}", &hash),
+            "8080808080808080808080808080808080808080808080808080808080808080"
+        );
     }
 
     #[test]
@@ -810,11 +709,6 @@ mod tests {
         assert!(verified_stream.verify(&sig, &pk));
     }
 
-    #[test]
-    fn empty_slice_hash() {
-        assert_eq!(Hash(super::crypto_impl::EMPTY_SLICE_HASH), hash(&[]));
-    }
-
     fn assert_serialize_deserialize<T>(original_value: &T)
     where
         T: Serialize + DeserializeOwned + PartialEq + fmt::Debug,
@@ -822,5 +716,19 @@ mod tests {
         let json = serde_json::to_string(original_value).unwrap();
         let deserialized_value: T = serde_json::from_str(&json).unwrap();
         assert_eq!(*original_value, deserialized_value);
+    }
+
+    #[test]
+    fn valid_keypair() {
+        let (pk, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
+    }
+
+    #[test]
+    #[should_panic]
+    fn not_valid_keypair() {
+        let (pk, _) = gen_keypair();
+        let (_, sk) = gen_keypair();
+        let _ = KeyPair::from_keys(pk, sk);
     }
 }

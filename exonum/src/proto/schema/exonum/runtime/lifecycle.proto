@@ -1,0 +1,140 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.runtime;
+
+option java_package = "com.exonum.messages.core.runtime";
+
+import "exonum/blockchain.proto";
+import "exonum/crypto/types.proto";
+import "exonum/runtime/base.proto";
+
+// Data that is required for initialization of a service instance.
+message InstanceInitParams {
+  // Instance specification.
+  InstanceSpec instance_spec = 1;
+  // Constructor argument for the instance.
+  bytes constructor = 2;
+}
+
+// Genesis config parameters.
+//
+// Information from this entity get saved to the genesis block.
+message GenesisConfig {
+  // Blockchain configuration used to create the genesis block.
+  exonum.Config consensus_config = 1;
+  // Artifact specification of the built-in services.
+  repeated ArtifactSpec artifacts = 2;
+  // List of services with their configuration parameters that are created directly
+  // in the genesis block.
+  repeated InstanceInitParams builtin_instances = 3;
+}
+
+// Current state of the artifact in dispatcher.
+message ArtifactState {
+  // Status of an artifact deployment.
+  enum Status {
+    // The artifact is pending unload.
+    UNLOADING = 0;
+    // The artifact is pending deployment.
+    DEPLOYING = 1;
+    // The artifact has been successfully deployed.
+    ACTIVE = 2;
+  }
+
+  // Runtime-specific artifact specification.
+  bytes deploy_spec = 1;
+  // Artifact deployment status.
+  Status status = 2;
+}
+
+message InstanceStatus {
+  enum Simple {
+    // The service instance has no status, i.e. this value corresponds to
+    // `Option::None` on the Rust code level and other corresponds to
+    // `Some(...)`.
+    NONE = 0;
+    // The service instance is active.
+    ACTIVE = 1;
+    // The service instance is stopped.
+    STOPPED = 2;
+    // The service instance is frozen; it can process read-only requests,
+    // but not transactions or `before_transactions` / `after_transactions` hooks.
+    FROZEN = 3;
+  }
+
+  oneof status {
+    // Service has a status from the `Simple` enum.
+    Simple simple = 1;
+    // Service is in process of migration.
+    InstanceMigration migration = 2;
+  }
+}
+
+message InstanceMigration {
+  // Migration target to obtain migration scripts from. This artifact
+  // must be deployed on the blockchain.
+  ArtifactId target = 1;
+  // Version of the instance data after the migration is completed.
+  // Note that it does not necessarily match the version of `target`,
+  // but should be not greater.
+  string end_version = 2;
+  // Consensus-wide outcome of the migration, in the form of
+  // the aggregation hash of the migrated data.
+  // The lack of value signifies that the migration is not finished yet.
+  exonum.crypto.Hash completed_hash = 3;
+}
+
+// Current state of service instance in dispatcher.
+message InstanceState {
+  // Service instance specification.
+  InstanceSpec spec = 1;
+  // Service instance activity status.
+  //
+  // Status can be `NONE` only during the block execution if instance was created,
+  // but activation routine for it is not yet completed, and this value can occur no more
+  // than once in a service lifetime.
+  //
+  // If this field is set to `NONE`, the pending_status must have value `ACTIVE`.
+  InstanceStatus status = 2;
+  // Pending status of the instance.
+  //
+  // Pending state can be not `NONE` if core is in process of changing service status,
+  // e.g. service initialization, resuming or migration. If this field was set to value
+  // other than `NONE`, it always will be reset to `NONE` in the next block.
+  //
+  // The purpose of this field is to keep information about further service status during the
+  // block execution because the service status can be changed only after that block is
+  // committed. This approach is needed because there is no guarantee that the executed
+  // block will be committed.
+  InstanceStatus pending_status = 3;
+  // Version of the service data. The empty value means that the data version
+  // is the same as the `spec.artifact`. Non-empty value means that one or more
+  // data migrations have been performed on the service, so that the service data
+  // is compatible with a newer artifact.
+  string data_version = 4;
+}
+
+// Local result of a migration.
+message MigrationStatus {
+  oneof result {
+    // Hash of the successfully migrated data.
+    exonum.crypto.Hash hash = 1;
+    // Human-readable description of an error that has occurred
+    // during migration.
+    string error = 2;
+  }
+}

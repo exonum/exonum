@@ -1,0 +1,75 @@
+// Copyright 2020 The Exonum Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package exonum.runtime;
+
+option java_package = "com.exonum.messages.core.runtime";
+
+// Unique service transaction identifier.
+message CallInfo {
+  // Unique service instance identifier. The dispatcher uses this identifier to
+  // find the corresponding runtime to execute a transaction.
+  uint32 instance_id = 1;
+  // Identifier of the method in the service interface required for the call.
+  uint32 method_id = 2;
+}
+
+// Transaction with the information required to dispatch it to a service.
+message AnyTx {
+  // Information required for the call of the corresponding executor.
+  CallInfo call_info = 1;
+  // Serialized transaction arguments.
+  bytes arguments = 2;
+}
+
+// The artifact identifier is required to construct service instances.
+// In other words, an artifact identifier is similar to a class name,
+// and a specific service instance is similar to a class instance.
+message ArtifactId {
+  // Runtime identifier.
+  uint32 runtime_id = 1;
+  // Artifact name.
+  string name = 2;
+  // Semantic version of the artifact.
+  string version = 3;
+}
+
+// Exhaustive artifact specification. This information is enough
+// to deploy an artifact.
+message ArtifactSpec {
+  // Information uniquely identifying the artifact.
+  ArtifactId artifact = 1;
+  // Runtime-specific artifact payload.
+  bytes payload = 2;
+}
+
+// Exhaustive service instance specification.
+message InstanceSpec {
+  // Unique numeric ID of the service instance.
+  //
+  // Exonum assigns an ID to the service on instantiation. It is mainly used
+  // to route transaction messages belonging to this instance.
+  uint32 id = 1;
+  // Unique name of the service instance.
+  //
+  // The name serves as a primary identifier of this service in most operations.
+  // It is assigned by the network administrators.
+  //
+  // The name must correspond to the following regular expression: `[a-zA-Z0-9/\:-_]+`.
+  string name = 2;
+  // Identifier of the corresponding artifact.
+  ArtifactId artifact = 3;
+}

@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,10 +38,15 @@ macro_rules! implement_public_crypto_wrapper {
             $crate::crypto_impl::$name::from_slice(bytes_slice).map($name)
         }
 
+        /// Copies bytes from this instance.
+        pub fn as_bytes(&self) -> [u8; $size] {
+            (self.0).0
+        }
+
         /// Returns a hex representation of binary data.
-        /// Lower case letters are used (e.g. f9b4ca).
+        /// Lower case letters are used (e.g. `f9b4ca`).
         pub fn to_hex(&self) -> String {
-            encode_hex(self)
+            $crate::encode_hex(self)
         }
     }
 
@@ -51,20 +56,37 @@ macro_rules! implement_public_crypto_wrapper {
         }
     }
 
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, stringify!($name))?;
-            write!(f, "(")?;
-            write_short_hex(f, &self[..])?;
-            write!(f, ")")
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let mut hex = String::with_capacity($crate::BYTES_IN_DEBUG + $crate::BYTES_IN_ELLIPSIS);
+            $crate::write_short_hex(&mut hex, &self[..])?;
+
+            f.debug_tuple(stringify!($name))
+                .field(&hex)
+                .finish()
         }
     }
 
     impl fmt::Display for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write_short_hex(f, &self[..])
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str(&self.to_hex())
         }
     }
+
+    impl std::str::FromStr for $name {
+        type Err = hex::FromHexError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            Self::from_hex(s)
+        }
+    }
+
     )
 }
 
@@ -100,21 +122,29 @@ macro_rules! implement_private_crypto_wrapper {
     }
 
     impl fmt::Debug for $name {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, stringify!($name))?;
-            write!(f, "(")?;
-            write_short_hex(f, &self[..])?;
-            write!(f, ")")
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            let mut hex = String::with_capacity($crate::BYTES_IN_DEBUG + $crate::BYTES_IN_ELLIPSIS);
+            $crate::write_short_hex(&mut hex, &self[..])?;
+
+            f.debug_tuple(stringify!($name))
+                .field(&hex)
+                .finish()
+        }
+    }
+
+    impl Default for $name {
+        fn default() -> Self {
+            Self::zero()
         }
     }
 
     impl ToHex for $name {
-        fn write_hex<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-            (self.0).0.as_ref().write_hex(w)
+        fn encode_hex<T: std::iter::FromIterator<char>>(&self) -> T {
+            (self.0).0.as_ref().encode_hex()
         }
 
-        fn write_hex_upper<W: ::std::fmt::Write>(&self, w: &mut W) -> ::std::fmt::Result {
-            (self.0).0.as_ref().write_hex_upper(w)
+        fn encode_hex_upper<T: std::iter::FromIterator<char>>(&self) -> T {
+            (self.0).0.as_ref().encode_hex_upper()
         }
     }
     )
@@ -154,7 +184,7 @@ macro_rules! implement_serde {
 
                 impl<'v> Visitor<'v> for HexVisitor {
                     type Value = $name;
-                    fn expecting(&self, fmt: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+                    fn expecting(&self, fmt: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
                         write!(fmt, "expecting str.")
                     }
                     fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>

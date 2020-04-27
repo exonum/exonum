@@ -5,43 +5,60 @@
         <div class="modal-content">
           <form @submit.prevent="submit">
             <div class="modal-header">
-              <h5 class="modal-title">{{ title }}</h5>
+              <h5 class="modal-title">
+                {{ title }}
+              </h5>
               <button type="button" class="close" @click="close">
                 <span aria-hidden="true">&times;</span>
               </button>
             </div>
 
             <div class="modal-body">
-              <slot/>
+              <slot />
             </div>
 
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" @click="close">Close</button>
-              <button type="submit" class="btn btn-primary">{{ actionBtn }}</button>
+              <button type="button" class="btn btn-secondary" @click="close">
+                Close
+              </button>
+              <button type="submit" class="btn btn-primary">
+                {{ actionBtn }}
+              </button>
             </div>
           </form>
         </div>
       </div>
     </div>
 
-    <div v-if="visible" class="modal-backdrop"/>
+    <div v-if="visible" class="modal-backdrop" />
   </div>
 </template>
 
 <script>
   const className = 'modal-open'
 
-  module.exports = {
-    name: 'modal',
+  export default {
+    name: 'Modal',
     props: {
-      title: String,
-      actionBtn: String,
+      title: {
+        type: String,
+        default: ""
+      },
+      actionBtn: {
+        type: String,
+        default: ""
+      },
       visible: Boolean
     },
     watch: {
       visible(value) {
         this.toggle(value)
       }
+    },
+    mounted() {
+      this.$nextTick(function() {
+        this.toggle(false)
+      })
     },
     methods: {
       close() {
@@ -59,11 +76,6 @@
           document.body.classList.remove(className)
         }
       }
-    },
-    mounted() {
-      this.$nextTick(function() {
-        this.toggle(false)
-      })
     }
   }
 </script>

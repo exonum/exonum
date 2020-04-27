@@ -7,34 +7,48 @@
 set -e
 
 # Base URL for demo service endpoints
-BASE_URL=http://127.0.0.1:8000/api/services/cryptocurrency/v1
-TRANSACTION_URL=http://127.0.0.1:8000/api/explorer/v1/transactions
+BASE_URL=http://127.0.0.1:8080/api/services/cryptocurrency/v1
+TRANSACTION_URL=http://127.0.0.1:8080/api/explorer/v1/transactions
+
+# Directory with the script.
+ROOT_DIR=`dirname $0`
 
 # Exit status
 STATUS=0
 
 # Launches the cryptocurrency demo and waits until it starts listening
-# on the TCP port 8000.
+# on the TCP port 8080.
 function launch-server {
-    cargo run --example demo &
+    cargo run -p exonum-cryptocurrency --example demo &
     CTR=0
     MAXCTR=60
-    while [[ ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'` ) && ( $CTR -lt $MAXCTR ) ]]; do
+    while [[
+      ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'` )
+      && ( $CTR -lt $MAXCTR )
+    ]]; do
       sleep 1
       CTR=$(( $CTR + 1 ))
     done
+
     if [[ $CTR == $MAXCTR ]]; then
         echo "Failed to launch the server; aborting"
         exit 1
     fi
 }
 
-# Kills whatever program is listening on the TCP port 8000, on which the cryptocurrency
+# Kills whatever program is listening on the TCP port 8080, on which the cryptocurrency
 # demo needs to bind to.
 function kill-server {
-    SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null |  awk '{ if ($9 == "*:8000") { print $2 } }'`
+    SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'`
     if [[ -n $SERVER_PID ]]; then
-        kill -9 $SERVER_PID
+        # First, try to send the shutdown message to the node in order to shut down it gracefully.
+        curl -X POST http://127.0.0.1:8081/api/system/v1/shutdown &>/dev/null
+        sleep 1
+
+        SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'`
+        if [[ -n $SERVER_PID ]]; then
+            kill -KILL $SERVER_PID
+        fi
     fi
 }
 
@@ -92,8 +106,7 @@ function check-request {
 function check-create-tx {
     if [[ \
       ( `echo $3 | jq .type` == \"committed\" ) && \
-      ( `echo $3 | jq .content.debug.name` == "\"$1\"" ) && \
-      ( `echo $3 | jq ".content.message == $2"` == "true") \
+      ( `echo $3 | jq ".message == $2"` == "true") \
     ]]; then
         echo "OK, got expected TxCreateWallet for user $1"
     else
@@ -110,7 +123,7 @@ function check-create-tx {
 function check-transfer-tx {
     if [[ \
       ( `echo $2 | jq .type` == \"committed\" ) && \
-      ( `echo $2 | jq ".content.message == $1"` == "true" ) \
+      ( `echo $2 | jq ".message == $1"` == "true" ) \
     ]]; then
         echo "OK, got expected TxTransfer between wallets"
     else
@@ -123,40 +136,44 @@ kill-server
 launch-server
 
 echo "Creating a wallet for Alice..."
-create-wallet create-wallet-1.json
-check-transaction 75a9d956
+create-wallet "$ROOT_DIR/create-wallet-1.json"
+check-transaction abe9ac1e
 
 echo "Creating a wallet for Bob..."
-create-wallet create-wallet-2.json
-check-transaction 7a09053a
+create-wallet "$ROOT_DIR/create-wallet-2.json"
+check-transaction 59198cca
+
+sleep 5
+
 echo "Transferring funds from Alice to Bob"
-transfer transfer-funds.json
-check-transaction ae3afbe3
+transfer "$ROOT_DIR/transfer-funds.json"
+check-transaction b5d68015
+
 echo "Waiting until transactions are committed..."
-sleep 7
+sleep 3
 
 echo "Retrieving info on all wallets..."
 RESP=`curl $BASE_URL/wallets 2>/dev/null`
 # Wallet records in the response are deterministically ordered by increasing
 # public key. As Alice's pubkey is lexicographically lesser than Bob's, it it possible to
 # determine his wallet as .[0] and hers as .[1].
-check-request "Alice" 85 "`echo $RESP | jq .[0]`"
-check-request "Bob" 115 "`echo $RESP | jq .[1]`"
+check-request "Alice" 95 "`echo $RESP | jq .[0]`"
+check-request "Bob" 105 "`echo $RESP | jq .[1]`"
 
 echo "Retrieving info on Alice's wallet..."
-RESP=`curl $BASE_URL/wallet?pub_key=114e49a764813f2e92609d103d90f23dc5b7e94e74b3e08134c1272441614bd9 2>/dev/null`
-check-request "Alice" 85 "$RESP"
+RESP=`curl $BASE_URL/wallet?pub_key=070122b6eb3f63a14b25aacd7a1922c418025e04b1be9d1febdfdbcf67615799 2>/dev/null`
+check-request "Alice" 95 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
-TXID=75a9d95694f22823ae01a6feafb3d4e27b55b83bd6897aa581456ea5da382dde
-RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
-EXP=`cat create-wallet-1.json | jq ".tx_body"`
+TXID=abe9ac1eef23b4cda7fc408ce488b233c3446331ac0f8195b7d21a210908b447
+RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
+EXP=`cat "$ROOT_DIR/create-wallet-1.json" | jq ".tx_body"`
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."
-TXID=ae3afbe35f1bfd102daea2f3f72884f04784a10aabe9d726749b1188a6b9fe9b
-RESP=`curl http://127.0.0.1:8000/api/explorer/v1/transactions?hash=$TXID 2>/dev/null`
-EXP=`cat transfer-funds.json | jq ".tx_body"`
+TXID=b5d68015cb47f1b1f909e7667c219f1c63a0b7c978cdd6e8ffc279d05ba66fec
+RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
+EXP=`cat "$ROOT_DIR/transfer-funds.json" | jq ".tx_body"`
 check-transfer-tx "$EXP" "$RESP"
 
 kill-server

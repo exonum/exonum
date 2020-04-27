@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,10 @@
 //! Module with protobuf generated files from `schema/exonum`.
 
 // For rust-protobuf generated files.
-#![allow(bare_trait_objects)]
-#![allow(renamed_and_removed_lints)]
+#![allow(bare_trait_objects, clippy::pedantic, clippy::nursery)]
+
+use crate::crypto::proto::*;
+use crate::merkledb::proto::*;
 
 include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
+include!(concat!(env!("OUT_DIR"), "/exonum_details_mod.rs"));

@@ -1,32 +1,28 @@
 {
-  "hash": "852633c087aafe306980350b56e6703ea01187f4c8926b697a93aa475419430e",
-  "config": {
-    "previous_cfg_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-    "actual_from": 0,
-    "validator_keys": [
-      {
-        "consensus_key": "1310ae0d650ef1e1ad581baea4d101504847c2ab392d35e2475f866f78ca4c9c",
-        "service_key": "18b9bcabf2bfe44cf4cd02e877e7e7bb8a6ab7ee6b13c9aa77563befe1f26554"
-      }
-    ],
-    "consensus": {
-      "first_round_timeout": 3000,
-      "status_timeout": 5000,
-      "peers_timeout": 10000,
-      "txs_block_limit": 1000,
-      "max_message_len": 1048576,
-      "min_propose_timeout": 10,
-      "max_propose_timeout": 200,
-      "propose_timeout_threshold": 500
+  "validator_keys": [
+    {
+      "consensus_key": "2e8c8f49039afa920b8bf3e2f0de7b54c49edcd6125907ba367c7e8fad9b722f",
+      "service_key": "6fb8a4cb65088acad4803d94667fc736fc5979aeb33530b5496850bdfb74b793"
     },
-    "services": {
-      "configuration": {
-        "majority_count": null
-      },
-      "exonum_time": null,
-      "timestamping": null
+    {
+      "consensus_key": "713f0a440f053cce9038d5eb22b68c6bee4aa7a175457972569722e6b45b7bd4",
+      "service_key": "99785dc67c094b07039b67dee30b6e8933bd63c7d4cbf17ccf9459a30c17dd66"
+    },
+    {
+      "consensus_key": "83b8cea7ec326fff60d6c63b01f425f6b3575b611167bd958ced29b048c4066e",
+      "service_key": "9f55f8a847811ceadf486e4585374b0774d8f98fa5f19b247f177cabb324b3d5"
+    },
+    {
+      "consensus_key": "f19f471455f2faec2c1bcb81597796354358e3362e61220274e50bd977313bb1",
+      "service_key": "77c4e4a7303c5e2097eaaf44fede6a5724a84e8a2e05973aab3efe1c83f335c5"
     }
-  },
-  "propose": null,
-  "votes": null
+  ],
+  "first_round_timeout": 3000,
+  "status_timeout": 5000,
+  "peers_timeout": 10000,
+  "txs_block_limit": 1000,
+  "max_message_len": 1048576,
+  "min_propose_timeout": 10,
+  "max_propose_timeout": 200,
+  "propose_timeout_threshold": 500
 }

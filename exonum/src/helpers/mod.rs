@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,132 +14,111 @@
 
 //! Different assorted utilities.
 
-pub use self::types::{Height, Milliseconds, Round, ValidatorId, ZeroizeOnDrop};
+pub use self::types::{Height, Round, ValidatorId};
 
-pub mod config;
-pub mod fabric;
-pub mod user_agent;
-#[macro_use]
-pub mod metrics;
+// Required by `consensus-tests`. This is not a public API, since `user_agent::get` is hidden
+// under `doc(hidden)`.
+pub use self::user_agent::{exonum_version, os_info, rust_version, user_agent};
+
+pub(crate) use self::ordered_map::OrderedMap;
+// `Milliseconds` is just `u64`, but more readable within context.
+pub use self::types::Milliseconds;
+
+mod ordered_map;
 
 use env_logger::Builder;
 use log::SetLoggerError;
 
-use std::path::{Component, Path, PathBuf};
-
-use crate::blockchain::{GenesisConfig, ValidatorKeys};
-use crate::crypto::gen_keypair;
-use crate::node::{ConnectListConfig, NodeConfig};
-
 mod types;
+mod user_agent;
 
-/// Performs the logger initialization.
+/// Initializes the logger.
+///
+/// See [`env_logger`] crate for details how to configure the logger output.
+///
+/// [`env_logger`]: https://docs.rs/env_logger/
 pub fn init_logger() -> Result<(), SetLoggerError> {
     Builder::from_default_env()
-        .default_format_timestamp_nanos(true)
+        .format_timestamp_nanos()
         .try_init()
 }
 
-/// Generates testnet configuration.
-pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<NodeConfig> {
-    let (validators, services): (Vec<_>, Vec<_>) = (0..count as usize)
-        .map(|_| (gen_keypair(), gen_keypair()))
-        .unzip();
-    let genesis =
-        GenesisConfig::new(
-            validators
-                .iter()
-                .zip(services.iter())
-                .map(|x| ValidatorKeys {
-                    consensus_key: (x.0).0,
-                    service_key: (x.1).0,
-                }),
-        );
-    let peers = (0..validators.len())
-        .map(|x| format!("127.0.0.1:{}", start_port + x as u16))
-        .collect::<Vec<_>>();
-
-    validators
-        .into_iter()
-        .zip(services.into_iter())
-        .enumerate()
-        .map(|(idx, (validator, service))| NodeConfig {
-            listen_address: peers[idx].parse().unwrap(),
-            external_address: peers[idx].clone(),
-            network: Default::default(),
-            consensus_public_key: validator.0,
-            consensus_secret_key: validator.1,
-            service_public_key: service.0,
-            service_secret_key: service.1,
-            genesis: genesis.clone(),
-            connect_list: ConnectListConfig::from_validator_keys(&genesis.validator_keys, &peers),
-            api: Default::default(),
-            mempool: Default::default(),
-            services_configs: Default::default(),
-            database: Default::default(),
-            thread_pool_size: Default::default(),
-        })
-        .collect::<Vec<_>>()
-}
-
-/// This routine is adapted from the *old* Path's `path_relative_from`
-/// function, which works differently from the new `relative_from` function.
-/// In particular, this handles the case on unix where both paths are
-/// absolute but with only the root as the common directory.
-///
-/// @see https://github.com/rust-lang/rust/blob/e1d0de82cc40b666b88d4a6d2c9dcbc81d7ed27f/src/librustc_back/rpath.rs#L116-L158
-pub fn path_relative_from(path: impl AsRef<Path>, base: impl AsRef<Path>) -> Option<PathBuf> {
-    let path = path.as_ref();
-    let base = base.as_ref();
-
-    if path.is_absolute() != base.is_absolute() {
-        if path.is_absolute() {
-            Some(PathBuf::from(path))
-        } else {
-            None
-        }
-    } else {
-        let mut ita = path.components();
-        let mut itb = base.components();
-        let mut comps: Vec<Component> = vec![];
-        loop {
-            match (ita.next(), itb.next()) {
-                (None, None) => break,
-                (Some(a), None) => {
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
-                }
-                (None, _) => comps.push(Component::ParentDir),
-                (Some(a), Some(b)) if comps.is_empty() && a == b => (),
-                (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
-                (Some(_), Some(b)) if b == Component::ParentDir => return None,
-                (Some(a), Some(_)) => {
-                    comps.push(Component::ParentDir);
-                    for _ in itb {
-                        comps.push(Component::ParentDir);
-                    }
-                    comps.push(a);
-                    comps.extend(ita.by_ref());
-                    break;
-                }
-            }
-        }
-        Some(comps.iter().map(|c| c.as_os_str()).collect())
+/// Basic trait to validate user defined input.
+pub trait ValidateInput: Sized {
+    /// The type returned in the event of a validate error.
+    type Error;
+    /// Perform parameters validation for this configuration and return error if
+    /// value is inconsistent.
+    fn validate(&self) -> Result<(), Self::Error>;
+    /// The same as validate method, but returns the value itself as a successful result.
+    fn into_validated(self) -> Result<Self, Self::Error> {
+        self.validate().map(|_| self)
     }
 }
 
-#[test]
-fn test_path_relative_from() {
-    let cases = vec![
-        ("/b", "/c", Some("../b".into())),
-        ("/a/b", "/a/c", Some("../b".into())),
-        ("/a", "/a/c", Some("../".into())),
-        ("/a/b/c", "/a/b", Some("c".into())),
-        ("/a/b/c", "/a/b/d", Some("../c".into())),
-        ("./a/b", "./a/c", Some("../b".into())),
-    ];
-    for c in cases {
-        assert_eq!(path_relative_from(c.0, c.1), c.2);
+/// Returns sufficient number of votes for the given validators number.
+pub fn byzantine_quorum(total: usize) -> usize {
+    total * 2 / 3 + 1
+}
+
+/// Module for serializing `Option<Hash>` to Protobuf.
+///
+/// It can be used with `ProtobufConvert` derive macro, e.g.:
+///
+/// ```ignore
+/// #[derive(Debug, ProtobufConvert)]
+/// #[protobuf_convert(source = "path::to::ProtoStructure")]
+/// struct Structure {
+///     #[protobuf_convert(with = "exonum::helpers::pb_optional_hash")]
+///     pub maybe_hash: Option<Hash>,
+/// }
+/// ```
+pub mod pb_optional_hash {
+    use exonum_crypto::{proto::types::Hash as PbHash, Hash};
+    use exonum_proto::ProtobufConvert;
+
+    /// Deserializes `Option<Hash>` from Protobuf.
+    pub fn from_pb(pb: PbHash) -> anyhow::Result<Option<Hash>> {
+        if pb.get_data().is_empty() {
+            Ok(None)
+        } else {
+            Hash::from_pb(pb).map(Some)
+        }
+    }
+
+    /// Serializes `Option<Hash>` to Protobuf.
+    pub fn to_pb(value: &Option<Hash>) -> PbHash {
+        if let Some(hash) = value {
+            hash.to_pb()
+        } else {
+            PbHash::new()
+        }
+    }
+}
+
+/// Module for serializing `semver::Version` to Protobuf.
+///
+/// It can be used with `ProtobufConvert` derive macro, e.g.:
+///
+/// ```ignore
+/// #[derive(Debug, ProtobufConvert)]
+/// #[protobuf_convert(source = "path::to::ProtoStructure")]
+/// struct Structure {
+///     #[protobuf_convert(with = "exonum::helpers::pb_version")]
+///     pub some_version: Version,
+/// }
+/// ```
+pub mod pb_version {
+    use semver::Version;
+
+    /// Deserializes `semver::Version` from string.
+    #[allow(clippy::needless_pass_by_value)] // False positive, we need a `String` type here.
+    pub fn from_pb(pb: String) -> anyhow::Result<Version> {
+        pb.parse().map_err(From::from)
+    }
+
+    /// Serializes `semver::Version` to string.
+    pub fn to_pb(value: &Version) -> String {
+        value.to_string()
     }
 }

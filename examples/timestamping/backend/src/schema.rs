@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,20 +14,25 @@
 
 //! Timestamping database schema.
 
-use super::proto;
 use chrono::{DateTime, Utc};
-use exonum::{
-    crypto::Hash,
-    storage::{Fork, ProofMapIndex, Snapshot},
+use exonum::crypto::Hash;
+use exonum::merkledb::{
+    access::{Access, FromAccess, RawAccessMut},
+    Entry, RawProofMapIndex,
 };
+use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
+use exonum_proto::ProtobufConvert;
+
+use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, ProtobufConvert)]
-#[exonum(pb = "proto::Timestamp")]
+#[derive(Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::Timestamp")]
 pub struct Timestamp {
     /// Hash of the content.
     pub content_hash: Hash,
-
     /// Additional metadata.
     pub metadata: String,
 }
@@ -43,22 +48,21 @@ impl Timestamp {
 }
 
 /// Timestamp entry.
-#[derive(Clone, Debug, ProtobufConvert)]
-#[exonum(pb = "proto::TimestampEntry", serde_pb_convert)]
+#[protobuf_convert(source = "proto::TimestampEntry", serde_pb_convert)]
+#[derive(Clone, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,
-
     /// Hash of transaction.
     pub tx_hash: Hash,
-
     /// Timestamp time.
     pub time: DateTime<Utc>,
 }
 
 impl TimestampEntry {
     /// New TimestampEntry.
-    pub fn new(timestamp: Timestamp, &tx_hash: &Hash, time: DateTime<Utc>) -> Self {
+    pub fn new(timestamp: Timestamp, tx_hash: Hash, time: DateTime<Utc>) -> Self {
         Self {
             timestamp,
             tx_hash,
@@ -68,50 +72,33 @@ impl TimestampEntry {
 }
 
 /// Timestamping database schema.
-#[derive(Debug)]
-pub struct Schema<T> {
-    view: T,
+#[derive(Debug, FromAccess)]
+pub(crate) struct Schema<T: Access> {
+    pub config: Entry<T::Base, Config>,
+    pub timestamps: RawProofMapIndex<T::Base, Hash, TimestampEntry>,
 }
 
-impl<T> Schema<T> {
-    /// Creates a new schema from the database view.
-    pub fn new(snapshot: T) -> Self {
-        Schema { view: snapshot }
+impl<T: Access> Schema<T> {
+    pub fn new(access: T) -> Self {
+        Self::from_root(access).unwrap()
     }
 }
 
 impl<T> Schema<T>
 where
-    T: AsRef<dyn Snapshot>,
+    T: Access,
+    T::Base: RawAccessMut,
 {
-    /// Returns the `ProofMapIndex` of timestamps.
-    pub fn timestamps(&self) -> ProofMapIndex<&T, Hash, TimestampEntry> {
-        ProofMapIndex::new("timestamping.timestamps", &self.view)
-    }
-
-    /// Returns the state hash of the timestamping service.
-    pub fn state_hash(&self) -> Vec<Hash> {
-        vec![self.timestamps().merkle_root()]
-    }
-}
-
-impl<'a> Schema<&'a mut Fork> {
-    /// Returns the mutable `ProofMapIndex` of timestamps.
-    pub fn timestamps_mut(&mut self) -> ProofMapIndex<&mut Fork, Hash, TimestampEntry> {
-        ProofMapIndex::new("timestamping.timestamps", &mut self.view)
-    }
-
     /// Adds the timestamp entry to the database.
     pub fn add_timestamp(&mut self, timestamp_entry: TimestampEntry) {
         let timestamp = timestamp_entry.timestamp.clone();
         let content_hash = &timestamp.content_hash;
 
         // Check that timestamp with given content_hash does not exist.
-        if self.timestamps().contains(content_hash) {
+        if self.timestamps.contains(content_hash) {
             return;
         }
-
-        // Add timestamp
-        self.timestamps_mut().put(content_hash, timestamp_entry);
+        // Add the timestamp.
+        self.timestamps.put(content_hash, timestamp_entry);
     }
 }

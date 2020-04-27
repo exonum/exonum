@@ -1,4 +1,4 @@
-// Copyright 2019 The Exonum Team
+// Copyright 2020 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,15 +15,15 @@
 //! Cryptocurrency API.
 
 use exonum::{
-    api::{self, ServiceApiBuilder, ServiceApiState},
-    blockchain::{self, BlockProof, TransactionMessage},
+    blockchain::{BlockProof, IndexProof},
     crypto::{Hash, PublicKey},
-    explorer::BlockchainExplorer,
-    helpers::Height,
-    storage::{ListProof, MapProof},
+    messages::{AnyTx, Verified},
+    runtime::CallerAddress as Address,
 };
+use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
+use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
-use crate::{wallet::Wallet, Schema, CRYPTOCURRENCY_SERVICE_ID};
+use crate::{schema::SchemaImpl, wallet::Wallet};
 
 /// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -35,10 +35,10 @@ pub struct WalletQuery {
 /// Proof of existence for specific wallet.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WalletProof {
-    /// Proof of the whole database table.
-    pub to_table: MapProof<Hash, Hash>,
+    /// Proof of the whole wallets table.
+    pub to_table: MapProof<String, Hash>,
     /// Proof of the specific wallet in this table.
-    pub to_wallet: MapProof<PublicKey, Wallet>,
+    pub to_wallet: MapProof<Address, Wallet, Raw>,
 }
 
 /// Wallet history.
@@ -47,7 +47,7 @@ pub struct WalletHistory {
     /// Proof of the list of transaction hashes.
     pub proof: ListProof<Hash>,
     /// List of above transactions.
-    pub transactions: Vec<TransactionMessage>,
+    pub transactions: Vec<Verified<AnyTx>>,
 }
 
 /// Wallet information.
@@ -67,40 +67,35 @@ pub struct PublicApi;
 
 impl PublicApi {
     /// Endpoint for getting a single wallet.
-    pub fn wallet_info(state: &ServiceApiState, query: WalletQuery) -> api::Result<WalletInfo> {
-        let snapshot = state.snapshot();
-        let general_schema = blockchain::Schema::new(&snapshot);
-        let currency_schema = Schema::new(&snapshot);
+    pub async fn wallet_info(
+        state: ServiceApiState,
+        query: WalletQuery,
+    ) -> api::Result<WalletInfo> {
+        let IndexProof {
+            block_proof,
+            index_proof,
+            ..
+        } = state.data().proof_for_service_index("wallets").unwrap();
 
-        let max_height = general_schema.block_hashes_by_height().len() - 1;
-
-        let block_proof = general_schema
-            .block_and_precommits(Height(max_height))
-            .unwrap();
-
-        let to_table: MapProof<Hash, Hash> =
-            general_schema.get_proof_to_service_table(CRYPTOCURRENCY_SERVICE_ID, 0);
-
-        let to_wallet: MapProof<PublicKey, Wallet> =
-            currency_schema.wallets().get_proof(query.pub_key);
-
+        let currency_schema = SchemaImpl::new(state.service_data());
+        let address = Address::from_key(query.pub_key);
+        let to_wallet = currency_schema.public.wallets.get_proof(address);
         let wallet_proof = WalletProof {
-            to_table,
+            to_table: index_proof,
             to_wallet,
         };
-
-        let wallet = currency_schema.wallet(&query.pub_key);
-
-        let explorer = BlockchainExplorer::new(state.blockchain());
+        let wallet = currency_schema.public.wallets.get(&address);
 
         let wallet_history = wallet.map(|_| {
-            let history = currency_schema.wallet_history(&query.pub_key);
-            let proof = history.get_range_proof(0, history.len());
+            // `history` is always present for existing wallets.
+            let history = currency_schema.wallet_history.get(&address);
+            let proof = history.get_range_proof(..);
 
+            let transactions = state.data().for_core().transactions();
             let transactions = history
                 .iter()
-                .map(|record| explorer.transaction_without_proof(&record).unwrap())
-                .collect::<Vec<_>>();
+                .map(|tx_hash| transactions.get(&tx_hash).unwrap())
+                .collect();
 
             WalletHistory {
                 proof,

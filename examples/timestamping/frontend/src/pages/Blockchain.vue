@@ -1,48 +1,68 @@
 <template>
   <div>
-    <div class="container mt-5">
-      <div class="row justify-content-sm-center">
-        <div class="col-md-6 col-md-offset-3">
-          <h1>Latest blocks</h1>
-
-          <ul class="list-group mt-5">
-            <li class="list-group-item font-weight-bold">
-              <div class="row">
-                <div class="col-sm-6">Height</div>
-                <div class="col-sm-6">Transactions count</div>
-              </div>
-            </li>
-            <li v-for="block in blocks" :key="block.height" class="list-group-item">
-              <div class="row">
-                <div class="col-sm-6">
-                  <router-link :to="{ name: 'block', params: { height: block.height } }">{{ block.height }}</router-link>
+    <div class="container">
+      <div class="row">
+        <div class="col-sm-12">
+          <div class="card mt-5">
+            <div class="card-header">
+              Latest blocks
+            </div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item font-weight-bold">
+                <div class="row">
+                  <div class="col-sm-6">
+                    Block height
+                  </div>
+                  <div class="col-sm-6">
+                    Transactions count
+                  </div>
                 </div>
-                <div class="col-sm-6">{{ block.tx_count }}</div>
-              </div>
-            </li>
-          </ul>
-
-          <button class="btn btn-lg btn-block btn-primary mt-3" @click.prevent="loadMore">Show previous blocks</button>
+              </li>
+              <li v-for="(block) in blocks" :key="block.height" class="list-group-item">
+                <div class="row">
+                  <div class="col-sm-6">
+                    <router-link :to="{ name: 'block', params: { height: block.height } }">
+                      {{ block.height }}
+                    </router-link>
+                  </div>
+                  <div class="col-sm-6">
+                    {{ block.tx_count }}
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <div class="card-body text-center">
+              <a href="#" class="btn btn-primary" @click.prevent="loadMore">Load older blocks</a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
 
-    <spinner :visible="isSpinnerVisible"/>
+    <spinner :visible="isSpinnerVisible" />
   </div>
 </template>
 
 <script>
   import Spinner from '../components/Spinner.vue'
 
-  module.exports = {
+  export default {
     components: {
       Spinner
     },
     data() {
       return {
-        blocks: [],
-        isSpinnerVisible: false
+        isSpinnerVisible: false,
+        blocks: []
       }
+    },
+    mounted() {
+      this.$nextTick(function() {
+        this.loadBlocks()
+      })
+    },
+    destroyed() {
+      this.webSocket.close()
     },
     methods: {
       async loadBlocks(latest) {
@@ -71,14 +91,6 @@
       handleNewBlock(event) {
         this.blocks.unshift(JSON.parse(event.data))
       }
-    },
-    mounted() {
-      this.$nextTick(function() {
-        this.loadBlocks()
-      })
-    },
-    destroyed() {
-      this.webSocket.close()
     }
   }
 </script>

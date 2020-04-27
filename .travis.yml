@@ -7,15 +7,17 @@ branches:
   - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
   # Branch names endings with "-release" (for example "0.9.0-release").
   - /-release$/
+  # Branch names endings with "-dev" (for example "update-rust-dev").
+  - /-dev$/
 
 addons:
   apt:
     sources:
-    - sourceline: 'ppa:giskou/librocksdb'
     - sourceline: 'ppa:maarten-fonville/protobuf'
     - sourceline: 'ppa:fsgmhoward/shadowsocks-libev'
-    - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/14.04/prod trusty main'
-      key_url: https://packages.microsoft.com/keys/microsoft.asc    
+    - sourceline: 'ppa:exonum/rocksdb'
+    - sourceline: 'deb [arch=amd64] https://packages.microsoft.com/ubuntu/18.04/prod bionic main'
+      key_url: https://packages.microsoft.com/keys/microsoft.asc
     packages:
     - binutils-dev
     - build-essential
@@ -27,48 +29,58 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb
+    - librocksdb6.2
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
     - pkg-config
     - powershell
     - protobuf-compiler
+    - python3-venv
     - unzip
     - zlib1g-dev
 
 rust:
-  - 1.32.0
+  - 1.42.0
 
 cache:
+  npm: true
   directories:
-  - node_modules
+  - $HOME/.cache
   - $HOME/.cargo
   - $HOME/.local
-  - $TRAVIS_BUILD_DIR/target
-  - $TRAVIS_BUILD_DIR/testkit/examples/server/node_modules
+  - $HOME/.kcov
 
-dist: trusty
-sudo: required
+dist: bionic
 
 env:
   global:
-  - DEADLINKS_VERS=0.3.0
+  - DEADLINKS_VERS=0.4.1
   - RUSTFLAGS="-D warnings"
-  - ROCKSDB_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
+  - SCCACHE_VERS=0.2.12
   matrix:
   - FEATURE=test
 
+before_install:
+  - sccache -V | grep $SCCACHE_VERS || cargo install sccache --vers $SCCACHE_VERS --force
+  - export RUSTC_WRAPPER=sccache
+
+
 jobs:
+  allow_failures:
+  - name: integration-tests
   include:
-  # Formatting & other lints that do not require compilation.
+  # Formatting & other lints.
   - name: lints
     install:
     - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
     - cargo install --list
     - rustup component add rustfmt
     - rustfmt -V
+    - rustup component add clippy
+    - cargo clippy --version
     - nvm install 8 && nvm use 8
     - npm install
     - ./node_modules/.bin/cspell --version
@@ -76,76 +88,106 @@ jobs:
     script:
     - npm run cspell
     - npm run md
-    # Force build.rs execution.
-    - cargo check -p exonum
+    # Clippy lints.
+    - cargo clippy --all --tests --examples --benches --all-features
+    # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc
     - cargo doc --no-deps
     # TODO: Temporary hack to ignore warnings about missing pages. (ECR-703)
-    - mkdir -p target/doc/exonum/encoding/serialize/reexport/serde
-    - mkdir -p target/doc/exonum/encoding/serialize/reexport/de/serde
     - mkdir -p target/doc/exonum_configuration
     - mkdir -p target/std/string
-    - touch target/doc/exonum/encoding/serialize/trait.Serialize.html
-    - touch target/doc/exonum/encoding/serialize/reexport/serde/index.html
-    - touch target/doc/exonum/encoding/serialize/reexport/de/serde/index.html
-    - touch target/doc/exonum_configuration/enum.Option.html
     - touch target/std/string/struct.String.html
     - touch target/std/primitive.usize.html
+    - mkdir -p target/doc/std/option
+    - touch target/doc/exonum_cli/password/struct.String.html
+    - touch target/doc/std/option/enum.Option.html
+    - touch target/doc/std/primitive.usize.html
+    - touch target/doc/std/primitive.char.html
     - cargo deadlinks --dir target/doc
 
-  # Run kcov.
+    # Run kcov.
   - name: kcov
     install:
-    - wget https://github.com/SimonKagstrom/kcov/archive/v36.tar.gz
-    - tar xzf v36.tar.gz
-    - cd kcov-36
-    - mkdir build
-    - cd build
-    - cmake ..
-    - make
-    - make install DESTDIR=../../kcov-build
-    - cd ../..
-    - rm -rf kcov-36
+    - |
+      if [ ! -f "$HOME/.kcov/bin/kcov" ]; then
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
+        tar xzf master.tar.gz
+        cd kcov-master
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.kcov -DCMAKE_BUILD_TYPE=Release
+        make -j2
+        make install
+        cd ../..
+        rm -rf kcov-master
+      fi
     script:
     - cargo test --no-run
     - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; ./kcov-build/usr/local/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
+    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; $HOME/.kcov/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
-  # Tests.
-  - name: test
-    install:
-    - nvm install 8 && nvm use 8
-    - cd $TRAVIS_BUILD_DIR/testkit/server/src && npm install && cd $TRAVIS_BUILD_DIR
+  # Unit tests (including test runs for benchmarks).
+  - name: unit-test
     script:
-    - cargo test --all
-    - cargo run -p exonum --example explorer
+    - cargo test --all --lib --tests --benches --bins
+
+  # Doc tests.
+  - name: doc-test
+    script:
+    - cargo test --all --doc
+
+  # Run examples and soak tests.
+  - name: examples
+    script:
+    - cargo run -p exonum-merkledb --example manual_migration
+    - cargo run -p exonum-merkledb --example migration_with_helper
+    - cargo run -p exonum-merkledb --example migration_with_iter_loop
+    - cargo run -p exonum-merkledb --example blockchain
+    - cargo run -p exonum-sample-runtime
+    - cargo run -p exonum-explorer --example explorer
     - cargo run -p exonum-testkit --example timestamping
-    - cargo run -p exonum-testkit --example configuration_change
+    - cargo run -p exonum-supervisor --example configuration_change
     - cargo run -p exonum-time --example simple_service
+    - cargo run -p exonum-soak-tests --bin toggle -- -H 10
+    - cargo run -p exonum-soak-tests --bin send_txs -- -T 100
+    - cargo run -p exonum-soak-tests --bin sleepy -- -H 10
+    - cargo run -p exonum-soak-tests --bin tx_filtering -- -H 10
+    - cargo run -p exonum-keys --example key-generator -- -p passphrase -s a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344
+
+  # Integration tests.
+  - name: integration-tests
+    install:
+    - python3 -m venv .venv
+    - source .venv/bin/activate
+    - pip3 install pip --upgrade
+    # Clone exonum-launcher to get a current master instead of release version.
+    - git clone https://github.com/exonum/exonum-launcher.git .venv/exonum-launcher
+    # Install dependencies from github-provided exonum-launcher (so we can get latest changes without release).
+    - pip3 install -r .venv/exonum-launcher/requirements.txt
+    # Install exonum-launcher itself from the cloned repo as well.
+    - pip3 install -e .venv/exonum-launcher
+    # Install integration tests.
+    - pip3 install -e $TRAVIS_BUILD_DIR/test-suite/exonum-py-tests --no-binary=protobuf protobuf
+    - nvm install 10 && nvm use 10
+    - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
+    - cargo build -p exonum-testkit-server
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --example cryptocurrency-migration --force
+    - cargo build -p exonum-cryptocurrency --example demo
+    script:
+    - python3 -m exonum_tests -v
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.sh
     - cd $TRAVIS_BUILD_DIR/examples/cryptocurrency/examples && ./test.ps1
-    - cd $TRAVIS_BUILD_DIR/testkit/server && npm run proto && npm run test:unix
-
- # Clippy linting.
-  - name: clippy
-    install:
-    - rustup component add clippy
-    - cargo clippy --version
-    script:
-    - cargo clippy --all -- -D warnings
-
-  # Benchmarks (compilation only).
-  - name: benchmarks
-    rust: nightly-2018-12-30
-    script:
-    - RUST_LOG=off cargo check --benches --features "long_benchmarks"
+    - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm run test:unix
+    - cd $TRAVIS_BUILD_DIR
+    after_script:
+    - deactivate
+    - rm -rf .venv
 
 notifications:
   webhooks:
     urls:
     - https://webhooks.gitter.im/e/9599da7e3a500810190d
-
-    
