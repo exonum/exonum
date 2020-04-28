@@ -5,7 +5,7 @@ from exonum_client import ExonumClient
 from exonum_client.crypto import KeyPair
 from exonum_launcher.action_result import ActionResult
 from exonum_launcher.configuration import Configuration
-from exonum_launcher.explorer import NotCommittedError
+from exonum_launcher.explorer import ExecutionFailError
 from exonum_launcher.launcher import Launcher
 
 from suite import (
@@ -98,9 +98,7 @@ class MigrationTests(unittest.TestCase):
 
         # Resume service with a new logic version 0.2.0
         instances = {INSTANCE_NAME: {"artifact": "cryptocurrency", "action": "resume"}}
-        resume_config_dict = generate_config(
-            self.network, instances=instances, artifact_action="none"
-        )
+        resume_config_dict = generate_config(self.network, instances=instances, artifact_action="none")
         resume_config = Configuration(resume_config_dict)
 
         with Launcher(resume_config) as launcher:
@@ -191,7 +189,7 @@ class MigrationTests(unittest.TestCase):
             for instance, (status, message) in launcher.launch_state.completed_migrations().items():
                 if instance == INSTANCE_NAME:
                     self.assertEqual(status, ActionResult.Fail)
-                    self.assertTrue("is not stopped or frozen" in message)
+                    self.assertIn("is not stopped or frozen", message)
 
     def test_migration_without_switching_artifact(self):
         """Tests migration flow without migration logic stage."""
@@ -246,17 +244,15 @@ class MigrationTests(unittest.TestCase):
 
         # Try to resume the service without a new logic migration to version 0.2.0
         instances = {INSTANCE_NAME: {"artifact": "cryptocurrency", "action": "resume"}}
-        resume_config_dict = generate_config(
-            self.network, instances=instances, artifact_action="none"
-        )
+        resume_config_dict = generate_config(self.network, instances=instances, artifact_action="none")
         resume_config = Configuration(resume_config_dict)
 
         with Launcher(resume_config) as launcher:
             launcher.start_all()
-            with self.assertRaises(NotCommittedError) as e:
+            with self.assertRaises(ExecutionFailError) as e:
                 launcher.wait_for_start()
-                self.assertTrue(
-                    f"Service `{INSTANCE_NAME}` has data version (0.2.0) differing from its artifact version" in e
+                self.assertIn(
+                    f"Service `{INSTANCE_NAME}` has data version (0.2.0) differing from its artifact version", e
                 )
 
     def test_unload_artifact_of_running_service(self):
@@ -296,7 +292,7 @@ class MigrationTests(unittest.TestCase):
 
             status, message = launcher.launch_state.unload_status
             self.assertEqual(status, ActionResult.Fail)
-            self.assertTrue("service `101:cryptocurrency` references it as the current artifact" in message)
+            self.assertIn("service `101:cryptocurrency` references it as the current artifact", message)
 
     def _tear_down(self, check_exit_codes=True):
         """Performs cleanup, removing network files."""
