@@ -27,7 +27,7 @@
     "exonum-client": "^0.18.3",
     "express": "^4.17.1",
     "http-proxy-middleware": "^1.0.3",
-    "jquery": "^3.4.1",
+    "jquery": "^3.5.0",
     "moment": "^2.24.0",
     "noty": "^3.2.0-beta",
     "popper.js": "^1.16.1",
