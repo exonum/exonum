@@ -7,7 +7,7 @@ from exonum_client import ExonumClient
 from exonum_client.crypto import KeyPair
 from exonum_launcher.configuration import Configuration
 from exonum_launcher.launcher import Launcher
-from exonum_launcher.explorer import NotCommittedError
+from exonum_launcher.explorer import ActionResult, ExecutionFailError
 
 from suite import (
     run_dev_node,
@@ -73,14 +73,15 @@ class RegularDeployTest(unittest.TestCase):
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
         with Launcher(cryptocurrency_advanced_config) as launcher:
             launcher.deploy_all()
-            with self.assertRaises(NotCommittedError):
-                launcher.wait_for_deploy()
+            launcher.wait_for_deploy()
 
             # artifact should not be deployed because of exceeded deadline height
             explorer = launcher.explorer()
-            for artifact in launcher.launch_state.completed_deployments():
+            for artifact, (action_result, message) in launcher.launch_state.completed_deployments().items():
                 deployed = explorer.is_deployed(artifact)
                 self.assertEqual(deployed, False)
+                self.assertEqual(action_result, ActionResult.Fail)
+                self.assertIn("Actual height for transaction is in the past", message)
 
     def test_deploy_regular_with_instance(self):
         """Tests the deploy mechanism in regular mode with instance."""
@@ -221,7 +222,7 @@ class RegularDeployTest(unittest.TestCase):
                 tx_response = crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
                 # in case of stopped service its tx will not be processed
                 self.assertEqual(tx_response.status_code, 400)
-                self.assertIn("Cannot dispatch transaction to non-active service", str(tx_response.content))
+                self.assertIn(b"Cannot dispatch transaction to non-active service", tx_response.content)
 
         # resume service
         instances = {"crypto": {"artifact": "cryptocurrency", "action": "resume"}}
@@ -295,7 +296,7 @@ class RegularDeployTest(unittest.TestCase):
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
-            with self.assertRaises(NotCommittedError):
+            with self.assertRaises(ExecutionFailError):
                 launcher.wait_for_start()
 
     def test_deploy_regular_with_instance_resume_action_before_start(self):
@@ -325,7 +326,7 @@ class RegularDeployTest(unittest.TestCase):
             launcher.deploy_all()
             launcher.wait_for_deploy()
             launcher.start_all()
-            with self.assertRaises(NotCommittedError):
+            with self.assertRaises(ExecutionFailError):
                 launcher.wait_for_start()
 
             for artifact in launcher.launch_state.completed_deployments():
