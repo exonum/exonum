@@ -197,7 +197,7 @@ impl RocksDB {
         const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
 
         let db_reader = self.get_lock_guard();
-        let mut iter = db_reader.raw_iterator_cf(cf)?;
+        let mut iter = db_reader.raw_iterator_cf(cf);
         iter.seek_to_last();
         if iter.valid() {
             if let Some(key) = iter.key() {
@@ -207,10 +207,10 @@ impl RocksDB {
                 // is mostly used for testing, this optimization leads to practical
                 // performance improvement.
                 if key.len() < LARGER_KEY.len() {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY)?;
+                    batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY);
                 } else {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], key)?;
-                    batch.delete_cf(cf, &key)?;
+                    batch.delete_range_cf::<&[u8]>(cf, &[], key);
+                    batch.delete_cf(cf, &key);
                 }
             }
         }
@@ -244,16 +244,16 @@ impl RocksDB {
                     buffer.truncate(ID_SIZE);
                     buffer.extend_from_slice(&key);
                     match change {
-                        Change::Put(ref value) => batch.put_cf(cf, &buffer, value)?,
-                        Change::Delete => batch.delete_cf(cf, &buffer)?,
+                        Change::Put(ref value) => batch.put_cf(cf, &buffer, value),
+                        Change::Delete => batch.delete_cf(cf, &buffer),
                     }
                 }
             } else {
                 // Write changes to the column family as-is.
                 for (key, change) in changes.into_data() {
                     match change {
-                        Change::Put(ref value) => batch.put_cf(cf, &key, value)?,
-                        Change::Delete => batch.delete_cf(cf, &key)?,
+                        Change::Put(ref value) => batch.put_cf(cf, &key, value),
+                        Change::Delete => batch.delete_cf(cf, &key),
                     }
                 }
             }
@@ -273,12 +273,11 @@ impl RocksDB {
     ) -> crate::Result<()> {
         if let Some(id_bytes) = resolved.id_to_bytes() {
             let next_bytes = next_id_bytes(id_bytes);
-            batch
-                .delete_range_cf(cf, id_bytes, next_bytes)
-                .map_err(Into::into)
+            batch.delete_range_cf(cf, id_bytes, next_bytes);
         } else {
-            self.clear_column_family(batch, cf)
+            self.clear_column_family(batch, cf)?;
         }
+        Ok(())
     }
 
     #[allow(unsafe_code)]
@@ -309,8 +308,7 @@ impl RocksDBSnapshot {
         let iter = match self.get_lock_guard().cf_handle(&name.name) {
             Some(cf) => self
                 .snapshot
-                .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward))
-                .unwrap(),
+                .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward)),
             None => self.snapshot.iterator(IteratorMode::Start),
         };
         RocksDBIterator {

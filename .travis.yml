@@ -29,7 +29,7 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb6.2
+    - librocksdb6.7
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
