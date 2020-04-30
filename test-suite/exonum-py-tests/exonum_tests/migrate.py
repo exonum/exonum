@@ -52,7 +52,7 @@ class MigrationTests(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
         # Create Alice's wallet with 0.1.0 version of the service
         alice_keys = self._create_wallet(client, "Alice", "0.1.0")
@@ -127,7 +127,7 @@ class MigrationTests(unittest.TestCase):
 
             for artifact in unload_config.artifacts.values():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, False)
+                self.assertFalse(deployed)
 
         # Create Bob's wallet with version 0.2.0 of the service.
         bob_keys = self._create_wallet(client, "Bob", "0.2.0")
@@ -175,7 +175,7 @@ class MigrationTests(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
         # Migrate service data from 0.1.0 to 0.2.0 version
         migrations = {INSTANCE_NAME: {"runtime": "rust", "name": "exonum-cryptocurrency", "version": "0.2.0"}}
@@ -210,7 +210,7 @@ class MigrationTests(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
         # Stop the working service with version 0.1.0.
         instances = {INSTANCE_NAME: {"artifact": "cryptocurrency", "action": "stop"}}
@@ -271,7 +271,7 @@ class MigrationTests(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
         # Try to unload artifact with version 0.1.0
         unload_config_dict = generate_config(
@@ -288,7 +288,7 @@ class MigrationTests(unittest.TestCase):
 
             for artifact in unload_config.artifacts.values():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)  # Not False !!!
+                self.assertTrue(deployed)  # Not False !!!
 
             status, message = launcher.launch_state.unload_status
             self.assertEqual(status, ActionResult.Fail)

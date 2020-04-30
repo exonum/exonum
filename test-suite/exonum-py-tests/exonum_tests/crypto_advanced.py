@@ -31,7 +31,7 @@ class CryptoAdvancedTest(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
             # Launcher checks that config is applied, no need to check it again.
 

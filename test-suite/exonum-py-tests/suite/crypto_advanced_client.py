@@ -15,24 +15,18 @@ class ExonumCryptoAdvancedClient:
         self.loader = client.protobuf_loader()
         self.loader.initialize()
         self.loader.load_main_proto_files()
+        self.loader.load_service_proto_files(runtime_id=0, artifact_name="exonum-supervisor", artifact_version="1.0.0")
         self.loader.load_service_proto_files(
-            runtime_id=0, artifact_name="exonum-supervisor", artifact_version="1.0.0",
-        )
-        self.loader.load_service_proto_files(
-            runtime_id=0, artifact_name=service_name, artifact_version=self.service_version,
+            runtime_id=0, artifact_name=service_name, artifact_version=self.service_version
         )
 
-        self.cryptocurrency_module = ModuleManager.import_service_module(
-            service_name, self.service_version, "service"
-        )
+        self.cryptocurrency_module = ModuleManager.import_service_module(service_name, self.service_version, "service")
         self.types_module = ModuleManager.import_service_module(
             service_name, self.service_version, "exonum.crypto.types"
         )
         instance_id = client.public_api.get_instance_id_by_name(self.instance_name)
         self.msg_generator = MessageGenerator(
-            instance_id=instance_id,
-            artifact_name=service_name,
-            artifact_version=self.service_version,
+            instance_id=instance_id, artifact_name=service_name, artifact_version=self.service_version
         )
 
     def __enter__(self):

@@ -102,12 +102,7 @@ def launcher_networks(network: ExonumNetwork) -> List[Dict[str, Any]]:
     networks = []
     for validator_id in range(network.validators_count()):
         host, public_port, private_port = network.api_address(validator_id)
-        node_network = {
-            "host": host,
-            "ssl": False,
-            "public-api-port": public_port,
-            "private-api-port": private_port,
-        }
+        node_network = {"host": host, "ssl": False, "public-api-port": public_port, "private-api-port": private_port}
         networks.append(node_network)
 
     # Temporary workaround: supervisor works in simple mode and we need only one node.
