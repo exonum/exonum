@@ -48,7 +48,7 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
     def test_deploy_regular_invalid_artifact_name(self):
         """Tests the deploy mechanism in regular mode with invalid artifact"""
@@ -64,7 +64,7 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, False)
+                self.assertFalse(deployed)
 
     def test_deploy_regular_exceed_deadline_height(self):
         """Tests the deploy mechanism in regular mode with exceeded deadline height"""
@@ -79,7 +79,7 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact, (action_result, message) in launcher.launch_state.completed_deployments().items():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, False)
+                self.assertFalse(deployed)
                 self.assertEqual(action_result, ActionResult.Fail)
                 self.assertIn("Actual height for transaction is in the past", message)
 
@@ -100,7 +100,7 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
@@ -142,7 +142,7 @@ class RegularDeployTest(unittest.TestCase):
             explorer = launcher.explorer()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
@@ -193,7 +193,7 @@ class RegularDeployTest(unittest.TestCase):
             self.wait_for_api_restart()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
@@ -283,7 +283,7 @@ class RegularDeployTest(unittest.TestCase):
             self.wait_for_api_restart()
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 
@@ -331,7 +331,7 @@ class RegularDeployTest(unittest.TestCase):
 
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
     def test_deploy_regular_with_invalid_action(self):
         """Tests the deploy mechanism in regular mode with
@@ -370,7 +370,7 @@ class DevDeployTest(unittest.TestCase):
 
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
     def test_deploy_dev_with_instance(self):
         """Tests the deploy mechanism in dev mode with instance."""
@@ -389,7 +389,7 @@ class DevDeployTest(unittest.TestCase):
 
             for artifact in launcher.launch_state.completed_deployments():
                 deployed = explorer.is_deployed(artifact)
-                self.assertEqual(deployed, True)
+                self.assertTrue(deployed)
 
             self.assertEqual(len(launcher.launch_state.completed_configs()), 1)
 

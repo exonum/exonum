@@ -20,7 +20,7 @@ exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 anyhow = "1.0.26"
 bit-vec = "0.6.1"
 chrono = { version = "0.4.6", features = ["serde"] }
-protobuf = "2.10.1"
+protobuf = "2.14.0"
 pretty_assertions = "0.6.1"
 serde = "1.0"
 serde_derive = "1.0"

@@ -41,7 +41,7 @@ class ProcessManager:
         # With this argument process will start in separate shell, not related to the shell
         # in which script is executed.
         self._process = subprocess.Popen(
-            self._command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid,
+            self._command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, preexec_fn=os.setsid
         )
 
         exit_code = self._process.wait()

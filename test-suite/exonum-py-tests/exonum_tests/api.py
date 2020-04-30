@@ -5,12 +5,7 @@ import time
 
 from exonum_client import ExonumClient
 
-from suite import (
-    run_4_nodes,
-    assert_processes_exited_successfully,
-    wait_network_to_start,
-    wait_for_block,
-)
+from suite import run_4_nodes, assert_processes_exited_successfully, wait_network_to_start, wait_for_block
 
 
 class ApiTest(unittest.TestCase):
@@ -30,9 +25,7 @@ class ApiTest(unittest.TestCase):
             node_info_response = client.private_api.get_info()
             self.assertEqual(node_info_response.status_code, 200)
             node_info = node_info_response.json()
-            self.assertEqual(
-                len(node_info["connected_peers"]), self.network.validators_count() - 1,
-            )
+            self.assertEqual(len(node_info["connected_peers"]), self.network.validators_count() - 1)
             self.assertEqual(node_info["consensus_status"], "active")
 
     def test_block_response(self):

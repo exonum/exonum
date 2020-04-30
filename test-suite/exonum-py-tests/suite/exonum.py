@@ -29,7 +29,7 @@ class ExonumNetwork:
     def __enter__(self) -> "ExonumNetwork":
         return self
 
-    def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object],) -> None:
+    def __exit__(self, exc_type: Optional[type], exc_value: Optional[Any], exc_traceback: Optional[object]) -> None:
         self.deinitialize()
 
     def generate_template(self, validators_count: int, supervisor_mode: str = "simple") -> None:
@@ -107,7 +107,7 @@ class ExonumNetwork:
 
         self._processes.append(process)
 
-        # Init metainfo, so you can work with run-dev node the same way
+        # Init meta info, so you can work with run-dev node the same way
         # as you'll work with a properly initialized network.
         self._validators_count = 1
         self._public_api_addresses[0] = "127.0.0.1:8080"
@@ -117,16 +117,14 @@ class ExonumNetwork:
         """Stops all the nodes and return outputs of each process."""
 
         # Send shutdown requests (it should contain word `null` in the request body).
-        shutdown_endpoint = "http://{}/api/system/v1/shutdown"
-        for private_address in self._private_api_addresses.values():
-            url = shutdown_endpoint.format(private_address)
-            requests.post(url, headers={"content-type": "application/json"})
-
+        headers = {"content-type": "application/json"}
+        for address in self._private_api_addresses.values():
+            try:
+                requests.post(f"http://{address}/api/system/v1/shutdown", headers=headers)
+            except ConnectionError:
+                print(f"Could not send a shutdown request to the address: {address}")
         # Join every process and collect outputs.
-        outputs = []
-        for process in self._processes:
-            output = process.join_process(NODE_SHUTDOWN_TIMEOUT)
-            outputs.append(output)
+        outputs = [process.join_process(NODE_SHUTDOWN_TIMEOUT) for process in self._processes]
 
         return outputs
 
