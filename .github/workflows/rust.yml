@@ -39,7 +39,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --all --tests
+          args: -p exonum --tests
 
   doc-tests:
     name: Doc Tests
