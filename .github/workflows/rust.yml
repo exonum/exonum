@@ -7,7 +7,7 @@ on:
 
 jobs:
   tests:
-    name: Test Exonum
+    name: Unit Tests
     runs-on:
       - windows-latest
     steps:
@@ -35,14 +35,14 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run Exonum Unit Tests
+      - name: Run Unit Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
           args: --all --lib --tests --benches --bins
 
   doc-tests:
-    name: Doc Test Exonum
+    name: Doc Tests
     runs-on:
       - windows-latest
     steps:
@@ -70,7 +70,7 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run Exonum Doc Tests
+      - name: Run Doc Tests
         uses: actions-rs/cargo@v1
         with:
           command: test
