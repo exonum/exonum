@@ -64,7 +64,7 @@ env:
   - FEATURE=test
 
 before_install:
-  - sccache -V | grep $SCCACHE_VERS || cargo install sccache --vers $SCCACHE_VERS --force
+  - sccache -V | grep $SCCACHE_VERS || cargo install sccache --vers $SCCACHE_VERS
   - export RUSTC_WRAPPER=sccache
 
 
@@ -75,7 +75,7 @@ jobs:
   # Formatting & other lints.
   - name: lints
     install:
-    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS --force
+    - cargo deadlinks -V | grep $DEADLINKS_VERS || cargo install cargo-deadlinks --vers $DEADLINKS_VERS
     - cargo install --list
     - rustup component add rustfmt
     - rustfmt -V
@@ -132,12 +132,12 @@ jobs:
   # Unit tests (including test runs for benchmarks).
   - name: unit-test
     script:
-    - cargo test --all --lib --tests --benches --bins
+    - cargo test --all-targets
 
   # Doc tests.
   - name: doc-test
     script:
-    - cargo test --all --doc
+    - cargo test --workspace --doc
 
   # Run examples and soak tests.
   - name: examples
@@ -174,8 +174,8 @@ jobs:
     - nvm install 10 && nvm use 10
     - cd $TRAVIS_BUILD_DIR/test-suite/testkit/server && npm install && cd $TRAVIS_BUILD_DIR
     - cargo build -p exonum-testkit-server
-    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --force
-    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --example cryptocurrency-migration --force
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend
+    - cargo install --path $TRAVIS_BUILD_DIR/examples/cryptocurrency-advanced/backend --example cryptocurrency-migration
     - cargo build -p exonum-cryptocurrency --example demo
     script:
     - python3 -m exonum_tests -v
