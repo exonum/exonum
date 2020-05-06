@@ -1,0 +1,21 @@
+name: Exonum Build
+
+on: [push, pull_request]
+
+jobs:
+  test-exonum:
+    name: Test Exonum
+    runs-on:
+      - windows-latest
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v2
+
+      - name: Install Dependencies
+        run: choco install llvm protoc -y
+
+      - name: Run Exonum Unit Tests
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all --lib --tests --benches --bins
