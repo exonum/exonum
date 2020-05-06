@@ -36,6 +36,8 @@ jobs:
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.toml') }}
 
       - name: Run Unit Tests
+        env:
+          RUST_BACKTRACE: full
         uses: actions-rs/cargo@v1
         with:
           command: test
