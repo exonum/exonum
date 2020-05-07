@@ -41,7 +41,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: -p exonum -p exonum-node -p exonum-merkledb --tests
+          args: -p exonum -p exonum-merkledb --tests
 
   doc-tests:
     name: Doc Tests
