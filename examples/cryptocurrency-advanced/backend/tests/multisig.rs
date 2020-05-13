@@ -30,7 +30,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use exonum_cryptocurrency_advanced::{
     transactions::{CreateWallet, Transfer},
-    CryptocurrencyInterface, CryptocurrencyService, Schema,
+    Config as CryptocurrencyConfig, CryptocurrencyInterface, CryptocurrencyService, Schema,
 };
 
 /// Service instance ID.
@@ -180,9 +180,12 @@ impl MultisigInterface<ExecutionContext<'_>> for MultisigService {
 }
 
 fn create_testkit_with_multisig(keys: Vec<PublicKey>, threshold: usize) -> TestKit {
-    let cryptocurrency = Spec::new(CryptocurrencyService).with_instance(SERVICE_ID, "token", ());
-    let config = Config::new(keys, threshold);
-    let multisig = Spec::new(MultisigService).with_instance(MULTISIG_ID, "multisig", config);
+    let crypto_config = CryptocurrencyConfig { init_balance: 100 };
+    let cryptocurrency =
+        Spec::new(CryptocurrencyService).with_instance(SERVICE_ID, "token", crypto_config);
+    let multisig_config = Config::new(keys, threshold);
+    let multisig =
+        Spec::new(MultisigService).with_instance(MULTISIG_ID, "multisig", multisig_config);
 
     TestKitBuilder::validator()
         .with(cryptocurrency)

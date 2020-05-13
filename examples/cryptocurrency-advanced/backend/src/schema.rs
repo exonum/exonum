@@ -17,12 +17,12 @@
 use exonum::crypto::Hash;
 use exonum::merkledb::{
     access::{Access, FromAccess, RawAccessMut},
-    Group, ObjectHash, ProofListIndex, RawProofMapIndex,
+    Entry, Group, ObjectHash, ProofListIndex, RawProofMapIndex,
 };
 use exonum::runtime::CallerAddress as Address;
 use exonum_derive::{FromAccess, RequireArtifact};
 
-use crate::{wallet::Wallet, INITIAL_BALANCE};
+use crate::{wallet::Wallet, Config};
 
 /// Database schema for the cryptocurrency.
 ///
@@ -34,6 +34,8 @@ pub(crate) struct SchemaImpl<T: Access> {
     pub public: Schema<T>,
     /// History for specific wallets.
     pub wallet_history: Group<T, Address, ProofListIndex<T::Base, Hash>>,
+    /// Configuration of the service.
+    pub config: Entry<T::Base, Config>,
 }
 
 /// Public part of the cryptocurrency schema.
@@ -86,7 +88,8 @@ where
         let mut history = self.wallet_history.get(&key);
         history.push(transaction);
         let history_hash = history.object_hash();
-        let wallet = Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash);
+        let config: Config = self.config.get().expect("Can't read service config");
+        let wallet = Wallet::new(key, name, config.init_balance, history.len(), &history_hash);
         self.public.wallets.put(&key, wallet);
     }
 }

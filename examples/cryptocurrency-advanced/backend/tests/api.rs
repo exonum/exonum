@@ -32,13 +32,15 @@ use exonum_testkit::{
 use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
+use exonum::runtime::SUPERVISOR_INSTANCE_ID;
 use exonum_cryptocurrency_advanced::{
     api::{WalletInfo, WalletQuery},
     schema::Schema,
     transactions::{CreateWallet, Transfer},
     wallet::Wallet,
-    CryptocurrencyInterface, CryptocurrencyService,
+    Config, CryptocurrencyInterface, CryptocurrencyService,
 };
+use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 
 /// Alice's wallets name.
 const ALICE_NAME: &str = "Alice";
@@ -48,6 +50,8 @@ const BOB_NAME: &str = "Bob";
 const SERVICE_ID: u32 = 120;
 /// Service instance name.
 const SERVICE_NAME: &str = "tst-token";
+/// Service configuration.
+const SERVICE_CONFIG: Config = Config { init_balance: 100 };
 
 fn author_address(tx: &Verified<AnyTx>) -> CallerAddress {
     CallerAddress::from_key(tx.author())
@@ -265,6 +269,48 @@ async fn test_unknown_wallet_request() {
     api.assert_no_wallet(tx.author()).await;
 }
 
+#[tokio::test]
+async fn test_config_endpoint() {
+    let (_, api) = create_testkit();
+    let config = api.get_config().await.unwrap();
+    assert_eq!(config.init_balance, SERVICE_CONFIG.init_balance)
+}
+
+#[tokio::test]
+async fn test_change_configuration() {
+    let (mut testkit, api) = create_testkit();
+    // Create and send a transaction via API
+    let (tx, _) = api.create_wallet(ALICE_NAME).await;
+    testkit.create_block();
+    api.assert_tx_status(tx.object_hash(), &json!({ "type": "success" }))
+        .await;
+
+    // Check that the user indeed is persisted by the service.
+    let wallet = api.get_wallet(tx.author()).await.unwrap();
+    assert_eq!(wallet.owner, author_address(&tx));
+    assert_eq!(wallet.name, ALICE_NAME);
+    assert_eq!(wallet.balance, 100);
+
+    // Change an initial balance to 200 via changing configuration.
+    let tx = api
+        .change_config(&mut testkit, Config { init_balance: 200 })
+        .await;
+    testkit.create_block();
+    api.assert_tx_status(tx.object_hash(), &json!({ "type": "success" }))
+        .await;
+
+    let (tx, _) = api.create_wallet(BOB_NAME).await;
+    testkit.create_block();
+    api.assert_tx_status(tx.object_hash(), &json!({ "type": "success" }))
+        .await;
+
+    // Check that the user indeed is persisted by the service.
+    let wallet = api.get_wallet(tx.author()).await.unwrap();
+    assert_eq!(wallet.owner, author_address(&tx));
+    assert_eq!(wallet.name, BOB_NAME);
+    assert_eq!(wallet.balance, 200);
+}
+
 /// Wrapper for the cryptocurrency service API allowing to easily use it
 /// (compared to `TestKitApi` calls).
 struct CryptocurrencyApi {
@@ -292,6 +338,22 @@ impl CryptocurrencyApi {
             .unwrap();
         assert_eq!(tx_info.tx_hash, tx.object_hash());
         (tx, keypair)
+    }
+
+    async fn change_config(&self, testkit: &mut TestKit, config: Config) -> Verified<AnyTx> {
+        let config_propose = ConfigPropose::immediate(0).service_config(SERVICE_ID, config.clone());
+        let service_keys = testkit.network().us().service_keypair();
+        let tx = service_keys.propose_config_change(SUPERVISOR_INSTANCE_ID, config_propose);
+
+        let tx_info: TransactionResponse = self
+            .inner
+            .public(ApiKind::Explorer)
+            .query(&json!({ "tx_body": tx }))
+            .post("v1/transactions")
+            .await
+            .unwrap();
+        assert_eq!(tx_info.tx_hash, tx.object_hash());
+        tx
     }
 
     async fn get_wallet(&self, pub_key: PublicKey) -> Option<Wallet> {
@@ -329,6 +391,15 @@ impl CryptocurrencyApi {
             .await
             .unwrap();
         assert_eq!(tx_info.tx_hash, tx.object_hash());
+    }
+
+    /// Retrieves service configuration.
+    async fn get_config(&self) -> Option<Config> {
+        self.inner
+            .public(ApiKind::Service(SERVICE_NAME))
+            .get::<Config>("v1/config")
+            .await
+            .ok()
     }
 
     /// Asserts that a wallet with the specified public key is not known to the blockchain.
@@ -369,7 +440,12 @@ impl CryptocurrencyApi {
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(ExplorerFactory).with_default_instance())
-        .with(Spec::new(CryptocurrencyService).with_instance(SERVICE_ID, SERVICE_NAME, ()))
+        .with(Supervisor::simple())
+        .with(Spec::new(CryptocurrencyService).with_instance(
+            SERVICE_ID,
+            SERVICE_NAME,
+            SERVICE_CONFIG,
+        ))
         .build();
 
     let api = CryptocurrencyApi {

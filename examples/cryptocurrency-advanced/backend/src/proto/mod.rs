@@ -17,7 +17,7 @@
 // For protobuf generated files.
 #![allow(bare_trait_objects)]
 
-pub use self::service::{CreateWallet, Issue, Transfer, Wallet};
+pub use self::service::{Config, CreateWallet, Issue, Transfer, Wallet};
 
 include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 

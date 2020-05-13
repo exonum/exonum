@@ -23,7 +23,7 @@ use exonum::{
 use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 
-use crate::{schema::SchemaImpl, wallet::Wallet};
+use crate::{config::Config, schema::SchemaImpl, wallet::Wallet};
 
 /// Describes the query parameters for the `get_wallet` endpoint.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
@@ -110,10 +110,19 @@ impl PublicApi {
         })
     }
 
+    /// Endpoint for getting current service configuration.
+    pub async fn config(state: ServiceApiState, _query: ()) -> api::Result<Config> {
+        SchemaImpl::new(state.service_data())
+            .config
+            .get()
+            .ok_or_else(|| api::Error::not_found().title("Configuration not found"))
+    }
+
     /// Wires the above endpoint to public scope of the given `ServiceApiBuilder`.
     pub fn wire(builder: &mut ServiceApiBuilder) {
         builder
             .public_scope()
+            .endpoint("/v1/config", Self::config)
             .endpoint("v1/wallets/info", Self::wallet_info);
     }
 }
