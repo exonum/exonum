@@ -43,7 +43,7 @@ use crate::{api::PublicApi as CryptocurrencyApi, schema::SchemaImpl};
 /// Cryptocurrency service ID.
 pub const INSTANCE_ID: InstanceId = 3;
 /// Cryptocurrency service instance name.
-pub const INSTANCE_NAME: &'static str = "crypto";
+pub const INSTANCE_NAME: &str = "crypto";
 
 /// Cryptocurrency service implementation.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
