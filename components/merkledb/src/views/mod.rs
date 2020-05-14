@@ -202,7 +202,7 @@ impl<T: RawAccess> ViewInner<T> {
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
-        use std::collections::Bound::*;
+        use std::collections::Bound::{Included, Unbounded};
 
         let changes_iter = self
             .changes

@@ -232,7 +232,7 @@ enum HandshakeStep {
 
 impl HandshakeStep {
     fn next(self) -> Option<Self> {
-        use self::HandshakeStep::*;
+        use self::HandshakeStep::{Done, EphemeralKeyExchange, StaticKeyExchange};
 
         match self {
             EphemeralKeyExchange => Some(StaticKeyExchange),

@@ -138,7 +138,7 @@ impl ErrorKind {
     }
 
     pub(super) fn from_raw(kind: errors_proto::ErrorKind, code: u8) -> anyhow::Result<Self> {
-        use errors_proto::ErrorKind::*;
+        use errors_proto::ErrorKind::{COMMON, CORE, RUNTIME, SERVICE, UNEXPECTED};
 
         let kind = match kind {
             UNEXPECTED => {

@@ -271,7 +271,7 @@ mod tests {
 
     use chrono::Duration;
 
-    use super::*;
+    use super::{BinaryValue, Decimal, Utc, Uuid, HASH_SIZE};
 
     fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
         for value in values {

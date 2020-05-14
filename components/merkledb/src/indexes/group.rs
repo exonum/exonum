@@ -154,7 +154,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Access, AsReadonly, BinaryKey, FromAccess, Group};
     use crate::{
         access::{AccessExt, CopyAccessExt, Prefixed, RawAccessMut},
         migration::{Migration, Scratchpad},

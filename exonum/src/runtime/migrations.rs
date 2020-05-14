@@ -605,7 +605,10 @@ impl LinearMigrations {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        InitMigrationError, InstanceSpec, LinearMigrations, MigrationContext, MigrationError,
+        MigrationHelper, MigrationScript, Version,
+    };
     use crate::runtime::{ArtifactId, RuntimeIdentifier};
 
     use assert_matches::assert_matches;

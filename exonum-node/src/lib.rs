@@ -1504,7 +1504,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, 
 mod tests {
     use exonum::merkledb::TemporaryDB;
 
-    use super::*;
+    use super::{generate_testnet_config, FlushPoolStrategy, MemoryPoolConfig, NodeBuilder};
 
     #[test]
     fn test_good_internal_events_config() {

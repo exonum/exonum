@@ -93,9 +93,12 @@ mod tests {
         helpers::Height,
         messages::Verified,
     };
+    use futures::{SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
 
-    use super::*;
+    use super::{
+        mpsc, BinaryValue, InternalEvent, InternalPart, InternalRequest, Message, SignedMessage,
+    };
     use crate::messages::Status;
 
     async fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {

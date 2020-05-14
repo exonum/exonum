@@ -16,7 +16,7 @@ use exonum::{
     crypto::Hash,
     runtime::{versioning::Version, ExecutionError},
 };
-use exonum_derive::*;
+use exonum_derive::BinaryValue;
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 

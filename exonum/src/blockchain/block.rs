@@ -580,7 +580,11 @@ mod tests {
     };
     use pretty_assertions::{assert_eq, assert_ne};
 
-    use super::*;
+    use super::{
+        AdditionalHeaders, BinaryValue, Block, BlockHeaderKey, BlockProof, CallInBlock, CallProof,
+        Epoch, ExecutionError, ExecutionErrorAux, Hash, Height, IndexProof, MapProof, OrderedMap,
+        Precommit, ProofError, ProposerId, ProtobufConvert, ValidationError, ValidatorId, Verified,
+    };
     use crate::{blockchain::Schema as CoreSchema, helpers::Round, runtime::InstanceId};
 
     impl BlockHeaderKey for Hash {

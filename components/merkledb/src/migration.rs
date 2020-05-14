@@ -691,7 +691,11 @@ pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        flush_migration, rollback_migration, AbortHandle, Arc, Database, Hash, IndexAddress,
+        IndexType, Migration, MigrationError, MigrationHelper, Scratchpad, ViewWithMetadata,
+        SCRATCHPAD_NAME,
+    };
     use crate::{
         access::{AccessExt, CopyAccessExt, RawAccess},
         HashTag, ObjectHash, SystemSchema, TemporaryDB,

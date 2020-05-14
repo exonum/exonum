@@ -60,7 +60,7 @@ use exonum::{
     runtime::{ExecutionError, ExecutionStatus},
 };
 use serde::{Serialize, Serializer};
-use serde_derive::*;
+use serde_derive::Deserialize;
 
 use std::{
     cell::{Ref, RefCell},

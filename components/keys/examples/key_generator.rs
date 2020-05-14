@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum_keys::*;
-use hex;
 use serde_json::json;
 use structopt::StructOpt;
 

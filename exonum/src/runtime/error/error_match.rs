@@ -193,7 +193,7 @@ impl StringMatch {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, StringMatch};
 
     #[test]
     #[allow(clippy::cognitive_complexity)] // More test code is fine

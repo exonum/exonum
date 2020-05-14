@@ -15,7 +15,7 @@
 pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36
 
 use exonum_crypto::Hash;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::cmp::Ordering;
@@ -651,7 +651,9 @@ pub enum ListProofError {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        hash_layer, merge, BinaryValue, Hash, HashTag, HashedEntry, ListProof, ProofListKey,
+    };
     use crate::{access::CopyAccessExt, Database, TemporaryDB};
 
     fn entry(height: u8, index: u64) -> HashedEntry {

@@ -334,7 +334,11 @@ mod tests {
     };
     use pretty_assertions::assert_eq;
 
-    use super::*;
+    use super::{
+        BinaryValue, BlockResponse, ExonumMessage, Hash, Height, Precommit, Round, SignedMessage,
+        Status, TransactionsResponse, ValidatorId, Verified, TX_RES_EMPTY_SIZE,
+        TX_RES_PB_OVERHEAD_PAYLOAD,
+    };
 
     #[test]
     fn test_verified_from_signed_correct_signature() {

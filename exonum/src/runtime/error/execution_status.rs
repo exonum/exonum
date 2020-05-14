@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use anyhow::ensure;
-use exonum_derive::*;
+use exonum_derive::BinaryValue;
 use exonum_proto::ProtobufConvert;
 
 use super::ExecutionError;

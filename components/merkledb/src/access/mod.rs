@@ -377,7 +377,7 @@ pub trait FromAccess<T: Access>: Sized {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Access, AccessExt, CopyAccessExt, FromAccess, IndexType, Prefixed};
     use crate::{Database, ListIndex, TemporaryDB};
 
     #[test]

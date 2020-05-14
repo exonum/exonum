@@ -594,7 +594,9 @@ mod tests {
 
     use std::fmt::Display;
 
-    use super::*;
+    use super::{
+        ArtifactId, ConsensusConfig, GenesisConfigBuilder, PublicKey, ValidateInput, ValidatorKeys,
+    };
     use crate::crypto::{self, gen_keypair_from_seed, Seed, SEED_LENGTH};
 
     fn assert_err_contains(actual: impl Display, expected: impl AsRef<str>) {

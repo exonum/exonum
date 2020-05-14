@@ -20,7 +20,7 @@ use exonum::{
         InstanceId, InstanceSpec, InstanceState, InstanceStatus, RuntimeFeature,
     },
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, interface_method};
 use exonum_merkledb::ObjectHash;
 
 use std::collections::HashSet;

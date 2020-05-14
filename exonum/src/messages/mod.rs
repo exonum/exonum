@@ -121,7 +121,7 @@ mod tests {
     use exonum_proto::ProtobufConvert;
     use protobuf::Message;
 
-    use super::*;
+    use super::{Precommit, SignedMessage, Verified, SIGNED_MESSAGE_MIN_SIZE};
     use crate::{
         helpers::{Height, Round, ValidatorId},
         proto::schema::messages as proto,

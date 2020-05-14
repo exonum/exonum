@@ -276,7 +276,7 @@ pub enum ValidationError<E: StdError + 'static> {
 mod tests {
     use exonum_crypto::{Hash, HashStream};
 
-    use super::*;
+    use super::{hash, HashTag, ProofPath, HASH_SIZE};
 
     #[test]
     fn empty_list_hash() {

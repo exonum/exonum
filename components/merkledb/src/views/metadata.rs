@@ -719,7 +719,10 @@ impl<T: RawAccess> From<ViewWithMetadata<T>> for View<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        vec, BinaryKey, BinaryValue, GroupKeys, IndexAddress, IndexMetadata, IndexType,
+        IndexesPool, NonZeroU64, View, ViewWithMetadata,
+    };
     use crate::{access::CopyAccessExt, Database, Fork, TemporaryDB};
 
     use std::collections::{BTreeSet, HashMap};
@@ -901,7 +904,7 @@ mod tests {
 
 #[cfg(test)]
 mod prop_tests {
-    use super::*;
+    use super::{GroupKeys, IndexAddress, RawAccess};
     use crate::{access::CopyAccessExt, Database, TemporaryDB};
 
     use proptest::{

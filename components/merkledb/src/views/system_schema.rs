@@ -139,7 +139,7 @@ impl SystemSchema<&Fork> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Fork, ObjectHash, SystemSchema};
     use crate::{
         access::{AccessExt, CopyAccessExt},
         migration::Migration,

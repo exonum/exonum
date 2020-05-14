@@ -15,12 +15,13 @@
 //! Information schema for the runtime dispatcher.
 
 use exonum_crypto::Hash;
-use exonum_derive::*;
+use exonum_derive::BinaryValue;
 use exonum_merkledb::{
     access::{Access, AccessExt, AsReadonly},
     Fork, KeySetIndex, MapIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
+use PbMigrationTransition::{COMMIT, NONE, ROLLBACK, START};
 
 use crate::{
     proto::schema::{
@@ -64,7 +65,6 @@ pub(super) enum MigrationTransition {
 impl MigrationTransition {
     #[allow(clippy::wrong_self_convention, clippy::trivially_copy_pass_by_ref)]
     fn to_pb(value: &Option<Self>) -> PbMigrationTransition {
-        use PbMigrationTransition::*;
         match value {
             None => NONE,
             Some(Self::Start) => START,
@@ -74,7 +74,6 @@ impl MigrationTransition {
     }
 
     fn from_pb(pb: PbMigrationTransition) -> anyhow::Result<Option<Self>> {
-        use PbMigrationTransition::*;
         Ok(match pb {
             NONE => None,
             START => Some(Self::Start),

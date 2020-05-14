@@ -453,7 +453,7 @@ where
     KeyMode: ToProofPath<K>,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
-        use self::MapProofError::*;
+        use self::MapProofError::{DuplicatePath, EmbeddedPaths, InvalidOrdering};
         use std::cmp::Ordering;
 
         // Check that entries in `proof` are in increasing order.
