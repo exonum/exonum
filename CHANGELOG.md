@@ -23,6 +23,13 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Backtrace is now included into `ExecutionError`s. (#1850)
 
+### New Features
+
+#### exonum-cli
+
+- Added a possibility to use domain names along with IP addresses on generation configs
+  stage and in the connect list as well. (#1870)
+
 ## 1.0.0 - 2020-03-31
 
 ### Breaking Changes
@@ -49,7 +56,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## 1.0.0-rc.3 - 2020-03-25
 
-### Breaking changes
+### Breaking Changes
 
 #### exonum
 
