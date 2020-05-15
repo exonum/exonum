@@ -420,7 +420,7 @@ fn test_generate_config_hostname_with_port() {
     env.command("generate-config")
         .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
-        .with_named_arg("-a", "exonum.com")
+        .with_named_arg("-a", "exonum.com:6777")
         .with_arg("--no-password")
         .run()
         .unwrap();
