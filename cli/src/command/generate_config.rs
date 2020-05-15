@@ -104,10 +104,12 @@ impl GenerateConfig {
     /// If no port is provided by user, uses `DEFAULT_EXONUM_LISTEN_PORT`.
     fn resolve_peer_address(hostname: &str) -> Result<SocketAddr, Error> {
         match hostname.to_socket_addrs() {
-            Ok(mut addrs) => addrs.next().ok_or(Error::msg(format!(
-                "No one IP address is related to the domain: {}",
-                hostname
-            ))),
+            Ok(mut addrs) => addrs.next().ok_or_else(|| {
+                Error::msg(format!(
+                    "No one IP address is related to the domain: {}",
+                    hostname
+                ))
+            }),
             Err(e) => {
                 if e.kind() == ErrorKind::InvalidInput {
                     Self::resolve_peer_address(&format!(
@@ -121,7 +123,7 @@ impl GenerateConfig {
         }
     }
 
-    /// Returns `provided` address or [INADDR_ANY](https://en.wikipedia.org/wiki/0.0.0.0) address
+    /// Returns `provided` address or [`INADDR_ANY`](https://en.wikipedia.org/wiki/0.0.0.0) address
     /// combined with the port number obtained from `peer_address`.
     fn get_listen_address(provided: Option<SocketAddr>, peer_address: &str) -> SocketAddr {
         provided.unwrap_or_else(|| match Self::resolve_peer_address(peer_address) {
