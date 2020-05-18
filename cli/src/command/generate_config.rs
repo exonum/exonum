@@ -115,14 +115,14 @@ impl GenerateConfig {
             }),
             Err(e) => {
                 if e.kind() == ErrorKind::InvalidInput {
-                    return if *is_host_with_port {
+                    if *is_host_with_port {
                         Err(Error::from(e))
                     } else {
                         let host_with_port = format!("{}:{}", hostname, DEFAULT_EXONUM_LISTEN_PORT);
                         *is_host_with_port = true;
 
                         Self::resolve_peer_address(&host_with_port, is_host_with_port)
-                    };
+                    }
                 } else {
                     Err(Error::from(e))
                 }
