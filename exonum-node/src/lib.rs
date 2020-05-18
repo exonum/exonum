@@ -51,7 +51,9 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn
+    clippy::missing_errors_doc, clippy::missing_const_for_fn,
+    // Seems should be fixed in thiserror crate.
+    clippy::used_underscore_binding
 )]
 
 pub use crate::{

@@ -17,10 +17,10 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum NoiseError {
-    #[error("Wrong handshake message length {}", _0)]
+    #[error("Wrong handshake message length {0}")]
     WrongMessageLength(usize),
 
-    #[error("Snow error: {}", _0)]
+    #[error("Snow error: {0}")]
     Snow(#[source] Error),
 }
 

@@ -156,11 +156,11 @@ pub enum MigrationError {
     /// we've run out of disc space) or the migration script getting aborted.
     ///
     /// Scripts should not instantiate errors of this kind.
-    #[error("{}", _0)]
+    #[error("{0}")]
     Helper(#[source] db_migration::MigrationError),
 
     /// Custom error signalling that the migration cannot be completed.
-    #[error("{}", _0)]
+    #[error("{0}")]
     Custom(String),
 }
 
@@ -361,7 +361,7 @@ pub enum InitMigrationError {
 
     /// The start version falls in the supported lower / upper bounds on versions,
     /// but is not supported itself. This can be the case, e.g., for pre-releases.
-    #[error("Start version is not supported: {}", _0)]
+    #[error("Start version is not supported: {0}")]
     UnsupportedStart(String),
 
     /// Data migrations are not supported by the artifact.

@@ -268,7 +268,7 @@ pub enum ValidationError<E: StdError + 'static> {
     UnmatchedRootHash,
 
     /// The proof is malformed.
-    #[error("Malformed proof: {}", _0)]
+    #[error("Malformed proof: {0}")]
     Malformed(#[source] E),
 }
 

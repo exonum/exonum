@@ -284,7 +284,7 @@ pub enum AccessErrorKind {
     InvalidTombstone,
 
     /// Custom error.
-    #[error("{}", _0)]
+    #[error("{0}")]
     Custom(#[source] anyhow::Error),
 }
 
