@@ -26,7 +26,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use pretty_assertions::assert_eq;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use exonum_rust_runtime::{DefaultInstance, RustRuntimeBuilder, Service, ServiceFactory};
 

@@ -18,8 +18,10 @@ use tokio::{task, time::delay_for};
 
 use std::time::{Duration, SystemTime};
 
-use super::{InternalEvent, InternalRequest, TimeoutRequest};
-use crate::messages::{ExonumMessage, Message};
+use crate::{
+    messages::{ExonumMessage, Message},
+    InternalEvent, InternalRequest, TimeoutRequest,
+};
 
 /// Processor of `InternalRequest`s that emits `InternalEvent`s as a result.
 #[derive(Debug)]
@@ -91,15 +93,16 @@ mod tests {
     use exonum::{
         crypto::{Hash, KeyPair, Signature},
         helpers::Height,
-        messages::Verified,
+        merkledb::BinaryValue,
+        messages::{SignedMessage, Verified},
     };
-    use futures::{SinkExt, StreamExt};
+    use futures::{channel::mpsc, SinkExt, StreamExt};
     use pretty_assertions::assert_eq;
 
-    use super::{
-        mpsc, BinaryValue, InternalEvent, InternalPart, InternalRequest, Message, SignedMessage,
+    use crate::{
+        messages::{Message, Status},
+        InternalEvent, InternalPart, InternalRequest,
     };
-    use crate::messages::Status;
 
     async fn verify_message(msg: Vec<u8>) -> Option<InternalEvent> {
         let (internal_tx, mut internal_rx) = mpsc::channel(16);

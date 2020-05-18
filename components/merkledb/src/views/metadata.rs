@@ -21,10 +21,10 @@ use serde_derive::{Deserialize, Serialize};
 
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64, vec};
 
-use super::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View};
 use crate::{
     access::{AccessError, AccessErrorKind},
     validation::check_index_valid_full_name,
+    views::{IndexAddress, RawAccess, RawAccessMut, ResolvedAddress, View},
     BinaryKey, BinaryValue,
 };
 

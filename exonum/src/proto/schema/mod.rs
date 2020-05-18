@@ -17,8 +17,7 @@
 // For rust-protobuf generated files.
 #![allow(bare_trait_objects, clippy::pedantic, clippy::nursery)]
 
-use crate::crypto::proto::*;
-use crate::merkledb::proto::*;
+use crate::{crypto::proto::*, merkledb::proto::*};
 
 include!(concat!(env!("OUT_DIR"), "/exonum_proto_mod.rs"));
 include!(concat!(env!("OUT_DIR"), "/exonum_details_mod.rs"));

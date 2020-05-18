@@ -17,7 +17,10 @@ use exonum::{
     helpers::Height,
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
-use exonum_derive::*;
+use exonum_derive::{
+    exonum_interface, BinaryValue, ExecutionFail, FromAccess, ObjectHash, ServiceDispatcher,
+    ServiceFactory,
+};
 use exonum_merkledb::{
     access::{Access, FromAccess},
     MapIndex,

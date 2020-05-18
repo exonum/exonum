@@ -138,14 +138,12 @@ use std::{
     },
 };
 
-use crate::validation::check_index_valid_full_name;
-use crate::views::IndexMetadata;
 use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
-    validation::assert_valid_name_component,
+    validation::{assert_valid_name_component, check_index_valid_full_name},
     views::{
-        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexType, IndexesPool,
-        RawAccessMut, View, ViewWithMetadata,
+        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexMetadata, IndexType,
+        IndexesPool, RawAccessMut, View, ViewWithMetadata,
     },
     BinaryKey, Database, Fork, ObjectHash, ProofMapIndex, ReadonlyFork,
 };

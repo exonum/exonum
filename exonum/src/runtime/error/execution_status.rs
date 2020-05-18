@@ -16,8 +16,7 @@ use anyhow::ensure;
 use exonum_derive::BinaryValue;
 use exonum_proto::ProtobufConvert;
 
-use super::ExecutionError;
-use crate::proto::schema::errors as errors_proto;
+use crate::{proto::schema::errors as errors_proto, runtime::ExecutionError};
 
 /// Status of a call execution in a way it is stored in the blockchain.
 /// This result may be either an empty unit type, in case of success,

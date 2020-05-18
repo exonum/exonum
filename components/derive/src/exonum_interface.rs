@@ -16,16 +16,13 @@ use darling::{self, FromMeta};
 use proc_macro::TokenStream;
 use proc_macro2::Span;
 use quote::{quote, ToTokens};
+use std::{collections::HashSet, convert::TryFrom, str::FromStr};
 use syn::{
     parse_macro_input, spanned::Spanned, Attribute, AttributeArgs, FnArg, Ident, ItemTrait, Lit,
     NestedMeta, Receiver, ReturnType, TraitItem, TraitItemMethod, Type,
 };
 
-use std::collections::HashSet;
-use std::convert::TryFrom;
-use std::str::FromStr;
-
-use super::{find_meta_attrs, RustRuntimeCratePath};
+use crate::{find_meta_attrs, RustRuntimeCratePath};
 
 #[derive(Debug)]
 struct ServiceMethodDescriptor {

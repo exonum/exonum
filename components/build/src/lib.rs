@@ -58,15 +58,14 @@
 use proc_macro2::{Ident, Span, TokenStream};
 use protoc_rust::Customize;
 use quote::{quote, ToTokens};
-use walkdir::WalkDir;
-
-use std::collections::HashSet;
 use std::{
+    collections::HashSet,
     env,
     fs::File,
     io::{Read, Write},
     path::{Path, PathBuf},
 };
+use walkdir::WalkDir;
 
 /// Enum representing various sources of Protobuf files.
 #[derive(Debug, Copy, Clone)]

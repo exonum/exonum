@@ -30,7 +30,10 @@ use exonum::{
     },
     runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
-use exonum_derive::*;
+use exonum_derive::{
+    exonum_interface, BinaryValue, FromAccess, ObjectHash, RequireArtifact, ServiceDispatcher,
+    ServiceFactory,
+};
 use exonum_rust_runtime::Service;
 use exonum_testkit::{Spec, TestKitBuilder};
 use serde_derive::{Deserialize, Serialize};

@@ -19,9 +19,8 @@ use exonum::merkledb::{migration::rollback_migration, Database, RocksDB};
 use exonum::runtime::remove_local_migration_result;
 use exonum_node::helpers::clear_consensus_messages_cache;
 use serde_derive::{Deserialize, Serialize};
-use structopt::StructOpt;
-
 use std::path::{Path, PathBuf};
+use structopt::StructOpt;
 
 use crate::{
     command::{ExonumCommand, StandardResult},

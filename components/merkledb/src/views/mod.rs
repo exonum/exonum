@@ -23,9 +23,9 @@ pub use self::{
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
-use self::address::key_bytes;
-use super::{
+use crate::{
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
+    views::address::key_bytes,
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 

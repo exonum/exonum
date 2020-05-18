@@ -61,7 +61,6 @@ use exonum::{
 };
 use serde::{Serialize, Serializer};
 use serde_derive::Deserialize;
-
 use std::{
     cell::{Ref, RefCell},
     collections::{BTreeMap, Bound},

@@ -27,7 +27,9 @@ use exonum::{
     },
 };
 use exonum_api::UpdateEndpoints;
-use exonum_derive::*;
+use exonum_derive::{
+    exonum_interface, FromAccess, RequireArtifact, ServiceDispatcher, ServiceFactory,
+};
 use futures::channel::mpsc;
 use pretty_assertions::assert_eq;
 

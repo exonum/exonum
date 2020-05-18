@@ -58,8 +58,10 @@ use std::{
     panic,
 };
 
-use super::{CallInfo, InstanceId, MethodId};
-use crate::proto::schema::errors as errors_proto;
+use crate::{
+    proto::schema::errors as errors_proto,
+    runtime::types::{CallInfo, InstanceId, MethodId},
+};
 
 /// Trait representing an error type defined in the service or runtime code.
 ///

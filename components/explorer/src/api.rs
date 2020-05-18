@@ -27,7 +27,6 @@ use exonum::{
     runtime::{AnyTx, CallInfo, ExecutionStatus, InstanceId},
 };
 use serde_derive::{Deserialize, Serialize};
-
 use std::ops::Range;
 
 use crate::median_precommits_time;

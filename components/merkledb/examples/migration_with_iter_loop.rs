@@ -31,10 +31,10 @@ use exonum_merkledb::{
     migration::{MigrationError, MigrationHelper},
     Database, ObjectHash,
 };
-
 use std::sync::Arc;
 
 mod migration;
+
 use crate::migration::{perform_migration, v1, v2};
 
 /// Provides migration of wallets with `MigrationHelper::iter_loop`.

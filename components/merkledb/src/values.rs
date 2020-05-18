@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
 
-use super::ObjectHash;
+use crate::ObjectHash;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///

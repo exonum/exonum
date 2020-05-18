@@ -14,8 +14,10 @@
 
 use exonum_crypto::Hash;
 
-use super::{AsReadonly, IndexType, RawAccess, ViewWithMetadata};
-use crate::{Fork, ObjectHash, ProofMapIndex};
+use crate::{
+    views::{AsReadonly, IndexType, RawAccess, ViewWithMetadata},
+    Fork, ObjectHash, ProofMapIndex,
+};
 
 /// Name of the state aggregator proof map.
 const STATE_AGGREGATOR: &str = "__STATE_AGGREGATOR__";
