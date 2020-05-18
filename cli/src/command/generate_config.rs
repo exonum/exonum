@@ -28,7 +28,7 @@ use structopt::StructOpt;
 use std::{
     fs,
     io::ErrorKind,
-    net::{IpAddr, SocketAddr, ToSocketAddrs},
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs},
     path::{Path, PathBuf},
 };
 
@@ -102,7 +102,10 @@ impl GenerateConfig {
     }
 
     /// If no port is provided by user, uses `DEFAULT_EXONUM_LISTEN_PORT`.
-    fn resolve_peer_address(hostname: &str) -> Result<SocketAddr, Error> {
+    fn resolve_peer_address(
+        hostname: &str,
+        is_host_with_port: &mut bool,
+    ) -> Result<SocketAddr, Error> {
         match hostname.to_socket_addrs() {
             Ok(mut addrs) => addrs.next().ok_or_else(|| {
                 Error::msg(format!(
@@ -112,10 +115,14 @@ impl GenerateConfig {
             }),
             Err(e) => {
                 if e.kind() == ErrorKind::InvalidInput {
-                    Self::resolve_peer_address(&format!(
-                        "{}:{}",
-                        hostname, DEFAULT_EXONUM_LISTEN_PORT
-                    ))
+                    return if *is_host_with_port {
+                        Err(Error::from(e))
+                    } else {
+                        let host_with_port = format!("{}:{}", hostname, DEFAULT_EXONUM_LISTEN_PORT);
+                        *is_host_with_port = true;
+
+                        Self::resolve_peer_address(&host_with_port, is_host_with_port)
+                    };
                 } else {
                     Err(Error::from(e))
                 }
@@ -126,15 +133,18 @@ impl GenerateConfig {
     /// Returns `provided` address or [`INADDR_ANY`](https://en.wikipedia.org/wiki/0.0.0.0) address
     /// combined with the port number obtained from `peer_address`.
     fn get_listen_address(provided: Option<SocketAddr>, peer_address: &str) -> SocketAddr {
-        provided.unwrap_or_else(|| match Self::resolve_peer_address(peer_address) {
-            Ok(address) => {
-                let ip_address = match address.ip() {
-                    IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),
-                    IpAddr::V6(_) => "::".parse().unwrap(),
-                };
-                SocketAddr::new(ip_address, address.port())
+        let mut is_host_with_port = false; // A purpose of the var is to limit infinite recursion.
+        provided.unwrap_or_else(|| {
+            match Self::resolve_peer_address(peer_address, &mut is_host_with_port) {
+                Ok(address) => {
+                    let ip_address = match address.ip() {
+                        IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
+                        IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
+                    };
+                    SocketAddr::new(ip_address, address.port())
+                }
+                Err(e) => panic!(e),
             }
-            Err(e) => panic!(e),
         })
     }
 }

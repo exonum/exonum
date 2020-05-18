@@ -28,7 +28,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 #### exonum-cli
 
 - Added a possibility to use domain names along with IP addresses on generation configs
-  stage and in the connect list as well. (#1870)
+  stage and in the connect list. (#1870)
 
 ## 1.0.0 - 2020-03-31
 
