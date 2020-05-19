@@ -1372,11 +1372,7 @@ impl State {
         peer: Option<PublicKey>,
     ) -> Option<PublicKey> {
         let next = {
-            let state = if let Some(state) = self.requests.get_mut(data) {
-                state
-            } else {
-                return None;
-            };
+            let state = self.requests.get_mut(data)?;
             if let Some(peer) = peer {
                 state.remove(&peer);
             }

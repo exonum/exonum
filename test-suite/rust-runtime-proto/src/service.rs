@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, ServiceDispatcher, ServiceFactory};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 /// Define the service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

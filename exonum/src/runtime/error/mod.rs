@@ -45,7 +45,10 @@ pub use self::{
     error_match::ErrorMatch, execution_status::ExecutionStatus,
 };
 
-use exonum_derive::*;
+use errors_proto::CallSite_Type::{
+    AFTER_TRANSACTIONS, BEFORE_TRANSACTIONS, CONSTRUCTOR, METHOD, RESUME,
+};
+use exonum_derive::{BinaryValue, ExecutionFail};
 use exonum_merkledb::Error as MerkledbError;
 use exonum_proto::ProtobufConvert;
 use thiserror::Error;
@@ -55,8 +58,10 @@ use std::{
     panic,
 };
 
-use super::{CallInfo, InstanceId, MethodId};
-use crate::proto::schema::errors as errors_proto;
+use crate::{
+    proto::schema::errors as errors_proto,
+    runtime::types::{CallInfo, InstanceId, MethodId},
+};
 
 /// Trait representing an error type defined in the service or runtime code.
 ///
@@ -219,8 +224,6 @@ impl ProtobufConvert for CallSite {
     type ProtoStruct = errors_proto::CallSite;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        use errors_proto::CallSite_Type::*;
-
         let mut pb = Self::ProtoStruct::new();
         pb.set_instance_id(self.instance_id);
         match &self.call_type {
@@ -238,8 +241,6 @@ impl ProtobufConvert for CallSite {
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-        use errors_proto::CallSite_Type::*;
-
         let call_type = match pb.get_call_type() {
             CONSTRUCTOR => CallType::Constructor,
             RESUME => CallType::Resume,

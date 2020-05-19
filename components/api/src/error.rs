@@ -19,9 +19,8 @@ pub use actix_web::http::{
     HeaderMap, StatusCode as HttpStatusCode,
 };
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
-
 use std::fmt;
+use thiserror::Error;
 
 /// API HTTP error struct.
 #[derive(Error, Debug)]

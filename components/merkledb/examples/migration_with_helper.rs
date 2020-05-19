@@ -27,11 +27,11 @@
 //! For the description of the common migration scenario, see the `migration` module docs.
 
 use exonum_merkledb::{migration::MigrationHelper, Database, ObjectHash};
-
 use std::sync::Arc;
 
-use crate::migration::{perform_migration, v1, v2};
 mod migration;
+
+use crate::migration::{perform_migration, v1, v2};
 
 /// Migrates wallets using `MigrationHelper`.
 ///

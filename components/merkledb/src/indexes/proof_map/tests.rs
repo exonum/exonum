@@ -1417,7 +1417,7 @@ where
 
 #[test]
 fn test_invalid_map_proofs() {
-    use self::MapProofError::*;
+    use self::MapProofError::{DuplicatePath, EmbeddedPaths, InvalidOrdering, NonTerminalNode};
 
     let h = hash(&[1]);
 

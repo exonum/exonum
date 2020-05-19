@@ -51,7 +51,9 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn
+    clippy::missing_errors_doc, clippy::missing_const_for_fn,
+    // Seems should be fixed in thiserror crate.
+    clippy::used_underscore_binding
 )]
 
 pub use crate::{
@@ -1504,7 +1506,7 @@ pub fn generate_testnet_config(count: u16, start_port: u16) -> Vec<(NodeConfig, 
 mod tests {
     use exonum::merkledb::TemporaryDB;
 
-    use super::*;
+    use super::{generate_testnet_config, FlushPoolStrategy, MemoryPoolConfig, NodeBuilder};
 
     #[test]
     fn test_good_internal_events_config() {

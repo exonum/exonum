@@ -268,7 +268,7 @@ pub enum ValidationError<E: StdError + 'static> {
     UnmatchedRootHash,
 
     /// The proof is malformed.
-    #[error("Malformed proof: {}", _0)]
+    #[error("Malformed proof: {0}")]
     Malformed(#[source] E),
 }
 
@@ -276,7 +276,7 @@ pub enum ValidationError<E: StdError + 'static> {
 mod tests {
     use exonum_crypto::{Hash, HashStream};
 
-    use super::*;
+    use super::{hash, HashTag, ProofPath, HASH_SIZE};
 
     #[test]
     fn empty_list_hash() {

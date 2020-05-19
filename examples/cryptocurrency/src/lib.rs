@@ -49,7 +49,7 @@ pub mod schema {
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
     use exonum_proto::ProtobufConvert;
 
-    use super::proto;
+    use crate::proto;
 
     // Declare the data to be stored in the blockchain, namely wallets with balances.
     // See [serialization docs][1] for details.

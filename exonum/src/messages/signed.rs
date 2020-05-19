@@ -253,7 +253,7 @@ mod tests {
     use exonum_crypto::{self as crypto, Signature};
     use pretty_assertions::assert_eq;
 
-    use super::*;
+    use super::{BinaryValue, ObjectHash, ProtobufConvert, Verified};
     use crate::{
         helpers::{Height, Round, ValidatorId},
         messages::Precommit,

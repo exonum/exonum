@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use crate::ValidationError; // TODO Change for a type alias after EJB switching to rust > 1.36 (ECR-3827)
+pub use crate::ValidationError;
 
 use exonum_crypto::Hash;
 use serde::{Deserializer, Serializer};
@@ -453,7 +453,7 @@ where
     KeyMode: ToProofPath<K>,
 {
     fn precheck(&self) -> Result<(), MapProofError> {
-        use self::MapProofError::*;
+        use self::MapProofError::{DuplicatePath, EmbeddedPaths, InvalidOrdering};
         use std::cmp::Ordering;
 
         // Check that entries in `proof` are in increasing order.

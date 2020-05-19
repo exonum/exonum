@@ -21,10 +21,12 @@ use exonum::{
     messages::Verified,
 };
 
-use crate::messages::Propose;
-use crate::sandbox::{
-    sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
-    timestamping_sandbox, Sandbox,
+use crate::{
+    messages::Propose,
+    sandbox::{
+        sandbox_tests_helper::{gen_timestamping_tx, NOT_LOCKED},
+        timestamping_sandbox, Sandbox,
+    },
 };
 
 #[test]

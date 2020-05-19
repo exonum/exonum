@@ -24,7 +24,7 @@ use uuid::Uuid;
 
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
 
-use super::ObjectHash;
+use crate::ObjectHash;
 
 /// A type that can be (de)serialized as a value in the blockchain storage.
 ///
@@ -271,7 +271,7 @@ mod tests {
 
     use chrono::Duration;
 
-    use super::*;
+    use super::{BinaryValue, Decimal, Utc, Uuid, HASH_SIZE};
 
     fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
         for value in values {

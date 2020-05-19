@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use exonum_cli::{NodeBuilder, Spec};
-
 use exonum_cryptocurrency::contracts::CryptocurrencyService;
 
 #[tokio::main]

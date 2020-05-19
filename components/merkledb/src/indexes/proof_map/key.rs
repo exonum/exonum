@@ -25,8 +25,6 @@ use std::{
     ops,
 };
 
-use leb128;
-
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
 
 use crate::{BinaryKey, ObjectHash};
@@ -513,7 +511,11 @@ mod tests {
 
     use std::io::Read;
 
-    use super::*;
+    use super::{
+        min, BinaryKey, BitsRange, ChildKind, Cursor, ProofPath, Raw, ToProofPath,
+        BRANCH_KEY_PREFIX, HASH_SIZE, KEY_SIZE, LEAF_KEY_PREFIX, PROOF_PATH_KEY_POS,
+        PROOF_PATH_KIND_POS, PROOF_PATH_LEN_POS, PROOF_PATH_SIZE,
+    };
 
     const MAX_PROOF_PATH_BITS: u16 = 256;
 

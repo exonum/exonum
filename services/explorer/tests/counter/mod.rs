@@ -20,7 +20,9 @@ use exonum::{
     },
     runtime::{ExecutionContext, ExecutionError, InstanceId},
 };
-use exonum_derive::*;
+use exonum_derive::{
+    exonum_interface, ExecutionFail, FromAccess, ServiceDispatcher, ServiceFactory,
+};
 use exonum_rust_runtime::{DefaultInstance, Service};
 
 pub const SERVICE_NAME: &str = "counter";

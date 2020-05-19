@@ -131,9 +131,7 @@ impl std::fmt::Debug for BranchNode {
 
 #[cfg(test)]
 mod tests {
-    use exonum_crypto;
-
-    use super::*;
+    use super::{exonum_crypto, BranchNode, ChildKind, ProofPath};
     use crate::{proof_map::key::BitsRange, BinaryValue, ObjectHash};
 
     #[test]

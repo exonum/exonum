@@ -60,7 +60,7 @@ pub mod proto;
 mod transactions;
 
 use exonum::runtime::{versioning, InstanceId};
-use exonum_derive::*;
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{DefaultInstance, Service};
 
 use std::{fmt, str::FromStr};

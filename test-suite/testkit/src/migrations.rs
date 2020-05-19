@@ -511,7 +511,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        AbortMigration, AbortPolicy, Arc, MigrateData, MigrationContext, MigrationError,
+        MigrationScript, MigrationTest, ScriptExt, ScriptStatus, ServiceFactory, Version,
+    };
 
     use exonum::{
         merkledb::access::AccessExt,

@@ -17,10 +17,12 @@ use log::{info, trace, warn};
 
 use std::mem;
 
-use super::{ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout};
-use crate::events::{
-    Event, EventHandler, EventOutcome, InternalEvent, InternalEventInner, InternalRequest,
-    NetworkEvent,
+use crate::{
+    events::{
+        Event, EventHandler, EventOutcome, InternalEvent, InternalEventInner, InternalRequest,
+        NetworkEvent,
+    },
+    ConnectListConfig, ExternalMessage, NodeHandler, NodeTimeout,
 };
 
 impl EventHandler for NodeHandler {

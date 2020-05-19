@@ -57,7 +57,7 @@ pub fn rust_version() -> Option<Version> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{exonum_version, rust_version, user_agent};
 
     // Checks that user agent string contains three nonempty components.
     #[test]

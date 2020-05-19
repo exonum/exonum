@@ -18,7 +18,7 @@ use quote::{quote, ToTokens};
 use semver::Version;
 use syn::{DeriveInput, Generics, Ident, Path};
 
-use super::RustRuntimeCratePath;
+use crate::RustRuntimeCratePath;
 
 fn is_allowed_artifact_name_char(c: u8) -> bool {
     match c {

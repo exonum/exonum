@@ -18,9 +18,8 @@ use anyhow::Error;
 use exonum::blockchain::ConsensusConfig;
 use exonum_supervisor::mode::Mode as SupervisorMode;
 use serde_derive::{Deserialize, Serialize};
-use structopt::StructOpt;
-
 use std::path::PathBuf;
+use structopt::StructOpt;
 
 use crate::{
     command::{ExonumCommand, StandardResult},

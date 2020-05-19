@@ -23,9 +23,9 @@ pub use self::{
 
 use std::{borrow::Cow, fmt, iter::Peekable, marker::PhantomData};
 
-use self::address::key_bytes;
-use super::{
+use crate::{
     db::{Change, ChangesMut, ChangesRef, ForkIter, ViewChanges},
+    views::address::key_bytes,
     BinaryKey, BinaryValue, Iter as BytesIter, Iterator as BytesIterator, Snapshot,
 };
 
@@ -202,7 +202,7 @@ impl<T: RawAccess> ViewInner<T> {
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
-        use std::collections::Bound::*;
+        use std::collections::Bound::{Included, Unbounded};
 
         let changes_iter = self
             .changes
