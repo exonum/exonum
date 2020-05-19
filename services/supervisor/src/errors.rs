@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use exonum::runtime::{ExecutionError, ExecutionFail};
-use exonum_derive::*;
+use exonum_derive::ExecutionFail;
 
 use std::fmt;
 

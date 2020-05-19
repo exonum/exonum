@@ -24,7 +24,10 @@ use exonum::{
 
 use crate::{
     messages::Propose,
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{
+        sandbox_tests_helper::{add_one_height, ProposeBuilder, SandboxState, NOT_LOCKED},
+        timestamping_sandbox,
+    },
 };
 
 /// HANDLE message

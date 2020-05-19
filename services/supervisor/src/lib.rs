@@ -163,7 +163,7 @@ pub use self::{
 pub use self::schema::SchemaImpl;
 
 use exonum::runtime::{ExecutionContext, ExecutionError, InstanceId, SUPERVISOR_INSTANCE_ID};
-use exonum_derive::*;
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::BinaryValue;
 use exonum_rust_runtime::{
     api::ServiceApiBuilder,

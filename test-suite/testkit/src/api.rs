@@ -491,7 +491,7 @@ fn create_test_server(aggregator: ApiAggregator) -> TestServer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::ApiKind;
     use crate::TestKitBuilder;
 
     fn assert_send<T: Send>(_object: &T) {}

@@ -24,8 +24,8 @@ use exonum_proto::ProtobufConvert;
 
 use std::fmt;
 
-use super::{Block, BlockProof, CallProof, ConsensusConfig};
 use crate::{
+    blockchain::{Block, BlockProof, CallProof, ConsensusConfig},
     crypto::{Hash, PublicKey},
     helpers::{Height, ValidatorId},
     messages::{AnyTx, Precommit, Verified},

@@ -29,7 +29,7 @@ use exonum::{
         SnapshotExt, WellKnownRuntime, SUPERVISOR_INSTANCE_ID,
     },
 };
-use exonum_derive::*;
+use exonum_derive::ExecutionFail;
 use exonum_node::{NodeApiConfig, NodeBuilder, NodeConfig, ShutdownHandle};
 use exonum_rust_runtime::{spec::Deploy, RustRuntime};
 use exonum_supervisor::{ConfigPropose, DeployRequest, Supervisor, SupervisorInterface};

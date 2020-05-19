@@ -550,7 +550,11 @@ fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        fmt, gen_keypair, hash, Hash, HashStream, KeyPair, PublicKey, SecretKey, Seed, Serialize,
+        SignStream, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH,
+        SIGNATURE_LENGTH,
+    };
 
     use hex::FromHex;
     use serde::de::DeserializeOwned;

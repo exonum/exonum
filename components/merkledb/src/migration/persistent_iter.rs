@@ -353,7 +353,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{AccessExt, IteratorPosition, PersistentIter, PersistentKeys};
     use crate::{
         access::CopyAccessExt, migration::Scratchpad, Database, ProofMapIndex, TemporaryDB,
     };

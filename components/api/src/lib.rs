@@ -75,7 +75,6 @@ mod manager;
 mod with;
 
 use serde::{de::DeserializeOwned, Serialize};
-
 use std::{collections::BTreeMap, fmt, future::Future};
 
 use crate::backends::actix;

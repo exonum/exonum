@@ -24,7 +24,7 @@ use exonum::{
         versioning::Version,
     },
 };
-use exonum_derive::*;
+use exonum_derive::{ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{Service, ServiceFactory};
 use rand::{seq::SliceRandom, thread_rng, Rng};
 

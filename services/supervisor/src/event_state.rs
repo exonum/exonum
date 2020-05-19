@@ -14,7 +14,7 @@
 
 use anyhow::format_err;
 use exonum::{helpers::Height, runtime::ExecutionError};
-use exonum_derive::*;
+use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use serde_derive::{Deserialize, Serialize};
 
@@ -90,7 +90,7 @@ impl ProtobufConvert for AsyncEventState {
     type ProtoStruct = pb_supervisor::AsyncEventState;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        use pb_supervisor::AsyncEventState_Type::*;
+        use pb_supervisor::AsyncEventState_Type::{FAIL, PENDING, SUCCESS, TIMEOUT};
 
         let mut pb = Self::ProtoStruct::new();
         match self {
@@ -110,7 +110,7 @@ impl ProtobufConvert for AsyncEventState {
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-        use pb_supervisor::AsyncEventState_Type::*;
+        use pb_supervisor::AsyncEventState_Type::{FAIL, PENDING, SUCCESS, TIMEOUT};
         let state = match pb.get_state() {
             PENDING => Self::Pending,
             SUCCESS => Self::Succeed,

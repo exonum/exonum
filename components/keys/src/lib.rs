@@ -250,7 +250,10 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        generate_keys, read_keys_from_file, thread_rng, validate_file_mode, EncryptedMasterKey,
+        SecretTree,
+    };
     use tempdir::TempDir;
 
     #[test]

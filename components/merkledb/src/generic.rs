@@ -185,7 +185,9 @@ impl AsReadonly for GenericRawAccess<'_> {
     type Readonly = Self;
 
     fn as_readonly(&self) -> Self::Readonly {
-        use self::GenericRawAccess::*;
+        use self::GenericRawAccess::{
+            Fork, OwnedFork, OwnedReadonlyFork, OwnedSnapshot, ReadonlyFork, Snapshot,
+        };
 
         match self {
             // Copy access for snapshots.
@@ -422,7 +424,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        AsReadonly, GenericRawAccess, IntoErased, Migration, Prefixed, Rc, Scratchpad, Snapshot,
+    };
     use crate::{
         access::{AccessExt, CopyAccessExt},
         Database, TemporaryDB,

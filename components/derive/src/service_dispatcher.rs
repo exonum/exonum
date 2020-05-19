@@ -17,7 +17,7 @@ use proc_macro::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{DeriveInput, Generics, Ident, Lit, Meta, NestedMeta, Path};
 
-use super::RustRuntimeCratePath;
+use crate::RustRuntimeCratePath;
 
 #[derive(Debug)]
 struct ServiceInterface {

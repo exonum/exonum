@@ -41,7 +41,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.42.0
+  - 1.43.0
 
 cache:
   npm: true
@@ -89,7 +89,7 @@ jobs:
     - npm run cspell
     - npm run md
     # Clippy lints.
-    - cargo clippy --all --tests --examples --benches --all-features
+    - cargo clippy --all-targets --all-features
     # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc

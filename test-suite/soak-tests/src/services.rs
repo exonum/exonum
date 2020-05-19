@@ -18,7 +18,7 @@ use exonum::{
     merkledb::{access::AccessExt, BinaryValue},
     runtime::{CommonError, ExecutionContext, ExecutionError, InstanceId},
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
 use serde_derive::{Deserialize, Serialize};
 

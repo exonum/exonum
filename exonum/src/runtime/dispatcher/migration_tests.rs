@@ -22,7 +22,12 @@ use exonum_merkledb::{
 
 use std::time::Duration;
 
-use super::*;
+use super::{
+    panic, remove_local_migration_result, rollback_migration, thread, Arc, ArtifactId, Blockchain,
+    Database, Dispatcher, ExecutionError, Fork, Hash, HashMap, InstanceId, InstanceMigration,
+    InstanceSpec, InstanceState, InstanceStatus, Mailbox, MigrationContext, MigrationScript,
+    MigrationThread, MigrationType, Runtime, RuntimeFeature, Snapshot, Version,
+};
 use crate::{
     blockchain::{ApiSender, Block, BlockParams, BlockchainMut},
     helpers::{Height, ValidatorId},

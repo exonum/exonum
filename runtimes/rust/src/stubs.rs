@@ -168,7 +168,7 @@ impl GenericCall<InstanceId> for KeyPair {
 
 #[cfg(test)]
 mod explanation {
-    use super::*;
+    use super::{AnyTx, GenericCall, InstanceId, MethodDescriptor, Verified};
 
     use exonum::{crypto::KeyPair, merkledb::BinaryValue};
     use pretty_assertions::assert_eq;

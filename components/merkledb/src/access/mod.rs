@@ -284,7 +284,7 @@ pub enum AccessErrorKind {
     InvalidTombstone,
 
     /// Custom error.
-    #[error("{}", _0)]
+    #[error("{0}")]
     Custom(#[source] anyhow::Error),
 }
 
@@ -377,7 +377,7 @@ pub trait FromAccess<T: Access>: Sized {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{Access, AccessExt, CopyAccessExt, FromAccess, IndexType, Prefixed};
     use crate::{Database, ListIndex, TemporaryDB};
 
     #[test]

@@ -96,7 +96,7 @@ where
 mod tests {
     use assert_matches::assert_matches;
 
-    use super::*;
+    use super::{FromAccess, Lazy};
     use crate::{access::AccessErrorKind, Database, IndexType, ListIndex, MapIndex, TemporaryDB};
 
     #[test]

@@ -23,7 +23,9 @@ use exonum_api::{
     backends::actix::{HttpRequest, RawHandler, RequestHandler},
     ApiBackend,
 };
-use exonum_derive::*;
+use exonum_derive::{
+    exonum_interface, ExecutionFail, FromAccess, RequireArtifact, ServiceDispatcher, ServiceFactory,
+};
 use exonum_explorer::api::TransactionResponse;
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},

@@ -275,7 +275,7 @@ impl Hash for SodiumSha256 {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{CryptoRng, Dh, Error, Random, RngCore, SodiumDh25519};
     use hex::FromHex;
     use pretty_assertions::assert_eq;
 

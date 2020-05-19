@@ -15,11 +15,11 @@
 //! Transaction logic for `MiddlewareService`.
 
 use exonum::runtime::{AnyTx, CoreError, ExecutionContext, ExecutionError, InstanceId};
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{FallthroughAuth, GenericCall, GenericCallMut, MethodDescriptor, TxStub};
 use semver::VersionReq;
-use serde_derive::*;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::{proto, ArtifactReq, MiddlewareService};
 
@@ -47,7 +47,7 @@ pub struct CheckedCall {
 }
 
 mod pb_version_req {
-    use super::*;
+    use super::VersionReq;
 
     #[allow(clippy::needless_pass_by_value)] // required by `exonum-proto`
     pub fn from_pb(pb: String) -> anyhow::Result<VersionReq> {

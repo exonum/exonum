@@ -32,6 +32,7 @@ use exonum_merkledb::{
 };
 
 mod common;
+
 use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]

@@ -20,7 +20,7 @@ use exonum::{
     crypto::PublicKey,
     runtime::{AnyTx, CallInfo, ExecutionContext, ExecutionError, InstanceId, SnapshotExt},
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
 use exonum_rust_runtime::{
     DefaultInstance, FallthroughAuth, GenericCallMut, MethodDescriptor, Service,

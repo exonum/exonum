@@ -22,7 +22,7 @@ use exonum::{
         BinaryKey, BinaryValue, Error as MerkledbError, ObjectHash, ProofMapIndex,
     },
 };
-use exonum_derive::*;
+use exonum_derive::FromAccess;
 
 use std::{
     borrow::Cow,
@@ -192,7 +192,7 @@ impl<T: Ord + BinaryValue> ObjectHash for BinarySet<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{BinarySet, BinaryValue};
 
     #[test]
     fn test_multisig_values_binary_value() {

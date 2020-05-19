@@ -84,7 +84,7 @@ use exonum::{
     merkledb::ObjectHash,
     runtime::{ExecutionContext, ExecutionError, ExecutionFail},
 };
-use exonum_derive::*;
+use exonum_derive::{ExecutionFail, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
 
 pub mod api;

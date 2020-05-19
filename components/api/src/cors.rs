@@ -14,7 +14,6 @@
 
 use anyhow::bail;
 use serde::{de, ser};
-
 use std::{fmt, str::FromStr};
 
 /// CORS header specification.
