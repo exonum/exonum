@@ -59,7 +59,7 @@ env:
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
-  - SCCACHE_VERS=0.2.12
+  - SCCACHE_VERS=0.2.13
   matrix:
   - FEATURE=test
 
@@ -108,6 +108,7 @@ jobs:
 
     # Run grcov.
   - name: grcov
+    rust: nightly
     install:
     - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     script:
