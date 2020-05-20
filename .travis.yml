@@ -106,27 +106,20 @@ jobs:
     - touch target/doc/std/primitive.char.html
     - cargo deadlinks --dir target/doc
 
-    # Run kcov.
-  - name: kcov
+    # Run grcov.
+  - name: grcov
     install:
-    - |
-      if [ ! -f "$HOME/.kcov/bin/kcov" ]; then
-        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
-        tar xzf master.tar.gz
-        cd kcov-master
-        mkdir build
-        cd build
-        cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.kcov -DCMAKE_BUILD_TYPE=Release
-        make -j2
-        make install
-        cd ../..
-        rm -rf kcov-master
-      fi
+    - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     script:
-    - cargo test --no-run
-    - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; $HOME/.kcov/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
-    - bash <(curl -s https://codecov.io/bash)
+    - export CARGO_INCREMENTAL=0
+    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Copt-level=0 -Clink-dead-code -Coverflow-checks=off -Zpanic_abort_tests -Cpanic=abort"
+    - export RUSTDOCFLAGS="-Cpanic=abort"
+    - cargo build --verbose $CARGO_OPTIONS
+    - cargo test --verbose $CARGO_OPTIONS
+    - |
+      zip -0 ccov.zip `find . \( -name "*.gc*" \) -print`;
+      ./grcov ccov.zip -s . -t lcov --llvm --branch --ignore-not-existing --ignore "/*" -o lcov.info;
+      bash <(curl -s https://codecov.io/bash) -f lcov.info;
     - echo "Uploaded code coverage"
 
   # Unit tests (including test runs for benchmarks).
