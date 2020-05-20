@@ -115,6 +115,7 @@ jobs:
       - RUSTDOCFLAGS="-Cpanic=abort"
     install: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     script:
+    - cargo clean
     - cargo build
     - cargo test --no-run
     - |
