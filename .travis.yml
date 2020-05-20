@@ -118,7 +118,7 @@ jobs:
     - cargo build --workspace
     - cargo test --all-targets --no-run
     - |
-      zip -0 ccov.zip `find . \( -name "*.gc*" \) -print`;
+      zip -0 ccov.zip `find . \( -name "*exonum*.gc*" \) -print`;
       ./grcov ccov.zip -s . -t coveralls+ --guess-directory-when-missing --llvm --branch --ignore-not-existing --ignore "/*" -o ccov.info;
       bash <(curl -s https://codecov.io/bash) -f ccov.info;
     - echo "Uploaded code coverage"
