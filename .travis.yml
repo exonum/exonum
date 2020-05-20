@@ -109,12 +109,12 @@ jobs:
     # Run grcov.
   - name: grcov
     rust: nightly
-    install:
-    - curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
+    env:
+      - CARGO_INCREMENTAL=0
+      - RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
+      - RUSTDOCFLAGS="-Cpanic=abort"
+    install: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     script:
-    - export CARGO_INCREMENTAL=0
-    - export RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
-    - export RUSTDOCFLAGS="-Cpanic=abort"
     - cargo build --workspace
     - cargo test --all-targets --no-run
     - |
