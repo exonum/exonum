@@ -115,12 +115,11 @@ jobs:
       - RUSTDOCFLAGS="-Cpanic=abort"
     install: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
     script:
-    - cargo build --workspace
-    - cargo test --all-targets --no-run
+    - cargo build
+    - cargo test --no-run
     - |
-      zip -0 ccov.zip `find . \( -name "*exonum*.gc*" \) -print`;
-      ./grcov ccov.zip -s . -t coveralls+ --guess-directory-when-missing --llvm --branch --ignore-not-existing --ignore "/*" -o ccov.info;
-      bash <(curl -s https://codecov.io/bash) -f ccov.info;
+      ./grcov target -s . -t coveralls+ --guess-directory-when-missing --llvm --branch --ignore-not-existing --ignore "/*" --ignore target/debug/build --token "$CODECOV_TOKEN" -o ccov.json
+      bash <(curl -s https://codecov.io/bash) -X gcov -f ccov.json;
     - echo "Uploaded code coverage"
 
   # Unit tests (including test runs for benchmarks).
