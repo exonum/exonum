@@ -119,8 +119,8 @@ jobs:
     - cargo build
     - cargo test --no-run
     - |
-      ./grcov target -s . -t coveralls+ --guess-directory-when-missing --llvm --branch --ignore-not-existing --ignore "/*" --ignore target/debug/build --token "$CODECOV_TOKEN" -o ccov.json
-      bash <(curl -s https://codecov.io/bash) -X gcov -f ccov.json;
+      ./grcov target -s . -t lcov --guess-directory-when-missing --llvm --branch --ignore-not-existing --ignore "/*" --ignore target/debug/build -o lcov.json
+      bash <(curl -s https://codecov.io/bash) -f lcov.json;
     - echo "Uploaded code coverage"
 
   # Unit tests (including test runs for benchmarks).
