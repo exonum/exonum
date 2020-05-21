@@ -24,6 +24,7 @@ pub struct ClapBackend;
 impl ClapBackend {
     // TODO: Remove code duplication. (ECR-164)
     #[doc(hidden)]
+    #[allow(deprecated)]
     pub fn execute_cmd_string<I, T>(
         commands: &HashMap<CommandName, CollectedCommand>,
         line: I,
@@ -53,6 +54,7 @@ impl ClapBackend {
         )
     }
 
+    #[allow(deprecated)]
     pub fn execute(commands: &HashMap<CommandName, CollectedCommand>) -> Feedback {
         let subcommands: Vec<_> = commands
             .values()

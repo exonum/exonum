@@ -21,6 +21,7 @@ chrono
 clippy
 clonned
 codecov
+codegen
 compat
 concat
 consts

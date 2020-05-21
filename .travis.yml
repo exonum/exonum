@@ -38,7 +38,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.36.0
+  - 1.39.0
 
 cache:
   npm: true
@@ -136,7 +136,7 @@ jobs:
     - rustup component add clippy
     - cargo clippy --version
     script:
-    - cargo clippy --all --tests --examples -- -D warnings
+    - cargo clippy --all --tests --examples
 
   # Benchmarks (compilation only).
   - name: benchmarks
