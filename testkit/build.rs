@@ -28,7 +28,7 @@ fn main() {
         ),
     ];
 
-    for (input_dir, includes, mod_file_name) in protobuf_gen_data.into_iter() {
+    for (input_dir, includes, mod_file_name) in protobuf_gen_data.iter() {
         protobuf_generate(input_dir, includes, mod_file_name);
     }
 }

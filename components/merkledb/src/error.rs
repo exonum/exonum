@@ -14,8 +14,6 @@
 
 //! An implementation of `Error` type.
 
-use std::error::Error as StdError;
-
 /// The error type for I/O operations with storage.
 ///
 /// These errors result in a panic. Storage errors are fatal as in the case of
@@ -39,6 +37,6 @@ impl Error {
 
 impl From<rocksdb::Error> for Error {
     fn from(err: rocksdb::Error) -> Self {
-        Self::new(err.description())
+        Self::new(err.to_string())
     }
 }

@@ -475,7 +475,7 @@ fn panic_description(any: &Box<dyn Any + Send>) -> Option<String> {
     } else if let Some(s) = any.downcast_ref::<String>() {
         Some(s.clone())
     } else if let Some(error) = any.downcast_ref::<Box<dyn Error + Send>>() {
-        Some(error.description().to_string())
+        Some(error.to_string())
     } else {
         None
     }
@@ -675,7 +675,7 @@ mod tests {
     #[test]
     fn box_error_panic() {
         let error: Box<dyn Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
-        let description = error.description().to_owned();
+        let description = error.to_string();
         let error = make_panic(error);
         assert_eq!(Some(description), panic_description(&error));
     }

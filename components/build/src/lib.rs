@@ -120,28 +120,16 @@ where
 
     let includes = includes.into_iter().collect::<Vec<_>>();
 
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: out_dir
-            .to_str()
-            .expect("Out dir name is not convertible to &str"),
-        input: &proto_files
-            .iter()
-            .map(|s| s.to_str().expect("File name is not convertible to &str"))
-            .collect::<Vec<_>>(),
-        includes: &includes
-            .iter()
-            .map(|s| {
-                s.as_ref()
-                    .to_str()
-                    .expect("Include dir name is not convertible to &str")
-            })
-            .collect::<Vec<_>>(),
-        customize: Customize {
+    protoc_rust::Codegen::new()
+        .out_dir(out_dir)
+        .inputs(proto_files)
+        .includes(includes)
+        .customize(Customize {
             serde_derive: Some(true),
             ..Default::default()
-        },
-    })
-    .expect("protoc");
+        })
+        .run()
+        .expect("protoc");
 
     // rerun build.rs if .proto files changed.
     println!(

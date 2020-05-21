@@ -5,13 +5,21 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 ## Unreleased
 
+## 0.12.2 - 2020-05-21
+
+### Bug Fixes
+
+#### exonum
+
+- Fixed a bug related to clear cache via maintenance subcommand.  
+
 ## 0.12.1 - 2019-09-19
 
 ### Bug Fixes
 
 #### exonum
 
-- A message length checking has been fixed (#1463)
+- A message length checking has been fixed. (#1463)
 
 ## 0.12.0 - 2019-08-14
 
