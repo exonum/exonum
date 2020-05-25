@@ -106,21 +106,30 @@ jobs:
     - touch target/doc/std/primitive.char.html
     - cargo deadlinks --dir target/doc
 
-    # Run grcov.
-  - name: grcov
-    rust: nightly
-    env:
-      - CARGO_INCREMENTAL=0
-      - RUSTFLAGS="-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off"
-      - RUSTDOCFLAGS="-Cpanic=abort"
-    install: curl -L https://github.com/mozilla/grcov/releases/latest/download/grcov-linux-x86_64.tar.bz2 | tar jxf -
-    script:
-    - cargo clean
-    - cargo build
-    - cargo test --no-run
+    # Run kcov.
+  - name: kcov
+    install:
     - |
-      ./grcov target -s . -t lcov --guess-directory-when-missing --llvm --branch --ignore-not-existing --ignore "/*" --ignore target/debug/build -o lcov.json
-      bash <(curl -s https://codecov.io/bash) -f lcov.json;
+      if [ ! -f "$HOME/.kcov/bin/kcov" ]; then
+        wget https://github.com/SimonKagstrom/kcov/archive/master.tar.gz
+        tar xzf master.tar.gz
+        cd kcov-master
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/.kcov -DCMAKE_BUILD_TYPE=Release
+        make -j2
+        make install
+        cd ../..
+        rm -rf kcov-master
+      fi
+    script:
+    - cargo test --all-targets --no-run
+    - |
+      for file in `find target/debug/ -maxdepth 2 -path target/debug/deps -prune -o -type f | egrep "*-([a-zA-Z0-9]{16}$)"`;
+      do mkdir -p "target/cov/$(basename $file)";
+      $HOME/.kcov/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file";
+      done
+    - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 
   # Unit tests (including test runs for benchmarks).
