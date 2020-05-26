@@ -26,7 +26,9 @@ use serde_json::json;
 
 use std::{collections::BTreeMap, iter};
 
-use exonum_explorer::*;
+use exonum_explorer::{
+    BlockInfo, BlockWithTransactions, BlockchainExplorer, CommittedTransaction, TransactionInfo,
+};
 
 #[path = "../tests/blockchain/mod.rs"]
 mod blockchain;

@@ -199,7 +199,7 @@ impl<T: Database> CheckpointDbInner<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{CheckpointDb, Database};
     use exonum_merkledb::{access::CopyAccessExt, TemporaryDB};
 
     fn stack_len<T>(db: &CheckpointDb<T>) -> usize {

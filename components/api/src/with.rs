@@ -16,7 +16,7 @@ use chrono::{DateTime, Utc};
 
 use std::{future::Future, marker::PhantomData};
 
-use super::{error, EndpointMutability};
+use crate::{error, EndpointMutability};
 
 /// Type alias for the usual synchronous result.
 pub type Result<I> = std::result::Result<I, error::Error>;

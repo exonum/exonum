@@ -138,14 +138,12 @@ use std::{
     },
 };
 
-use crate::validation::check_index_valid_full_name;
-use crate::views::IndexMetadata;
 use crate::{
     access::{Access, AccessError, Prefixed, RawAccess},
-    validation::assert_valid_name_component,
+    validation::{assert_valid_name_component, check_index_valid_full_name},
     views::{
-        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexType, IndexesPool,
-        RawAccessMut, View, ViewWithMetadata,
+        get_state_aggregator, AsReadonly, GroupKeys, IndexAddress, IndexMetadata, IndexType,
+        IndexesPool, RawAccessMut, View, ViewWithMetadata,
     },
     BinaryKey, Database, Fork, ObjectHash, ProofMapIndex, ReadonlyFork,
 };
@@ -587,7 +585,7 @@ impl MigrationHelper {
 #[derive(Debug, Error)]
 pub enum MigrationError {
     /// Failed to merge migration changes to database.
-    #[error("Failed to merge migration changes to the database: {}", _0)]
+    #[error("Failed to merge migration changes to the database: {0}")]
     Merge(#[source] crate::Error),
 
     /// Migration has been aborted.
@@ -691,7 +689,11 @@ pub fn rollback_migration(fork: &mut Fork, namespace: &str) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        flush_migration, rollback_migration, AbortHandle, Arc, Database, Hash, IndexAddress,
+        IndexType, Migration, MigrationError, MigrationHelper, Scratchpad, ViewWithMetadata,
+        SCRATCHPAD_NAME,
+    };
     use crate::{
         access::{AccessExt, CopyAccessExt, RawAccess},
         HashTag, ObjectHash, SystemSchema, TemporaryDB,

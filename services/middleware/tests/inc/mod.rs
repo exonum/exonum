@@ -25,7 +25,7 @@ use exonum::{
         ArtifactId, CommonError, ExecutionContext, ExecutionError, RuntimeIdentifier,
     },
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, FromAccess, RequireArtifact, ServiceDispatcher};
 use exonum_rust_runtime::{ArtifactProtobufSpec, Service, ServiceFactory};
 
 use exonum_middleware_service::ArtifactReq;

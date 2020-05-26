@@ -18,12 +18,11 @@
 use anyhow::Error;
 use exonum::keys::{read_keys_from_file, Keys};
 use serde_derive::{Deserialize, Serialize};
-use structopt::StructOpt;
-
 use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
 };
+use structopt::StructOpt;
 
 use crate::{
     command::{ExonumCommand, StandardResult},

@@ -15,12 +15,13 @@
 //! An implementation of `TemporaryDB` database.
 
 use rocksdb::{WriteBatch, WriteOptions};
+use std::sync::Arc;
 use tempfile::TempDir;
 
-use std::sync::Arc;
-
-use crate::backends::rocksdb::{RocksDB, RocksDBSnapshot};
-use crate::{db::DB_METADATA, Database, DbOptions, Iter, Patch, ResolvedAddress, Result, Snapshot};
+use crate::{
+    backends::rocksdb::RocksDBSnapshot, db::DB_METADATA, Database, DbOptions, Iter, Patch,
+    ResolvedAddress, Result, RocksDB, Snapshot,
+};
 
 /// A wrapper over the `RocksDB` backend which stores data in the temporary directory
 /// using the `tempfile` crate.

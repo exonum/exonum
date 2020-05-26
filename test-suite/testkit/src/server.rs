@@ -274,7 +274,7 @@ mod tests {
 
     use std::time::Duration;
 
-    use super::*;
+    use super::{CreateBlock, LocalSet, TestKitActor, TestKitStatus};
     use crate::{TestKitApi, TestKitBuilder};
 
     const TIMESTAMP_SERVICE_ID: u32 = 2;

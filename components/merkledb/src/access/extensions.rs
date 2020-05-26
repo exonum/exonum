@@ -14,8 +14,8 @@
 
 //! Extension traits to simplify index instantiation.
 
-use super::{Access, FromAccess};
 use crate::{
+    access::{Access, FromAccess},
     indexes::proof_map::{Raw, ToProofPath},
     views::IndexType,
     BinaryKey, BinaryValue, Entry, Group, IndexAddress, KeySetIndex, ListIndex, MapIndex,
@@ -500,7 +500,7 @@ impl<T: Access> AccessExt for T {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{AccessExt, CopyAccessExt, IndexType};
     use crate::{access::Prefixed, migration::Migration, Database, TemporaryDB};
 
     #[test]

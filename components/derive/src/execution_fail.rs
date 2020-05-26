@@ -20,7 +20,7 @@ use syn::{Attribute, Data, DeriveInput, Expr, Lit, Meta, MetaNameValue, Variant}
 
 use std::convert::TryFrom;
 
-use super::{find_meta_attrs, MainCratePath};
+use crate::{find_meta_attrs, MainCratePath};
 
 #[derive(Debug, FromMeta)]
 #[darling(default)]

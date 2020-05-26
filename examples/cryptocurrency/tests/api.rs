@@ -28,9 +28,6 @@ use exonum_rust_runtime::api;
 use exonum_testkit::{
     explorer::api::TransactionQuery, ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder,
 };
-use pretty_assertions::assert_eq;
-use serde_json::json;
-
 // Import data types used in tests from the crate where the service is defined.
 use exonum_cryptocurrency::{
     api::WalletQuery,
@@ -38,6 +35,8 @@ use exonum_cryptocurrency::{
     schema::Wallet,
     transactions::{CreateWallet, TxTransfer},
 };
+use pretty_assertions::assert_eq;
+use serde_json::json;
 
 /// Alice's wallets name.
 const ALICE_NAME: &str = "Alice";

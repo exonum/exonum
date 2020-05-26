@@ -29,7 +29,7 @@ addons:
     - libelf-dev
     - libiberty-dev
     - libprotobuf-dev
-    - librocksdb6.7
+    - librocksdb6.8
     - libsnappy-dev
     - libsodium-dev
     - libssl-dev
@@ -41,7 +41,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.42.0
+  - 1.43.0
 
 cache:
   npm: true
@@ -59,7 +59,7 @@ env:
   - RUSTFLAGS="-D warnings"
   - ROCKSDB_LIB_DIR=/usr/lib
   - SNAPPY_LIB_DIR=/usr/lib/x86_64-linux-gnu
-  - SCCACHE_VERS=0.2.12
+  - SCCACHE_VERS=0.2.13
   matrix:
   - FEATURE=test
 
@@ -89,7 +89,7 @@ jobs:
     - npm run cspell
     - npm run md
     # Clippy lints.
-    - cargo clippy --all --tests --examples --benches --all-features
+    - cargo clippy --all-targets --all-features
     # Other cargo lints.
     - cargo fmt --all -- --check
     - cargo clean --doc
@@ -123,9 +123,12 @@ jobs:
         rm -rf kcov-master
       fi
     script:
-    - cargo test --no-run
-    - cd $TRAVIS_BUILD_DIR
-    - for file in `find target/debug/ -maxdepth 1 -type f | egrep "*-([a-zA-Z0-9]{16}$)"`; do mkdir -p "target/cov/$(basename $file)"; $HOME/.kcov/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file"; done
+    - cargo test --all-targets --no-run
+    - |
+      for file in `find target/debug/ -maxdepth 2 -path target/debug/deps -prune -o -type f | egrep "*-([a-zA-Z0-9]{16}$)"`;
+      do mkdir -p "target/cov/$(basename $file)";
+      $HOME/.kcov/bin/kcov --exclude-pattern=/.cargo,/usr/lib --verify "target/cov/$(basename $file)" "$file";
+      done
     - bash <(curl -s https://codecov.io/bash)
     - echo "Uploaded code coverage"
 

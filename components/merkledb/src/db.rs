@@ -1076,7 +1076,7 @@ where
     }
 
     fn step(&mut self) -> NextIterValue {
-        use std::cmp::Ordering::*;
+        use std::cmp::Ordering::{Equal, Greater, Less};
 
         if let Some(ref mut changes) = self.changes {
             match changes.peek() {
@@ -1232,7 +1232,10 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        AsReadonly, Change, Database, DatabaseExt, Fork, OwnedReadonlyFork, Patch, Rc,
+        ResolvedAddress, Snapshot, StdIterator, SystemSchema, View,
+    };
     use crate::{access::CopyAccessExt, ObjectHash, TemporaryDB};
 
     use std::{collections::HashSet, iter::FromIterator};

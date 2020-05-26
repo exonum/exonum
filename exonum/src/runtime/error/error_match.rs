@@ -16,9 +16,10 @@
 
 use std::fmt;
 
-use super::{CallSite, CallType, ErrorKind, ExecutionError, ExecutionFail};
-
-use crate::runtime::InstanceId;
+use crate::runtime::{
+    error::{CallSite, CallType, ErrorKind, ExecutionError, ExecutionFail},
+    InstanceId,
+};
 
 /// Matcher for `ExecutionError`s that can have some fields unspecified. Can be compared to
 /// an `ExceptionError`, e.g., in tests. The unspecified fields will match any value in the error.
@@ -193,7 +194,7 @@ impl StringMatch {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{CallSite, CallType, ErrorKind, ErrorMatch, ExecutionError, StringMatch};
 
     #[test]
     #[allow(clippy::cognitive_complexity)] // More test code is fine

@@ -132,8 +132,7 @@ mod test {
     use pretty_assertions::assert_eq;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
-    use super::*;
-    use crate::ConnectInfo;
+    use super::{ConnectInfo, ConnectList};
 
     const SEED_LENGTH: usize = 32;
     static VALIDATORS: [[u8; SEED_LENGTH]; 2] = [[1; SEED_LENGTH], [2; SEED_LENGTH]];

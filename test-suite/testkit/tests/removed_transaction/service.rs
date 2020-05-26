@@ -16,7 +16,7 @@
 //! Used to test removed methods workflow.
 
 use exonum::runtime::{ExecutionError, InstanceId};
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, interface_method, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{DefaultInstance, ExecutionContext, Service};
 
 pub const SERVICE_NAME: &str = "sample_service";

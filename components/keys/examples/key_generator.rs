@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_keys::*;
-use hex;
+use exonum_keys::generate_keys_from_seed;
 use serde_json::json;
 use structopt::StructOpt;
 
@@ -56,6 +55,7 @@ fn generate_json(passphrase: &str, seed: &str) -> anyhow::Result<serde_json::Val
 
 #[test]
 fn test_key_generator() {
+    use exonum_keys::read_keys_from_file;
     #[cfg(unix)]
     use std::os::unix::fs::OpenOptionsExt;
     use std::{fs::OpenOptions, io::Write};

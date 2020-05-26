@@ -16,7 +16,7 @@ use exonum::{
     crypto::Hash,
     runtime::{ArtifactId, InstanceId},
 };
-use exonum_derive::*;
+use exonum_derive::{FromAccess, RequireArtifact};
 use exonum_merkledb::{
     access::{Access, FromAccess, Prefixed},
     Entry, Fork, ProofEntry, ProofMapIndex, ValueSetIndex,

@@ -22,10 +22,9 @@ use proptest::{
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use exonum_merkledb::migration::{rollback_migration, Scratchpad};
 use exonum_merkledb::{
     access::CopyAccessExt,
-    migration::{PersistentIter, PersistentKeys},
+    migration::{rollback_migration, PersistentIter, PersistentKeys, Scratchpad},
     Database, Fork, IndexAddress, IndexType, TemporaryDB,
 };
 

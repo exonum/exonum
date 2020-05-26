@@ -22,11 +22,9 @@ use exonum::{
     runtime::{ExecutionStatus, InstanceId, MethodId},
 };
 use serde_derive::{Deserialize, Serialize};
-
 use std::fmt;
 
-use super::TransactionHex;
-use crate::median_precommits_time;
+use crate::{api::TransactionHex, median_precommits_time};
 
 /// Messages proactively sent by WebSocket clients to the server.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]

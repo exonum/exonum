@@ -19,7 +19,10 @@ use exonum::{
 
 use crate::{
     messages::{Message, Service},
-    sandbox::{sandbox_tests_helper::*, timestamping_sandbox},
+    sandbox::{
+        sandbox_tests_helper::{make_prevote_from_propose, NOT_LOCKED},
+        timestamping_sandbox,
+    },
 };
 
 #[test]
@@ -165,62 +168,60 @@ fn test_approving_skip_propose(sequence: &[MessageType]) {
     panic!("Haven't reached new epoch by the end of the test");
 }
 
-#[test]
-fn approve_skip_propose_a() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Propose, Prevote, Prevote, Precommit, Precommit]);
-}
+#[cfg(test)]
+mod skip_proposes {
+    use super::{
+        test_approving_skip_propose,
+        MessageType::{Precommit, Prevote, Propose},
+    };
 
-#[test]
-fn approve_skip_propose_b() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Prevote, Prevote, Propose, Precommit, Precommit]);
-}
+    #[test]
+    fn approve_skip_propose_a() {
+        test_approving_skip_propose(&[Propose, Prevote, Prevote, Precommit, Precommit]);
+    }
 
-#[test]
-fn approve_skip_propose_c() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Prevote, Prevote, Precommit, Propose, Precommit]);
-}
+    #[test]
+    fn approve_skip_propose_b() {
+        test_approving_skip_propose(&[Prevote, Prevote, Propose, Precommit, Precommit]);
+    }
 
-#[test]
-fn approve_skip_propose_d() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Precommit, Precommit, Prevote, Prevote, Propose]);
-}
+    #[test]
+    fn approve_skip_propose_c() {
+        test_approving_skip_propose(&[Prevote, Prevote, Precommit, Propose, Precommit]);
+    }
 
-#[test]
-fn approve_skip_propose_e() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Propose, Precommit, Precommit, Prevote, Prevote]);
-}
+    #[test]
+    fn approve_skip_propose_d() {
+        test_approving_skip_propose(&[Precommit, Precommit, Prevote, Prevote, Propose]);
+    }
 
-#[test]
-fn approve_skip_propose_f() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Prevote, Propose, Precommit, Prevote, Precommit]);
-}
+    #[test]
+    fn approve_skip_propose_e() {
+        test_approving_skip_propose(&[Propose, Precommit, Precommit, Prevote, Prevote]);
+    }
 
-#[test]
-fn approve_skip_propose_other_precommits_a() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Precommit, Precommit, Precommit, Propose]);
-}
+    #[test]
+    fn approve_skip_propose_f() {
+        test_approving_skip_propose(&[Prevote, Propose, Precommit, Prevote, Precommit]);
+    }
 
-#[test]
-fn approve_skip_propose_other_precommits_b() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Precommit, Precommit, Propose, Precommit]);
-}
+    #[test]
+    fn approve_skip_propose_other_precommits_a() {
+        test_approving_skip_propose(&[Precommit, Precommit, Precommit, Propose]);
+    }
 
-#[test]
-fn approve_skip_propose_other_precommits_c() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Propose, Precommit, Precommit, Precommit]);
-}
+    #[test]
+    fn approve_skip_propose_other_precommits_b() {
+        test_approving_skip_propose(&[Precommit, Precommit, Propose, Precommit]);
+    }
 
-#[test]
-fn approve_skip_propose_other_precommits_d() {
-    use self::MessageType::*;
-    test_approving_skip_propose(&[Propose, Precommit, Precommit, Prevote, Precommit]);
+    #[test]
+    fn approve_skip_propose_other_precommits_c() {
+        test_approving_skip_propose(&[Propose, Precommit, Precommit, Precommit]);
+    }
+
+    #[test]
+    fn approve_skip_propose_other_precommits_d() {
+        test_approving_skip_propose(&[Propose, Precommit, Precommit, Prevote, Precommit]);
+    }
 }

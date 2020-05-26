@@ -32,6 +32,7 @@ use std::{
     str::FromStr,
 };
 
+use self::schema::lifecycle::ArtifactState_Status::{ACTIVE, DEPLOYING, UNLOADING};
 use super::InstanceDescriptor;
 use crate::{
     blockchain::config::InstanceInitParams, helpers::ValidateInput, messages::Verified,
@@ -428,8 +429,6 @@ impl ProtobufConvert for ArtifactStatus {
     type ProtoStruct = schema::lifecycle::ArtifactState_Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        use self::schema::lifecycle::ArtifactState_Status::*;
-
         match self {
             Self::Unloading => UNLOADING,
             Self::Active => ACTIVE,
@@ -438,8 +437,6 @@ impl ProtobufConvert for ArtifactStatus {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-        use self::schema::lifecycle::ArtifactState_Status::*;
-
         Ok(match pb {
             UNLOADING => Self::Unloading,
             ACTIVE => Self::Active,
@@ -594,7 +591,7 @@ impl InstanceStatus {
     }
 
     fn create_pb(status: Option<&Self>) -> schema::lifecycle::InstanceStatus {
-        use schema::lifecycle::InstanceStatus_Simple::*;
+        use schema::lifecycle::InstanceStatus_Simple::{ACTIVE, FROZEN, NONE, STOPPED};
 
         let mut pb = schema::lifecycle::InstanceStatus::new();
         match status {
@@ -610,7 +607,7 @@ impl InstanceStatus {
     pub(super) fn from_pb(
         mut pb: schema::lifecycle::InstanceStatus,
     ) -> anyhow::Result<Option<Self>> {
-        use schema::lifecycle::InstanceStatus_Simple::*;
+        use schema::lifecycle::InstanceStatus_Simple::{ACTIVE, FROZEN, NONE, STOPPED};
 
         if pb.has_simple() {
             Ok(match pb.get_simple() {
@@ -711,7 +708,7 @@ pub struct InstanceState {
 }
 
 mod pb_optional_version {
-    use super::*;
+    use super::Version;
 
     #[allow(clippy::needless_pass_by_value)] // required for work with `protobuf_convert(with)`
     pub fn from_pb(pb: String) -> anyhow::Result<Option<Version>> {
@@ -1022,11 +1019,11 @@ unsafe impl RawKey for CallerAddress {
 
 #[cfg(test)]
 mod tests {
+    use exonum_crypto as crypto;
     use pretty_assertions::assert_eq;
     use serde_json::json;
 
-    use super::*;
-    use exonum_crypto as crypto;
+    use super::{ArtifactId, Caller, InstanceSpec, Version};
 
     #[test]
     fn parse_artifact_id_correct() {

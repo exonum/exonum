@@ -19,7 +19,7 @@ use exonum::runtime::{
     versioning::Version,
     ExecutionContext, ExecutionError, InstanceId,
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{AfterCommitContext, DefaultInstance, Service};
 
 use std::sync::{

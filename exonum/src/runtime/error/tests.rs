@@ -21,10 +21,12 @@ use serde_json::json;
 
 use std::{any::Any, panic};
 
-use super::*;
 use crate::{
     blockchain::{CallInBlock, Schema},
     helpers::Height,
+    runtime::error::{
+        errors_proto, CallSite, CallType, ErrorKind, ExecutionError, ExecutionStatus,
+    },
 };
 
 fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {

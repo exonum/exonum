@@ -16,7 +16,6 @@
 
 use exonum_node::{ConfigManager, ConnectListConfig};
 use log::error;
-
 use std::{path::Path, sync::mpsc, thread};
 
 use crate::{

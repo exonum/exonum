@@ -790,7 +790,7 @@ mod proto {
         HashedEntry, ListProof, ProofListKey,
     };
     use crate::{
-        proto::{self, *},
+        proto::{self, ListProofEntry},
         BinaryValue,
     };
 

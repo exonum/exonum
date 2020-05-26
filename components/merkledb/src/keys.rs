@@ -346,7 +346,9 @@ impl BinaryKey for Decimal {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{
+        BigEndian, BinaryKey, ByteOrder, DateTime, Decimal, Hash, PublicKey, Signature, Utc, Uuid,
+    };
     use crate::access::CopyAccessExt;
 
     use std::{fmt::Debug, str::FromStr};

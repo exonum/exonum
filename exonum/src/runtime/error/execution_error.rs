@@ -27,13 +27,15 @@ use std::{
     mem,
 };
 
-use super::{
-    execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError,
-    ExecutionErrorAux,
-};
 use crate::{
     proto::schema,
-    runtime::{CallSite, RuntimeIdentifier},
+    runtime::{
+        error::{
+            execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError,
+            ExecutionErrorAux,
+        },
+        CallSite, RuntimeIdentifier,
+    },
 };
 
 impl ExecutionError {

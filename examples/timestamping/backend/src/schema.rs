@@ -15,10 +15,12 @@
 //! Timestamping database schema.
 
 use chrono::{DateTime, Utc};
-use exonum::crypto::Hash;
-use exonum::merkledb::{
-    access::{Access, FromAccess, RawAccessMut},
-    Entry, RawProofMapIndex,
+use exonum::{
+    crypto::Hash,
+    merkledb::{
+        access::{Access, FromAccess, RawAccessMut},
+        Entry, RawProofMapIndex,
+    },
 };
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use exonum_proto::ProtobufConvert;

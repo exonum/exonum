@@ -394,7 +394,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{ListIndex, RawAccessMut};
     use crate::{
         access::{AccessExt, CopyAccessExt},
         Database, Fork, TemporaryDB,

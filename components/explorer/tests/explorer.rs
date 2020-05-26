@@ -22,13 +22,14 @@ use exonum::{
     messages::{AnyTx, Verified},
     runtime::{ErrorKind, SnapshotExt},
 };
+use exonum_explorer::{
+    BlockInfo, BlockWithTransactions, BlockchainExplorer, CommittedTransaction, TransactionInfo,
+};
 use serde_json::json;
-
 use std::iter;
 
-use exonum_explorer::*;
-
 mod blockchain;
+
 use self::blockchain::{
     create_block, create_blockchain, CreateWallet, ExplorerTransactions, Transfer, SERVICE_ID,
 };

@@ -27,10 +27,10 @@
 use exonum_merkledb::{
     access::Prefixed, migration::Migration, Database, Fork, ObjectHash, ReadonlyFork,
 };
-
 use std::sync::Arc;
 
 mod migration;
+
 use crate::migration::{perform_migration, v1, v2};
 
 /// Provides migration of wallets with schema.

@@ -19,7 +19,7 @@ use exonum::{
     merkledb::ObjectHash,
     runtime::{ExecutionContext, ExecutionError, SnapshotExt},
 };
-use exonum_derive::*;
+use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{spec::Spec, Service};
 use exonum_testkit::TestKitBuilder;
 

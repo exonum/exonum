@@ -27,6 +27,7 @@ use std::{collections::HashSet, hash::Hash, rc::Rc};
 use exonum_merkledb::{access::AccessExt, Fork, KeySetIndex, TemporaryDB, ValueSetIndex};
 
 mod common;
+
 use crate::common::{compare_collections, AsForkAction, ForkAction, FromFork, ACTIONS_MAX_LEN};
 
 #[derive(Debug, Clone)]

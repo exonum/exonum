@@ -21,7 +21,7 @@ use exonum::{
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
-use super::{proto, schema::SchemaImpl, CryptocurrencyService};
+use crate::{proto, schema::SchemaImpl, CryptocurrencyService};
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, ExecutionFail)]

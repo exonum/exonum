@@ -18,7 +18,7 @@ use exonum::{crypto::Hash, runtime::CallerAddress as Address};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 
-use super::proto;
+use crate::proto;
 
 /// Wallet information stored in the database.
 #[derive(Clone, Debug, ProtobufConvert, BinaryValue, ObjectHash)]

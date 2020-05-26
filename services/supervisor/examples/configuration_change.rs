@@ -16,7 +16,7 @@ use exonum::{
     helpers::Height,
     runtime::{ExecutionContext, ExecutionError, InstanceId, SnapshotExt, SUPERVISOR_INSTANCE_ID},
 };
-use exonum_derive::*;
+use exonum_derive::{FromAccess, ServiceDispatcher, ServiceFactory};
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess},
     Entry, ObjectHash,
