@@ -14,12 +14,11 @@
 
 //! An implementation of `TemporaryDB` database.
 
-use crossbeam::sync::ShardedLock;
 use smallvec::SmallVec;
 use std::{
     collections::{btree_map::Range, BTreeMap},
     iter::{Iterator, Peekable},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -36,7 +35,7 @@ const DEFAULT_COLLECTION: &str = "default";
 /// operate under load in production.
 #[derive(Debug)]
 pub struct TemporaryDB {
-    inner: Arc<ShardedLock<MemoryDB>>,
+    inner: Arc<RwLock<MemoryDB>>,
 }
 
 struct TemporarySnapshot {
@@ -55,7 +54,7 @@ impl TemporaryDB {
         let mut db = BTreeMap::new();
 
         db.insert(DEFAULT_COLLECTION.to_owned(), BTreeMap::new());
-        let inner = Arc::new(ShardedLock::new(db));
+        let inner = Arc::new(RwLock::new(db));
         let mut db = Self { inner };
         check_database(&mut db).unwrap();
         db
