@@ -14,74 +14,67 @@
 
 //! An implementation of `TemporaryDB` database.
 
-use rocksdb::{WriteBatch, WriteOptions};
-use std::sync::Arc;
-use tempfile::TempDir;
-
-use crate::{
-    backends::rocksdb::RocksDBSnapshot, db::DB_METADATA, Database, DbOptions, Iter, Patch,
-    ResolvedAddress, Result, RocksDB, Snapshot,
+use crossbeam::sync::ShardedLock;
+use smallvec::SmallVec;
+use std::{
+    collections::{btree_map::Range, BTreeMap},
+    iter::{Iterator, Peekable},
+    sync::Arc,
 };
 
-/// A wrapper over the `RocksDB` backend which stores data in the temporary directory
-/// using the `tempfile` crate.
-///
-/// This database is only used for testing and experimenting; is not designed to
+use crate::{
+    backends::rocksdb::{next_id_bytes, ID_SIZE},
+    db::{check_database, Change, Iterator as DbIterator},
+    Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
+};
+
+type MemoryDB = BTreeMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
+
+const DEFAULT_COLLECTION: &str = "default";
+
+/// This in-memory database is only used for testing and experimenting; is not designed to
 /// operate under load in production.
 #[derive(Debug)]
 pub struct TemporaryDB {
-    inner: RocksDB,
-    dir: Arc<TempDir>,
+    inner: Arc<ShardedLock<MemoryDB>>,
 }
 
-/// A wrapper over the `RocksDB` snapshot with the `TempDir` handle to prevent
-/// it from destroying until all the snapshots and database itself are dropped.
 struct TemporarySnapshot {
-    snapshot: RocksDBSnapshot,
-    _dir: Arc<TempDir>,
+    snapshot: MemoryDB,
+}
+
+struct TemporaryDBIterator<'a> {
+    iter: Peekable<Range<'a, Vec<u8>, Vec<u8>>>,
+    prefix: Option<[u8; ID_SIZE]>,
+    ended: bool,
 }
 
 impl TemporaryDB {
     /// Creates a new, empty database.
     pub fn new() -> Self {
-        let dir = Arc::new(TempDir::new().unwrap());
-        let options = DbOptions::default();
-        let inner = RocksDB::open(dir.path(), &options).unwrap();
-        Self { dir, inner }
+        let mut db = BTreeMap::new();
+
+        db.insert(DEFAULT_COLLECTION.to_owned(), BTreeMap::new());
+        let inner = Arc::new(ShardedLock::new(db));
+        let mut db = Self { inner };
+        check_database(&mut db).unwrap();
+        db
     }
 
     /// Clears the contents of the database.
     pub fn clear(&self) -> crate::Result<()> {
-        /// Name of the default column family.
-        const DEFAULT_CF: &str = "default";
+        let mut rw_lock = self.inner.write().expect("Couldn't get read-write lock");
 
-        let opts = rocksdb::Options::default();
-        let names = rocksdb::DB::list_cf(&opts, self.dir.path())?;
-
-        // For some reason, using a `WriteBatch` is significantly faster than using `DB::drop_cf`,
-        // both in debug and release modes.
-        let mut batch = WriteBatch::default();
-        let db_reader = self.inner.get_lock_guard();
-        for name in &names {
-            if name != DEFAULT_CF && name != DB_METADATA {
-                let cf = db_reader.cf_handle(name).ok_or_else(|| {
-                    let message = format!("Cannot access column family {}", name);
-                    crate::Error::new(message)
-                })?;
-                self.inner.clear_column_family(&mut batch, cf)?;
-            }
+        for collection in rw_lock.values_mut() {
+            collection.clear();
         }
 
-        let write_options = WriteOptions::default();
-        db_reader
-            .write_opt(batch, &write_options)
-            .map_err(Into::into)
+        Ok(())
     }
 
     fn temporary_snapshot(&self) -> TemporarySnapshot {
         TemporarySnapshot {
-            snapshot: self.inner.rocksdb_snapshot(),
-            _dir: Arc::clone(&self.dir),
+            snapshot: self.inner.read().expect("Couldn't get read lock").clone(),
         }
     }
 }
@@ -92,21 +85,129 @@ impl Database for TemporaryDB {
     }
 
     fn merge(&self, patch: Patch) -> Result<()> {
-        self.inner.merge(patch)
+        let mut rw_lock = self.inner.write().expect("Couldn't get write lock");
+        for (resolved, changes) in patch.into_changes() {
+            if !rw_lock.contains_key(&resolved.name) {
+                rw_lock.insert(resolved.name.clone(), BTreeMap::new());
+            }
+
+            let collection: &mut BTreeMap<Vec<u8>, Vec<u8>> =
+                rw_lock.get_mut(&resolved.name).unwrap();
+
+            if changes.is_cleared() {
+                if let Some(id_bytes) = resolved.id_to_bytes() {
+                    let next_bytes = next_id_bytes(id_bytes).to_vec();
+                    let keys_to_remove = collection
+                        .range(id_bytes.to_vec()..next_bytes)
+                        .map(|(key, _)| key.clone())
+                        .collect::<Vec<_>>();
+                    for key in keys_to_remove {
+                        collection.remove(&key);
+                    }
+                } else {
+                    collection.clear();
+                }
+            }
+
+            if let Some(id_bytes) = resolved.id_to_bytes() {
+                // Write changes to the column family with each key prefixed by the ID of the
+                // resolved address.
+
+                // We assume that typical key sizes are less than `1_024 - ID_SIZE = 1_016` bytes,
+                // so that they fit into stack.
+                let mut buffer: SmallVec<[u8; 1_024]> = SmallVec::new();
+                buffer.extend_from_slice(&id_bytes);
+
+                for (key, change) in changes.into_data() {
+                    buffer.truncate(ID_SIZE);
+                    buffer.extend_from_slice(&key);
+                    match change {
+                        Change::Put(value) => collection.insert(buffer.to_vec(), value),
+                        Change::Delete => collection.remove(&buffer.to_vec()),
+                    };
+                }
+            } else {
+                // Write changes to the column family as-is.
+                for (key, change) in changes.into_data() {
+                    match change {
+                        Change::Put(value) => collection.insert(key, value),
+                        Change::Delete => collection.remove(&key),
+                    };
+                }
+            }
+        }
+        Ok(())
     }
 
     fn merge_sync(&self, patch: Patch) -> Result<()> {
-        self.inner.merge_sync(patch)
+        self.merge(patch)
+    }
+}
+
+impl<'a> DbIterator for TemporaryDBIterator<'a> {
+    fn next(&mut self) -> Option<(&[u8], &[u8])> {
+        if self.ended {
+            return None;
+        }
+
+        let (key, value) = self.iter.next()?;
+
+        if let Some(ref prefix) = self.prefix {
+            if &key[..ID_SIZE] != prefix {
+                self.ended = true;
+                return None;
+            }
+        }
+
+        let key = if self.prefix.is_some() {
+            &key[ID_SIZE..]
+        } else {
+            &key[..]
+        };
+
+        Some((key, value))
+    }
+
+    fn peek(&mut self) -> Option<(&[u8], &[u8])> {
+        if self.ended {
+            return None;
+        }
+
+        let (key, value) = self.iter.peek()?;
+        let key = if let Some(prefix) = self.prefix {
+            if key[..ID_SIZE] != prefix {
+                self.ended = true;
+                return None;
+            }
+            &key[ID_SIZE..]
+        } else {
+            &key[..]
+        };
+
+        Some((key, value))
     }
 }
 
 impl Snapshot for TemporarySnapshot {
     fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        self.snapshot.get(name, key)
+        let collection = self.snapshot.get(&name.name)?;
+        collection.get(name.keyed(key).as_ref()).cloned()
     }
 
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
-        self.snapshot.iter(name, from)
+        let collection = self
+            .snapshot
+            .get(&name.name)
+            .or_else(|| self.snapshot.get(DEFAULT_COLLECTION))
+            .unwrap();
+        let from = name.keyed(from).to_vec();
+        let iter = collection.range(from..);
+
+        Box::new(TemporaryDBIterator {
+            iter: iter.peekable(),
+            prefix: name.id_to_bytes(),
+            ended: false,
+        })
     }
 }
 
@@ -128,15 +229,16 @@ fn clearing_database() {
     use crate::access::CopyAccessExt;
 
     let db = TemporaryDB::new();
-
     let fork = db.fork();
+
     fork.get_list("foo").extend(vec![1_u32, 2, 3]);
     fork.get_proof_entry(("bar", &0_u8)).set("!".to_owned());
     fork.get_proof_entry(("bar", &1_u8)).set("?".to_owned());
     db.merge(fork.into_patch()).unwrap();
-
     db.clear().unwrap();
+
     let fork = db.fork();
+
     assert!(fork.index_type("foo").is_none());
     assert!(fork.index_type(("bar", &0_u8)).is_none());
     assert!(fork.index_type(("bar", &1_u8)).is_none());
@@ -145,29 +247,7 @@ fn clearing_database() {
 
     let snapshot = db.snapshot();
     let list = snapshot.get_proof_list::<_, u32>("foo");
+
     assert_eq!(list.len(), 3);
     assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5, 6]);
-}
-
-#[test]
-fn check_if_snapshot_is_still_valid() {
-    use crate::access::CopyAccessExt;
-
-    let (snapshot, db_path) = {
-        let db = TemporaryDB::new();
-        let db_path = db.dir.path().to_path_buf();
-        let fork = db.fork();
-        {
-            let mut index = fork.get_list("index");
-            index.push(1);
-        }
-        db.merge_sync(fork.into_patch()).unwrap();
-        (db.snapshot(), db_path)
-    };
-
-    assert!(db_path.exists()); // A directory with db files still exists.
-                               // So we can safety work with the snapshot.
-
-    let index = snapshot.get_list("index");
-    assert_eq!(index.get(0), Some(1));
 }
