@@ -12,20 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{criterion_group, criterion_main};
+use exonum_merkledb::{DbOptions, RocksDB};
+use tempfile::{tempdir, TempDir};
 
-use crate::benchmarks::{
-    encoding::bench_encoding, schema_patterns::bench_schema_patterns, storage::bench_storage,
-    transactions::bench_transactions,
-};
+pub mod encoding;
+pub mod schema_patterns;
+pub mod storage;
+pub mod transactions;
 
-mod benchmarks;
+pub(super) struct BenchDB {
+    _dir: TempDir,
+    db: RocksDB,
+}
 
-criterion_group!(
-    benches,
-    bench_storage,
-    bench_encoding,
-    bench_schema_patterns,
-    bench_transactions
-);
-criterion_main!(benches);
+impl AsRef<RocksDB> for BenchDB {
+    fn as_ref(&self) -> &RocksDB {
+        &self.db
+    }
+}
+
+pub(super) fn create_database() -> BenchDB {
+    let dir = tempdir().expect("Couldn't create tempdir");
+    let db = RocksDB::open(dir.path(), &DbOptions::default()).expect("Couldn't create database");
+    BenchDB { _dir: dir, db }
+}

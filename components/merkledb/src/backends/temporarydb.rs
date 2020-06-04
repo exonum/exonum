@@ -14,11 +14,12 @@
 
 //! An implementation of `TemporaryDB` database.
 
+use crossbeam::sync::ShardedLock;
 use smallvec::SmallVec;
 use std::{
-    collections::{btree_map::Range, BTreeMap},
+    collections::{btree_map::Range, BTreeMap, HashMap},
     iter::{Iterator, Peekable},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use crate::{
@@ -27,7 +28,7 @@ use crate::{
     Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
 };
 
-type MemoryDB = BTreeMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
+type MemoryDB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
 
 const DEFAULT_COLLECTION: &str = "default";
 
@@ -35,7 +36,7 @@ const DEFAULT_COLLECTION: &str = "default";
 /// operate under load in production.
 #[derive(Debug)]
 pub struct TemporaryDB {
-    inner: Arc<RwLock<MemoryDB>>,
+    inner: Arc<ShardedLock<MemoryDB>>,
 }
 
 struct TemporarySnapshot {
@@ -51,10 +52,10 @@ struct TemporaryDBIterator<'a> {
 impl TemporaryDB {
     /// Creates a new, empty database.
     pub fn new() -> Self {
-        let mut db = BTreeMap::new();
+        let mut db = HashMap::new();
 
         db.insert(DEFAULT_COLLECTION.to_owned(), BTreeMap::new());
-        let inner = Arc::new(RwLock::new(db));
+        let inner = Arc::new(ShardedLock::new(db));
         let mut db = Self { inner };
         check_database(&mut db).unwrap();
         db
@@ -84,14 +85,14 @@ impl Database for TemporaryDB {
     }
 
     fn merge(&self, patch: Patch) -> Result<()> {
-        let mut rw_lock = self.inner.write().expect("Couldn't get write lock");
+        let mut inner = self.inner.write().expect("Couldn't get write lock");
         for (resolved, changes) in patch.into_changes() {
-            if !rw_lock.contains_key(&resolved.name) {
-                rw_lock.insert(resolved.name.clone(), BTreeMap::new());
+            if !inner.contains_key(&resolved.name) {
+                inner.insert(resolved.name.clone(), BTreeMap::new());
             }
 
             let collection: &mut BTreeMap<Vec<u8>, Vec<u8>> =
-                rw_lock.get_mut(&resolved.name).unwrap();
+                inner.get_mut(&resolved.name).unwrap();
 
             if changes.is_cleared() {
                 if let Some(id_bytes) = resolved.id_to_bytes() {
