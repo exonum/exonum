@@ -156,6 +156,7 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
     let url = format!("{}/services/simple/answer", public_api_root);
     let answer: u64 = send_request(client.get(&url)).await?;
     assert_eq!(answer, 42);
+
     let url = format!("{}/services/other/answer", public_api_root);
     let answer: u64 = send_request(client.get(&url)).await?;
     assert_eq!(answer, 42);
@@ -163,6 +164,9 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
     // Shutdown the node via private system API.
     let url = format!("{}/system/v1/shutdown", private_api_root);
     send_request(client.post(&url)).await?;
+
+    delay_for(Duration::from_secs(5)).await; // Wait until actix workers will finish
     node_task.await??;
+
     Ok(())
 }
