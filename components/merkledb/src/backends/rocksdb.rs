@@ -14,12 +14,13 @@
 
 //! An implementation of `RocksDB` database.
 
+pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
+
 use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
 use ctor::{ctor, dtor};
 use rocksdb::{
     self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
 };
-pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 use smallvec::SmallVec;
 use std::{
     fmt,

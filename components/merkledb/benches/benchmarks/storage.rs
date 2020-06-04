@@ -20,7 +20,7 @@ use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use std::{collections::HashSet, convert::TryInto};
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
-use exonum_merkledb::{access::CopyAccessExt, Database, Fork, ListIndex, MapIndex, ObjectHash};
+use exonum_merkledb::{access::CopyAccessExt, Fork, ListIndex, MapIndex, ObjectHash};
 
 use super::BenchDB;
 
@@ -222,7 +222,7 @@ fn proof_list_append(b: &mut Bencher<'_>, len: usize) {
 
     let db = BenchDB::default();
     b.iter_with_setup(
-        || (db.as_ref().fork(), data.clone()),
+        || (db.fork(), data.clone()),
         |(fork, data)| {
             let mut table = fork.get_proof_list(NAME);
             assert!(table.is_empty());
@@ -245,7 +245,7 @@ fn proof_list_extend(b: &mut Bencher<'_>, len: usize) {
 
     let db = BenchDB::default();
     b.iter_with_setup(
-        || (db.as_ref().fork(), data.clone()),
+        || (db.fork(), data.clone()),
         |(fork, data)| {
             let mut table = fork.get_proof_list(NAME);
             assert!(table.is_empty());
@@ -258,7 +258,7 @@ fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
     let db = BenchDB::default();
     let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (db.as_ref().fork(), data.clone()),
+        || (db.fork(), data.clone()),
         |(fork, data)| {
             let mut table = fork.get_proof_map(NAME);
             for item in data {

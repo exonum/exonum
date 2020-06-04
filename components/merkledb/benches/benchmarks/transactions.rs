@@ -17,8 +17,7 @@ use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use exonum_merkledb::{
     access::{Access, FromAccess},
-    BinaryValue, Database, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex,
-    ProofMapIndex,
+    BinaryValue, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
@@ -268,7 +267,7 @@ fn do_bench(bencher: &mut Bencher<'_>, params: BenchParams, isolate: bool) {
         }
 
         // Some fast assertions.
-        let snapshot = db.as_ref().snapshot();
+        let snapshot = db.snapshot();
         let schema = Schema::new(&snapshot);
         assert_eq!(schema.blocks.len(), params.blocks as u64);
     });

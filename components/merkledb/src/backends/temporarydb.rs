@@ -123,7 +123,7 @@ impl Database for TemporaryDB {
                     buffer.extend_from_slice(&key);
                     match change {
                         Change::Put(value) => collection.insert(buffer.to_vec(), value),
-                        Change::Delete => collection.remove(&buffer.to_vec()),
+                        Change::Delete => collection.remove(buffer.as_ref()),
                     };
                 }
             } else {

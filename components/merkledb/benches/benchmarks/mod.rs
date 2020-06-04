@@ -55,9 +55,3 @@ impl Default for BenchDB {
         Self::new()
     }
 }
-
-impl AsRef<RocksDB> for BenchDB {
-    fn as_ref(&self) -> &RocksDB {
-        &self.db
-    }
-}
