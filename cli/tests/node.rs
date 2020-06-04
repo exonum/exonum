@@ -163,8 +163,6 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
     // Shutdown the node via private system API.
     let url = format!("{}/system/v1/shutdown", private_api_root);
     send_request(client.post(&url)).await?;
-
     node_task.await??;
-    delay_for(Duration::from_secs(1)).await;
     Ok(())
 }

@@ -20,10 +20,10 @@ use serde_derive::{Deserialize, Serialize};
 use exonum_crypto::Hash;
 use exonum_merkledb::{
     access::{Access, AccessExt, FromAccess, Prefixed, RawAccessMut},
-    Database, Group, KeySetIndex, Lazy, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
+    Group, KeySetIndex, Lazy, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
 };
 
-use super::create_database;
+use super::BenchDB;
 
 const SEED: [u8; 32] = [100; 32];
 const SAMPLE_SIZE: usize = 10;
@@ -266,8 +266,8 @@ fn bench<T: ExecuteTransaction>(bencher: &mut Bencher<'_>, prefixed: bool) {
     const PREFIX: &str = "moderately_long_prefix";
 
     let transactions = gen_random_transactions(TX_COUNT);
-    bencher.iter_with_setup(create_database, |db| {
-        let fork = db.as_ref().fork();
+    bencher.iter_with_setup(BenchDB::default, |db| {
+        let fork = db.fork();
         if prefixed {
             for transaction in &transactions {
                 let prefix = black_box(PREFIX.to_owned());

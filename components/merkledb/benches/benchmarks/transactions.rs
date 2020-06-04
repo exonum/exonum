@@ -18,13 +18,13 @@ use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use exonum_merkledb::{
     access::{Access, FromAccess},
     BinaryValue, Database, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex,
-    ProofMapIndex, RocksDB,
+    ProofMapIndex,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt};
 
-use super::create_database;
+use super::BenchDB;
 
 const SEED: [u8; 32] = [100; 32];
 const SAMPLE_SIZE: usize = 10;
@@ -200,7 +200,7 @@ impl Schema<&Fork> {
 }
 
 impl Block {
-    fn execute(&self, db: &RocksDB) {
+    fn execute(&self, db: &BenchDB) {
         let fork = db.fork();
         for transaction in &self.transactions {
             transaction.execute(&fork);
@@ -209,7 +209,7 @@ impl Block {
         db.merge(fork.into_patch()).unwrap();
     }
 
-    fn execute_with_isolation(&self, db: &RocksDB) {
+    fn execute_with_isolation(&self, db: &BenchDB) {
         let mut rng = StdRng::from_seed(SEED);
 
         let mut fork = db.fork();
@@ -258,12 +258,12 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
 fn do_bench(bencher: &mut Bencher<'_>, params: BenchParams, isolate: bool) {
     let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
 
-    bencher.iter_with_setup(create_database, |db| {
+    bencher.iter_with_setup(BenchDB::default, |db| {
         for block in &blocks {
             if isolate {
-                block.execute_with_isolation(db.as_ref());
+                block.execute_with_isolation(&db);
             } else {
-                block.execute(db.as_ref());
+                block.execute(&db);
             }
         }
 

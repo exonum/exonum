@@ -22,7 +22,7 @@ use std::{collections::HashSet, convert::TryInto};
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
 use exonum_merkledb::{access::CopyAccessExt, Database, Fork, ListIndex, MapIndex, ObjectHash};
 
-use super::create_database;
+use super::BenchDB;
 
 const NAME: &str = "name";
 const FAMILY: &str = "index_family";
@@ -75,16 +75,16 @@ fn generate_random_values(len: usize) -> Vec<Vec<u8>> {
 fn plain_map_index_insert(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (create_database(), data.clone()),
+        || (BenchDB::default(), data.clone()),
         |(db, data)| {
-            let fork = db.as_ref().fork();
+            let fork = db.fork();
             {
                 let mut table = fork.get_map(NAME);
                 for item in data {
                     table.put(&item.0, item.1);
                 }
             }
-            db.as_ref().merge_sync(fork.into_patch()).unwrap();
+            db.merge_sync(fork.into_patch()).unwrap();
         },
     );
 }
@@ -92,24 +92,24 @@ fn plain_map_index_insert(b: &mut Bencher<'_>, len: usize) {
 fn plain_map_index_with_family_insert(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (create_database(), data.clone()),
+        || (BenchDB::default(), data.clone()),
         |(db, data)| {
-            let fork = db.as_ref().fork();
+            let fork = db.fork();
             {
                 let mut table = fork.get_map((NAME, FAMILY));
                 for item in data {
                     table.put(&item.0, item.1);
                 }
             }
-            db.as_ref().merge_sync(fork.into_patch()).unwrap();
+            db.merge_sync(fork.into_patch()).unwrap();
         },
     );
 }
 
 fn plain_map_index_iter(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
 
     {
         let mut table = fork.get_map(NAME);
@@ -118,10 +118,10 @@ fn plain_map_index_iter(b: &mut Bencher<'_>, len: usize) {
             table.put(&item.0, item.1);
         }
     }
-    db.as_ref().merge_sync(fork.into_patch()).unwrap();
+    db.merge_sync(fork.into_patch()).unwrap();
 
     b.iter_with_setup(
-        || db.as_ref().snapshot(),
+        || db.snapshot(),
         |snapshot| {
             let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map(NAME);
             for (key, value) in &index {
@@ -134,8 +134,8 @@ fn plain_map_index_iter(b: &mut Bencher<'_>, len: usize) {
 
 fn plain_map_index_with_family_iter(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
 
     {
         let mut table = fork.get_map((NAME, FAMILY));
@@ -144,10 +144,10 @@ fn plain_map_index_with_family_iter(b: &mut Bencher<'_>, len: usize) {
             table.put(&item.0, item.1);
         }
     }
-    db.as_ref().merge(fork.into_patch()).unwrap();
+    db.merge(fork.into_patch()).unwrap();
 
     b.iter_with_setup(
-        || db.as_ref().snapshot(),
+        || db.snapshot(),
         |snapshot| {
             let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map((NAME, FAMILY));
             for (key, value) in &index {
@@ -160,8 +160,8 @@ fn plain_map_index_with_family_iter(b: &mut Bencher<'_>, len: usize) {
 
 fn plain_map_index_read(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
 
     {
         let mut table = fork.get_map(NAME);
@@ -170,10 +170,10 @@ fn plain_map_index_read(b: &mut Bencher<'_>, len: usize) {
             table.put(&item.0, item.1);
         }
     }
-    db.as_ref().merge_sync(fork.into_patch()).unwrap();
+    db.merge_sync(fork.into_patch()).unwrap();
 
     b.iter_with_setup(
-        || db.as_ref().snapshot(),
+        || db.snapshot(),
         |snapshot| {
             let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map(NAME);
             for item in &data {
@@ -186,8 +186,8 @@ fn plain_map_index_read(b: &mut Bencher<'_>, len: usize) {
 
 fn plain_map_index_with_family_read(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
 
     {
         let mut table = fork.get_map((NAME, FAMILY));
@@ -196,10 +196,10 @@ fn plain_map_index_with_family_read(b: &mut Bencher<'_>, len: usize) {
             table.put(&item.0, item.1);
         }
     }
-    db.as_ref().merge_sync(fork.into_patch()).unwrap();
+    db.merge_sync(fork.into_patch()).unwrap();
 
     b.iter_with_setup(
-        || db.as_ref().snapshot(),
+        || db.snapshot(),
         |snapshot| {
             let index: MapIndex<_, Hash, Vec<u8>> = snapshot.get_map((NAME, FAMILY));
             for item in &data {
@@ -220,7 +220,7 @@ fn proof_list_append(b: &mut Bencher<'_>, len: usize) {
         })
         .collect::<Vec<_>>();
 
-    let db = create_database();
+    let db = BenchDB::default();
     b.iter_with_setup(
         || (db.as_ref().fork(), data.clone()),
         |(fork, data)| {
@@ -243,7 +243,7 @@ fn proof_list_extend(b: &mut Bencher<'_>, len: usize) {
         })
         .collect::<Vec<_>>();
 
-    let db = create_database();
+    let db = BenchDB::default();
     b.iter_with_setup(
         || (db.as_ref().fork(), data.clone()),
         |(fork, data)| {
@@ -255,7 +255,7 @@ fn proof_list_extend(b: &mut Bencher<'_>, len: usize) {
 }
 
 fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
-    let db = create_database();
+    let db = BenchDB::default();
     let data = generate_random_kv(len);
     b.iter_with_setup(
         || (db.as_ref().fork(), data.clone()),
@@ -271,24 +271,24 @@ fn proof_map_insert_without_merge(b: &mut Bencher<'_>, len: usize) {
 fn proof_map_insert_with_merge(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
     b.iter_with_setup(
-        || (create_database(), data.clone()),
+        || (BenchDB::default(), data.clone()),
         |(db, data)| {
-            let fork = db.as_ref().fork();
+            let fork = db.fork();
             {
                 let mut table = fork.get_proof_map(NAME);
                 for item in data {
                     table.put(&item.0, item.1);
                 }
             }
-            db.as_ref().merge_sync(fork.into_patch()).unwrap();
+            db.merge_sync(fork.into_patch()).unwrap();
         },
     );
 }
 
 fn proof_list_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_values(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
     let mut table = fork.get_proof_list(NAME);
 
     for item in &data {
@@ -311,8 +311,8 @@ fn proof_list_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
 
 fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_values(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
     let mut table = fork.get_proof_list(NAME);
 
     for item in &data {
@@ -331,8 +331,8 @@ fn proof_list_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
 
 fn proof_map_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
     let mut table = fork.get_proof_map(NAME);
 
     for item in &data {
@@ -354,8 +354,8 @@ fn proof_map_index_build_proofs(b: &mut Bencher<'_>, len: usize) {
 
 fn proof_map_index_verify_proofs(b: &mut Bencher<'_>, len: usize) {
     let data = generate_random_kv(len);
-    let db = create_database();
-    let fork = db.as_ref().fork();
+    let db = BenchDB::default();
+    let fork = db.fork();
     let mut table = fork.get_proof_map(NAME);
 
     for item in &data {
@@ -401,30 +401,30 @@ fn fill_list(list: &mut ListIndex<&Fork, Vec<u8>>, rng: &mut impl Rng) {
 fn bench_index_clearing(bencher: &mut Bencher<'_>) {
     let mut rng = StdRng::from_seed(SEED);
 
-    let db = create_database();
+    let db = BenchDB::default();
     // Surround the cleared index with the indexes in the same column family.
-    let fork = db.as_ref().fork();
+    let fork = db.fork();
     for key in &[0_u8, 2] {
         fill_list(&mut fork.get_list(("list", key)), &mut rng);
     }
-    db.as_ref().merge(fork.into_patch()).unwrap();
+    db.merge(fork.into_patch()).unwrap();
 
     bencher.iter_batched(
         || {
             let addr = ("list", &1_u8);
-            let fork = db.as_ref().fork();
+            let fork = db.fork();
             fill_list(&mut fork.get_list(addr), &mut rng);
-            db.as_ref().merge(fork.into_patch()).unwrap();
+            db.merge(fork.into_patch()).unwrap();
 
-            let fork = db.as_ref().fork();
+            let fork = db.fork();
             fork.get_list::<_, Vec<u8>>(addr).clear();
             fork.into_patch()
         },
-        |patch| db.as_ref().merge(patch).unwrap(),
+        |patch| db.merge(patch).unwrap(),
         BatchSize::SmallInput,
     );
 
-    let snapshot = db.as_ref().snapshot();
+    let snapshot = db.snapshot();
     for key in &[0_u8, 2] {
         let list = snapshot.get_list::<_, Vec<u8>>(("list", key));
         assert_eq!(list.iter().count(), 500);

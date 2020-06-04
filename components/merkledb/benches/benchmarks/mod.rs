@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use exonum_merkledb::{DbOptions, RocksDB};
+use exonum_merkledb::{Database, DbOptions, Fork, Patch, Result, RocksDB, Snapshot};
 use tempfile::{tempdir, TempDir};
 
 pub mod encoding;
@@ -25,14 +25,39 @@ pub(super) struct BenchDB {
     db: RocksDB,
 }
 
+impl BenchDB {
+    pub(crate) fn new() -> Self {
+        let dir = tempdir().expect("Couldn't create tempdir");
+        let db =
+            RocksDB::open(dir.path(), &DbOptions::default()).expect("Couldn't create database");
+        Self { _dir: dir, db }
+    }
+
+    pub(crate) fn fork(&self) -> Fork {
+        self.db.fork()
+    }
+
+    pub(crate) fn snapshot(&self) -> Box<dyn Snapshot> {
+        self.db.snapshot()
+    }
+
+    pub(crate) fn merge(&self, patch: Patch) -> Result<()> {
+        self.db.merge(patch)
+    }
+
+    pub(crate) fn merge_sync(&self, patch: Patch) -> Result<()> {
+        self.db.merge_sync(patch)
+    }
+}
+
+impl Default for BenchDB {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AsRef<RocksDB> for BenchDB {
     fn as_ref(&self) -> &RocksDB {
         &self.db
     }
-}
-
-pub(super) fn create_database() -> BenchDB {
-    let dir = tempdir().expect("Couldn't create tempdir");
-    let db = RocksDB::open(dir.path(), &DbOptions::default()).expect("Couldn't create database");
-    BenchDB { _dir: dir, db }
 }
