@@ -17,21 +17,10 @@
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
 use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
-use ctor::{ctor, dtor};
 use rocksdb::{
     self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
 };
-use std::{
-    fmt,
-    iter::Peekable,
-    mem, ops,
-    path::Path,
-    ptr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{fmt, iter::Peekable, mem, path::Path, ptr, sync::Arc};
 
 use crate::{
     db::{check_database, Change},
@@ -42,57 +31,6 @@ use crate::{
 /// in a column family.
 pub(crate) const ID_SIZE: usize = mem::size_of::<u64>();
 
-/// Flag indicating that the main thread has exited.
-#[ctor]
-static FINISHED: AtomicBool = AtomicBool::new(false);
-
-#[dtor]
-fn finished() {
-    FINISHED.store(true, Ordering::Release);
-}
-
-/// Container that does not drop its contents if the process is being shut down.
-#[derive(Debug)]
-pub(super) struct NoDropOnShutdown<T> {
-    inner: mem::ManuallyDrop<T>,
-}
-
-impl<T> NoDropOnShutdown<T> {
-    fn new(inner: T) -> Self {
-        Self {
-            inner: mem::ManuallyDrop::new(inner),
-        }
-    }
-}
-
-impl<T> Drop for NoDropOnShutdown<T> {
-    #[allow(unsafe_code)]
-    fn drop(&mut self) {
-        if !FINISHED.load(Ordering::Acquire) {
-            unsafe {
-                // SAFETY: `self.inner` is not used afterwards.
-                mem::ManuallyDrop::drop(&mut self.inner);
-            }
-        }
-    }
-}
-
-impl<T> ops::Deref for NoDropOnShutdown<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &*self.inner
-    }
-}
-
-impl<T> ops::DerefMut for NoDropOnShutdown<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.inner
-    }
-}
-
-type InnerDB = NoDropOnShutdown<rocksdb::DB>;
-
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
 /// backend.
 ///
@@ -100,7 +38,7 @@ type InnerDB = NoDropOnShutdown<rocksdb::DB>;
 /// This structure is required to potentially adapt the interface to
 /// use different databases.
 pub struct RocksDB {
-    db: Arc<ShardedLock<InnerDB>>,
+    db: Arc<ShardedLock<rocksdb::DB>>,
     options: DbOptions,
 }
 
@@ -123,7 +61,7 @@ impl From<&DbOptions> for RocksDbOptions {
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: rocksdb::Snapshot<'static>,
-    db: Arc<ShardedLock<InnerDB>>,
+    db: Arc<ShardedLock<rocksdb::DB>>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -151,7 +89,7 @@ impl RocksDB {
             }
         };
         let mut db = Self {
-            db: Arc::new(ShardedLock::new(NoDropOnShutdown::new(inner))),
+            db: Arc::new(ShardedLock::new(inner)),
             options: *options,
         };
         check_database(&mut db)?;
@@ -182,7 +120,7 @@ impl RocksDB {
             .map_err(Into::into)
     }
 
-    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, InnerDB> {
+    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
     }
 
@@ -301,7 +239,7 @@ impl RocksDB {
 }
 
 impl RocksDBSnapshot {
-    fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, InnerDB> {
+    fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
         self.db.read().expect("Couldn't get read lock to DB")
     }
 
@@ -457,39 +395,4 @@ fn test_next_id_bytes() {
         next_id_bytes([1, 2, 3, 4, 5, 255, 255, 255]),
         [1, 2, 3, 4, 6, 0, 0, 0]
     );
-}
-
-/// To reproduce UB in the test, it should run in isolation. The UB may vanish on consecutive
-/// launches of the test.
-///
-/// The UB is most often realized as `pthread lock: Invalid argument`, but may manifest with
-/// other errors.
-#[test]
-fn concurrency_is_hard() {
-    use std::{thread, time::Duration};
-
-    let mut options = DbOptions::default();
-    options.create_if_missing = true;
-    let options = &options;
-
-    let names = rocksdb::DB::list_cf(&options.into(), "/tmp/rocksdb").unwrap_or_default();
-    let cf_names = names.iter().map(String::as_str).collect::<Vec<_>>();
-    let db = rocksdb::DB::open_cf(&options.into(), "/tmp/rocksdb", cf_names).unwrap();
-    let db = NoDropOnShutdown::new(db);
-
-    let signal = Arc::new(AtomicBool::new(true));
-    let signal_ = Arc::clone(&signal);
-
-    thread::spawn(move || {
-        for _ in 0..200 {
-            thread::sleep(Duration::from_millis(1));
-            if !signal_.load(Ordering::Acquire) {
-                drop(db);
-                return;
-            }
-        }
-    });
-
-    thread::sleep(Duration::from_millis(20));
-    signal.store(false, Ordering::Release);
 }
