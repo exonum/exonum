@@ -15,10 +15,10 @@
 //! An implementation of `TemporaryDB` database.
 
 use crossbeam::sync::ShardedLock;
-use smallvec::SmallVec;
 use std::{
     collections::{btree_map::Range, BTreeMap, HashMap},
     iter::{Iterator, Peekable},
+    ptr,
     sync::Arc,
 };
 
@@ -84,6 +84,7 @@ impl Database for TemporaryDB {
         Box::new(self.temporary_snapshot())
     }
 
+    #[allow(unsafe_code)]
     fn merge(&self, patch: Patch) -> Result<()> {
         let mut inner = self.inner.write().expect("Couldn't get write lock");
         for (resolved, changes) in patch.into_changes() {
@@ -115,15 +116,21 @@ impl Database for TemporaryDB {
 
                 // We assume that typical key sizes are less than `1_024 - ID_SIZE = 1_016` bytes,
                 // so that they fit into stack.
-                let mut buffer: SmallVec<[u8; 1_024]> = SmallVec::new();
-                buffer.extend_from_slice(&id_bytes);
+                let mut buffer: [u8; 1_024] = [0; 1024];
+                unsafe {
+                    ptr::copy(id_bytes.as_ptr(), buffer.as_mut_ptr(), ID_SIZE);
+                }
 
                 for (key, change) in changes.into_data() {
-                    buffer.truncate(ID_SIZE);
-                    buffer.extend_from_slice(&key);
+                    let buffer_size = key.len() + ID_SIZE;
+                    unsafe {
+                        ptr::copy(key.as_ptr(), buffer.as_mut_ptr().add(ID_SIZE), key.len());
+                    }
                     match change {
-                        Change::Put(value) => collection.insert(buffer.to_vec(), value),
-                        Change::Delete => collection.remove(buffer.as_ref()),
+                        Change::Put(value) => {
+                            collection.insert(buffer[..buffer_size].into(), value)
+                        }
+                        Change::Delete => collection.remove(&buffer[..buffer_size]),
                     };
                 }
             } else {
