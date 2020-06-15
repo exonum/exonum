@@ -20,7 +20,8 @@ use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
 use rocksdb::{
     self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
 };
-use std::{fmt, iter::Peekable, mem, path::Path, ptr, sync::Arc};
+use smallvec::SmallVec;
+use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
 
 use crate::{
     db::{check_database, Change},
@@ -154,7 +155,6 @@ impl RocksDB {
         Ok(())
     }
 
-    #[allow(unsafe_code)]
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
         for (resolved, changes) in patch.into_changes() {
@@ -175,19 +175,15 @@ impl RocksDB {
 
                 // We assume that typical key sizes are less than `1_024 - ID_SIZE = 1_016` bytes,
                 // so that they fit into stack.
-                let mut buffer: [u8; 1_024] = [0; 1024];
-                unsafe {
-                    ptr::copy(id_bytes.as_ptr(), buffer.as_mut_ptr(), ID_SIZE);
-                }
+                let mut buffer: SmallVec<[u8; 1_024]> = SmallVec::new();
+                buffer.extend_from_slice(&id_bytes);
 
                 for (key, change) in changes.into_data() {
-                    let buffer_size = key.len() + ID_SIZE;
-                    unsafe {
-                        ptr::copy(key.as_ptr(), buffer.as_mut_ptr().add(ID_SIZE), key.len());
-                    }
+                    buffer.truncate(ID_SIZE);
+                    buffer.extend_from_slice(&key);
                     match change {
-                        Change::Put(ref value) => batch.put_cf(cf, &buffer[..buffer_size], value),
-                        Change::Delete => batch.delete_cf(cf, &buffer[..buffer_size]),
+                        Change::Put(ref value) => batch.put_cf(cf, &buffer, value),
+                        Change::Delete => batch.delete_cf(cf, &buffer),
                     }
                 }
             } else {

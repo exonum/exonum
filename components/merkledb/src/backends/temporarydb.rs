@@ -15,10 +15,10 @@
 //! An implementation of `TemporaryDB` database.
 
 use crossbeam::sync::ShardedLock;
+use smallvec::SmallVec;
 use std::{
     collections::{btree_map::Range, BTreeMap, HashMap},
     iter::{Iterator, Peekable},
-    ptr,
     sync::Arc,
 };
 
@@ -28,9 +28,7 @@ use crate::{
     Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
 };
 
-type MemoryDB = HashMap<String, BTreeMap<Vec<u8>, Vec<u8>>>;
-
-const DEFAULT_COLLECTION: &str = "default";
+type MemoryDB = HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;
 
 /// This in-memory database is only used for testing and experimenting; is not designed to
 /// operate under load in production.
@@ -54,7 +52,7 @@ impl TemporaryDB {
     pub fn new() -> Self {
         let mut db = HashMap::new();
 
-        db.insert(DEFAULT_COLLECTION.to_owned(), BTreeMap::new());
+        db.insert(ResolvedAddress::system("default"), BTreeMap::new());
         let inner = Arc::new(ShardedLock::new(db));
         let mut db = Self { inner };
         check_database(&mut db).unwrap();
@@ -84,27 +82,21 @@ impl Database for TemporaryDB {
         Box::new(self.temporary_snapshot())
     }
 
-    #[allow(unsafe_code)]
     fn merge(&self, patch: Patch) -> Result<()> {
         let mut inner = self.inner.write().expect("Couldn't get write lock");
         for (resolved, changes) in patch.into_changes() {
-            if !inner.contains_key(&resolved.name) {
-                inner.insert(resolved.name.clone(), BTreeMap::new());
+            if !inner.contains_key(&resolved) {
+                inner.insert(resolved.clone(), BTreeMap::new());
             }
 
-            let collection: &mut BTreeMap<Vec<u8>, Vec<u8>> =
-                inner.get_mut(&resolved.name).unwrap();
+            let collection: &mut BTreeMap<Vec<u8>, Vec<u8>> = inner.get_mut(&resolved).unwrap();
 
             if changes.is_cleared() {
                 if let Some(id_bytes) = resolved.id_to_bytes() {
-                    let next_bytes = next_id_bytes(id_bytes).to_vec();
-                    let keys_to_remove = collection
-                        .range(id_bytes.to_vec()..next_bytes)
-                        .map(|(key, _)| key.clone())
-                        .collect::<Vec<_>>();
-                    for key in keys_to_remove {
-                        collection.remove(&key);
-                    }
+                    let next_bytes = next_id_bytes(id_bytes);
+                    let mut middle_and_tail = collection.split_off(id_bytes.as_ref());
+                    let mut tail = middle_and_tail.split_off(next_bytes.as_ref());
+                    collection.append(&mut tail);
                 } else {
                     collection.clear();
                 }
@@ -116,21 +108,16 @@ impl Database for TemporaryDB {
 
                 // We assume that typical key sizes are less than `1_024 - ID_SIZE = 1_016` bytes,
                 // so that they fit into stack.
-                let mut buffer: [u8; 1_024] = [0; 1024];
-                unsafe {
-                    ptr::copy(id_bytes.as_ptr(), buffer.as_mut_ptr(), ID_SIZE);
-                }
+                let mut buffer: SmallVec<[u8; 1_024]> = SmallVec::new();
+                buffer.extend_from_slice(&id_bytes);
 
                 for (key, change) in changes.into_data() {
-                    let buffer_size = key.len() + ID_SIZE;
-                    unsafe {
-                        ptr::copy(key.as_ptr(), buffer.as_mut_ptr().add(ID_SIZE), key.len());
-                    }
+                    buffer.truncate(ID_SIZE);
+                    buffer.extend_from_slice(&key);
+
                     match change {
-                        Change::Put(value) => {
-                            collection.insert(buffer[..buffer_size].into(), value)
-                        }
-                        Change::Delete => collection.remove(&buffer[..buffer_size]),
+                        Change::Put(value) => collection.insert(buffer.to_vec(), value),
+                        Change::Delete => collection.remove(buffer.as_ref()),
                     };
                 }
             } else {
@@ -197,18 +184,18 @@ impl<'a> DbIterator for TemporaryDBIterator<'a> {
 
 impl Snapshot for TemporarySnapshot {
     fn get(&self, name: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        let collection = self.snapshot.get(&name.name)?;
+        let collection = self.snapshot.get(name)?;
         collection.get(name.keyed(key).as_ref()).cloned()
     }
 
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
         let collection = self
             .snapshot
-            .get(&name.name)
-            .or_else(|| self.snapshot.get(DEFAULT_COLLECTION))
+            .get(name)
+            .or_else(|| self.snapshot.get(&ResolvedAddress::system("default")))
             .unwrap();
-        let from = name.keyed(from).to_vec();
-        let iter = collection.range(from..);
+        let from = name.keyed(from).into_owned();
+        let iter = collection.range::<Vec<u8>, _>(&from..);
 
         Box::new(TemporaryDBIterator {
             iter: iter.peekable(),
