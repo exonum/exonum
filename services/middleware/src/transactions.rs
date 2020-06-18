@@ -241,7 +241,7 @@ fn checked_call_in_json() {
         serde_json::to_value(&checked_call).unwrap(),
         json!({
             "artifact_name": "test-artifact",
-            "artifact_version": ">= 0.9, < 2",
+            "artifact_version": ">=0.9, <2",
             "inner": checked_call.inner,
         })
     );
