@@ -23,6 +23,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Backtrace is now included into `ExecutionError`s. (#1850)
 
+#### exonum-merkledb
+
+- Inner rocksdb database has been replaced for in-memory data structure in
+  TemporaryDB. (#1872)
+
 ## 1.0.0 - 2020-03-31
 
 ### Breaking Changes
