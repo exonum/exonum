@@ -23,12 +23,15 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Backtrace is now included into `ExecutionError`s. (#1850)
 
-### New Features
-
 #### exonum-cli
 
 - Added a possibility to use domain names along with IP addresses on generation configs
   stage and in the connect list. (#1870)
+
+#### exonum-merkledb
+
+- Inner rocksdb database has been replaced for in-memory data structure in
+  TemporaryDB. (#1872)
 
 ## 1.0.0 - 2020-03-31
 

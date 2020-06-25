@@ -15,16 +15,15 @@
 use criterion::{AxisScale, Bencher, Criterion, PlotConfiguration, Throughput};
 use exonum_crypto::{Hash, PublicKey, PUBLIC_KEY_LENGTH};
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-use serde_derive::{Deserialize, Serialize};
-
-use std::{collections::HashMap, fmt};
-
 use exonum_merkledb::{
     access::{Access, FromAccess},
-    BinaryValue, Database, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex,
-    ProofMapIndex, TemporaryDB,
+    BinaryValue, Fork, Group, ListIndex, MapIndex, ObjectHash, ProofListIndex, ProofMapIndex,
 };
+use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
+use serde_derive::{Deserialize, Serialize};
+use std::{collections::HashMap, fmt};
+
+use super::BenchDB;
 
 const SEED: [u8; 32] = [100; 32];
 const SAMPLE_SIZE: usize = 10;
@@ -200,7 +199,7 @@ impl Schema<&Fork> {
 }
 
 impl Block {
-    fn execute(&self, db: &TemporaryDB) {
+    fn execute(&self, db: &BenchDB) {
         let fork = db.fork();
         for transaction in &self.transactions {
             transaction.execute(&fork);
@@ -209,7 +208,7 @@ impl Block {
         db.merge(fork.into_patch()).unwrap();
     }
 
-    fn execute_with_isolation(&self, db: &TemporaryDB) {
+    fn execute_with_isolation(&self, db: &BenchDB) {
         let mut rng = StdRng::from_seed(SEED);
 
         let mut fork = db.fork();
@@ -257,7 +256,8 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
 
 fn do_bench(bencher: &mut Bencher<'_>, params: BenchParams, isolate: bool) {
     let blocks = gen_random_blocks(params.blocks, params.txs_in_block, params.users);
-    bencher.iter_with_setup(TemporaryDB::new, |db| {
+
+    bencher.iter_with_setup(BenchDB::default, |db| {
         for block in &blocks {
             if isolate {
                 block.execute_with_isolation(&db);
