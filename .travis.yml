@@ -41,7 +41,7 @@ addons:
     - zlib1g-dev
 
 rust:
-  - 1.43.0
+  - 1.45.0
 
 cache:
   npm: true
