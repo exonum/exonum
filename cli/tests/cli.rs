@@ -343,12 +343,84 @@ fn test_generate_config_ipv4() {
 }
 
 #[test]
+fn test_generate_config_ipv4_port() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "127.0.0.1:6777")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
 fn test_generate_config_ipv6() {
     let env = ConfigSpec::new_without_pass();
     env.command("generate-config")
         .with_arg(&env.expected_template_file(SupervisorMode::Simple))
         .with_arg(&env.output_node_config_dir(0))
-        .with_named_arg("-a", "::1")
+        .with_named_arg("-a", "[::1]")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
+fn test_generate_config_ipv6_with_port() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "[::1]:6777")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
+fn test_generate_config_localhost() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "localhost")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
+fn test_generate_config_localhost_with_port() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "localhost:6776")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
+fn test_generate_config_hostname() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "exonum.com")
+        .with_arg("--no-password")
+        .run()
+        .unwrap();
+}
+
+#[test]
+fn test_generate_config_hostname_with_port() {
+    let env = ConfigSpec::new_without_pass();
+    env.command("generate-config")
+        .with_arg(&env.expected_template_file(SupervisorMode::Simple))
+        .with_arg(&env.output_node_config_dir(0))
+        .with_named_arg("-a", "exonum.com:6777")
         .with_arg("--no-password")
         .run()
         .unwrap();
