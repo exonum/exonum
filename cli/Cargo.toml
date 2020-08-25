@@ -22,7 +22,7 @@ exonum-rust-runtime = { version = "1.0.0", path = "../runtimes/rust" }
 
 anyhow = "1.0.26"
 log = "0.4"
-rpassword = "4.0"
+rpassword = "5.0"
 serde = "1.0"
 serde_derive = "1.0"
 structopt = "0.3"
