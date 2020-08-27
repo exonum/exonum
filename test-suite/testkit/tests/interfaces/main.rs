@@ -223,11 +223,8 @@ fn test_deposit_invalid_auth() {
     }
     // Since there is no uninterrupted chain of fallthrough auth, the authorization should fail
     // for the deposit service.
-    let err = execute_transaction(
-        &mut testkit,
-        keypair.call_any(AnyCallService::ID, call.clone()),
-    )
-    .unwrap_err();
+    let err =
+        execute_transaction(&mut testkit, keypair.call_any(AnyCallService::ID, call)).unwrap_err();
     assert_eq!(err, ErrorMatch::from_fail(&Error::UnauthorizedIssuer));
 
     let backtrace = err.backtrace();

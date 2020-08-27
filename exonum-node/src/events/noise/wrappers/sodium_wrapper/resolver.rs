@@ -48,7 +48,7 @@ impl CryptoResolver for SodiumResolver {
     fn resolve_dh(&self, choice: &DHChoice) -> Option<Box<dyn Dh>> {
         match *choice {
             DHChoice::Curve25519 => Some(Box::new(SodiumDh25519::default())),
-            _ => None,
+            DHChoice::Ed448 => None,
         }
     }
 
@@ -62,7 +62,7 @@ impl CryptoResolver for SodiumResolver {
     fn resolve_cipher(&self, choice: &CipherChoice) -> Option<Box<dyn Cipher>> {
         match *choice {
             CipherChoice::ChaChaPoly => Some(Box::new(SodiumChaChaPoly::default())),
-            _ => None,
+            CipherChoice::AESGCM => None,
         }
     }
 }

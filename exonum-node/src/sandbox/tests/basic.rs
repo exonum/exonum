@@ -121,7 +121,7 @@ fn test_reach_actual_round() {
         ValidatorId(3),
         Height(1),
         Round(4),
-        block_at_first_height.clone().object_hash(),
+        block_at_first_height.object_hash(),
         vec![], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(3)),
     );

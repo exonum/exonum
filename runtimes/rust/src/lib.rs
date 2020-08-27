@@ -316,7 +316,9 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn
+    clippy::missing_errors_doc, clippy::missing_const_for_fn,
+    // Obviously should be removed after the next actix-web release.
+    clippy::future_not_send
 )]
 
 pub use exonum::runtime::ExecutionContext;

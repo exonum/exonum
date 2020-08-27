@@ -52,7 +52,7 @@ fn into_verified<T: TryFrom<SignedMessage>>(raw: &[Vec<u8>]) -> anyhow::Result<V
 }
 
 /// Helper trait to efficiently merge changes to the `BlockchainMut`.
-pub(crate) trait PersistChanges {
+pub trait PersistChanges {
     /// Persists changes to the node schema.
     fn persist_changes<F>(&mut self, change: F, error_msg: &str)
     where
@@ -72,7 +72,7 @@ impl PersistChanges for BlockchainMut {
 
 /// Result of an action within a round.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) enum RoundAction {
+pub enum RoundAction {
     /// New height was achieved.
     NewEpoch,
     /// No actions happened.
@@ -81,7 +81,7 @@ pub(crate) enum RoundAction {
 
 /// Error that may occur during transaction processing in `NodeHandler::handle_tx()`.
 #[derive(Debug)]
-pub(crate) enum HandleTxError {
+pub enum HandleTxError {
     /// Transaction is committed in one of blocks.
     AlreadyProcessed,
     /// Transaction is invalid according to `Blockchain::check_tx`.

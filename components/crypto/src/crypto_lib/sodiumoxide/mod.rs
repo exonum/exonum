@@ -111,6 +111,6 @@ pub fn hash(data: &[u8]) -> Hash {
 }
 
 /// Verifies that public key matches provided secret key.
-pub(crate) fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
+pub fn verify_keys_match(public_key: &PublicKey, secret_key: &SecretKey) -> bool {
     convert_sk_to_pk(secret_key) == *public_key
 }

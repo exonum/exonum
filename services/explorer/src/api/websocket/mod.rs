@@ -616,7 +616,7 @@ impl Actor for Session {
                     Ok(result) => {
                         actor.id = result;
                     }
-                    _ => context.stop(),
+                    Err(..) => context.stop(),
                 }
                 actix::fut::ready(())
             })

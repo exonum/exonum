@@ -254,7 +254,7 @@ fn basic_runtime_workflow() {
             ),
             RuntimeEvent::CommitService(
                 Height(0),
-                supervisor.instance_spec.clone(),
+                supervisor.instance_spec,
                 InstanceStatus::Active,
             ),
             RuntimeEvent::AfterTransactions(Height(0), ToySupervisorService::INSTANCE_ID),
@@ -401,7 +401,7 @@ fn basic_runtime_workflow() {
             RuntimeEvent::AfterTransactions(Height(5), TestServiceImpl::INSTANCE_ID),
             RuntimeEvent::CommitService(
                 Height(6),
-                test_instance.instance_spec.clone(),
+                test_instance.instance_spec,
                 InstanceStatus::Stopped,
             ),
             RuntimeEvent::AfterCommit(Height(6)),
@@ -494,7 +494,7 @@ fn runtime_restart() {
             // `Runtime::start_adding_service` is never called for the same service
             RuntimeEvent::CommitService(
                 Height(2),
-                supervisor.instance_spec.clone(),
+                supervisor.instance_spec,
                 InstanceStatus::Active
             ),
             // `Runtime::after_commit` is never called for the same block

@@ -39,7 +39,7 @@ mod tests;
 /// changes that took place after that view had been created. `View`
 /// implementation provides an interface to work with related `changes`.
 #[derive(Debug)]
-pub(crate) enum View<T: RawAccess> {
+pub enum View<T: RawAccess> {
     Real(ViewInner<T>),
     Phantom,
 }
@@ -443,7 +443,7 @@ impl BytesIterator for EmptyIterator {
     }
 }
 
-pub(crate) struct ChangesIter<'a, T: Iterator + 'a> {
+pub struct ChangesIter<'a, T: Iterator + 'a> {
     inner: Peekable<T>,
     _lifetime: PhantomData<&'a ()>,
 }

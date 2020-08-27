@@ -266,7 +266,7 @@ impl<'a> ExecutionContext<'a> {
 
 /// Version of `ExecutionContext` used for top-level calls.
 #[derive(Debug)]
-pub(crate) struct TopLevelContext<'a> {
+pub struct TopLevelContext<'a> {
     inner: ExecutionContext<'a>,
 }
 

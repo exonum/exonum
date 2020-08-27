@@ -99,7 +99,7 @@ impl NoiseHandshake {
 
     pub async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> anyhow::Result<Vec<u8>>
     where
-        S: AsyncRead + Unpin,
+        S: AsyncRead + Send + Unpin,
     {
         let handshake = HandshakeRawMessage::read(stream).await?;
         let message = self.noise.read_handshake_msg(&handshake.0)?;
@@ -108,7 +108,7 @@ impl NoiseHandshake {
 
     pub async fn write_handshake_msg<S>(&mut self, stream: &mut S, msg: &[u8]) -> anyhow::Result<()>
     where
-        S: AsyncWrite + Unpin,
+        S: AsyncWrite + Send + Unpin,
     {
         let buf = self.noise.write_handshake_msg(msg)?;
         HandshakeRawMessage(buf).write(stream).await

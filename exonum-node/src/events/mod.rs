@@ -131,7 +131,7 @@ impl InternalEvent {
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) enum InternalEventInner {
+pub enum InternalEventInner {
     /// Round update event.
     JumpToRound(Height, Round),
     /// Timeout event.

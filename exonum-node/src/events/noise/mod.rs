@@ -58,7 +58,7 @@ pub struct HandshakeRawMessage(pub Vec<u8>);
 impl HandshakeRawMessage {
     pub async fn read<S>(sock: &mut S) -> anyhow::Result<Self>
     where
-        S: AsyncRead + Unpin,
+        S: AsyncRead + Send + Unpin,
     {
         let mut len_buf = [0_u8; HANDSHAKE_HEADER_LENGTH];
         // First `HANDSHAKE_HEADER_LENGTH` bytes of handshake message is the payload length
@@ -74,7 +74,7 @@ impl HandshakeRawMessage {
 
     pub async fn write<S>(&self, sock: &mut S) -> anyhow::Result<()>
     where
-        S: AsyncWrite + Unpin,
+        S: AsyncWrite + Send + Unpin,
     {
         let len = self.0.len();
         debug_assert!(len < MAX_HANDSHAKE_MESSAGE_LENGTH);

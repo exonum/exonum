@@ -166,7 +166,7 @@ impl ExonumCommand for GenerateConfig {
 
         let private_config = NodePrivateConfig {
             listen_address,
-            external_address: self.peer_address.to_string(),
+            external_address: self.peer_address,
             master_key_path: master_key_path.clone(),
             api: NodeApiConfig::default(),
             network: NetworkConfiguration::default(),

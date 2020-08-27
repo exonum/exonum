@@ -107,7 +107,7 @@ impl<'a, T: BinaryValue> Interface<'a> for dyn Configure<Params = T> {
 
 // Makeshift replacement for generic stubbing, which is made difficult by the existence
 // of the type param.
-pub(crate) trait ConfigureMut<Ctx> {
+pub trait ConfigureMut<Ctx> {
     type Output;
 
     fn verify_config(&mut self, context: Ctx, params: Vec<u8>) -> Self::Output;

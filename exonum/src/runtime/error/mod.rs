@@ -141,7 +141,7 @@ pub struct ExecutionError {
 /// Additional details about an `ExecutionError` that do not influence blockchain state hash.
 #[derive(Debug, Clone, ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "errors_proto::ExecutionErrorAux")]
-pub(crate) struct ExecutionErrorAux {
+pub struct ExecutionErrorAux {
     /// Human-readable error description.
     pub description: String,
     /// Backtrace. The backtrace excludes the call in which the error has occurred (it is recorded

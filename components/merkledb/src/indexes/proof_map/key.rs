@@ -223,7 +223,7 @@ impl ProofPath {
 }
 
 /// The bits representation of the `ProofPath`.
-pub(crate) trait BitsRange {
+pub trait BitsRange {
     /// Returns the left border of the range.
     fn start(&self) -> u16;
 

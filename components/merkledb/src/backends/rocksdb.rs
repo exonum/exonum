@@ -30,7 +30,7 @@ use crate::{
 
 /// Size of a byte representation of an index ID, which is used to prefix index keys
 /// in a column family.
-pub(crate) const ID_SIZE: usize = mem::size_of::<u64>();
+pub const ID_SIZE: usize = mem::size_of::<u64>();
 
 /// Database implementation on top of [`RocksDB`](https://rocksdb.org)
 /// backend.
@@ -219,6 +219,7 @@ impl RocksDB {
     }
 
     #[allow(unsafe_code)]
+    #[allow(clippy::useless_transmute)]
     pub(super) fn rocksdb_snapshot(&self) -> RocksDBSnapshot {
         RocksDBSnapshot {
             // SAFETY:
@@ -356,7 +357,7 @@ impl fmt::Debug for RocksDBSnapshot {
 
 /// Generates the sequence of bytes lexicographically following the provided one. Assumes that
 /// the provided sequence is less than `[u8::max_value(); ID_SIZE]`.
-pub(crate) fn next_id_bytes(id_bytes: [u8; ID_SIZE]) -> [u8; ID_SIZE] {
+pub fn next_id_bytes(id_bytes: [u8; ID_SIZE]) -> [u8; ID_SIZE] {
     let mut next_id_bytes = id_bytes;
     for byte in next_id_bytes.iter_mut().rev() {
         if *byte == u8::max_value() {
