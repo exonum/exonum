@@ -27,7 +27,7 @@
     "chai": "^4.2.0",
     "exonum-client": "0.18.3",
     "mocha": "^6.2.3",
-    "node-fetch": "^2.6.0",
+    "node-fetch": "^2.6.1",
     "protobufjs": "^6.8.9",
     "regenerator-runtime": "^0.13.5"
   },
