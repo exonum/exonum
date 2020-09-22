@@ -23,7 +23,7 @@ exonum-merkledb = { version = "1.0.0", path = "../../components/merkledb" }
 exonum-proto = { version = "1.0.0", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
-anyhow = "1.0.26"
+anyhow = "1.0"
 chrono = { version = "0.4.6", features = ["serde"] }
 futures = "0.3.4"
 protobuf = "2.17.0"
@@ -36,11 +36,11 @@ exonum-cli = { version = "1.0.0", path = "../../cli" }
 exonum-supervisor = { version = "1.0.0", path = "../supervisor" }
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 
-bincode = "1.2.1"
+bincode = "1.3"
 pretty_assertions = "0.6.1"
 
 [dev-dependencies.tokio]
-version = "0.2.13"
+version = "0.2.22"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [build-dependencies]
