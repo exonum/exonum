@@ -21,6 +21,8 @@ use exonum_merkledb::{
     ProofEntry, ProofMapIndex,
 };
 
+use std::cmp::Reverse;
+
 /// Database schema of the time service. The schema is fully public.
 #[derive(Debug, FromAccess, RequireArtifact)]
 pub struct TimeSchema<T: Access> {
@@ -74,7 +76,7 @@ where
                 })
                 .collect::<Vec<_>>();
             // Ordering time from highest to lowest.
-            times.sort_by(|a, b| b.cmp(a));
+            times.sort_by_key(|&t| Reverse(t));
             times
         };
 

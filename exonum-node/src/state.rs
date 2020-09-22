@@ -30,6 +30,7 @@ use exonum::{
 use log::{error, trace};
 
 use std::{
+    cmp::Reverse,
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     sync::{Arc, RwLock},
     time::{Duration, SystemTime},
@@ -771,7 +772,7 @@ impl State {
         }
 
         let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
-        rounds.sort_unstable_by(|a, b| b.cmp(a));
+        rounds.sort_unstable_by_key(|&r| Reverse(r));
 
         if *rounds[max_byzantine_count] > self.round {
             Some(*rounds[max_byzantine_count])
