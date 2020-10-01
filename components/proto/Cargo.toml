@@ -15,7 +15,7 @@ links = "exonum_protobuf_common"
 
 [dependencies]
 anyhow = "1.0"
-base64 = "0.12"
+base64 = "0.13"
 base64-serde = "0.6"
 chrono = { version = "0.4.6", features = ["serde"] }
 protobuf = { version = "2.17.0", features = ["with-serde"] }
