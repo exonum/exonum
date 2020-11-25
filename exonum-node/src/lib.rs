@@ -229,6 +229,9 @@ pub struct NodeApiConfig {
     ///
     /// [cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
     pub private_allow_origin: Option<AllowOrigin>,
+    /// Json payload size. If value is `None` (default value) the allowed size of receiving payload
+    /// would be 32 Kb.
+    pub json_payload_size: Option<usize>,
     /// HTTP server restart policy. The server is restarted each time the list of endpoints
     /// is updated (e.g., due to a new service initialization).
     #[serde(default)]
@@ -243,6 +246,7 @@ impl Default for NodeApiConfig {
             private_api_address: None,
             public_allow_origin: None,
             private_allow_origin: None,
+            json_payload_size: None,
             server_restart: ServerRestartPolicy::default(),
         }
     }
@@ -1210,6 +1214,7 @@ impl Node {
         if let Some(listen_address) = api_cfg.public_api_address {
             let mut server_config = WebServerConfig::new(listen_address);
             server_config.allow_origin = api_cfg.public_allow_origin.clone();
+            server_config.json_payload_size = api_cfg.json_payload_size;
             servers.insert(ApiAccess::Public, server_config);
         }
         if let Some(listen_address) = api_cfg.private_api_address {

@@ -23,7 +23,7 @@ exonum-explorer = { version = "1.0.0", path = "../../components/explorer" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 actix = { version = "0.10.0", default-features = false }
-actix-web = { version = "3.0.2", default-features = false }
+actix-web = { version = "3.3.0", default-features = false }
 actix-web-actors = "3.0.0"
 anyhow = "1.0"
 futures = "0.3.4"
