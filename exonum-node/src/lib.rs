@@ -1384,7 +1384,7 @@ impl Reactor {
 
     /// Listens to the same 3 signals as `actix`: SIGINT, SIGTERM, and SIGQUIT.
     #[cfg(unix)]
-    #[allow(clippy::mut_mut)] // occurs in the `select!` macro
+    #[allow(clippy::mut_mut, clippy::unused_unit)] // occurs in the `select!` macro
     async fn listen_to_signals() {
         use futures::StreamExt;
         use tokio::signal::unix::{signal, SignalKind};
@@ -1415,7 +1415,7 @@ impl Reactor {
             _ = int_listener => (),
             _ = term_listener.next() => (),
             _ = quit_listener.next() => (),
-        }
+        };
     }
 
     #[cfg(not(unix))]
