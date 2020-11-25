@@ -16,7 +16,11 @@
 
 use actix_cors::{Cors, CorsFactory};
 use actix_rt::time::delay_for;
-use actix_web::{dev::Server, web, App, HttpServer};
+use actix_web::{
+    dev::Server,
+    web::{self, JsonConfig},
+    App, HttpServer,
+};
 use futures::{
     channel::mpsc,
     future::{join_all, try_join_all},
@@ -42,6 +46,8 @@ pub struct WebServerConfig {
     pub listen_address: SocketAddr,
     /// Optional CORS settings.
     pub allow_origin: Option<AllowOrigin>,
+    /// Json payload size.
+    pub json_payload_size: Option<usize>,
 }
 
 impl WebServerConfig {
@@ -50,6 +56,17 @@ impl WebServerConfig {
         Self {
             listen_address,
             allow_origin: None,
+            json_payload_size: None,
+        }
+    }
+
+    fn json_config(&self) -> JsonConfig {
+        let config = JsonConfig::default();
+
+        if let Some(limit) = self.json_payload_size {
+            config.limit(limit)
+        } else {
+            config
         }
     }
 
@@ -355,6 +372,7 @@ impl ApiManager {
 
         let mut server_builder = HttpServer::new(move || {
             App::new()
+                .app_data(server_config.json_config())
                 .wrap(server_config.cors_factory())
                 .wrap(error_handlers())
                 .service(aggregator.extend_backend(access, web::scope("api")))

@@ -14,6 +14,11 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
   The module was renamed to `pool` and related names were updated accordingly.
   (#1840)
 
+#### exonum-api
+
+- Added a possibility to set max allowed json payload size in `node.toml` config
+  file in `api` section (e.g. `json_payload_size = 1048576`). (#1918)
+
 ### Internal Improvements
 
 #### exonum

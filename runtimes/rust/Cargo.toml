@@ -22,7 +22,7 @@ exonum-derive = { version = "1.0.0", path = "../../components/derive" }
 exonum-merkledb = { version = "1.0.0", path = "../../components/merkledb" }
 exonum-proto = { version = "1.0.0", path = "../../components/proto" }
 
-actix-web = "3.0.2"
+actix-web = "3.3.0"
 futures = "0.3.5"
 log = "0.4.11"
 protobuf = "2.17.0"

@@ -722,7 +722,7 @@ impl TestKit {
         &mut self.network
     }
 
-    #[allow(clippy::mut_mut)] // occurs withing `select!` macro
+    #[allow(clippy::mut_mut, clippy::unused_unit)] // occurs withing `select!` macro
     async fn run(mut self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let events_task = self.remove_events_stream().fuse();
         futures::pin_mut!(events_task);
