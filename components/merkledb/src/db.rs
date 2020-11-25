@@ -300,7 +300,7 @@ pub type Iter<'a> = Box<dyn Iterator + 'a>;
 /// An enum that represents a type of change made to some key in the storage.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(test, derive(Eq, Hash))] // needed for patch equality comparison
-pub(crate) enum Change {
+pub enum Change {
     /// Put the specified value into the storage for the corresponding key.
     Put(Vec<u8>),
     /// Delete a value from the storage for the corresponding key.

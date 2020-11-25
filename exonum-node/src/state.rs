@@ -30,6 +30,7 @@ use exonum::{
 use log::{error, trace};
 
 use std::{
+    cmp::Reverse,
     collections::{hash_map::Entry, BTreeMap, HashMap, HashSet},
     sync::{Arc, RwLock},
     time::{Duration, SystemTime},
@@ -54,8 +55,9 @@ pub const PREVOTES_REQUEST_TIMEOUT: Milliseconds = 100;
 /// Timeout value for the `BlockRequest` message.
 pub const BLOCK_REQUEST_TIMEOUT: Milliseconds = 100;
 
+/// Peer's state.
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct PeerState {
+pub struct PeerState {
     pub epoch: Height,
     pub blockchain_height: Height,
 }
@@ -79,7 +81,7 @@ impl Default for PeerState {
 }
 
 #[derive(Debug)]
-pub(crate) struct AdvancedPeers {
+pub struct AdvancedPeers {
     pub peers_with_greater_height: Vec<PublicKey>,
     pub peers_with_greater_epoch: Vec<PublicKey>,
 }
@@ -115,7 +117,7 @@ impl AdvancedPeers {
 
 /// State of the `NodeHandler`.
 #[derive(Debug)]
-pub(crate) struct State {
+pub struct State {
     validator_state: Option<ValidatorState>,
     our_connect_message: Verified<Connect>,
 
@@ -174,7 +176,7 @@ pub(crate) struct State {
 
 /// State of a validator node.
 #[derive(Debug, Clone)]
-pub(crate) struct ValidatorState {
+pub struct ValidatorState {
     id: ValidatorId,
     our_prevotes: HashMap<Round, Verified<Prevote>>,
     our_precommits: HashMap<Round, Verified<Precommit>>,
@@ -183,7 +185,7 @@ pub(crate) struct ValidatorState {
 /// `RequestData` represents a request for some data to other nodes. Each enum variant will be
 /// translated to the corresponding request-message.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum RequestData {
+pub enum RequestData {
     /// Represents `ProposeRequest` message.
     Propose(Hash),
     /// Represents `PoolTransactionsRequest` message.
@@ -487,7 +489,7 @@ impl IncompleteBlock {
 
 /// Shared `ConnectList` representation to be used in network.
 #[derive(Clone, Debug, Default)]
-pub(crate) struct SharedConnectList {
+pub struct SharedConnectList {
     inner: Arc<RwLock<ConnectList>>,
 }
 
@@ -770,7 +772,7 @@ impl State {
         }
 
         let mut rounds: Vec<_> = self.validators_rounds.iter().map(|(_, v)| v).collect();
-        rounds.sort_unstable_by(|a, b| b.cmp(a));
+        rounds.sort_unstable_by_key(|&r| Reverse(r));
 
         if *rounds[max_byzantine_count] > self.round {
             Some(*rounds[max_byzantine_count])

@@ -41,7 +41,7 @@ impl fmt::Display for ConnectInfo {
 
 /// Stores mapping between IP addresses / domain names and public keys.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ConnectList {
+pub struct ConnectList {
     /// Peers to which we can connect.
     pub peers: BTreeMap<PublicKey, String>,
 }

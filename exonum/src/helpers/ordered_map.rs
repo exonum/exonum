@@ -31,7 +31,7 @@ use crate::proto;
 /// - Duplicate keys are forbidden.
 #[derive(Debug, Default, Clone, Eq, PartialEq, Ord, PartialOrd)]
 #[derive(Serialize, Deserialize)]
-pub(crate) struct OrderedMap<K: Ord, V>(pub BTreeMap<K, V>);
+pub struct OrderedMap<K: Ord, V>(pub BTreeMap<K, V>);
 
 #[derive(ProtobufConvert)]
 #[protobuf_convert(source = "proto::schema::key_value_sequence::KeyValue")]

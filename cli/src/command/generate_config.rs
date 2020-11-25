@@ -27,7 +27,8 @@ use structopt::StructOpt;
 
 use std::{
     fs,
-    net::{IpAddr, SocketAddr},
+    io::ErrorKind,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs},
     path::{Path, PathBuf},
 };
 
@@ -59,15 +60,12 @@ pub struct GenerateConfig {
     /// will be saved.
     pub output_dir: PathBuf,
 
-    /// External IP address of the node used for communications between nodes.
+    /// External IPv4/IPv6 address or domain name of the node used for communications
+    /// between nodes.
     ///
     /// If no port is provided, the default Exonum port 6333 is used.
-    #[structopt(
-        long,
-        short = "a",
-        parse(try_from_str = GenerateConfig::parse_external_address)
-    )]
-    pub peer_address: SocketAddr,
+    #[structopt(long, short = "a")]
+    pub peer_address: String,
 
     /// Listen IP address of the node used for communications between nodes.
     ///
@@ -104,30 +102,37 @@ impl GenerateConfig {
     }
 
     /// If no port is provided by user, uses `DEFAULT_EXONUM_LISTEN_PORT`.
-    fn parse_external_address(input: &str) -> Result<SocketAddr, Error> {
-        if let Ok(address) = input.parse() {
-            Ok(address)
-        } else {
-            let ip_address = input.parse()?;
-            Ok(SocketAddr::new(ip_address, DEFAULT_EXONUM_LISTEN_PORT))
+    fn resolve_peer_address(hostname: &str, is_host_with_port: bool) -> Result<SocketAddr, Error> {
+        match hostname.to_socket_addrs() {
+            Ok(mut addrs) => addrs.next().ok_or_else(|| {
+                Error::msg(format!(
+                    "No one IP address is related to the domain: {}",
+                    hostname
+                ))
+            }),
+            Err(e) if e.kind() == ErrorKind::InvalidInput && !is_host_with_port => {
+                Self::resolve_peer_address(
+                    &format!("{}:{}", hostname, DEFAULT_EXONUM_LISTEN_PORT),
+                    true,
+                )
+            }
+            Err(e) => Err(Error::from(e)),
         }
     }
 
-    /// Returns `provided` address or and address combined from all-zeros
-    /// IP address and the port number from `external_address`.
-    fn get_listen_address(
-        provided: Option<SocketAddr>,
-        external_address: SocketAddr,
-    ) -> SocketAddr {
-        if let Some(provided) = provided {
-            provided
-        } else {
-            let ip_address = match external_address.ip() {
-                IpAddr::V4(_) => "0.0.0.0".parse().unwrap(),
-                IpAddr::V6(_) => "::".parse().unwrap(),
-            };
-            SocketAddr::new(ip_address, external_address.port())
-        }
+    /// Returns `provided` address or [`INADDR_ANY`](https://en.wikipedia.org/wiki/0.0.0.0) address
+    /// combined with the port number obtained from `peer_address`.
+    fn get_listen_address(provided: Option<SocketAddr>, peer_address: &str) -> SocketAddr {
+        provided.unwrap_or_else(|| match Self::resolve_peer_address(peer_address, false) {
+            Ok(address) => {
+                let ip_address = match address.ip() {
+                    IpAddr::V4(_) => Ipv4Addr::UNSPECIFIED.into(),
+                    IpAddr::V6(_) => Ipv6Addr::UNSPECIFIED.into(),
+                };
+                SocketAddr::new(ip_address, address.port())
+            }
+            Err(e) => panic!(e),
+        })
     }
 }
 
@@ -139,7 +144,7 @@ impl ExonumCommand for GenerateConfig {
         let private_config_path = self.output_dir.join(PRIVATE_CONFIG_FILE_NAME);
         let master_key_path = get_master_key_path(self.master_key_path.clone())?;
 
-        let listen_address = Self::get_listen_address(self.listen_address, self.peer_address);
+        let listen_address = Self::get_listen_address(self.listen_address, &self.peer_address);
 
         let keys = {
             let passphrase =
@@ -161,7 +166,7 @@ impl ExonumCommand for GenerateConfig {
 
         let private_config = NodePrivateConfig {
             listen_address,
-            external_address: self.peer_address.to_string(),
+            external_address: self.peer_address,
             master_key_path: master_key_path.clone(),
             api: NodeApiConfig::default(),
             network: NetworkConfiguration::default(),

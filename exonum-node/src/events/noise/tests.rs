@@ -451,14 +451,14 @@ impl NoiseErrorHandshake {
 
     async fn read_handshake_msg<S>(&mut self, stream: &mut S) -> anyhow::Result<()>
     where
-        S: AsyncRead + Unpin,
+        S: AsyncRead + Send + Unpin,
     {
         self.inner.read_handshake_msg(stream).await.map(drop)
     }
 
     async fn write_handshake_msg<S>(&mut self, stream: &mut S) -> anyhow::Result<()>
     where
-        S: AsyncWrite + Unpin,
+        S: AsyncWrite + Send + Unpin,
     {
         if self.current_step == self.bogus_message.step {
             let msg = self.bogus_message.message;

@@ -14,15 +14,12 @@
 
 use criterion::{criterion_group, criterion_main};
 
-use crate::{
+use crate::benchmarks::{
     encoding::bench_encoding, schema_patterns::bench_schema_patterns, storage::bench_storage,
     transactions::bench_transactions,
 };
 
-mod encoding;
-mod schema_patterns;
-mod storage;
-mod transactions;
+mod benchmarks;
 
 criterion_group!(
     benches,

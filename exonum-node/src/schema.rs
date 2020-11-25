@@ -32,7 +32,7 @@ const PEERS_CACHE: &str = "core.peers_cache";
 
 /// Schema for an Exonum node.
 #[derive(Debug)]
-pub(crate) struct NodeSchema<T> {
+pub struct NodeSchema<T> {
     access: T,
 }
 

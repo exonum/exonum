@@ -18,18 +18,18 @@ links = "exonum_protobuf"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-anyhow = "1.0.26"
+anyhow = "1.0"
 log = "0.4.6"
 hex = "0.4.0"
-serde = "1.0.101"
-serde_derive = "1.0.101"
+serde = "1.0"
+serde_derive = "1.0"
 serde_str = "0.1.0"
-env_logger = "0.7.1"
-futures = "0.3.4"
-os_info = "2.0"
+env_logger = "0.8.1"
+futures = "0.3.5"
+os_info = "3.0"
 chrono = { version = "0.4.6", features = ["serde"] }
-protobuf = { version = "2.14.0", features = ["with-serde"] }
-semver = { version = "0.9.0", features = ["serde"] }
+protobuf = { version = "2.17.0", features = ["with-serde"] }
+semver = { version = "0.10.0", features = ["serde"] }
 thiserror = "1.0"
 
 exonum-crypto = { version = "1.0.0", path = "../components/crypto" }
@@ -39,13 +39,13 @@ exonum-merkledb = { version = "1.0.0", path = "../components/merkledb" }
 exonum-proto = { version = "1.0.0", path = "../components/proto" }
 
 [dev-dependencies]
-assert_matches = "1.3.0"
-bincode = "1.2.0"
-bit-vec = "0.6.0"
-criterion = "0.3.0"
-pretty_assertions = "0.6.1"
-rand = "0.7.3"
-serde_json = "1.0.19"
+assert_matches = "1.3"
+bincode = "1.3"
+bit-vec = "0.6"
+criterion = "0.3"
+pretty_assertions = "0.6"
+rand = "0.7"
+serde_json = "1.0"
 
 [[bench]]
 name = "criterion"

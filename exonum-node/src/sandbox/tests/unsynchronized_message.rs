@@ -108,7 +108,7 @@ fn test_queue_propose_message_from_next_height() {
         ValidatorId(0),
         Height(2),
         Round(2),
-        block_at_first_height.clone().object_hash(),
+        block_at_first_height.object_hash(),
         vec![], // there are no transactions in future propose
         sandbox.secret_key(ValidatorId(0)),
     );

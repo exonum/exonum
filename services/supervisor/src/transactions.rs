@@ -285,7 +285,7 @@ fn validate_status(
 }
 
 /// Returns the information about a service instance by its name.
-pub(crate) fn get_instance_by_name(
+pub fn get_instance_by_name(
     context: &ExecutionContext<'_>,
     service: &str,
 ) -> Result<InstanceState, ExecutionError> {

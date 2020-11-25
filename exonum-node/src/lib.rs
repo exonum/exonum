@@ -151,7 +151,7 @@ pub enum ExternalMessage {
 
 /// Node timeout types.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum NodeTimeout {
+pub enum NodeTimeout {
     /// Status timeout with the current height.
     Status(Height),
     /// Round timeout.
@@ -460,7 +460,7 @@ impl ValidateInput for NodeConfig {
 /// This type is considered an implementation detail of the node handler; it is exempt from
 /// semantic versioning.
 #[derive(Debug, Clone)]
-pub(crate) struct Configuration {
+pub struct Configuration {
     /// Connection list.
     pub connect_list: ConnectList,
     /// Network configuration.

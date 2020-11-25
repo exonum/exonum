@@ -18,8 +18,8 @@ use std::cmp::Ordering;
 
 use crate::BinaryKey;
 
-pub(crate) const HEIGHT_SHIFT: u64 = 56;
-pub(crate) const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1
+pub const HEIGHT_SHIFT: u64 = 56;
+pub const MAX_INDEX: u64 = 0xFF_FFFF_FFFF_FFFF; // 2_u64.pow(56) - 1
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofListKey {

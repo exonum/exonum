@@ -1,6 +1,7 @@
 abortable
 actix
 addrs
+aesgcm
 appveyor
 atomicity
 backend
@@ -73,6 +74,7 @@ hashable
 hasher
 healthcheck
 idempotence
+inaddr
 interlayer
 kdfparams
 keepalive
