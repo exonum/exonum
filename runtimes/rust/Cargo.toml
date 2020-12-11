@@ -28,7 +28,7 @@ log = "0.4.11"
 protobuf = "2.17.0"
 serde = "1.0"
 serde_derive = "1.0"
-tokio = "0.2.22"
+tokio = "0.3.5"
 
 [dev-dependencies]
 anyhow = "1.0"

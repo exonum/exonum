@@ -33,5 +33,5 @@ anyhow = "1.0"
 pretty_assertions = "0.6.1"
 
 [dev-dependencies.tokio]
-version = "0.2.22"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

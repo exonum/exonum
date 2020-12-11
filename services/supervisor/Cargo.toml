@@ -35,7 +35,7 @@ exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 bincode = "1.3"
 
 [dev-dependencies.tokio]
-version = "0.2.22"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [build-dependencies]

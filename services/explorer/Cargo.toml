@@ -44,5 +44,5 @@ reqwest = { version = "0.10.2", features = ["json"] }
 websocket = { version = "0.26.2", default-features = false, features = ["sync"] }
 
 [dev-dependencies.tokio]
-version = "0.2.22"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

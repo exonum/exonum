@@ -24,5 +24,5 @@ exonum-explorer-service = { version = "1.0.0", path = "../../../services/explore
 exonum-rust-runtime = { version = "1.0.0", path = "../../../runtimes/rust" }
 
 [dependencies.tokio]
-version = "0.2.13"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

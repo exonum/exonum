@@ -42,7 +42,7 @@ exonum-proto = { version = "1.0.0", path = "../components/proto" }
 exonum_sodiumoxide = { version = "0.0.23", optional = true }
 
 [dependencies.tokio]
-version = "0.2.22"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "signal", "tcp", "time"]
 
 [dev-dependencies]

@@ -30,7 +30,7 @@ exonum-api = { version = "1.0.0", path = "../../components/api" }
 reqwest = "0.10.4"
 
 [dev-dependencies.tokio]
-version = "0.2.13"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [build-dependencies]

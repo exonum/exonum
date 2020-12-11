@@ -39,5 +39,5 @@ pretty_assertions = "0.6"
 reqwest = { version = "0.10.2", features = ["json"] }
 
 [dev-dependencies.tokio]
-version = "0.2.13"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]

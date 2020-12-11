@@ -45,7 +45,7 @@ serde_json = "1.0"
 serde_urlencoded = "0.7.0"
 
 [dependencies.tokio]
-version = "0.2.22"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [dev-dependencies]

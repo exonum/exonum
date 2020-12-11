@@ -40,7 +40,7 @@ pretty_assertions = "0.6.1"
 rand = "0.7"
 
 [dev-dependencies.tokio]
-version = "0.2.13"
+version = "0.3.5"
 features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
 
 [build-dependencies]
