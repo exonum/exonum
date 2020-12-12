@@ -22,6 +22,7 @@ use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFa
 use exonum_proto::ProtobufConvert;
 
 use super::{proto, schema::SchemaImpl, CryptocurrencyService};
+use rand::Rng;
 
 /// Error codes emitted by wallet transactions during execution.
 #[derive(Debug, ExecutionFail)]
@@ -46,6 +47,10 @@ pub enum Error {
     ///
     /// Can be emitted by 'Transfer`.
     SenderSameAsReceiver = 4,
+    /// Approver doesn't exist.
+    ///
+    /// Can be emitted by `Transfer` or `Issue`.
+    ApproverNotFound = 5,
 }
 
 /// Transfer `amount` of the currency from one wallet to another.
@@ -77,9 +82,9 @@ pub struct Issue {
     pub seed: u64,
 }
 
-/*#[derive(Clone, Debug)]
+#[derive(Clone, Debug)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
-#[protobuf_convert(source = "proto::TxSendApprove", serde_pb_convert)]
+#[protobuf_convert(source = "proto::service::TxSendApprove", serde_pb_convert)]
 pub struct TxSendApprove {
     /// Address of receiver's wallet.
     pub to: Address,
@@ -91,7 +96,7 @@ pub struct TxSendApprove {
     ///
     /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
     pub seed: u64,
-}*/
+}
 
 /// Create wallet with the given `name`.
 #[derive(Clone, Debug)]
@@ -125,6 +130,27 @@ pub trait CryptocurrencyInterface<Ctx> {
     /// Creates wallet with the given `name`.
     #[interface_method(id = 2)]
     fn create_wallet(&self, ctx: Ctx, arg: CreateWallet) -> Self::Output;
+    /// Transfer amount with approve
+    #[interface_method(id = 3)]
+    fn tx_send_with_approve(&self, ctx: Ctx, arg: TxSendApprove) -> Self::Output;
+}
+
+impl TxSendApprove {
+    /// Creates a new approval transaction.
+    pub fn new(
+        to: Address,
+        amount: u64,
+        approve_address: Address
+    ) -> Self {
+        let mut rng = rand::thread_rng();
+
+        Self {
+            to: to,
+            amount: amount,
+            seed: rng.gen::<u64>(),
+            approve_address: approve_address
+        }
+    }
 }
 
 impl CryptocurrencyInterface<ExecutionContext<'_>> for CryptocurrencyService {
@@ -174,6 +200,29 @@ impl CryptocurrencyInterface<ExecutionContext<'_>> for CryptocurrencyService {
             Ok(())
         } else {
             Err(Error::WalletAlreadyExists.into())
+        }
+    }
+
+    fn tx_send_with_approve(&self, context: ExecutionContext<'_>, arg: TxSendApprove) -> Self::Output {
+        let (from, tx_hash) = extract_info(&context)?;
+        let mut schema = SchemaImpl::new(context.service_data());
+
+        let to = arg.to;
+        let amount = arg.amount;
+        if from == to {
+            return Err(Error::SenderSameAsReceiver.into());
+        }
+
+        // Checking that all participants exist
+        let sender = schema.wallet(from).ok_or(Error::SenderNotFound)?;
+        schema.wallet(arg.to).ok_or(Error::ReceiverNotFound)?;
+        schema.wallet(arg.approve_address).ok_or(Error::ApproverNotFound)?;
+
+        if (sender.balance - sender.frozen_balance) < amount {
+            Err(Error::InsufficientCurrencyAmount.into())
+        } else {
+            schema.create_send_approve_transaction(sender, amount, to, arg.approve_address, tx_hash);
+            Ok(())
         }
     }
 }

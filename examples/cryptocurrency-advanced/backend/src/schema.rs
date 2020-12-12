@@ -23,6 +23,7 @@ use exonum::runtime::CallerAddress as Address;
 use exonum_derive::{FromAccess, RequireArtifact};
 
 use crate::{wallet::Wallet, INITIAL_BALANCE};
+use crate::transactions::TxSendApprove;
 
 /// Database schema for the cryptocurrency.
 ///
@@ -42,6 +43,8 @@ pub(crate) struct SchemaImpl<T: Access> {
 pub struct Schema<T: Access> {
     /// Map of wallet keys to information about the corresponding account.
     pub wallets: RawProofMapIndex<T::Base, Address, Wallet>,
+    /// Map of approval transactions hash to infromation about the corresponding approval transaction
+    pub confirmed_transaction: RawProofMapIndex<T::Base, Hash, TxSendApprove>,
 }
 
 impl<T: Access> SchemaImpl<T> {
@@ -59,6 +62,46 @@ where
     T: Access,
     T::Base: RawAccessMut,
 {
+    pub fn create_send_approve_transaction(&mut self,
+                                           wallet: Wallet,
+                                           amount: u64,
+                                           to: Address,
+                                           approver: Address,
+                                           transaction: Hash) {
+        self.increase_frozen_balance(wallet,  amount as i64, transaction);
+        self.public.confirmed_transaction.put(&transaction, TxSendApprove::new(to, amount, approver))
+    }
+
+    /// Increases frozen of the wallet and append new record to its history.
+    pub fn increase_frozen_balance(&mut self,
+                                 wallet: Wallet,
+                                 frozen_balance_change: i64,
+                                 transaction: Hash) {
+        let mut history = self.wallet_history.get(&wallet.owner);
+        history.push(transaction);
+        let history_hash = history.object_hash();
+
+        let wallet = wallet.set_frozen_balance(((wallet.freezed_balance as i64) + frozen_balance_change) as u64, &history_hash);
+
+        let wallet_key = wallet.owner;
+        self.public.wallets.put(&wallet_key, wallet);
+    }
+
+    /// Decreases frozen of the wallet and append new record to its history.
+    pub fn decrease_frozen_balance(&mut self,
+                                   wallet: Wallet,
+                                   frozen_balance_change: i64,
+                                   transaction: Hash) {
+        let mut history = self.wallet_history.get(&wallet.owner);
+        history.push(transaction);
+        let history_hash = history.object_hash();
+
+        let wallet = wallet.set_frozen_balance(((wallet.freezed_balance as i64) - frozen_balance_change) as u64, &history_hash);
+
+        let wallet_key = wallet.owner;
+        self.public.wallets.put(&wallet_key, wallet);
+    }
+
     /// Increases balance of the wallet and append new record to its history.
     pub fn increase_wallet_balance(&mut self, wallet: Wallet, amount: u64, transaction: Hash) {
         let mut history = self.wallet_history.get(&wallet.owner);
@@ -86,7 +129,7 @@ where
         let mut history = self.wallet_history.get(&key);
         history.push(transaction);
         let history_hash = history.object_hash();
-        let wallet = Wallet::new(key, name, INITIAL_BALANCE, history.len(), &history_hash);
+        let wallet = Wallet::new(key, name, INITIAL_BALANCE, 0, history.len(), &history_hash);
         self.public.wallets.put(&key, wallet);
     }
 }

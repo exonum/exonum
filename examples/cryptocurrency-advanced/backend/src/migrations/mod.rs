@@ -36,6 +36,7 @@ fn convert_wallet(old_wallet: OldWallet) -> Wallet {
         owner: CallerAddress::from_key(old_wallet.pub_key),
         name: old_wallet.name,
         balance: old_wallet.balance,
+        frozen_balance: 0,
         history_len: 0,
         history_hash: Hash::zero(),
     }
