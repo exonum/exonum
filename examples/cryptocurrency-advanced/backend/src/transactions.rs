@@ -77,6 +77,22 @@ pub struct Issue {
     pub seed: u64,
 }
 
+/*#[derive(Clone, Debug)]
+#[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TxSendApprove", serde_pb_convert)]
+pub struct TxSendApprove {
+    /// Address of receiver's wallet.
+    pub to: Address,
+    /// Address of approve
+    pub approve_address: Address,
+    /// Amount of currency to transfer.
+    pub amount: u64,
+    /// Auxiliary number to guarantee [non-idempotence][idempotence] of transactions.
+    ///
+    /// [idempotence]: https://en.wikipedia.org/wiki/Idempotence
+    pub seed: u64,
+}*/
+
 /// Create wallet with the given `name`.
 #[derive(Clone, Debug)]
 #[derive(Serialize, Deserialize)]

@@ -12,41 +12,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! These are tests concerning the API of the cryptocurrency service. See `tx_logic.rs`
-//! for tests focused on the business logic of transactions.
+//! These are tests concerning the API of the cryptocurrency service.
 //!
 //! Note how API tests predominantly use `TestKitApi` to send transactions and make assertions
 //! about the storage state.
 
 use exonum::{
+    blockchain::IndexProof,
     crypto::{Hash, KeyPair, PublicKey},
+    merkledb::ObjectHash,
     messages::{AnyTx, Verified},
+    runtime::{Caller, CallerAddress, SnapshotExt},
 };
 use exonum_explorer_service::ExplorerFactory;
-use exonum_merkledb::ObjectHash;
-use exonum_rust_runtime::api;
 use exonum_testkit::{
-    explorer::api::TransactionQuery, ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder,
+    explorer::api::{TransactionQuery, TransactionResponse},
+    ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder,
 };
-use pretty_assertions::assert_eq;
 use serde_json::json;
 
 // Import data types used in tests from the crate where the service is defined.
-use exonum_cryptocurrency::{
-    api::WalletQuery,
-    contracts::{CryptocurrencyInterface, CryptocurrencyService},
-    schema::Wallet,
-    transactions::{CreateWallet, TxTransfer},
+use exonum_cryptocurrency_advanced::{
+    api::{WalletInfo, WalletQuery},
+    schema::Schema,
+    transactions::{CreateWallet, Transfer},
+    wallet::Wallet,
+    CryptocurrencyInterface, CryptocurrencyService,
 };
 
 /// Alice's wallets name.
 const ALICE_NAME: &str = "Alice";
 /// Bob's wallet name.
 const BOB_NAME: &str = "Bob";
-/// Service instance id.
-const INSTANCE_ID: u32 = 1010;
+/// Service instance ID.
+const SERVICE_ID: u32 = 120;
 /// Service instance name.
-const INSTANCE_NAME: &str = "nnm-token";
+const SERVICE_NAME: &str = "tst-token";
+
+fn author_address(tx: &Verified<AnyTx>) -> CallerAddress {
+    CallerAddress::from_key(tx.author())
+}
+
+/*#[tokio::test]
+async fn test_approve() {
+    let (mut testkit, api) = create_testkit();
+
+    let (tx_alice, _alice) = api.create_wallet(ALICE_NAME).await;
+    let (tx_bob, _bob) = api.create_wallet(BOB_NAME).await;
+    let (tx_approver, _approver) = api.create_wallet(APPROVER_NAME).await;
+    testkit.create_block();
+}*/
 
 /// Check that the wallet creation transaction works when invoked via API.
 #[tokio::test]
@@ -59,8 +74,8 @@ async fn test_create_wallet() {
         .await;
 
     // Check that the user indeed is persisted by the service.
-    let wallet = api.get_wallet(tx.author()).await;
-    assert_eq!(wallet.pub_key, tx.author());
+    let wallet = api.get_wallet(tx.author()).await.unwrap();
+    assert_eq!(wallet.owner, author_address(&tx));
     assert_eq!(wallet.name, ALICE_NAME);
     assert_eq!(wallet.balance, 100);
 }
@@ -79,18 +94,18 @@ async fn test_transfer() {
         .await;
 
     // Check that the initial Alice's and Bob's balances persisted by the service.
-    let wallet = api.get_wallet(tx_alice.author()).await;
+    let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
-    let wallet = api.get_wallet(tx_bob.author()).await;
+    let wallet = api.get_wallet(tx_bob.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
 
     // Transfer funds by invoking the corresponding API method.
     let tx = alice.transfer(
-        INSTANCE_ID,
-        TxTransfer {
-            to: tx_bob.author(),
+        SERVICE_ID,
+        Transfer {
+            to: author_address(&tx_bob),
             amount: 10,
-            seed: 0,
+            seed: 10,
         },
     );
 
@@ -101,10 +116,18 @@ async fn test_transfer() {
 
     // After the transfer transaction is included into a block, we may check new wallet
     // balances.
-    let wallet = api.get_wallet(tx_alice.author()).await;
+    let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
     assert_eq!(wallet.balance, 90);
-    let wallet = api.get_wallet(tx_bob.author()).await;
+    let wallet = api.get_wallet(tx_bob.author()).await.unwrap();
     assert_eq!(wallet.balance, 110);
+
+    // Check the balances via public schema.
+    let snapshot = testkit.snapshot();
+    let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
+    let alice_wallet = schema.wallets.get(&author_address(&tx_alice)).unwrap();
+    assert_eq!(alice_wallet.balance, 90);
+    let bob_wallet = schema.wallets.get(&author_address(&tx_bob)).unwrap();
+    assert_eq!(bob_wallet.balance, 110);
 }
 
 /// Check that a transfer from a non-existing wallet fails as expected.
@@ -119,13 +142,13 @@ async fn test_transfer_from_nonexisting_wallet() {
     testkit.create_block_with_tx_hashes(&[tx_bob.object_hash()]);
 
     api.assert_no_wallet(tx_alice.author()).await;
-    let wallet = api.get_wallet(tx_bob.author()).await;
+    let wallet = api.get_wallet(tx_bob.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
 
     let tx = alice.transfer(
-        INSTANCE_ID,
-        TxTransfer {
-            to: tx_bob.author(),
+        SERVICE_ID,
+        Transfer {
+            to: author_address(&tx_bob),
             amount: 10,
             seed: 0,
         },
@@ -136,19 +159,25 @@ async fn test_transfer_from_nonexisting_wallet() {
     let expected_status = json!({
         "type": "service_error",
         "code": 1,
-        "description": "Sender doesn\'t exist.\n\nCan be emitted by `TxTransfer`.",
+        "description": "Sender doesn\'t exist.\n\nCan be emitted by `Transfer`.",
         "runtime_id": 0,
         "call_site": {
             "call_type": "method",
-            "instance_id": INSTANCE_ID,
-            "method_id": 1,
+            "instance_id": SERVICE_ID,
+            "method_id": 0,
         },
     });
     api.assert_tx_status(tx.object_hash(), &expected_status)
         .await;
 
     // Check that Bob's balance doesn't change.
-    let wallet = api.get_wallet(tx_bob.author()).await;
+    let wallet = api.get_wallet(tx_bob.author()).await.unwrap();
+    assert_eq!(wallet.balance, 100);
+
+    // Same check via schema.
+    let snapshot = testkit.snapshot();
+    let schema: Schema<_> = snapshot.service_schema(SERVICE_ID).unwrap();
+    let wallet = schema.wallets.get(&author_address(&tx_bob)).unwrap();
     assert_eq!(wallet.balance, 100);
 }
 
@@ -163,14 +192,14 @@ async fn test_transfer_to_nonexisting_wallet() {
     // when a transfer occurs.
     testkit.create_block_with_tx_hashes(&[tx_alice.object_hash()]);
 
-    let wallet = api.get_wallet(tx_alice.author()).await;
+    let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
     api.assert_no_wallet(tx_bob.author()).await;
 
     let tx = alice.transfer(
-        INSTANCE_ID,
-        TxTransfer {
-            to: tx_bob.author(),
+        SERVICE_ID,
+        Transfer {
+            to: author_address(&tx_bob),
             amount: 10,
             seed: 0,
         },
@@ -181,19 +210,19 @@ async fn test_transfer_to_nonexisting_wallet() {
     let expected_status = json!({
         "type": "service_error",
         "code": 2,
-        "description": "Receiver doesn\'t exist.\n\nCan be emitted by `TxTransfer`.",
+        "description": "Receiver doesn\'t exist.\n\nCan be emitted by `Transfer` or `Issue`.",
         "runtime_id": 0,
         "call_site": {
             "call_type": "method",
-            "instance_id": INSTANCE_ID,
-            "method_id": 1,
+            "instance_id": SERVICE_ID,
+            "method_id": 0,
         },
     });
     api.assert_tx_status(tx.object_hash(), &expected_status)
         .await;
 
     // Check that Alice's balance doesn't change.
-    let wallet = api.get_wallet(tx_alice.author()).await;
+    let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
 }
 
@@ -208,9 +237,9 @@ async fn test_transfer_overcharge() {
 
     // Transfer funds. The transfer amount (110) is more than Alice has (100).
     let tx = alice.transfer(
-        INSTANCE_ID,
-        TxTransfer {
-            to: tx_bob.author(),
+        SERVICE_ID,
+        Transfer {
+            to: author_address(&tx_bob),
             amount: 110,
             seed: 0,
         },
@@ -221,52 +250,36 @@ async fn test_transfer_overcharge() {
     let expected_status = json!({
         "type": "service_error",
         "code": 3,
-        "description": "Insufficient currency amount.\n\nCan be emitted by `TxTransfer`.",
+        "description": "Insufficient currency amount.\n\nCan be emitted by `Transfer`.",
         "runtime_id": 0,
         "call_site": {
             "call_type": "method",
-            "instance_id": INSTANCE_ID,
-            "method_id": 1,
+            "instance_id": SERVICE_ID,
+            "method_id": 0,
         },
     });
     api.assert_tx_status(tx.object_hash(), &expected_status)
         .await;
 
-    let wallet = api.get_wallet(tx_alice.author()).await;
+    let wallet = api.get_wallet(tx_alice.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
-    let wallet = api.get_wallet(tx_bob.author()).await;
+    let wallet = api.get_wallet(tx_bob.author()).await.unwrap();
     assert_eq!(wallet.balance, 100);
 }
 
 #[tokio::test]
 async fn test_unknown_wallet_request() {
     let (_testkit, api) = create_testkit();
-
     // Transaction is sent by API, but isn't committed.
     let (tx, _) = api.create_wallet(ALICE_NAME).await;
-
-    let info = api
-        .inner
-        .public(ApiKind::Service(INSTANCE_NAME))
-        .query(&WalletQuery {
-            pub_key: tx.author(),
-        })
-        .get::<Wallet>("v1/wallet")
-        .await
-        .unwrap_err();
-
-    assert_eq!(info.http_code, api::HttpStatusCode::NOT_FOUND);
-    assert_eq!(info.body.title, "Wallet not found");
-    assert_eq!(
-        info.body.source,
-        format!("{}:{}", INSTANCE_ID, INSTANCE_NAME)
-    );
+    api.assert_no_wallet(tx.author()).await;
 }
 
 /// Wrapper for the cryptocurrency service API allowing to easily use it
 /// (compared to `TestKitApi` calls).
 struct CryptocurrencyApi {
-    pub inner: TestKitApi,
+    validator_keys: Vec<PublicKey>,
+    inner: TestKitApi,
 }
 
 impl CryptocurrencyApi {
@@ -277,57 +290,70 @@ impl CryptocurrencyApi {
     /// to the pool of unconfirmed transactions.
     async fn create_wallet(&self, name: &str) -> (Verified<AnyTx>, KeyPair) {
         let keypair = KeyPair::random();
-        // Create a pre-signed transaction
-        let tx = keypair.create_wallet(INSTANCE_ID, CreateWallet::new(name));
-        let tx_info: serde_json::Value = self
+        // Create a pre-signed transaction.
+        let tx = keypair.create_wallet(SERVICE_ID, CreateWallet::new(name));
+
+        let tx_info: TransactionResponse = self
             .inner
             .public(ApiKind::Explorer)
             .query(&json!({ "tx_body": tx }))
             .post("v1/transactions")
             .await
             .unwrap();
-        assert_eq!(tx_info, json!({ "tx_hash": tx.object_hash() }));
+        assert_eq!(tx_info.tx_hash, tx.object_hash());
         (tx, keypair)
+    }
+
+    async fn get_wallet(&self, pub_key: PublicKey) -> Option<Wallet> {
+        let wallet_info = self
+            .inner
+            .public(ApiKind::Service(SERVICE_NAME))
+            .query(&WalletQuery { pub_key })
+            .get::<WalletInfo>("v1/wallets/info")
+            .await
+            .unwrap();
+
+        // Check parts of the proof returned together with the wallet.
+        let index_proof =
+            IndexProof::new(wallet_info.block_proof, wallet_info.wallet_proof.to_table);
+        let (index_name, index_hash) = index_proof.verify(&self.validator_keys).unwrap();
+        assert_eq!(index_name, format!("{}.wallets", SERVICE_NAME));
+
+        let to_wallet = wallet_info
+            .wallet_proof
+            .to_wallet
+            .check_against_hash(index_hash)
+            .unwrap();
+        let address = Caller::Transaction { author: pub_key }.address();
+        let (_, wallet) = to_wallet.all_entries().find(|(&key, _)| key == address)?;
+        wallet.cloned()
     }
 
     /// Sends a transfer transaction over HTTP and checks the synchronous result.
     async fn transfer(&self, tx: &Verified<AnyTx>) {
-        let tx_info: serde_json::Value = self
+        let tx_info: TransactionResponse = self
             .inner
             .public(ApiKind::Explorer)
             .query(&json!({ "tx_body": tx }))
             .post("v1/transactions")
             .await
             .unwrap();
-        assert_eq!(tx_info, json!({ "tx_hash": tx.object_hash()}));
-    }
-
-    /// Gets the state of a particular wallet using an HTTP request.
-    async fn get_wallet(&self, pub_key: PublicKey) -> Wallet {
-        self.inner
-            .public(ApiKind::Service(INSTANCE_NAME))
-            .query(&WalletQuery { pub_key })
-            .get("v1/wallet")
-            .await
-            .unwrap()
+        assert_eq!(tx_info.tx_hash, tx.object_hash());
     }
 
     /// Asserts that a wallet with the specified public key is not known to the blockchain.
     async fn assert_no_wallet(&self, pub_key: PublicKey) {
-        let err = self
+        let wallet_info: WalletInfo = self
             .inner
-            .public(ApiKind::Service(INSTANCE_NAME))
+            .public(ApiKind::Service(SERVICE_NAME))
             .query(&WalletQuery { pub_key })
-            .get::<Wallet>("v1/wallet")
+            .get("v1/wallets/info")
             .await
-            .unwrap_err();
+            .unwrap();
 
-        assert_eq!(err.http_code, api::HttpStatusCode::NOT_FOUND);
-        assert_eq!(err.body.title, "Wallet not found");
-        assert_eq!(
-            err.body.source,
-            format!("{}:{}", INSTANCE_ID, INSTANCE_NAME)
-        );
+        let to_wallet = wallet_info.wallet_proof.to_wallet.check().unwrap();
+        let address = Caller::Transaction { author: pub_key }.address();
+        assert!(to_wallet.missing_keys().any(|&key| key == address))
     }
 
     /// Asserts that the transaction with the given hash has a specified status.
@@ -353,9 +379,11 @@ impl CryptocurrencyApi {
 fn create_testkit() -> (TestKit, CryptocurrencyApi) {
     let mut testkit = TestKitBuilder::validator()
         .with(Spec::new(ExplorerFactory).with_default_instance())
-        .with(Spec::new(CryptocurrencyService).with_instance(INSTANCE_ID, INSTANCE_NAME, ()))
+        .with(Spec::new(CryptocurrencyService).with_instance(SERVICE_ID, SERVICE_NAME, ()))
         .build();
+
     let api = CryptocurrencyApi {
+        validator_keys: vec![testkit.us().public_keys().consensus_key],
         inner: testkit.api(),
     };
     (testkit, api)
