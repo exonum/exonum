@@ -32,7 +32,7 @@ serde = "1.0"
 serde_derive = "1.0"
 snow = { version = "0.7.0", default-features = false }
 thiserror = "1.0"
-tokio-util = { version = "0.3.0", features = ["codec"] }
+tokio-util = { version = "0.5.1", features = ["codec"] }
 
 exonum = { version = "1.0.0", path = "../exonum" }
 exonum-api = { version = "1.0.0", path = "../components/api" }
