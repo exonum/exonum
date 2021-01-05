@@ -20,7 +20,7 @@
     ]
   },
   "dependencies": {
-    "axios": "^0.20.0",
+    "axios": "^0.21.1",
     "big-integer": "^1.6.48",
     "bootstrap": "^4.4.1",
     "crypto-js": "^4.0.0",
