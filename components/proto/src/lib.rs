@@ -53,6 +53,7 @@
     clippy::missing_errors_doc
 )]
 
+#[allow(unused_imports)]
 #[macro_use]
 extern crate serde_derive; // Required for Protobuf.
 
