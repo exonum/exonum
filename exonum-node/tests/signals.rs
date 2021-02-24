@@ -147,8 +147,10 @@ fn check_child_with_custom_handler(
 }
 
 async fn start_node_without_signals(start_port: u16, with_http: bool) {
-    let mut options = Options::default();
-    options.disable_signals = true;
+    let mut options = Options {
+        disable_signals: true,
+        ..Default::default()
+    };
     if with_http {
         options.http_start_port = Some(start_port + 1);
     }

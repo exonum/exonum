@@ -841,6 +841,7 @@ where
     V: BinaryValue + fmt::Debug,
     KeyMode: ToProofPath<K>,
 {
+    #[allow(clippy::option_if_let_else)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         struct Entry<'a, T: RawAccess, K: ?Sized, V: BinaryValue, KeyMode: ToProofPath<K>> {
             index: &'a ProofMapIndex<T, K, V, KeyMode>,

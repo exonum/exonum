@@ -137,6 +137,7 @@ impl DefaultInstance for CounterFactory {
     const INSTANCE_NAME: &'static str = "counter";
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn migration_script(context: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = Schema::new(context.helper.old_data());
     let mut new_schema = Schema::new(context.helper.new_data());
@@ -347,10 +348,7 @@ fn check_state_after_restart(
     assert_eq!(initial_events[0], RuntimeEvent::InitializeRuntime);
     assert_eq!(*initial_events.last().unwrap(), RuntimeEvent::ResumeRuntime);
     let supervisor = ToySupervisorService.default_instance().instance_spec;
-    assert!(initial_events.iter().any(|event| match event {
-        RuntimeEvent::CommitService(_, spec, InstanceStatus::Active) if *spec == supervisor => true,
-        _ => false,
-    }));
+    assert!(initial_events.iter().any(|event| matches!(event, RuntimeEvent::CommitService(_, spec, InstanceStatus::Active) if *spec == supervisor)));
 
     let old_spec = CounterFactory::new(VERSIONS[0].parse().unwrap())
         .default_instance()

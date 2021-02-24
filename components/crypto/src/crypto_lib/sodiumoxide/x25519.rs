@@ -76,6 +76,7 @@ pub fn convert_to_private_key(key: &mut [u8; 32]) {
 }
 
 /// Calculates the scalar multiplication for X25519.
+#[allow(clippy::result_unit_err)]
 pub fn scalarmult(sc: &SecretKey, pk: &PublicKey) -> Result<PublicKey, ()> {
     sodium_scalarmult(sc.as_ref(), pk.as_ref()).map(PublicKey)
 }

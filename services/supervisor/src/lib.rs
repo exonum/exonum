@@ -142,7 +142,9 @@
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn
+    clippy::missing_errors_doc,
+    clippy::missing_const_for_fn,
+    clippy::unnecessary_wraps
 )]
 
 pub use self::{
@@ -318,33 +320,34 @@ fn update_configs(
 /// entry if needed.
 fn assign_instance_id(context: &ExecutionContext<'_>) -> InstanceId {
     let mut schema = SchemaImpl::new(context.service_data());
-    if let Some(id) = schema.assign_instance_id() {
-        id
-    } else {
-        // Instance ID entry is not initialized, do it now.
-        // We have to do it lazy, since dispatcher doesn't know the amount
-        // of builtin instances until the genesis block is committed, and
-        // `after_transactions` hook is not invoked for services at the genesis
-        // block.
+    schema.assign_instance_id().map_or_else(
+        || {
+            // Instance ID entry is not initialized, do it now.
+            // We have to do it lazy, since dispatcher doesn't know the amount
+            // of builtin instances until the genesis block is committed, and
+            // `after_transactions` hook is not invoked for services at the genesis
+            // block.
 
-        // ID for the new instance is next to the highest builtin ID to avoid
-        // overlap if builtin identifiers space is sparse.
-        let dispatcher_schema = context.data().for_dispatcher();
-        let builtin_instances = dispatcher_schema.service_instances();
+            // ID for the new instance is next to the highest builtin ID to avoid
+            // overlap if builtin identifiers space is sparse.
+            let dispatcher_schema = context.data().for_dispatcher();
+            let builtin_instances = dispatcher_schema.service_instances();
 
-        let new_instance_id = builtin_instances
-            .values()
-            .map(|state| state.spec.id)
-            .max()
-            .unwrap_or(SUPERVISOR_INSTANCE_ID)
-            + 1;
+            let new_instance_id = builtin_instances
+                .values()
+                .map(|state| state.spec.id)
+                .max()
+                .unwrap_or(SUPERVISOR_INSTANCE_ID)
+                + 1;
 
-        // We're going to use ID obtained above, so the vacant ID is next to it.
-        let vacant_instance_id = new_instance_id + 1;
-        schema.vacant_instance_id.set(vacant_instance_id);
+            // We're going to use ID obtained above, so the vacant ID is next to it.
+            let vacant_instance_id = new_instance_id + 1;
+            schema.vacant_instance_id.set(vacant_instance_id);
 
-        new_instance_id
-    }
+            new_instance_id
+        },
+        |id| id,
+    )
 }
 
 /// Supervisor service implementation.

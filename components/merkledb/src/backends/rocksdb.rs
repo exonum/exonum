@@ -126,11 +126,7 @@ impl RocksDB {
     }
 
     /// Clears the column family completely, removing all keys from it.
-    pub(super) fn clear_column_family(
-        &self,
-        batch: &mut WriteBatch,
-        cf: &ColumnFamily,
-    ) -> crate::Result<()> {
+    pub(super) fn clear_column_family(&self, batch: &mut WriteBatch, cf: &ColumnFamily) {
         /// Some lexicographically large key.
         const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
 
@@ -152,7 +148,6 @@ impl RocksDB {
                 }
             }
         }
-        Ok(())
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
@@ -166,7 +161,7 @@ impl RocksDB {
             let cf = db_reader.cf_handle(&resolved.name).unwrap();
 
             if changes.is_cleared() {
-                self.clear_prefix(&mut batch, cf, &resolved)?;
+                self.clear_prefix(&mut batch, cf, &resolved);
             }
 
             if let Some(id_bytes) = resolved.id_to_bytes() {
@@ -203,19 +198,13 @@ impl RocksDB {
     }
 
     /// Removes all keys with the specified prefix from a column family.
-    fn clear_prefix(
-        &self,
-        batch: &mut WriteBatch,
-        cf: &ColumnFamily,
-        resolved: &ResolvedAddress,
-    ) -> crate::Result<()> {
+    fn clear_prefix(&self, batch: &mut WriteBatch, cf: &ColumnFamily, resolved: &ResolvedAddress) {
         if let Some(id_bytes) = resolved.id_to_bytes() {
             let next_bytes = next_id_bytes(id_bytes);
             batch.delete_range_cf(cf, id_bytes, next_bytes);
         } else {
-            self.clear_column_family(batch, cf)?;
+            self.clear_column_family(batch, cf);
         }
-        Ok(())
     }
 
     #[allow(unsafe_code)]

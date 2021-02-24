@@ -320,11 +320,10 @@ impl Runtime for RuntimeInspector {
 
     fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         catch_panic(|| {
-            if let Some(action) = self.after_transactions.borrow_mut().pop_front() {
-                action.execute(context)
-            } else {
-                Ok(())
-            }
+            self.after_transactions
+                .borrow_mut()
+                .pop_front()
+                .map_or(Ok(()), |action| action.execute(context))
         })
     }
 

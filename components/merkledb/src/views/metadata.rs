@@ -66,10 +66,7 @@ pub enum IndexType {
 impl IndexType {
     /// Checks if the index of this type is Merkelized.
     pub fn is_merkelized(self) -> bool {
-        match self {
-            Self::ProofList | Self::ProofMap | Self::ProofEntry => true,
-            _ => false,
-        }
+        matches!(self, Self::ProofList | Self::ProofMap | Self::ProofEntry)
     }
 }
 
@@ -496,10 +493,9 @@ where
                 // Store the next key in the raw form.
                 self.next_key = Some(key.to_owned());
                 break;
-            } else {
-                // Store the key into the buffer.
-                buffer.push(K::read(&key[self.key_prefix.len()..]));
             }
+            // Store the key into the buffer.
+            buffer.push(K::read(&key[self.key_prefix.len()..]));
         }
         debug_assert!(buffer.len() <= self.buffer_size);
         self.buffered_keys = buffer.into_iter();
@@ -515,13 +511,11 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         self.buffered_keys.next().or_else(|| {
-            if let Some(next_key) = self.next_key.take() {
+            self.next_key.take().and_then(|next_key| {
                 // Buffer more keys.
                 self.buffer_keys(&next_key);
                 self.buffered_keys.next()
-            } else {
-                None
-            }
+            })
         })
     }
 }
@@ -923,11 +917,9 @@ mod prop_tests {
     type GroupKey = (&'static str, Option<u32>);
 
     fn group_address(group: GroupKey) -> IndexAddress {
-        if let Some(prefix) = group.1 {
-            (group.0, &prefix).into()
-        } else {
-            group.0.into()
-        }
+        group
+            .1
+            .map_or_else(|| group.0.into(), |prefix| (group.0, &prefix).into())
     }
 
     // Note that the case where both "foo" and ("foo", _) are groups leads to unexpected results.

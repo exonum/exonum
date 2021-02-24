@@ -58,7 +58,7 @@ async fn inc_count(api: &TestKitApi, by: u64) -> Hash {
     tx_info.tx_hash
 }
 
-fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CounterSchema<impl Access + 'a> {
+fn get_schema(snapshot: &dyn Snapshot) -> CounterSchema<impl Access + '_> {
     snapshot.service_schema(SERVICE_NAME).unwrap()
 }
 

@@ -119,10 +119,7 @@ impl InternalEvent {
     }
 
     pub fn is_message_verified(&self) -> bool {
-        match self.0 {
-            InternalEventInner::MessageVerified(_) => true,
-            _ => false,
-        }
+        matches!(self.0, InternalEventInner::MessageVerified(_))
     }
 
     pub(crate) fn timeout(timeout: NodeTimeout) -> Self {

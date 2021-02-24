@@ -15,6 +15,8 @@
 //! Example of a very simple runtime that can perform two types of transaction:
 //! increment and reset counter in the service instance.
 
+#![allow(clippy::unnecessary_wraps)]
+
 use exonum::{
     blockchain::{config::GenesisConfigBuilder, Blockchain, ConsensusConfig, ValidatorKeys},
     helpers::Height,

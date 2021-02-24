@@ -449,7 +449,7 @@ impl<V: BinaryValue> ListProof<V> {
 
     /// Returns iterator over indexes of the elements in the proof without verifying
     /// proof integrity.
-    pub fn indexes_unchecked<'s>(&'s self) -> impl Iterator<Item = u64> + 's {
+    pub fn indexes_unchecked(&self) -> impl Iterator<Item = u64> + '_ {
         self.entries_unchecked().iter().map(|(index, _)| *index)
     }
 

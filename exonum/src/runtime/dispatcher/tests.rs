@@ -214,11 +214,10 @@ impl Runtime for SampleRuntime {
         let new_status = new_state.status.as_ref().unwrap();
 
         assert_eq!(spec.artifact.runtime_id, self.runtime_type);
-        let status_changed = if let Some(status) = self.services.get(&spec.id) {
-            status != new_status
-        } else {
-            true
-        };
+        let status_changed = self
+            .services
+            .get(&spec.id)
+            .map_or(true, |status| status != new_status);
 
         if status_changed {
             self.services.insert(spec.id, new_status.to_owned());

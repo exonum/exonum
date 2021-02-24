@@ -21,10 +21,7 @@ use syn::{DeriveInput, Generics, Ident, Path};
 use crate::RustRuntimeCratePath;
 
 fn is_allowed_artifact_name_char(c: u8) -> bool {
-    match c {
-        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'.' | b'_' | b'/' => true,
-        _ => false,
-    }
+    matches!(c, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'.' | b'_' | b'/')
 }
 
 /// Check that the artifact name contains only allowed characters and is not empty.

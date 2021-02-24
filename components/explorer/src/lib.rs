@@ -576,18 +576,12 @@ impl TransactionInfo {
 
     /// Is this in-pool transaction?
     pub fn is_in_pool(&self) -> bool {
-        match *self {
-            TransactionInfo::InPool { .. } => true,
-            _ => false,
-        }
+        matches!(*self, TransactionInfo::InPool { .. })
     }
 
     /// Is this a committed transaction?
     pub fn is_committed(&self) -> bool {
-        match *self {
-            TransactionInfo::Committed(_) => true,
-            _ => false,
-        }
+        matches!(*self, TransactionInfo::Committed(_))
     }
 
     /// Returns a reference to the inner committed transaction if this transaction is committed.

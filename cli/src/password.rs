@@ -154,9 +154,8 @@ fn prompt_passphrase(prompt: &str) -> Result<Passphrase, Error> {
 
         if password == confirmation {
             return Ok(password);
-        } else {
-            eprintln!("Passphrases do not match. Try again.");
         }
+        eprintln!("Passphrases do not match. Try again.");
     }
 }
 

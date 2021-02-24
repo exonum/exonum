@@ -518,10 +518,7 @@ impl NodeRole {
 
     /// Checks if node is validator.
     pub fn is_validator(self) -> bool {
-        match self {
-            Self::Validator(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Validator(_))
     }
 }
 

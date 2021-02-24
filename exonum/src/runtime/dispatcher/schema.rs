@@ -73,6 +73,7 @@ impl MigrationTransition {
         }
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn from_pb(pb: PbMigrationTransition) -> anyhow::Result<Option<Self>> {
         Ok(match pb {
             NONE => None,

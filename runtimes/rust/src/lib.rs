@@ -318,7 +318,8 @@
     // Too much work to fix.
     clippy::missing_errors_doc, clippy::missing_const_for_fn,
     // Obviously should be removed after the next actix-web release.
-    clippy::future_not_send
+    clippy::future_not_send,
+    clippy::unnecessary_wraps
 )]
 
 pub use exonum::runtime::ExecutionContext;
@@ -576,11 +577,7 @@ impl RustRuntime {
         Ok(())
     }
 
-    fn new_service(
-        &self,
-        artifact: &ArtifactId,
-        instance: &InstanceDescriptor,
-    ) -> Result<Instance, ExecutionError> {
+    fn new_service(&self, artifact: &ArtifactId, instance: &InstanceDescriptor) -> Instance {
         let factory = self.available_artifacts.get(artifact).unwrap_or_else(|| {
             panic!(
                 "BUG: Core requested service instance start ({}) of not deployed artifact {}",
@@ -589,12 +586,12 @@ impl RustRuntime {
         });
 
         let service = factory.create_instance();
-        Ok(Instance {
+        Instance {
             id: instance.id,
             name: instance.name.to_owned(),
             service,
             artifact_id: artifact.to_owned(),
-        })
+        }
     }
 
     /// Instantiates a service after checking that a matching service is not instantiated
@@ -613,7 +610,7 @@ impl RustRuntime {
         &self,
         artifact: &ArtifactId,
         descriptor: &InstanceDescriptor,
-    ) -> Result<Option<Instance>, ExecutionError> {
+    ) -> Option<Instance> {
         if let Some(instance) = self.started_services.get(&descriptor.id) {
             assert!(
                 instance.artifact_id == *artifact || artifact.is_upgrade_of(&instance.artifact_id),
@@ -627,10 +624,10 @@ impl RustRuntime {
             if instance.artifact_id == *artifact {
                 // We just continue running the existing service since we've just checked
                 // that it corresponds to the same artifact.
-                return Ok(None);
+                return None;
             }
         }
-        Some(self.new_service(artifact, descriptor)).transpose()
+        Some(self.new_service(artifact, descriptor))
     }
 
     fn api_endpoints(&self) -> Vec<(String, ApiBuilder)> {
@@ -687,10 +684,7 @@ impl Runtime for RustRuntime {
     }
 
     fn is_supported(&self, feature: &RuntimeFeature) -> bool {
-        match feature {
-            RuntimeFeature::FreezingServices => true,
-            _ => false,
-        }
+        matches!(feature, RuntimeFeature::FreezingServices)
     }
 
     // Propagates changes in the services immediately after initialization.
@@ -728,7 +722,7 @@ impl Runtime for RustRuntime {
         artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let instance = self.new_service(artifact, context.instance())?;
+        let instance = self.new_service(artifact, context.instance());
         let service = instance.as_ref();
         catch_panic(|| service.initialize(context, parameters))
     }
@@ -739,22 +733,16 @@ impl Runtime for RustRuntime {
         artifact: &ArtifactId,
         parameters: Vec<u8>,
     ) -> Result<(), ExecutionError> {
-        let maybe_instance = self.new_service_if_needed(artifact, context.instance())?;
-        let service = if let Some(ref instance) = maybe_instance {
-            instance.as_ref()
-        } else {
-            // Indexing is safe due to how `new_service_if_needed` is implemented.
-            self.started_services[&context.instance().id].as_ref()
-        };
+        let maybe_instance = self.new_service_if_needed(artifact, context.instance());
+        let service = maybe_instance.as_ref().map_or_else(
+            || self.started_services[&context.instance().id].as_ref(),
+            |instance| instance.as_ref(),
+        );
         catch_panic(|| service.resume(context, parameters))
     }
 
+    #[allow(clippy::option_if_let_else)]
     fn update_service_status(&mut self, _snapshot: &dyn Snapshot, state: &InstanceState) {
-        const CANNOT_INSTANTIATE_SERVICE: &str =
-            "BUG: Attempt to create a new service instance failed; \
-             within `instantiate_adding_service` we were able to create a new instance, \
-             but now we are not.";
-
         let status = state
             .status
             .as_ref()
@@ -765,9 +753,8 @@ impl Runtime for RustRuntime {
         let switch_off = if status.provides_read_access() {
             if let Some(artifact) = state.associated_artifact() {
                 // Instantiate the service if necessary.
-                let maybe_instance = self
-                    .new_service_if_needed(artifact, &state.spec.as_descriptor())
-                    .expect(CANNOT_INSTANTIATE_SERVICE);
+                let maybe_instance =
+                    self.new_service_if_needed(artifact, &state.spec.as_descriptor());
                 if let Some(instance) = maybe_instance {
                     self.add_started_service(instance);
                     // The service API has changed even if it was previously instantiated

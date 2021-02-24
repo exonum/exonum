@@ -18,7 +18,7 @@ use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use protobuf::Message;
 
-use std::{borrow::Cow, collections::BTreeMap, iter::FromIterator};
+use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::proto;
 
@@ -103,7 +103,7 @@ where
             "Invalid keys ordering or duplicate keys found in BinaryMap"
         );
 
-        Ok(Self(BTreeMap::from_iter(values.into_iter())))
+        Ok(Self(values.into_iter().collect()))
     }
 }
 

@@ -326,13 +326,10 @@ impl ProtobufBase64 {
     /// (standard or URL-safe alphabet, with or without padding).
     pub fn decode(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
         // Remove padding if any.
-        let value_without_padding = if value.ends_with("==") {
-            &value[..value.len() - 2]
-        } else if value.ends_with('=') {
-            &value[..value.len() - 1]
-        } else {
-            value
-        };
+        let value_without_padding = value.strip_suffix("==").map_or_else(
+            || value.strip_suffix("=").map_or(value, |stripped| stripped),
+            |stripped| stripped,
+        );
 
         let is_url_safe = value_without_padding.contains(|ch: char| ch == '-' || ch == '_');
         let config = if is_url_safe {
