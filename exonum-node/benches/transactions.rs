@@ -134,9 +134,9 @@ struct MessageVerifier {
     network_task: JoinHandle<()>,
     handler_task: JoinHandle<()>,
     // We retain sender references in order to not shut down the event loop prematurely.
-    external_tx_sender: Option<mpsc::Sender<Verified<AnyTx>>>,
-    api_sender: Option<mpsc::Sender<ExternalMessage>>,
-    network_sender: Option<mpsc::Sender<NetworkEvent>>,
+    _external_tx_sender: Option<mpsc::Sender<Verified<AnyTx>>>,
+    _api_sender: Option<mpsc::Sender<ExternalMessage>>,
+    _network_sender: Option<mpsc::Sender<NetworkEvent>>,
 }
 
 impl MessageVerifier {
@@ -164,9 +164,9 @@ impl MessageVerifier {
             network_task,
             tx_sender: Some(channel.internal_requests.0.clone()),
             tx_handler: handler,
-            external_tx_sender: Some(channel.transactions.0),
-            api_sender: Some(channel.api_requests.0),
-            network_sender: Some(channel.network_events.0),
+            _external_tx_sender: Some(channel.transactions.0),
+            _api_sender: Some(channel.api_requests.0),
+            _network_sender: Some(channel.network_events.0),
         }
     }
 
@@ -187,11 +187,11 @@ impl MessageVerifier {
     async fn join(mut self) {
         self.tx_sender = None;
         self.network_task.await.unwrap();
-
-        self.external_tx_sender = None;
-        self.api_sender = None;
-        self.network_sender = None;
         self.handler_task.await.unwrap();
+
+        self._external_tx_sender = None;
+        self._api_sender = None;
+        self._network_sender = None;
     }
 }
 

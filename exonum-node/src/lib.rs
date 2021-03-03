@@ -201,6 +201,7 @@ pub(crate) struct NodeHandler {
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Node role.
+    #[allow(dead_code)]
     node_role: NodeRole,
     /// Configuration file manager.
     config_manager: Option<Box<dyn ConfigManager>>,

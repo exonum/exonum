@@ -117,7 +117,7 @@ impl<'a> ExecutionContext<'a> {
     /// Provides access to blockchain data.
     pub fn data(&self) -> BlockchainData<&Fork> {
         if self.call_error_flag.is_set() {
-            panic!(ACCESS_ERROR_STR);
+            panic!("{}", ACCESS_ERROR_STR);
         }
 
         BlockchainData::new(self.fork, &self.instance.name)
@@ -205,7 +205,7 @@ impl<'a> ExecutionContext<'a> {
     /// Re-borrows an execution context with the given instance descriptor.
     fn reborrow(&mut self, instance: InstanceDescriptor) -> ExecutionContext<'_> {
         if self.call_error_flag.is_set() {
-            panic!(ACCESS_ERROR_STR);
+            panic!("{}", ACCESS_ERROR_STR);
         }
 
         ExecutionContext {
@@ -235,7 +235,7 @@ impl<'a> ExecutionContext<'a> {
         fallthrough_auth: bool,
     ) -> ExecutionContext<'s> {
         if self.call_error_flag.is_set() {
-            panic!(ACCESS_ERROR_STR);
+            panic!("{}", ACCESS_ERROR_STR);
         }
 
         let caller = if fallthrough_auth {

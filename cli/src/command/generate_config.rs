@@ -131,7 +131,7 @@ impl GenerateConfig {
                 };
                 SocketAddr::new(ip_address, address.port())
             }
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         })
     }
 }

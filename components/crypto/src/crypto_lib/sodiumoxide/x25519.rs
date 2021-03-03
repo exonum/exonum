@@ -142,9 +142,9 @@ macro_rules! implement_x25519_type {
         }
     }
 
-    impl Into<$name> for $name_from {
-        fn into(self) -> $name {
-            $name(self)
+    impl From<$name_from> for $name {
+        fn from(other: $name_from) -> Self {
+            Self(other)
         }
     }
     )

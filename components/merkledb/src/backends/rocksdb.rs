@@ -272,7 +272,7 @@ impl Snapshot for RocksDBSnapshot {
         if let Some(cf) = self.get_lock_guard().cf_handle(&resolved_addr.name) {
             match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
                 Ok(value) => value.map(|v| v.to_vec()),
-                Err(e) => panic!(e),
+                Err(e) => panic!("{}", e),
             }
         } else {
             None

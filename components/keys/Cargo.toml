@@ -27,7 +27,7 @@ exonum-crypto = { version = "1.0.0", path = "../crypto" }
 [dev-dependencies]
 hex = "0.4.2"
 serde_json = "1.0"
-tempdir = "0.3.7"
+tempfile = "3.2"
 
 [[example]]
 name = "key-generator"
