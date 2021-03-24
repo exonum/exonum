@@ -4,7 +4,6 @@ on:
     branches:
       - master
       - develop
-      - github_actions # Temporary. Remove after all.
 
 name: Lint Checker
 

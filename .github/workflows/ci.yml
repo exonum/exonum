@@ -4,7 +4,6 @@ on:
     branches:
     - master
     - develop
-    - github_actions # Temporary. Remove after all.
 
 name: CI
 
@@ -20,9 +19,6 @@ jobs:
           - build: Linux
             os: ubuntu-latest
             rust: stable
-          - build: macOS
-            os: macos-latest
-            rust: stable
           - build: Windows
             os: windows-latest
             rust: stable
@@ -35,8 +31,6 @@ jobs:
           sudo add-apt-repository -y ppa:exonum/rocksdb
           sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler \
             libprotobuf-dev librocksdb6.8 pkg-config clang-7 lldb-7 lld-7
-      - if: runner.os == 'macOS'
-        run: brew install rocksdb protobuf
       - uses: actions/cache@v2
         with:
           path: |
