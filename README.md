@@ -1,7 +1,7 @@
 # Exonum
 
 **Status:**
-[![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux)](https://travis-ci.com/exonum/exonum)
+[![CI](https://github.com/exonum/exonum/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/exonum/exonum/actions/workflows/ci.yml)
 [![dependency status](https://deps.rs/repo/github/exonum/exonum/status.svg)](https://deps.rs/repo/github/exonum/exonum)
 [![codecov](https://codecov.io/gh/exonum/exonum/branch/master/graph/badge.svg)](https://codecov.io/gh/exonum/exonum)
 
