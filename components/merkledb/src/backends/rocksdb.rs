@@ -55,6 +55,7 @@ impl From<&DbOptions> for RocksDbOptions {
         defaults.create_if_missing(opts.create_if_missing);
         defaults.set_compression_type(opts.compression_type.into());
         defaults.set_max_open_files(opts.max_open_files.unwrap_or(-1));
+        defaults.set_max_total_wal_size(opts.max_total_wal_size.unwrap_or(0));
         defaults
     }
 }

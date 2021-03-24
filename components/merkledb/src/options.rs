@@ -46,6 +46,11 @@ pub struct DbOptions {
     ///
     /// Defaults to `CompressionType::None`, meaning there is no compression.
     pub compression_type: CompressionType,
+    /// Max total size of the WAL journal in bytes.
+    ///
+    /// Defaults to `None`, meaning that the size of WAL journal will be adjusted
+    /// by the rocksdb.
+    pub max_total_wal_size: Option<u64>,
 }
 
 impl DbOptions {
@@ -54,11 +59,13 @@ impl DbOptions {
         max_open_files: Option<i32>,
         create_if_missing: bool,
         compression_type: CompressionType,
+        max_total_wal_size: Option<u64>,
     ) -> Self {
         Self {
             max_open_files,
             create_if_missing,
             compression_type,
+            max_total_wal_size,
         }
     }
 }
@@ -97,6 +104,6 @@ impl From<CompressionType> for DBCompressionType {
 
 impl Default for DbOptions {
     fn default() -> Self {
-        Self::new(None, true, CompressionType::None)
+        Self::new(None, true, CompressionType::None, None)
     }
 }
