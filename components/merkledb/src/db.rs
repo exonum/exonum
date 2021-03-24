@@ -647,11 +647,7 @@ pub trait DatabaseExt: Database {
         for (name, changes) in &patch.changes {
             let mut view_changes = changes.data.clone();
             for (key, change) in &mut view_changes {
-                *change = if let Some(value) = snapshot.get(name, key) {
-                    Change::Put(value)
-                } else {
-                    Change::Delete
-                };
+                *change = snapshot.get(name, key).map_or(Change::Delete, Change::Put);
             }
 
             // Remember all elements that will be deleted.
@@ -1075,6 +1071,7 @@ where
         }
     }
 
+    #[allow(clippy::option_if_let_else)]
     fn step(&mut self) -> NextIterValue {
         use std::cmp::Ordering::{Equal, Greater, Less};
 
@@ -1223,9 +1220,8 @@ pub fn check_database(db: &mut dyn Database) -> Result<()> {
             }
 
             return Ok(());
-        } else {
-            view.put(VERSION_NAME, DB_VERSION);
         }
+        view.put(VERSION_NAME, DB_VERSION);
     }
     db.merge(fork.into_patch())
 }

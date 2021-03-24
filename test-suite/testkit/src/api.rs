@@ -407,6 +407,7 @@ where
     /// the corresponding type.
     ///
     /// If query was specified, it is serialized as a JSON in the request body.
+    #[allow(clippy::option_if_let_else)]
     pub async fn post<R>(self, endpoint: &str) -> api::Result<R>
     where
         R: DeserializeOwned + 'static,

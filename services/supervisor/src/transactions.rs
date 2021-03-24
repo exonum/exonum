@@ -329,11 +329,10 @@ impl SupervisorInterface<ExecutionContext<'_>> for Supervisor {
             // We have a proposal, check that it's actual.
             if current_height < proposal.config_propose.actual_from {
                 return Err(ConfigurationError::ConfigProposeExists.into());
-            } else {
-                // Proposal is outdated but was not removed (e.g. because of the panic
-                // during config applying), clean it.
-                schema.public.pending_proposal.remove();
             }
+            // Proposal is outdated but was not removed (e.g. because of the panic
+            // during config applying), clean it.
+            schema.public.pending_proposal.remove();
         }
         drop(schema);
 

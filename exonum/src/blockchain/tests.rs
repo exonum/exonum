@@ -100,7 +100,7 @@ impl Execute for InitAction {
     fn execute(self, _context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         match self {
             Self::Noop => Ok(()),
-            Self::Panic => panic!(PANIC_STR),
+            Self::Panic => panic!("{}", PANIC_STR),
             Self::Error(code, description) => Err(ExecutionError::service(code, description)),
         }
     }
@@ -130,7 +130,7 @@ impl Execute for AfterTransactionsAction {
                 Ok(())
             }
 
-            Self::Panic => panic!(PANIC_STR),
+            Self::Panic => panic!("{}", PANIC_STR),
         }
     }
 }
@@ -174,10 +174,10 @@ impl Execute for Transaction {
             Self::Panic => {
                 let mut schema = InspectorSchema::new(&*context.fork);
                 schema.values.push(42);
-                panic!(PANIC_STR);
+                panic!("{}", PANIC_STR);
             }
 
-            Self::MerkledbError => panic!(MerkledbError::new(PANIC_STR)),
+            Self::MerkledbError => panic!("{:?}", MerkledbError::new(PANIC_STR)),
 
             Self::ExecutionError(code, description) => {
                 let mut schema = InspectorSchema::new(&*context.fork);
@@ -320,11 +320,10 @@ impl Runtime for RuntimeInspector {
 
     fn after_transactions(&self, context: ExecutionContext<'_>) -> Result<(), ExecutionError> {
         catch_panic(|| {
-            if let Some(action) = self.after_transactions.borrow_mut().pop_front() {
-                action.execute(context)
-            } else {
-                Ok(())
-            }
+            self.after_transactions
+                .borrow_mut()
+                .pop_front()
+                .map_or(Ok(()), |action| action.execute(context))
         })
     }
 

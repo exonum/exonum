@@ -47,7 +47,7 @@ pub struct WalletService;
 impl WalletService {
     pub const ID: InstanceId = 24;
 
-    pub fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> WalletSchema<impl Access + 'a> {
+    pub fn get_schema(snapshot: &dyn Snapshot) -> WalletSchema<impl Access + '_> {
         WalletSchema::new(snapshot.for_service(Self::ID).unwrap())
     }
 }

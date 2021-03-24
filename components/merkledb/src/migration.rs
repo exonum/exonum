@@ -700,7 +700,7 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
-    use std::{collections::HashMap, iter::FromIterator, sync::mpsc, thread, time::Duration};
+    use std::{collections::HashMap, sync::mpsc, thread, time::Duration};
 
     #[test]
     fn in_memory_migration() {
@@ -1144,7 +1144,7 @@ mod tests {
         })?;
 
         // Check the data after migration.
-        let old_balances: HashMap<_, _> = HashMap::from_iter(DATA.iter().copied());
+        let old_balances: HashMap<_, _> = DATA.iter().copied().collect();
         let new_balances = helper.new_data().get_proof_map::<_, str, u64>("balances");
         for (name, balance) in &new_balances {
             assert_eq!(balance, old_balances[&name.as_str()] + 10);

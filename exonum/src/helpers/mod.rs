@@ -88,11 +88,7 @@ pub mod pb_optional_hash {
 
     /// Serializes `Option<Hash>` to Protobuf.
     pub fn to_pb(value: &Option<Hash>) -> PbHash {
-        if let Some(hash) = value {
-            hash.to_pb()
-        } else {
-            PbHash::new()
-        }
+        value.map_or_else(PbHash::new, |hash| hash.to_pb())
     }
 }
 

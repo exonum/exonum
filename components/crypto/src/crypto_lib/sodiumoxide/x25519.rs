@@ -76,6 +76,7 @@ pub fn convert_to_private_key(key: &mut [u8; 32]) {
 }
 
 /// Calculates the scalar multiplication for X25519.
+#[allow(clippy::result_unit_err)]
 pub fn scalarmult(sc: &SecretKey, pk: &PublicKey) -> Result<PublicKey, ()> {
     sodium_scalarmult(sc.as_ref(), pk.as_ref()).map(PublicKey)
 }
@@ -141,9 +142,9 @@ macro_rules! implement_x25519_type {
         }
     }
 
-    impl Into<$name> for $name_from {
-        fn into(self) -> $name {
-            $name(self)
+    impl From<$name_from> for $name {
+        fn from(other: $name_from) -> Self {
+            Self(other)
         }
     }
     )

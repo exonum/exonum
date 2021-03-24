@@ -119,9 +119,9 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[protobuf_convert(source = "crate::proto::TestProtobufConvertRepeated")]
 #[derive(Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "crate::proto::TestProtobufConvertRepeated")]
 struct StructWithRepeatedTypes {
     keys: Vec<PublicKey>,
     bytes_array: Vec<Vec<u8>>,
@@ -192,9 +192,9 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[protobuf_convert(source = "crate::proto::TestFixedArrays")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "crate::proto::TestFixedArrays")]
 struct StructWithFixedArrays {
     fixed_array_8: [u8; 8],
     fixed_array_16: [u8; 16],

@@ -28,7 +28,7 @@ use super::BenchDB;
 const SEED: [u8; 32] = [100; 32];
 const SAMPLE_SIZE: usize = 10;
 
-#[cfg(not(feature = "long_benchmarks"))]
+#[cfg(feature = "long_benchmarks")]
 const ITEM_COUNTS: &[BenchParams] = &[
     BenchParams {
         users: 10_000,
@@ -81,10 +81,10 @@ const ITEM_COUNTS: &[BenchParams] = &[
         txs_in_block: 1,
     },
 ];
-#[cfg(not(feature = "long_benchmarks"))]
-const TOTAL_TX_COUNT: u64 = 10_000;
-
 #[cfg(feature = "long_benchmarks")]
+const TOTAL_TX_COUNT: u64 = 100_000;
+
+#[cfg(not(feature = "long_benchmarks"))]
 const ITEM_COUNTS: &[BenchParams] = &[
     BenchParams {
         users: 1_000,
@@ -112,8 +112,8 @@ const ITEM_COUNTS: &[BenchParams] = &[
         txs_in_block: 1,
     },
 ];
-#[cfg(feature = "long_benchmarks")]
-const TOTAL_TX_COUNT: u64 = 100_000;
+#[cfg(not(feature = "long_benchmarks"))]
+const TOTAL_TX_COUNT: u64 = 10_000;
 
 #[derive(Clone, Copy, Debug)]
 struct BenchParams {

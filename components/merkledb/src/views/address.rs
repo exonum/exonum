@@ -86,11 +86,7 @@ impl IndexAddress {
     pub(super) fn namespace(&self) -> &str {
         if self.in_migration {
             let dot_position = self.name.find('.');
-            if let Some(pos) = dot_position {
-                &self.name[..pos]
-            } else {
-                &self.name
-            }
+            dot_position.map_or(&self.name, |pos| &self.name[..pos])
         } else {
             ""
         }

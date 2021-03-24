@@ -5,7 +5,7 @@ use proptest::{
     test_runner::TestCaseResult,
 };
 
-use std::{collections::BTreeMap, iter::FromIterator};
+use std::collections::BTreeMap;
 
 use exonum_merkledb::{
     access::{Access, AccessExt, RawAccessMut},
@@ -158,16 +158,22 @@ impl IndexData {
 
             IndexType::Map => {
                 let map = snapshot.get_map::<_, u8, Vec<u8>>(addr);
-                let expected_map =
-                    BTreeMap::from_iter(self.values.iter().map(|val| (val[0], val.clone())));
+                let expected_map: BTreeMap<_, _> = self
+                    .values
+                    .iter()
+                    .map(|val| (val[0], val.clone()))
+                    .collect();
                 // Using `Vec<_>` allows to test for duplicate entries during iteration etc.
                 let expected_map: Vec<_> = expected_map.into_iter().collect();
                 prop_assert_eq!(map.iter().collect::<Vec<_>>(), expected_map);
             }
             IndexType::ProofMap => {
                 let map = snapshot.get_proof_map::<_, u8, Vec<u8>>(addr);
-                let expected_map =
-                    BTreeMap::from_iter(self.values.iter().map(|val| (val[0], val.clone())));
+                let expected_map: BTreeMap<_, _> = self
+                    .values
+                    .iter()
+                    .map(|val| (val[0], val.clone()))
+                    .collect();
                 let expected_map: Vec<_> = expected_map.into_iter().collect();
                 prop_assert_eq!(map.iter().collect::<Vec<_>>(), expected_map);
             }

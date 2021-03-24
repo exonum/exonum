@@ -1198,12 +1198,10 @@ impl NodeHandler {
             }
         };
 
-        if let Some(data) = requested_data {
+        requested_data.map_or(true, |data| {
             self.request(data, key);
             false
-        } else {
-            true
-        }
+        })
     }
 
     /// Requests a block for the next height from all peers with a bigger height. Called when the

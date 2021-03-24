@@ -110,7 +110,8 @@
     // Too much work to fix.
     clippy::missing_errors_doc, clippy::missing_const_for_fn,
     // Obviously should be removed after the next actix-web release.
-    clippy::future_not_send
+    clippy::future_not_send,
+    clippy::unnecessary_wraps
 )]
 
 pub use crate::{

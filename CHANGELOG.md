@@ -32,6 +32,9 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - Added a possibility to use domain names along with IP addresses on generation configs
   stage and in the connect list. (#1870)
+  
+- There is a new property `max_total_wal_size` was introduced in a database configuration
+  section for a setting maximum size of WAL journal of the rocksdb. (#1961)
 
 #### exonum-merkledb
 

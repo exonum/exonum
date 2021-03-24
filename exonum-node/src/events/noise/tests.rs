@@ -378,6 +378,7 @@ async fn wait_for_handshake_result(
     (sender_err, listener_err)
 }
 
+#[allow(clippy::option_if_let_else)]
 async fn run_handshake_listener(
     addr: SocketAddr,
     params: HandshakeParams,

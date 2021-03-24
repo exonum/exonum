@@ -358,7 +358,7 @@ mod tests {
         access::CopyAccessExt, migration::Scratchpad, Database, ProofMapIndex, TemporaryDB,
     };
 
-    use std::{collections::HashSet, iter::FromIterator};
+    use std::collections::HashSet;
 
     #[test]
     fn persistent_iter_for_map() {
@@ -552,7 +552,7 @@ mod tests {
         let iter = PersistentIter::new(&scratchpad, "set", &set);
         let tail: Vec<_> = iter.map(|(_, val)| val).collect();
 
-        let actual_set: HashSet<_> = HashSet::from_iter(head.into_iter().chain(middle).chain(tail));
-        assert_eq!(actual_set, HashSet::from_iter(items.iter().copied()));
+        let actual_set: HashSet<_> = head.into_iter().chain(middle).chain(tail).collect();
+        assert_eq!(actual_set, items.iter().copied().collect());
     }
 }

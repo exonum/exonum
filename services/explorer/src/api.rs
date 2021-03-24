@@ -513,11 +513,7 @@ impl ExplorerApi {
         } else {
             (explorer.height(), Bound::Unbounded)
         };
-        let lower_bound = if let Some(lower) = query.earliest {
-            Bound::Included(lower)
-        } else {
-            Bound::Unbounded
-        };
+        let lower_bound = query.earliest.map_or(Bound::Unbounded, Bound::Included);
 
         let blocks: Vec<_> = explorer
             .blocks((lower_bound, upper_bound))

@@ -522,39 +522,25 @@ impl InstanceStatus {
 
     /// Returns `true` if a service with this status provides at least read access to its data.
     pub fn provides_read_access(&self) -> bool {
-        match self {
-            // Migrations are non-destructive currently; i.e., the old service data is consistent
-            // during migration.
-            Self::Active | Self::Frozen | Self::Migrating(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Active | Self::Frozen | Self::Migrating(_))
     }
 
     /// Returns `true` if the service instance with this status can be resumed.
     pub fn can_be_resumed(&self) -> bool {
-        match self {
-            Self::Stopped | Self::Frozen => true,
-            _ => false,
-        }
+        matches!(self, Self::Stopped | Self::Frozen)
     }
 
     /// Returns `true` if the service instance with this status can be stopped.
     pub fn can_be_stopped(&self) -> bool {
-        match self {
-            Self::Active | Self::Frozen => true,
-            _ => false,
-        }
+        matches!(self, Self::Active | Self::Frozen)
     }
 
     /// Returns `true` if the service instance with this status can be frozen in all cases.
     pub fn can_be_frozen(&self) -> bool {
-        match self {
-            Self::Active => true,
-            // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service
-            // may have a data version differing from the artifact recorded in service spec,
-            // or, more generally, from any of deployed artifacts.
-            _ => false,
-        }
+        // We cannot easily transition `Stopped` -> `Frozen` because a `Stopped` service
+        // may have a data version differing from the artifact recorded in service spec,
+        // or, more generally, from any of deployed artifacts.
+        matches!(self, Self::Active | Self::Frozen)
     }
 
     pub(super) fn ongoing_migration_target(&self) -> Option<&ArtifactId> {
@@ -720,11 +706,7 @@ mod pb_optional_version {
     }
 
     pub fn to_pb(value: &Option<Version>) -> String {
-        if let Some(value) = value.as_ref() {
-            value.to_string()
-        } else {
-            String::new()
-        }
+        value.as_ref().map_or_else(String::new, ToString::to_string)
     }
 }
 

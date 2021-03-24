@@ -673,9 +673,8 @@ impl Sandbox {
                     if request.time() > now {
                         timers.push(request);
                         break;
-                    } else {
-                        request.event()
                     }
+                    request.event()
                 } else {
                     break;
                 }

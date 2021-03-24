@@ -1,0 +1,151 @@
+on:
+  pull_request:
+  push:
+    branches:
+    - master
+    - develop
+
+name: CI
+
+jobs:
+  tests:
+    name: Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [ Linux, Windows ]
+        include:
+          - build: Linux
+            os: ubuntu-latest
+            rust: stable
+          - build: Windows
+            os: windows-latest
+            rust: stable
+    steps:
+      - uses: actions/checkout@v2
+      - if: runner.os == 'Windows'
+        run: choco install llvm protoc minisign -y
+      - if: runner.os == 'Linux'
+        run: |
+          sudo add-apt-repository -y ppa:exonum/rocksdb
+          sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler \
+            libprotobuf-dev librocksdb6.8 pkg-config clang-7 lldb-7 lld-7
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust }}-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          # Not enough space on a VM to test with param: --all-targets
+          args: -p exonum -p exonum-merkledb -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
+        env:
+          RUST_BACKTRACE: full
+
+  doc-tests:
+    name: Doc Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Dependencies
+        run: |
+          sudo add-apt-repository -y ppa:exonum/rocksdb
+          sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb6.8
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --workspace --doc
+
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Dependencies
+        run: |
+          sudo add-apt-repository -y ppa:exonum/rocksdb
+          sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb6.8
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - run: cargo run -p exonum-merkledb --example manual_migration
+      - run: cargo run -p exonum-merkledb --example migration_with_helper
+      - run: cargo run -p exonum-merkledb --example migration_with_iter_loop
+      - run: cargo run -p exonum-merkledb --example blockchain
+      - run: cargo run -p exonum-sample-runtime
+      - run: cargo run -p exonum-explorer --example explorer
+      - run: cargo run -p exonum-testkit --example timestamping
+      - run: cargo run -p exonum-supervisor --example configuration_change
+      - run: cargo run -p exonum-time --example simple_service
+      - run: cargo run -p exonum-soak-tests --bin toggle -- -H 10
+      - run: cargo run -p exonum-soak-tests --bin send_txs -- -T 100
+      - run: cargo run -p exonum-soak-tests --bin sleepy -- -H 10
+      - run: cargo run -p exonum-soak-tests --bin tx_filtering -- -H 10
+      - run: cargo run -p exonum-keys --example key-generator -- -p passphrase -s a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+          profile: minimal
+          override: true
+      - name: Install Dependencies
+        run: |
+          sudo add-apt-repository -y ppa:exonum/rocksdb
+          sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb6.8
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-targets --all-features -- -D warnings
+
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+          profile: minimal
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+  security_audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

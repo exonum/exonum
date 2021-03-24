@@ -48,10 +48,7 @@ fn create_testkit(inc_versions: Vec<Version>) -> TestKit {
     builder.build()
 }
 
-fn inc_schema<'a>(
-    snapshot: &'a dyn Snapshot,
-    service_id: InstanceId,
-) -> IncSchema<impl Access + 'a> {
+fn inc_schema(snapshot: &dyn Snapshot, service_id: InstanceId) -> IncSchema<impl Access + '_> {
     snapshot.service_schema(service_id).unwrap()
 }
 

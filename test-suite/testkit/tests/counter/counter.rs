@@ -170,6 +170,7 @@ impl CounterApi {
         Ok(TransactionResponse::new(tx_hash))
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     fn count(snapshot: impl Access) -> api::Result<u64> {
         let schema = CounterSchema::new(snapshot);
         Ok(schema.counter.get().unwrap_or_default())

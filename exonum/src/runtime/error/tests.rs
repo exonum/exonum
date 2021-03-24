@@ -19,7 +19,7 @@ use pretty_assertions::{assert_eq, assert_ne};
 use protobuf::Message;
 use serde_json::json;
 
-use std::{any::Any, panic};
+use std::{any::Any, fmt::Display, panic};
 
 use crate::{
     blockchain::{CallInBlock, Schema},
@@ -29,8 +29,8 @@ use crate::{
     },
 };
 
-fn make_panic<T: Send + 'static>(val: T) -> Box<dyn Any + Send> {
-    panic::catch_unwind(panic::AssertUnwindSafe(|| panic!(val))).unwrap_err()
+fn make_panic<T: Send + Display + 'static>(val: &T) -> Box<dyn Any + Send> {
+    panic::catch_unwind(panic::AssertUnwindSafe(|| panic!("{}", val))).unwrap_err()
 }
 
 #[test]
@@ -393,35 +393,39 @@ fn execution_result_serde_roundtrip() {
 #[test]
 fn str_panic() {
     let static_str = "Static string (&str)";
-    let panic = make_panic(static_str);
+    let panic = make_panic(&static_str);
     assert_eq!(ExecutionError::from_panic(panic).description, static_str);
 }
 
 #[test]
 fn string_panic() {
     let string = "Owned string (String)".to_owned();
-    let panic = make_panic(string.clone());
+    let panic = make_panic(&string);
     assert_eq!(ExecutionError::from_panic(panic).description, string);
 }
 
 #[test]
 fn box_error_panic() {
-    let error: Box<dyn std::error::Error + Send> = Box::new("e".parse::<i32>().unwrap_err());
-    let description = error.to_string();
-    let panic = make_panic(error);
-    assert_eq!(ExecutionError::from_panic(panic).description, description);
+    let error = "e".parse::<i32>().unwrap_err();
+    let panic = make_panic(&error);
+    assert_eq!(
+        ExecutionError::from_panic(panic).description,
+        error.to_string()
+    );
 }
 
 #[test]
 fn failure_panic() {
     let error = format_err!("Failure panic");
-    let description = error.to_string();
-    let panic = make_panic(error);
-    assert_eq!(ExecutionError::from_panic(panic).description, description);
+    let panic = make_panic(&error);
+    assert_eq!(
+        ExecutionError::from_panic(panic).description,
+        error.to_string()
+    );
 }
 
 #[test]
 fn unknown_panic() {
-    let panic = make_panic(1);
-    assert_eq!(ExecutionError::from_panic(panic).description, "");
+    let panic = make_panic(&1);
+    assert_eq!(ExecutionError::from_panic(panic).description, "1");
 }

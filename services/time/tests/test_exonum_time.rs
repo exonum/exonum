@@ -23,7 +23,7 @@ use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use pretty_assertions::assert_eq;
 
-use std::{collections::HashMap, iter::FromIterator};
+use std::collections::HashMap;
 
 use exonum_time::{
     Error, MockTimeProvider, TimeOracleInterface, TimeSchema, TimeServiceFactory, TxTime,
@@ -33,7 +33,7 @@ use exonum_time::{
 const INSTANCE_ID: InstanceId = 112;
 const INSTANCE_NAME: &str = "my-time";
 
-fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> TimeSchema<impl Access + 'a> {
+fn get_schema(snapshot: &dyn Snapshot) -> TimeSchema<impl Access + '_> {
     snapshot.service_schema(INSTANCE_NAME).unwrap()
 }
 
@@ -457,12 +457,11 @@ async fn assert_current_validators_times_eq(
     api: &mut TestKitApi,
     expected_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
 ) {
-    let validators_times = HashMap::from_iter(
-        get_current_validators_times(api)
-            .await
-            .iter()
-            .map(|validator| (validator.public_key, validator.time)),
-    );
+    let validators_times: HashMap<_, _> = get_current_validators_times(api)
+        .await
+        .iter()
+        .map(|validator| (validator.public_key, validator.time))
+        .collect();
 
     assert_eq!(*expected_times, validators_times);
 }
@@ -471,12 +470,11 @@ async fn assert_all_validators_times_eq(
     api: &mut TestKitApi,
     expected_validators_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
 ) {
-    let validators_times = HashMap::from_iter(
-        get_all_validators_times(api)
-            .await
-            .iter()
-            .map(|validator| (validator.public_key, validator.time)),
-    );
+    let validators_times: HashMap<_, _> = get_all_validators_times(api)
+        .await
+        .iter()
+        .map(|validator| (validator.public_key, validator.time))
+        .collect();
 
     assert_eq!(*expected_validators_times, validators_times);
 }

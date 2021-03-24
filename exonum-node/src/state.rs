@@ -1439,10 +1439,7 @@ impl State {
     /// Checks if the pool flushing strategy prescribes to flush transactions immediately
     /// on initial processing.
     pub(super) fn persist_txs_immediately(&self) -> bool {
-        match self.flush_pool_strategy {
-            FlushPoolStrategy::Immediate => true,
-            _ => false,
-        }
+        matches!(self.flush_pool_strategy, FlushPoolStrategy::Immediate)
     }
 
     /// Returns mutable reference to the invalid transactions cache.

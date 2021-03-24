@@ -399,7 +399,7 @@ impl<T: RawAccessMut> View<T> {
 
         match self {
             Self::Real(ViewInner { changes, .. }) => changes.as_mut().expect(ACCESS_ERROR),
-            Self::Phantom => panic!(ACCESS_ERROR),
+            Self::Phantom => panic!("{}", ACCESS_ERROR),
         }
     }
 

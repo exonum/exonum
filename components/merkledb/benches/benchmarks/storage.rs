@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use criterion::{
-    black_box, AxisScale, BatchSize, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration,
-    Throughput,
+    black_box, AxisScale, BatchSize, Bencher, BenchmarkId, Criterion, PlotConfiguration, Throughput,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-use std::{collections::HashSet, convert::TryInto};
+use std::collections::HashSet;
 
 use exonum_crypto::{Hash, HASH_SIZE as KEY_SIZE};
 use exonum_merkledb::{access::CopyAccessExt, Fork, ListIndex, MapIndex, ObjectHash};
@@ -376,18 +375,19 @@ fn bench_fn<F>(c: &mut Criterion, name: &str, benchmark: F)
 where
     F: Fn(&mut Bencher<'_>, usize) + 'static,
 {
-    let item_counts = ITEM_COUNTS.iter().cloned();
-    c.bench(
-        name,
-        ParameterizedBenchmark::new(
-            "items",
-            move |b: &mut Bencher<'_>, &len: &usize| benchmark(b, len),
-            item_counts,
-        )
-        .throughput(|s| Throughput::Elements((*s).try_into().unwrap()))
-        .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-        .sample_size(SAMPLE_SIZE),
-    );
+    let mut group = c.benchmark_group(name);
+    for item_counts in ITEM_COUNTS.iter() {
+        group
+            .bench_with_input(
+                BenchmarkId::from_parameter(item_counts),
+                item_counts,
+                |b: &mut Bencher<'_>, len: &usize| benchmark(b, *len),
+            )
+            .throughput(Throughput::Elements(*item_counts as u64))
+            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
+            .sample_size(SAMPLE_SIZE);
+    }
+    group.finish();
 }
 
 fn fill_list(list: &mut ListIndex<&Fork, Vec<u8>>, rng: &mut impl Rng) {
