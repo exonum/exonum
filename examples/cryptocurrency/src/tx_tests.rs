@@ -215,14 +215,14 @@ fn test_fuzz_transfers() {
     ]);
 
     for _ in 0..BLOCKS {
-        let n_txs = rng.gen_range(0, MAX_TRANSACTIONS); // number of transactions in the block
+        let n_txs = rng.gen_range(0..MAX_TRANSACTIONS); // number of transactions in the block
 
         let txs = (0..n_txs).map(|_| {
             let (sender, receiver) = (
                 keys.choose(&mut rng).unwrap(),
                 keys.choose(&mut rng).unwrap(),
             );
-            let amount = rng.gen_range(0, 250);
+            let amount = rng.gen_range(0..250);
 
             sender.transfer(
                 INSTANCE_ID,

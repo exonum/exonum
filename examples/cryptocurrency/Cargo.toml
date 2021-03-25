@@ -37,7 +37,7 @@ exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 
 assert_matches = "1.2.0"
 pretty_assertions = "0.6.1"
-rand = "0.7"
+rand = "0.8"
 
 [dev-dependencies.tokio]
 version = "0.2.13"

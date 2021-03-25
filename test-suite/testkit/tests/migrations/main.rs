@@ -350,7 +350,7 @@ fn generate_users(rng: &mut impl Rng, user_count: usize) -> Vec<TestUser> {
                 full_name: format!("{} {}", first_name, last_name).into(),
                 first_name: first_name.into(),
                 last_name: last_name.into(),
-                balance: rng.gen_range(0, 10_000),
+                balance: rng.gen_range(0..10_000),
             }
         })
         .collect()

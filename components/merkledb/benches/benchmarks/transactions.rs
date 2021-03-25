@@ -236,7 +236,7 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
         .collect::<HashMap<_, _>>();
 
     let get_random_user = |rng: &mut StdRng| -> PublicKey {
-        let id = rng.gen_range(0, wallets_count);
+        let id = rng.gen_range(0..wallets_count);
         *users.get(&id).unwrap()
     };
 
@@ -246,7 +246,7 @@ fn gen_random_blocks(blocks: usize, txs_count: usize, wallets_count: usize) -> V
                 .map(|_| Transaction {
                     sender: get_random_user(&mut rng),
                     receiver: get_random_user(&mut rng),
-                    amount: rng.gen_range(0, 10),
+                    amount: rng.gen_range(0..10),
                 })
                 .collect();
             Block { transactions }

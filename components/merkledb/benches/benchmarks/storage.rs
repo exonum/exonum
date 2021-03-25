@@ -46,7 +46,7 @@ fn generate_random_kv(len: usize) -> Vec<(Hash, Vec<u8>)> {
         let mut v = vec![0; CHUNK_SIZE];
         // Generate only unique keys.
         let mut k = base;
-        let byte: usize = rng.gen_range(0, 31);
+        let byte: usize = rng.gen_range(0..31);
         k[byte] = rng.gen::<u8>();
 
         rng.fill_bytes(&mut v);
