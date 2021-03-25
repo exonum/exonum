@@ -57,7 +57,7 @@ fn generate_random_data(len: usize) -> Vec<([u8; KEY_SIZE], Vec<u8>)> {
 
         // Generate only unique keys
         let mut k = base;
-        let byte: usize = rng.gen_range(0, 31);
+        let byte: usize = rng.gen_range(0..31);
         k[byte] = rng.gen::<u8>();
 
         rng.fill_bytes(&mut v);
@@ -78,10 +78,10 @@ fn generate_random_data_keys<R: Rng>(
     rng: &mut R,
 ) -> Vec<(Vec<u8>, Vec<u8>)> {
     let kv_generator = |_| {
-        let mut new_key = vec![0; rng.gen_range(0, 64)];
+        let mut new_key = vec![0; rng.gen_range(0..64)];
         rng.fill_bytes(&mut new_key);
         while exists_keys.contains(&new_key) {
-            new_key = vec![0; rng.gen_range(0, 64)];
+            new_key = vec![0; rng.gen_range(0..64)];
             rng.fill_bytes(&mut new_key);
         }
         exists_keys.insert(new_key.clone());

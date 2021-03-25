@@ -13,10 +13,11 @@ categories = ["algorithms", "cryptography"]
 description = "Exonum node keys management."
 
 [dependencies]
-anyhow = "1.0.26"
-rand = "0.7"
-pwbox = "0.3.0"
-secret-tree = "0.2.0"
+anyhow = "1.0"
+rand = "0.8"
+pwbox = "0.4"
+secrecy = "0.7"
+secret-tree = { git = "https://github.com/slowli/secret-tree.git" }
 serde = "1.0"
 serde_derive = "1.0"
 structopt = "0.3"

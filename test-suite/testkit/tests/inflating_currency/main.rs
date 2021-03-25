@@ -174,10 +174,10 @@ async fn test_fuzz_transfers() {
         let tx_count = rng.gen::<u32>() & 15;
         let height = testkit.height().0;
         let txs = (0..tx_count).map(|_| {
-            let sender_idx = rng.gen_range(0, USERS);
+            let sender_idx = rng.gen_range(0..USERS);
             let (sender, _) = &keys_and_txs[sender_idx];
-            let receiver = &pubkeys[rng.gen_range(0, USERS)];
-            let amount = rng.gen_range(1, 2 * height);
+            let receiver = &pubkeys[rng.gen_range(0..USERS)];
+            let amount = rng.gen_range(1..2 * height);
 
             sender.transfer(
                 SERVICE_ID,

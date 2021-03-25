@@ -52,7 +52,7 @@ impl Collection {
 
     fn fill(self, fork: &Fork, rng: &mut impl Rng) {
         let addr = self.get_address();
-        let item_count = rng.gen_range(25, 100);
+        let item_count = rng.gen_range(25..100);
         match self.ty {
             IndexType::List => {
                 let mut list = fork.get_list(addr);

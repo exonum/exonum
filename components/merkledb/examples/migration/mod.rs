@@ -97,11 +97,11 @@ fn create_initial_data() -> TemporaryDB {
             let wallet = v1::Wallet {
                 public_key,
                 username,
-                balance: rng.gen_range(0, 1_000),
+                balance: rng.gen_range(0..1_000),
             };
             schema.wallets.put(&public_key, wallet);
 
-            let history_len = rng.gen_range(0, 10);
+            let history_len = rng.gen_range(0..10);
             schema
                 .histories
                 .get(&public_key)
