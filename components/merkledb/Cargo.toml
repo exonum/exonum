@@ -30,7 +30,7 @@ rocksdb = { version = "0.15", default-features = false }
 rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
-smallvec = "1.0"
+smallvec = "1.6"
 tempfile = "3.2"
 thiserror = "1.0"
 uuid = { version = "0.8", features = ["v4"] }
