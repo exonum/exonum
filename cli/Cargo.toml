@@ -35,7 +35,7 @@ exonum-derive = { version = "1.0.0", path = "../components/derive" }
 
 futures = "0.3.4"
 lazy_static = "1.4.0"
-pretty_assertions = "0.6"
+pretty_assertions = "0.7"
 reqwest = { version = "0.10.2", features = ["json"] }
 
 [dev-dependencies.tokio]
