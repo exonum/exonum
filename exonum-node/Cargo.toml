@@ -24,7 +24,7 @@ byteorder = { version = "1.3", features = ["i128"] }
 bytes = "0.5"
 chrono = "0.4.6"
 futures = "0.3.4"
-futures-retry = "0.5"
+futures-retry = "0.6"
 log = "0.4.6"
 protobuf = { version = "2.17.0", features = ["with-serde"] }
 rand = "0.7"
