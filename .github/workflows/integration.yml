@@ -33,11 +33,11 @@ jobs:
           cargo install --path examples/cryptocurrency-advanced/backend
           cargo install --path examples/cryptocurrency-advanced/backend --example cryptocurrency-migration
       - name: Run tests
-        run: python3 -m exonum_tests -v
-      - name: Cleanup
         run: |
-          deactivate
-          rm -rf .venv
+          source .venv/bin/activate
+          python3 -m exonum_tests -v
+      - name: Cleanup
+        run: rm -rf .venv
   shell_tests:
     name: Shell tests
     runs-on: ubuntu-latest
@@ -49,7 +49,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo add-apt-repository -y ppa:exonum/rocksdb
-          sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler
+          sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler jq
           nvm install 10 && nvm use 10
           cd $GITHUB_WORKSPACE/test-suite/testkit/server && npm install && cd $GITHUB_WORKSPACE
           cargo build -p exonum-testkit-server
