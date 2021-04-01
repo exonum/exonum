@@ -36,7 +36,7 @@ jobs:
         with:
           command: test
           # Not enough space on a VM to test with param: --all-targets
-          args: -p exonum -p exonum-merkledb -p exonum-crypto -p exonum-node --tests
+          args: -p exonum -p exonum-merkledb -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
         env:
           RUST_BACKTRACE: full
 

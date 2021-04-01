@@ -11,33 +11,6 @@ env:
   rust: 1.50.0
 
 jobs:
-  integration_tests:
-    name: Python tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ env.rust }}
-      - name: Install dependencies
-        run: |
-          sudo add-apt-repository -y ppa:exonum/rocksdb
-          sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler
-          python3 -m venv .venv
-          source .venv/bin/activate
-          pip3 install pip --upgrade
-          git clone https://github.com/exonum/exonum-launcher.git .venv/exonum-launcher
-          pip3 install -r .venv/exonum-launcher/requirements.txt
-          pip3 install -e .venv/exonum-launcher
-          pip3 install -e test-suite/exonum-py-tests --no-binary=protobuf protobuf
-          cargo install --path examples/cryptocurrency-advanced/backend
-          cargo install --path examples/cryptocurrency-advanced/backend --example cryptocurrency-migration
-      - name: Run tests
-        run: |
-          source .venv/bin/activate
-          python3 -m exonum_tests -v
-      - name: Cleanup
-        run: rm -rf .venv
   shell_tests:
     name: Shell tests
     runs-on: ubuntu-latest
