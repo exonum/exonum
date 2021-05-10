@@ -11,27 +11,24 @@ env:
   rust: 1.50.0
 
 jobs:
-  tests:
-    name: Unit Tests
+  partial_unit_tests:
+    name: Partiall Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        build: [ Linux, Windows ]
+        build: [ MacOS, Windows ]
         include:
-          - build: Linux
-            os: ubuntu-latest
+          - build: MacOS
+            os: macos-latest
           - build: Windows
             os: windows-latest
     steps:
       - uses: actions/checkout@v2
       - if: runner.os == 'Windows'
         run: choco install llvm protoc minisign -y
-      - if: runner.os == 'Linux'
-        run: |
-          sudo add-apt-repository -y ppa:exonum/rocksdb
-          sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler \
-            libprotobuf-dev librocksdb6.8 pkg-config clang-7 lldb-7 lld-7
+      - if: runner.os == 'MacOS'
+        run: brew install libsodium rocksdb pkg-config protobuf
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust }}
@@ -40,6 +37,21 @@ jobs:
           command: test
           # Not enough space on a VM to test with param: --all-targets
           args: -p exonum -p exonum-merkledb -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
+        env:
+          RUST_BACKTRACE: full
+
+  all_unit_tests:
+    name: All Unit Tests
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust }}
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --all-targets
         env:
           RUST_BACKTRACE: full
 
