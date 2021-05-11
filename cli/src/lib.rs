@@ -250,11 +250,9 @@ impl NodeBuilder {
     /// - `Err(_)` if an error occurred during command execution
     #[doc(hidden)] // unstable
     pub fn execute_command(mut self) -> anyhow::Result<Option<Node>> {
-        let command = if let Some(args) = self.args {
-            Command::from_iter(args)
-        } else {
-            Command::from_args()
-        };
+        let command = self
+            .args
+            .map_or_else(Command::from_args, Command::from_iter);
 
         if let StandardResult::Run(run_config) = command.execute()? {
             // Deploy "default" services (supervisor and the explorer).

@@ -41,7 +41,7 @@ const INSTANCE_ID: u32 = 1010;
 /// Service instance name.
 const INSTANCE_NAME: &str = "nnm-token";
 
-fn get_schema<'a>(snapshot: &'a dyn Snapshot) -> CurrencySchema<impl Access + 'a> {
+fn get_schema(snapshot: &dyn Snapshot) -> CurrencySchema<impl Access + '_> {
     CurrencySchema::new(snapshot.for_service(INSTANCE_NAME).unwrap())
 }
 
@@ -198,7 +198,7 @@ fn test_transfers_in_single_block() {
 #[test]
 fn test_fuzz_transfers() {
     use rand::{seq::SliceRandom, Rng};
-    use std::{collections::BTreeSet, iter::FromIterator};
+    use std::collections::BTreeSet;
 
     const BLOCKS: usize = 50; // number of blocks to create
     const MAX_TRANSACTIONS: usize = 20; // maximum number of transactions in a block
@@ -215,14 +215,14 @@ fn test_fuzz_transfers() {
     ]);
 
     for _ in 0..BLOCKS {
-        let n_txs = rng.gen_range(0, MAX_TRANSACTIONS); // number of transactions in the block
+        let n_txs = rng.gen_range(0..MAX_TRANSACTIONS); // number of transactions in the block
 
         let txs = (0..n_txs).map(|_| {
             let (sender, receiver) = (
                 keys.choose(&mut rng).unwrap(),
                 keys.choose(&mut rng).unwrap(),
             );
-            let amount = rng.gen_range(0, 250);
+            let amount = rng.gen_range(0..250);
 
             sender.transfer(
                 INSTANCE_ID,
@@ -243,8 +243,10 @@ fn test_fuzz_transfers() {
         assert_eq!(wallets.len(), 2);
         // These wallets should belong to Alice and Bob.
         assert_eq!(
-            BTreeSet::from_iter(wallets.iter().map(|w| &w.pub_key)),
-            BTreeSet::from_iter(vec![&alice.public_key(), &bob.public_key()])
+            wallets.iter().map(|w| &w.pub_key).collect::<BTreeSet<_>>(),
+            vec![alice.public_key(), bob.public_key()]
+                .iter()
+                .collect::<BTreeSet<_>>()
         );
         // The total amount of funds should equal 200, no matter which transactions were executed.
         assert_eq!(wallets.iter().map(|w| w.balance).sum::<u64>(), 200);

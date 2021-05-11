@@ -40,7 +40,7 @@ use crate::{
     },
 };
 
-const DELAY: Duration = Duration::from_millis(40);
+const DELAY: Duration = Duration::from_millis(100);
 
 #[derive(Default, Debug, Clone)]
 struct MigrationRuntime {
@@ -61,15 +61,15 @@ impl WellKnownRuntime for MigrationRuntime {
 }
 
 impl Runtime for MigrationRuntime {
-    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
-        Receiver::with_result(Ok(()))
-    }
-
     // We use service freezing in some tests.
     fn is_supported(&self, feature: &RuntimeFeature) -> bool {
         match feature {
             RuntimeFeature::FreezingServices => true,
         }
+    }
+
+    fn deploy_artifact(&mut self, _artifact: ArtifactId, _deploy_spec: Vec<u8>) -> Receiver {
+        Receiver::with_result(Ok(()))
     }
 
     fn is_artifact_deployed(&self, _id: &ArtifactId) -> bool {

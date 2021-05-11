@@ -22,10 +22,10 @@
 //!
 //! ```
 //! use exonum_keys::{generate_keys, read_keys_from_file};
-//! use tempdir::TempDir;
+//! use tempfile::TempDir;
 //!
 //! # fn main() -> anyhow::Result<()> {
-//! let dir = TempDir::new("test_keys")?;
+//! let dir = TempDir::new()?;
 //! let file_path = dir.path().join("private_key.toml");
 //! let pass_phrase = b"super_secret_passphrase";
 //! let keys = generate_keys(file_path.as_path(), pass_phrase)?;
@@ -54,10 +54,10 @@
     clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
-use anyhow::format_err;
 use exonum_crypto::{KeyPair, PublicKey, SecretKey, Seed, SEED_LENGTH};
 use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
+use secrecy::ExposeSecret;
 use secret_tree::{Name, SecretTree};
 use serde_derive::{Deserialize, Serialize};
 
@@ -169,7 +169,7 @@ impl EncryptedMasterKey {
         let mut eraser = Eraser::new();
         eraser.add_suite::<Sodium>();
         let pwbox = Sodium::build_box(&mut rng)
-            .seal(pass_phrase, key)
+            .seal(pass_phrase, key.expose_secret())
             .map_err(|_| Error::new(ErrorKind::Other, "Couldn't create a pw box"))?;
         let encrypted_key = eraser
             .erase(&pwbox)
@@ -206,8 +206,7 @@ pub fn generate_keys_from_seed(
     passphrase: &[u8],
     seed: &[u8],
 ) -> anyhow::Result<(Keys, EncryptedMasterKey)> {
-    let tree = SecretTree::from_seed(seed)
-        .ok_or_else(|| format_err!("Error creating SecretTree from seed"))?;
+    let tree = SecretTree::from_slice(seed)?;
     let encrypted_key = EncryptedMasterKey::encrypt(tree.seed(), passphrase)?;
     let keys = generate_keys_from_master_password(&tree);
 
@@ -243,22 +242,20 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     let keys: EncryptedMasterKey =
         toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let seed = keys.decrypt(pass_phrase)?;
-    let tree = SecretTree::from_seed(&seed).expect("Error creating secret tree from seed.");
+    let tree = SecretTree::from_slice(&seed)?;
 
     Ok(generate_keys_from_master_password(&tree))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        generate_keys, read_keys_from_file, thread_rng, validate_file_mode, EncryptedMasterKey,
-        SecretTree,
-    };
-    use tempdir::TempDir;
+    use super::{generate_keys, read_keys_from_file, thread_rng, EncryptedMasterKey, SecretTree};
+    use secrecy::ExposeSecret;
+    use tempfile::TempDir;
 
     #[test]
     fn test_create_and_read_keys_file() {
-        let dir = TempDir::new("test_utils").expect("Couldn't create TempDir");
+        let dir = TempDir::new().expect("Couldn't create TempDir");
         let file_path = dir.path().join("private_key.toml");
         let pass_phrase = b"passphrase";
         let pk1 = generate_keys(file_path.as_path(), pass_phrase).unwrap();
@@ -277,7 +274,7 @@ mod tests {
         let decrypted_seed = key
             .decrypt(pass_phrase)
             .expect("Couldn't decrypt master key ");
-        assert_eq!(&seed[..], &decrypted_seed[..]);
+        assert_eq!(seed.expose_secret(), &decrypted_seed[..]);
     }
 
     #[test]
@@ -312,6 +309,8 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn test_validate_file_mode() {
+        use super::validate_file_mode;
+
         assert!(validate_file_mode(0o_100_600).is_ok());
         assert!(validate_file_mode(0o_600).is_ok());
         assert!(validate_file_mode(0o_111_111).is_err());

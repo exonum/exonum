@@ -16,12 +16,8 @@
 // to `ParameterizedBenchmark::new()`.
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
-use criterion::{
-    AxisScale, Bencher, Criterion, ParameterizedBenchmark, PlotConfiguration, Throughput,
-};
+use criterion::{AxisScale, Bencher, BenchmarkId, Criterion, PlotConfiguration, Throughput};
 use exonum::crypto::{hash, sign, verify, KeyPair};
-
-use std::convert::TryInto;
 
 fn bench_sign(b: &mut Bencher<'_>, &count: &usize) {
     let keys = KeyPair::random();
@@ -49,22 +45,37 @@ pub fn bench_crypto(c: &mut Criterion) {
     // 2^6 = 64 - is relatively small message, and our starting test point.
     // 2^16 = 65536 - is relatively big message, and our end point.
 
-    c.bench(
-        "hash",
-        ParameterizedBenchmark::new("hash", bench_hash, (6..16).map(|i| 1 << i))
-            .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
-            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
-    );
-    c.bench(
-        "sign",
-        ParameterizedBenchmark::new("sign", bench_sign, (6..16).map(|i| 1 << i))
-            .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
-            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
-    );
-    c.bench(
-        "verify",
-        ParameterizedBenchmark::new("verify", bench_verify, (6..16).map(|i| 1 << i))
-            .throughput(|s| Throughput::Bytes((*s).try_into().unwrap()))
-            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic)),
-    );
+    let params = (6..16).map(|i| 1 << i).collect::<Vec<usize>>();
+    let mut group = c.benchmark_group("hash");
+
+    for param in &params {
+        group
+            .bench_with_input(BenchmarkId::from_parameter(param), param, bench_hash)
+            .throughput(Throughput::Elements(*param as u64))
+            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    }
+
+    group.finish();
+
+    let mut group = c.benchmark_group("sign");
+
+    for param in &params {
+        group
+            .bench_with_input(BenchmarkId::from_parameter(param), param, bench_sign)
+            .throughput(Throughput::Elements(*param as u64))
+            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    }
+
+    group.finish();
+
+    let mut group = c.benchmark_group("verify");
+
+    for param in &params {
+        group
+            .bench_with_input(BenchmarkId::from_parameter(param), param, bench_verify)
+            .throughput(Throughput::Elements(*param as u64))
+            .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    }
+
+    group.finish();
 }

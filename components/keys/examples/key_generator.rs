@@ -59,9 +59,9 @@ fn test_key_generator() {
     #[cfg(unix)]
     use std::os::unix::fs::OpenOptionsExt;
     use std::{fs::OpenOptions, io::Write};
-    use tempdir::TempDir;
+    use tempfile::TempDir;
 
-    let tempdir = TempDir::new("test_key_generator").unwrap();
+    let tempdir = TempDir::new().unwrap();
     let master_key_path = tempdir.path().join("master_key.toml");
     let seed = "a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344";
     let passphrase = "passphrase";

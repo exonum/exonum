@@ -80,7 +80,7 @@ fn roundtrip_mini_fuzz() {
 
     let mut rng = StdRng::seed_from_u64(SEED);
     for _ in 0..10_000 {
-        let len = rng.gen_range(0, 64);
+        let len = rng.gen_range(0..64);
         let mut bytes = vec![0_u8; len];
         rng.fill(&mut bytes[..]);
         let test = Test { bytes };

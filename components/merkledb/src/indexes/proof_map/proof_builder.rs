@@ -50,9 +50,8 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
             if contour.is_empty() || node.key.len() <= common_prefix {
                 contour.push(node);
                 break;
-            } else {
-                self = node.add_to_proof(self);
             }
+            self = node.add_to_proof(self);
         }
 
         // Push new items to the contour.
@@ -267,6 +266,7 @@ where
         }
     }
 
+    #[allow(clippy::option_if_let_else)]
     fn create_multiproof(
         &self,
         keys: impl IntoIterator<Item = K::Owned>,

@@ -26,7 +26,6 @@ use std::{
     env,
     ffi::OsString,
     fs::{self, OpenOptions},
-    panic,
     path::{Path, PathBuf},
 };
 
@@ -183,11 +182,7 @@ impl ArgsBuilder {
 }
 
 fn is_run_node_config(result: StandardResult) -> bool {
-    if let StandardResult::Run(_) = result {
-        true
-    } else {
-        false
-    }
+    matches!(result, StandardResult::Run(_))
 }
 
 fn touch(path: impl AsRef<Path>) {

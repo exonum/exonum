@@ -106,10 +106,11 @@ impl ApiManagerConfig {
         servers: HashMap<ApiAccess, WebServerConfig>,
         api_aggregator: ApiAggregator,
     ) -> Self {
-        let mut this = Self::default();
-        this.servers = servers;
-        this.api_aggregator = api_aggregator;
-        this
+        Self {
+            servers,
+            api_aggregator,
+            ..Default::default()
+        }
     }
 
     /// Sets the retry policy for this config.

@@ -45,10 +45,7 @@ pub enum AsyncEventState {
 impl AsyncEventState {
     /// Returns `true` if state of this deployment considered failed.
     pub fn is_failed(&self) -> bool {
-        match self {
-            Self::Timeout | Self::Failed { .. } => true,
-            _ => false,
-        }
+        matches!(self, Self::Timeout | Self::Failed { .. })
     }
 
     /// Attempts to get a height from the state.
@@ -71,18 +68,12 @@ impl AsyncEventState {
 
     /// Returns `true` if current state is `AsyncEventState::Pending`.
     pub fn is_pending(&self) -> bool {
-        match self {
-            Self::Pending => true,
-            _ => false,
-        }
+        matches!(self, Self::Pending)
     }
 
     /// Returns `true` if current state is `AsyncEventState::Succeed`.
     pub fn is_succeed(&self) -> bool {
-        match self {
-            Self::Succeed => true,
-            _ => false,
-        }
+        matches!(self, Self::Succeed)
     }
 }
 

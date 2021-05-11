@@ -201,6 +201,7 @@ pub(crate) struct NodeHandler {
     /// Does this node participate in the consensus?
     is_enabled: bool,
     /// Node role.
+    #[allow(dead_code)]
     node_role: NodeRole,
     /// Configuration file manager.
     config_manager: Option<Box<dyn ConfigManager>>,
@@ -518,10 +519,7 @@ impl NodeRole {
 
     /// Checks if node is validator.
     pub fn is_validator(self) -> bool {
-        match self {
-            Self::Validator(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Validator(_))
     }
 }
 

@@ -1,0 +1,33 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - develop
+
+name: Lint Checker
+
+jobs:
+  spellcheck:
+    name: Spell cheker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: streetsidesoftware/cspell-action@v1.0.1
+        with:
+          config: .cspell.json
+          files: "**/*.{rs,md,py}"
+          exclude: ".*/(target|node_modules)/.*"
+
+  markdown:
+    name: Markdown lints
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+      - name: Check md files
+        uses: nosborn/github-action-markdown-cli@v1.1.1
+        with:
+          files: .
+          config_file: .markdownlintrc
+          ignore_files: ".*/(target|node_modules)/.*"

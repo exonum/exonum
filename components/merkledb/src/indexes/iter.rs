@@ -47,11 +47,7 @@ where
         T: RawAccess,
         P: BinaryKey,
     {
-        let base_iter = if let Some(from) = from {
-            view.iter_from(prefix, from)
-        } else {
-            view.iter(prefix)
-        };
+        let base_iter = from.map_or_else(|| view.iter(prefix), |from| view.iter_from(prefix, from));
         Self { base_iter }
     }
 

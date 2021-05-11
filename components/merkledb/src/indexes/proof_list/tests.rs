@@ -356,8 +356,8 @@ fn random_proofs() {
 
     let index_hash = index.object_hash();
     for _ in 0..10 {
-        let start = rng.gen_range(0, LIST_SIZE as u64);
-        let end = rng.gen_range(start + 1, LIST_SIZE as u64 + 1);
+        let start = rng.gen_range(0..LIST_SIZE as u64);
+        let end = rng.gen_range(start + 1..=LIST_SIZE as u64);
         let end = cmp::min(end, start + MAX_RANGE_SIZE);
 
         let range_proof = index.get_range_proof(start..end);
@@ -759,8 +759,8 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
         }
         let proof_ranges: Vec<_> = (0..50)
             .map(|_| {
-                let start = rng.gen_range(0, LIST_LEN as u64);
-                let end = rng.gen_range(start, LIST_LEN as u64) + 1;
+                let start = rng.gen_range(0..LIST_LEN as u64);
+                let end = rng.gen_range(start..LIST_LEN as u64) + 1;
                 start..end
             })
             .collect();
@@ -837,11 +837,11 @@ fn truncating_list_leads_to_expected_hash() {
 
     for _ in 0..10 {
         let values: [u32; 32] = rng.gen();
-        let truncated_len = rng.gen_range(5, 25);
+        let truncated_len = rng.gen_range(5..25);
         let proof_ranges: Vec<_> = (0..50)
             .map(|_| {
-                let start = rng.gen_range(0, truncated_len as u64);
-                let end = rng.gen_range(start, truncated_len as u64) + 1;
+                let start = rng.gen_range(0..truncated_len as u64);
+                let end = rng.gen_range(start..truncated_len as u64) + 1;
                 start..end
             })
             .collect();

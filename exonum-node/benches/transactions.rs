@@ -20,8 +20,8 @@ const MESSAGES_COUNT: u64 = 1_000;
 const SAMPLE_SIZE: usize = 20;
 
 use criterion::{
-    criterion_group, criterion_main, AxisScale, Bencher, Criterion, ParameterizedBenchmark,
-    PlotConfiguration, Throughput,
+    criterion_group, criterion_main, AxisScale, Bencher, BenchmarkId, Criterion, PlotConfiguration,
+    Throughput,
 };
 use exonum::{
     crypto,
@@ -134,9 +134,9 @@ struct MessageVerifier {
     network_task: JoinHandle<()>,
     handler_task: JoinHandle<()>,
     // We retain sender references in order to not shut down the event loop prematurely.
-    external_tx_sender: Option<mpsc::Sender<Verified<AnyTx>>>,
-    api_sender: Option<mpsc::Sender<ExternalMessage>>,
-    network_sender: Option<mpsc::Sender<NetworkEvent>>,
+    _external_tx_sender: Option<mpsc::Sender<Verified<AnyTx>>>,
+    _api_sender: Option<mpsc::Sender<ExternalMessage>>,
+    _network_sender: Option<mpsc::Sender<NetworkEvent>>,
 }
 
 impl MessageVerifier {
@@ -164,9 +164,9 @@ impl MessageVerifier {
             network_task,
             tx_sender: Some(channel.internal_requests.0.clone()),
             tx_handler: handler,
-            external_tx_sender: Some(channel.transactions.0),
-            api_sender: Some(channel.api_requests.0),
-            network_sender: Some(channel.network_events.0),
+            _external_tx_sender: Some(channel.transactions.0),
+            _api_sender: Some(channel.api_requests.0),
+            _network_sender: Some(channel.network_events.0),
         }
     }
 
@@ -187,11 +187,11 @@ impl MessageVerifier {
     async fn join(mut self) {
         self.tx_sender = None;
         self.network_task.await.unwrap();
-
-        self.external_tx_sender = None;
-        self.api_sender = None;
-        self.network_sender = None;
         self.handler_task.await.unwrap();
+
+        self._external_tx_sender = None;
+        self._api_sender = None;
+        self._network_sender = None;
     }
 }
 
@@ -225,21 +225,37 @@ fn bench_verify_transactions(c: &mut Criterion) {
     crypto::init();
 
     let parameters = (7..12).map(|i| 1 << i).collect::<Vec<_>>();
+    let mut group = c.benchmark_group("transactions/simple");
 
-    c.bench(
-        "transactions/simple",
-        ParameterizedBenchmark::new("size", bench_verify_messages_simple, parameters.clone())
-            .throughput(|_| Throughput::Elements(MESSAGES_COUNT))
+    for parameter in &parameters {
+        group
+            .bench_with_input(
+                BenchmarkId::from_parameter(parameter),
+                parameter,
+                bench_verify_messages_simple,
+            )
+            .throughput(Throughput::Elements(MESSAGES_COUNT))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-            .sample_size(SAMPLE_SIZE),
-    );
-    c.bench(
-        "transactions/event_loop",
-        ParameterizedBenchmark::new("size", bench_verify_messages_event_loop, parameters)
-            .throughput(|_| Throughput::Elements(MESSAGES_COUNT))
+            .sample_size(SAMPLE_SIZE);
+    }
+
+    group.finish();
+
+    let mut group = c.benchmark_group("transactions/event_loop");
+
+    for parameter in &parameters {
+        group
+            .bench_with_input(
+                BenchmarkId::from_parameter(parameter),
+                parameter,
+                bench_verify_messages_event_loop,
+            )
+            .throughput(Throughput::Elements(MESSAGES_COUNT))
             .plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic))
-            .sample_size(SAMPLE_SIZE),
-    );
+            .sample_size(SAMPLE_SIZE);
+    }
+
+    group.finish();
 }
 
 criterion_group!(benches, bench_verify_transactions);

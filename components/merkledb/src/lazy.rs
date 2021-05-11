@@ -126,7 +126,10 @@ mod tests {
         // ...but this errors:
         assert_matches!(
             bogus.try_get().unwrap_err().kind,
-            AccessErrorKind::WrongIndexType { actual: IndexType::List, .. }
+            AccessErrorKind::WrongIndexType {
+                actual: IndexType::List,
+                ..
+            }
         )
     }
 }

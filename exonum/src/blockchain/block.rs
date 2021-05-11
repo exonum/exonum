@@ -508,11 +508,9 @@ impl CallProof {
         call_proof: MapProof<CallInBlock, ExecutionError>,
         error_aux: Option<ExecutionErrorAux>,
     ) -> Self {
-        let (error_description, error_backtrace) = if let Some(aux) = error_aux {
+        let (error_description, error_backtrace) = error_aux.map_or((None, None), |aux| {
             (Some(aux.description), Some(aux.backtrace))
-        } else {
-            (None, None)
-        };
+        });
 
         Self {
             block_proof,

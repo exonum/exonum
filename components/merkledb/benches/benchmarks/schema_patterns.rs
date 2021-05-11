@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use criterion::{black_box, Bencher, Benchmark, Criterion, Throughput};
+use criterion::{black_box, Bencher, Criterion, Throughput};
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use serde_derive::{Deserialize, Serialize};
@@ -285,21 +285,19 @@ fn bench<T: ExecuteTransaction>(bencher: &mut Bencher<'_>, prefixed: bool) {
 pub fn bench_schema_patterns(c: &mut Criterion) {
     exonum_crypto::init();
 
-    c.bench(
-        "schema_patterns",
-        Benchmark::new("eager", |b| bench::<EagerStyle>(b, false))
-            .with_function("lazy", |b| bench::<LazyStyle>(b, false))
-            .with_function("wrapper", |b| bench::<WrapperStyle>(b, false))
-            .throughput(Throughput::Elements(TX_COUNT as u64))
-            .sample_size(SAMPLE_SIZE),
-    );
+    let mut group = c.benchmark_group("schema_patterns");
+    group.bench_function("eager", |b| bench::<EagerStyle>(b, false));
+    group.bench_function("lazy", |b| bench::<LazyStyle>(b, false));
+    group.bench_function("wrapper", |b| bench::<WrapperStyle>(b, false));
+    group.throughput(Throughput::Elements(TX_COUNT as u64));
+    group.sample_size(SAMPLE_SIZE);
+    group.finish();
 
-    c.bench(
-        "schema_patterns/prefixed",
-        Benchmark::new("eager", |b| bench::<EagerStyle>(b, true))
-            .with_function("lazy", |b| bench::<LazyStyle>(b, true))
-            .with_function("wrapper", |b| bench::<WrapperStyle>(b, true))
-            .throughput(Throughput::Elements(TX_COUNT as u64))
-            .sample_size(SAMPLE_SIZE),
-    );
+    let mut group = c.benchmark_group("schema_patterns/prefixed");
+    group.bench_function("eager", |b| bench::<EagerStyle>(b, true));
+    group.bench_function("lazy", |b| bench::<LazyStyle>(b, true));
+    group.bench_function("wrapper", |b| bench::<WrapperStyle>(b, true));
+    group.throughput(Throughput::Elements(TX_COUNT as u64));
+    group.sample_size(SAMPLE_SIZE);
+    group.finish();
 }

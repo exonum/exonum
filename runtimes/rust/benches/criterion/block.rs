@@ -37,7 +37,7 @@
 //! - `block_cryptocurrency_rollback`: Transferring cryptocurrency among random accounts.
 //!   Accounts are stored in a `MapIndex`. Transactions are rolled back 50% of the time.
 
-use criterion::{Criterion, ParameterizedBenchmark, Throughput};
+use criterion::{BenchmarkId, Criterion, Throughput};
 use exonum::{
     blockchain::{
         config::{GenesisConfig, GenesisConfigBuilder},
@@ -576,20 +576,22 @@ fn execute_block_rocksdb_with_blockchain(
     // executing it as regular benches, with 100 samples,
     // lead to relatively big testing time.
     // That's why the number of samples was decreased in each test.
-    criterion.bench(
-        bench_name,
-        ParameterizedBenchmark::new(
-            "transactions",
-            move |bencher, &&txs_in_block| {
-                bencher.iter(|| {
-                    execute_block(&blockchain, &tx_hashes[..txs_in_block]);
-                });
-            },
-            TXS_IN_BLOCK,
-        )
-        .sample_size(100)
-        .throughput(|&&txs_in_block| Throughput::Elements(txs_in_block as u64)),
-    );
+    let mut group = criterion.benchmark_group(bench_name);
+
+    for txs_in_block in TXS_IN_BLOCK {
+        group
+            .bench_with_input(
+                BenchmarkId::from_parameter(txs_in_block),
+                txs_in_block,
+                |bencher, txs_in_block| {
+                    bencher.iter(|| {
+                        execute_block(&blockchain, &tx_hashes[..*txs_in_block]);
+                    })
+                },
+            )
+            .sample_size(100)
+            .throughput(Throughput::Elements(*txs_in_block as u64));
+    }
 }
 
 pub fn bench_block(criterion: &mut Criterion) {

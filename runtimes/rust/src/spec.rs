@@ -299,6 +299,7 @@ impl ForeignSpec {
 impl Sealed for ForeignSpec {}
 
 impl Deploy for ForeignSpec {
+    #[allow(clippy::option_if_let_else)]
     fn deploy(self, genesis: &mut GenesisConfigBuilder, _: &mut RustRuntimeBuilder) {
         let mut new_config = if let Some(deploy_spec) = self.deploy_spec {
             mem::take(genesis).with_parametric_artifact(self.artifact, deploy_spec)

@@ -89,10 +89,10 @@ impl ValidateInput for ValidatorKeys {
 ///
 /// For additional information on the Exonum consensus algorithm, refer to
 /// [Consensus in Exonum](https://exonum.com/doc/version/latest/architecture/consensus/).
-#[protobuf_convert(source = "schema::blockchain::Config")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "schema::blockchain::Config")]
 #[non_exhaustive]
 pub struct ConsensusConfig {
     /// List of validators public keys.

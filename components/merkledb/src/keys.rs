@@ -405,9 +405,10 @@ mod tests {
                 }
 
                 // Fuzzed ordering
+                let rng = thread_rng();
                 let (mut x_buffer, mut y_buffer) = ([0_u8; $size], [0_u8; $size]);
                 let mut vals: Vec<$type> = rng.sample_iter(&Standard).take(FUZZ_SAMPLES).collect();
-                vals.sort();
+                vals.sort_unstable();
                 for w in vals.windows(2) {
                     let (x, y) = (w[0], w[1]);
                     if x == y {

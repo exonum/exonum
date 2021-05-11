@@ -42,10 +42,7 @@ pub fn is_valid_index_name_component(prefix: &str) -> bool {
 /// Only these combination of symbols are allowed:
 /// `[0-9]`, `[a-z]`, `[A-Z]`, `_`, `-`.
 pub fn is_allowed_index_name_char(c: u8) -> bool {
-    match c {
-        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' => true,
-        _ => false,
-    }
+    matches!(c, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_')
 }
 
 // Allow because it's looks more readable.

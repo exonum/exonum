@@ -725,7 +725,7 @@ mod tests {
     #[test]
     fn valid_keypair() {
         let (pk, sk) = gen_keypair();
-        let _ = KeyPair::from_keys(pk, sk);
+        let _key_pair = KeyPair::from_keys(pk, sk);
     }
 
     #[test]
@@ -733,6 +733,6 @@ mod tests {
     fn not_valid_keypair() {
         let (pk, _) = gen_keypair();
         let (_, sk) = gen_keypair();
-        let _ = KeyPair::from_keys(pk, sk);
+        let _key_pair = KeyPair::from_keys(pk, sk);
     }
 }

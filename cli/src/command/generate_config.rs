@@ -131,7 +131,7 @@ impl GenerateConfig {
                 };
                 SocketAddr::new(ip_address, address.port())
             }
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         })
     }
 }
@@ -202,10 +202,9 @@ fn create_keys_and_files(
             "Failed to create secret key file. File exists: {}",
             secret_key_path.to_string_lossy(),
         )
-    } else {
-        if let Some(dir) = secret_key_path.parent() {
-            fs::create_dir_all(dir)?;
-        }
-        generate_keys(&secret_key_path, passphrase.as_ref())
     }
+    if let Some(dir) = secret_key_path.parent() {
+        fs::create_dir_all(dir)?;
+    }
+    generate_keys(&secret_key_path, passphrase.as_ref())
 }

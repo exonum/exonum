@@ -136,12 +136,11 @@ impl NodeHandler {
         let tx_cache_size = self.state().tx_cache_len();
         if tx_cache_size == 0 {
             return;
-        } else {
-            trace!(
-                "Flushing {} transactions from cache to persistent pool",
-                tx_cache_size
-            );
         }
+        trace!(
+            "Flushing {} transactions from cache to persistent pool",
+            tx_cache_size
+        );
 
         let fork = self.blockchain.fork();
         let mut schema = Schema::new(&fork);

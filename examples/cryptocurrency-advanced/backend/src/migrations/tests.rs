@@ -97,7 +97,7 @@ fn generate_random_wallets() -> impl Iterator<Item = (String, u64)> {
     let mut rng = StdRng::seed_from_u64(RNG_SEED);
     iter::from_fn(move || {
         let name = format!("User #{}", rng.gen::<u32>());
-        let balance = rng.gen_range(0, 1_000);
+        let balance = rng.gen_range(0..1_000);
         Some((name, balance))
     })
 }

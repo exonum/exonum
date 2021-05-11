@@ -50,9 +50,9 @@ impl Timestamp {
 }
 
 /// Timestamp entry.
-#[protobuf_convert(source = "proto::TimestampEntry", serde_pb_convert)]
 #[derive(Clone, Debug)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
+#[protobuf_convert(source = "proto::TimestampEntry", serde_pb_convert)]
 pub struct TimestampEntry {
     /// Timestamp data.
     pub timestamp: Timestamp,

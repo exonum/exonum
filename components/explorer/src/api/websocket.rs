@@ -75,8 +75,8 @@ impl TransactionFilter {
 }
 
 /// Response to a WebSocket client. Roughly equivalent to `Result<T, String>`.
-#[serde(tag = "result", rename_all = "snake_case")]
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "result", rename_all = "snake_case")]
 pub enum Response<T> {
     /// Successful response.
     Success {

@@ -137,9 +137,11 @@ struct TestEvents {
 
 impl TestEvents {
     fn with_addr(listen_address: SocketAddr, connect_list: &SharedConnectList) -> Self {
-        let mut network_config = NetworkConfiguration::default();
-        network_config.tcp_nodelay = true;
-        network_config.tcp_connect_retry_timeout = 100;
+        let network_config = NetworkConfiguration {
+            tcp_nodelay: true,
+            tcp_connect_retry_timeout: 100,
+            ..NetworkConfiguration::default()
+        };
 
         Self {
             listen_address,

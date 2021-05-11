@@ -198,10 +198,7 @@ pub fn impl_object_hash(input: TokenStream) -> TokenStream {
 
 /// Checks that an ASCII character is allowed in the `IndexAddress` component.
 pub fn is_allowed_component_char(c: u8) -> bool {
-    match c {
-        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_' => true,
-        _ => false,
-    }
+    matches!(c, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'-' | b'_')
 }
 
 fn validate_address_component(name: &str) -> Result<(), String> {

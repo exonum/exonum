@@ -58,6 +58,7 @@ impl ExecutionError {
     }
 
     /// Tries to get a meaningful description from the given panic.
+    #[allow(clippy::option_if_let_else)]
     pub(crate) fn description_from_panic(any: impl AsRef<(dyn Any + Send)>) -> String {
         let any = any.as_ref();
 

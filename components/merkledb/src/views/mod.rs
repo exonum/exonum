@@ -202,7 +202,7 @@ impl<T: RawAccess> ViewInner<T> {
     }
 
     fn iter_bytes(&self, from: &[u8]) -> BytesIter<'_> {
-        use std::collections::Bound::{Included, Unbounded};
+        use std::ops::Bound::{Included, Unbounded};
 
         let changes_iter = self
             .changes
@@ -399,7 +399,7 @@ impl<T: RawAccessMut> View<T> {
 
         match self {
             Self::Real(ViewInner { changes, .. }) => changes.as_mut().expect(ACCESS_ERROR),
-            Self::Phantom => panic!(ACCESS_ERROR),
+            Self::Phantom => panic!("{}", ACCESS_ERROR),
         }
     }
 

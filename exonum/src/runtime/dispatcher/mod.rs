@@ -107,7 +107,7 @@ impl CommittedServices {
         Some((InstanceDescriptor::new(id, &info.name), &info.status))
     }
 
-    fn active_instances<'a>(&'a self) -> impl Iterator<Item = (InstanceDescriptor, u32)> + 'a {
+    fn active_instances(&self) -> impl Iterator<Item = (InstanceDescriptor, u32)> + '_ {
         self.instances.iter().filter_map(|(&id, info)| {
             if info.status.is_active() {
                 let descriptor = InstanceDescriptor::new(id, &info.name);
@@ -1067,11 +1067,9 @@ impl Dispatcher {
 
     /// Return true if the artifact with the given identifier is deployed.
     pub(crate) fn is_artifact_deployed(&self, id: &ArtifactId) -> bool {
-        if let Some(runtime) = self.runtimes.get(&id.runtime_id) {
-            runtime.is_artifact_deployed(id)
-        } else {
-            false
-        }
+        self.runtimes
+            .get(&id.runtime_id)
+            .map_or(false, |runtime| runtime.is_artifact_deployed(id))
     }
 
     /// Looks up a runtime by its identifier.

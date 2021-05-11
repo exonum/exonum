@@ -32,6 +32,11 @@ use exonum::{
     },
 };
 
+#[cfg(not(feature = "long_benchmarks"))]
+const TX_PER_BLOCK: usize = 128;
+#[cfg(feature = "long_benchmarks")]
+const TX_PER_BLOCK: usize = 2_048;
+
 #[derive(Debug)]
 struct DummyRuntime;
 
@@ -135,7 +140,7 @@ fn prepare_transactions(count: usize) -> Vec<Verified<AnyTx>> {
 
 fn check_tx_no_cache(bencher: &mut Bencher) {
     let blockchain = prepare_blockchain();
-    let transactions = prepare_transactions(128);
+    let transactions = prepare_transactions(TX_PER_BLOCK);
     let snapshot = blockchain.snapshot();
     bencher.iter(|| {
         assert!(transactions
@@ -146,7 +151,7 @@ fn check_tx_no_cache(bencher: &mut Bencher) {
 
 fn check_tx_cache(bencher: &mut Bencher) {
     let blockchain = prepare_blockchain();
-    let transactions = prepare_transactions(128);
+    let transactions = prepare_transactions(TX_PER_BLOCK);
     let snapshot = blockchain.snapshot();
 
     bencher.iter_batched(
