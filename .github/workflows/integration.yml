@@ -1,0 +1,34 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - develop
+
+name: Integration Tests
+
+env:
+  rust: 1.50.0
+
+jobs:
+  shell_tests:
+    name: Shell tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust }}
+      - name: Install dependencies
+        run: |
+          sudo add-apt-repository -y ppa:exonum/rocksdb
+          sudo apt-get install build-essential libsodium-dev libsnappy-dev libssl-dev protobuf-compiler jq
+          nvm install 10 && nvm use 10
+          cd $GITHUB_WORKSPACE/test-suite/testkit/server && npm install && cd $GITHUB_WORKSPACE
+          cargo build -p exonum-testkit-server
+          cargo build -p exonum-cryptocurrency --example demo
+      - name: Run tests
+        run: |
+          cd $GITHUB_WORKSPACE/examples/cryptocurrency/examples && ./test.sh
+          cd $GITHUB_WORKSPACE/examples/cryptocurrency/examples && ./test.ps1
+          cd $GITHUB_WORKSPACE/test-suite/testkit/server && npm run test:unix

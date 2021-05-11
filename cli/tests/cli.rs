@@ -26,7 +26,6 @@ use std::{
     env,
     ffi::OsString,
     fs::{self, OpenOptions},
-    panic,
     path::{Path, PathBuf},
 };
 
