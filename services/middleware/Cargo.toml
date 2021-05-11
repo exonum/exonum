@@ -24,7 +24,7 @@ exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 anyhow = "1.0"
 protobuf = "2.17.0"
-semver = { version = "0.10.0", features = ["serde"] }
+semver = { version = "0.11.0", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
 
