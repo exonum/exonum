@@ -16,7 +16,7 @@ description = "HTTP API engine of the Exonum framework"
 travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
-actix-cors = "0.4.0"
+actix-cors = "0.5.4"
 actix-rt = "1.1"
 actix-web = { version = "3.3.0", default-features = false }
 anyhow = "1.0"
