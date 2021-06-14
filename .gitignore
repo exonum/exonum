@@ -38,3 +38,7 @@ npm-debug.log
 .idea
 .vscode
 *.iml
+
+# Results of criterion benchmarks
+components/merkledb/proptest-regressions
+components/merkledb/**/*.proptest-regressions
