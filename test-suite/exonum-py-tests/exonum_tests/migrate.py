@@ -129,6 +129,20 @@ class MigrationTests(unittest.TestCase):
                 deployed = explorer.is_deployed(artifact)
                 self.assertFalse(deployed)
 
+        # Set a service configuration. A new version of the service demands it.
+        instances = {INSTANCE_NAME: {"artifact": "cryptocurrency", "action": "config", "config": {"init_balance": 100}}}
+        set_config_dict = generate_config(self.network, instances=instances, artifact_action="none")
+        set_config = Configuration(set_config_dict)
+
+        with Launcher(set_config) as launcher:
+            launcher.start_all()
+            launcher.wait_for_start()
+            self.wait_for_api_restart()
+
+        with ExonumCryptoAdvancedClient(client, instance_name=INSTANCE_NAME) as crypto_client:
+            init_balance = crypto_client.get_config().json()["init_balance"]
+            self.assertEqual(init_balance, 100)
+
         # Create Bob's wallet with version 0.2.0 of the service.
         bob_keys = self._create_wallet(client, "Bob", "0.2.0")
 

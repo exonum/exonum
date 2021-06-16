@@ -128,7 +128,7 @@ class RegularDeployTest(unittest.TestCase):
             "max_propose_timeout": 200,
             "propose_timeout_threshold": 500,
         }
-        instances = {"crypto": {"artifact": "cryptocurrency"}}
+        instances = {"crypto": {"artifact": "cryptocurrency", "config": {"init_balance": 100}}}
         cryptocurrency_advanced_config_dict = generate_config(self.network, consensus=consensus, instances=instances)
 
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
@@ -178,7 +178,7 @@ class RegularDeployTest(unittest.TestCase):
         """Tests the deploy mechanism to stop
         and resume running instance."""
 
-        instances = {"crypto": {"artifact": "cryptocurrency"}}
+        instances = {"crypto": {"artifact": "cryptocurrency", "config": {"init_balance": 100}}}
         cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances)
 
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
@@ -268,7 +268,7 @@ class RegularDeployTest(unittest.TestCase):
         """Tests the deploy mechanism in regular mode with instance
         within resume action for running service."""
 
-        instances = {"crypto": {"artifact": "cryptocurrency"}}
+        instances = {"crypto": {"artifact": "cryptocurrency", "config": {"init_balance": 100}}}
         cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances)
 
         cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)

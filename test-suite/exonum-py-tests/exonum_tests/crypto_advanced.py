@@ -50,6 +50,45 @@ class CryptoAdvancedTest(unittest.TestCase):
                 alice_balance = crypto_client.get_balance(alice_keys)
                 self.assertEqual(alice_balance, 100)
 
+    def test_change_configuration(self):
+        """Tests the change configuration"""
+
+        for validator_id in range(self.network.validators_count()):
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            with ExonumCryptoAdvancedClient(client) as crypto_client:
+                init_balance = crypto_client.get_config().json()["init_balance"]
+                self.assertEqual(init_balance, 100)
+                alice_keys = KeyPair.generate()
+                crypto_client.create_wallet(alice_keys, "Alice" + str(validator_id))
+                with client.create_subscriber("transactions") as subscriber:
+                    subscriber.wait_for_new_event()
+                self.assertEqual(crypto_client.get_wallet_info(alice_keys).status_code, 200)
+                alice_balance = crypto_client.get_balance(alice_keys)
+                self.assertEqual(alice_balance, 100)
+
+        instances = {"crypto": {"artifact": "cryptocurrency", "action": "config", "config": {"init_balance": 200}}}
+        cryptocurrency_advanced_config_dict = generate_config(self.network, instances=instances)
+        cryptocurrency_advanced_config = Configuration(cryptocurrency_advanced_config_dict)
+
+        with Launcher(cryptocurrency_advanced_config) as launcher:
+            launcher.start_all()
+            launcher.wait_for_start()
+
+        for validator_id in range(self.network.validators_count()):
+            host, public_port, private_port = self.network.api_address(validator_id)
+            client = ExonumClient(host, public_port, private_port)
+            with ExonumCryptoAdvancedClient(client) as crypto_client:
+                init_balance = crypto_client.get_config().json()["init_balance"]
+                self.assertEqual(init_balance, 200)
+                bob_keys = KeyPair.generate()
+                crypto_client.create_wallet(bob_keys, "Bob" + str(validator_id))
+                with client.create_subscriber("transactions") as subscriber:
+                    subscriber.wait_for_new_event()
+                self.assertEqual(crypto_client.get_wallet_info(bob_keys).status_code, 200)
+                bob_balance = crypto_client.get_balance(bob_keys)
+                self.assertEqual(bob_balance, 200)
+
     def test_token_issue(self):
         """Tests the token issue"""
 

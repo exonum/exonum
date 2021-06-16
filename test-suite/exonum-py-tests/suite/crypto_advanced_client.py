@@ -80,6 +80,10 @@ class ExonumCryptoAdvancedClient:
         transfer_tx.sign(from_wallet)
         return self.client.public_api.send_transaction(transfer_tx)
 
+    def get_config(self):
+        public_service_api = self.client.service_public_api(self.instance_name)
+        return public_service_api.get_service("v1/config")
+
 
 def gen_seed():
     """Method to generate seed"""

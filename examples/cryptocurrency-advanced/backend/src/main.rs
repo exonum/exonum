@@ -14,16 +14,18 @@
 
 use exonum_cli::{NodeBuilder, Spec};
 
-use exonum_cryptocurrency_advanced::CryptocurrencyService;
+use exonum_cryptocurrency_advanced::{Config, CryptocurrencyService, INSTANCE_ID, INSTANCE_NAME};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     exonum::helpers::init_logger()?;
 
+    let config = Config { init_balance: 100 };
+    let spec = Spec::new(CryptocurrencyService).with_instance(INSTANCE_ID, INSTANCE_NAME, config);
+
     NodeBuilder::new()
-        // Starts cryptocurrency instance with the default identifiers
-        // immediately after genesis block creation.
-        .with(Spec::new(CryptocurrencyService).with_default_instance())
+        // Starts cryptocurrency instance immediately after genesis block creation.
+        .with(spec)
         .run()
         .await
 }
