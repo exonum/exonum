@@ -105,7 +105,8 @@ impl RocksDB {
     ///
     /// [`RocksDB` docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
-        let checkpoint = Checkpoint::new(&*self.get_lock_guard())?;
+        let db = self.get_lock_guard();
+        let checkpoint = Checkpoint::new(&db)?;
         checkpoint.create_checkpoint(path)?;
         Ok(())
     }
@@ -129,7 +130,7 @@ impl RocksDB {
     /// Clears the column family completely, removing all keys from it.
     pub(super) fn clear_column_family(&self, batch: &mut WriteBatch, cf: &ColumnFamily) {
         /// Some lexicographically large key.
-        const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
+        const LARGER_KEY: &[u8] = &[u8::MAX; 1_024];
 
         let db_reader = self.get_lock_guard();
         let mut iter = db_reader.raw_iterator_cf(cf);
@@ -142,9 +143,9 @@ impl RocksDB {
                 // is mostly used for testing, this optimization leads to practical
                 // performance improvement.
                 if key.len() < LARGER_KEY.len() {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY);
+                    batch.delete_range_cf(&cf, &[] as &[u8], LARGER_KEY);
                 } else {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], key);
+                    batch.delete_range_cf(&cf, &[] as &[u8], key);
                     batch.delete_cf(cf, &key);
                 }
             }
