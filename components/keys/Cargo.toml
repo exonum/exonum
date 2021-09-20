@@ -17,7 +17,7 @@ anyhow = "1.0"
 rand = "0.8"
 pwbox = "0.4"
 secrecy = "0.7"
-secret-tree = { git = "https://github.com/slowli/secret-tree.git" }
+secret-tree = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
 structopt = "0.3"
