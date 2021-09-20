@@ -3,7 +3,7 @@
 [![Travis Build Status](https://img.shields.io/travis/exonum/exonum/master.svg?label=Linux%20Build)](https://travis-ci.com/exonum/exonum)
 [![Docs.rs](https://docs.rs/exonum-testkit/badge.svg)](https://docs.rs/exonum-testkit)
 [![License: Apache-2.0](https://img.shields.io/github/license/exonum/exonum.svg)](https://github.com/exonum/exonum/blob/master/LICENSE)
-![rust 1.50.0+ required](https://img.shields.io/badge/rust-1.50.0+-blue.svg?label=Required%20Rust)
+![rust 1.55.0+ required](https://img.shields.io/badge/rust-1.55.0+-blue.svg?label=Required%20Rust)
 
 Testkit for Exonum blockchain allows to test service operation.
 Specifically, it allows to test transaction execution
