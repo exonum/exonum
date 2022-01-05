@@ -534,7 +534,7 @@ pub trait Runtime: Send + fmt::Debug + 'static {
     /// - Suppose the service is committed during the node operation. Then `snapshot` is taken at the
     ///   moment the fork applies for which the corresponding `initiate_adding_service`
     ///   has been performed.
-    /// - Suppose the service is stopped during the node operation. `Then `snapshot` is taken at
+    /// - Suppose the service is stopped during the node operation. Then `snapshot` is taken at
     ///   the moment the fork applies for which the corresponding request has been performed.
     /// - Suppose the service resumes after the node restart. Then `snapshot` is the storage state
     ///   at the node start.

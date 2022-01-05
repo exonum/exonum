@@ -25,7 +25,7 @@ use exonum_rust_runtime::{
     DefaultInstance,
 };
 use structopt::StructOpt;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use std::{borrow::Cow, iter, time::Duration};
 
@@ -156,6 +156,6 @@ async fn main() {
         {
             break;
         }
-        delay_for(Duration::from_millis(500)).await;
+        sleep(Duration::from_millis(500)).await;
     }
 }

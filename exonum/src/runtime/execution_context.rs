@@ -54,7 +54,7 @@ impl CallErrorFlag<'_> {
     fn reborrow(&mut self) -> CallErrorFlag<'_> {
         match self {
             Self::Owned(ref mut flag) => CallErrorFlag::Borrowed(flag),
-            Self::Borrowed(flag) => CallErrorFlag::Borrowed(&mut *flag),
+            Self::Borrowed(flag) => CallErrorFlag::Borrowed(*flag),
         }
     }
 }
@@ -116,10 +116,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Provides access to blockchain data.
     pub fn data(&self) -> BlockchainData<&Fork> {
-        if self.call_error_flag.is_set() {
-            panic!("{}", ACCESS_ERROR_STR);
-        }
-
+        assert!(!self.call_error_flag.is_set(), "{}", ACCESS_ERROR_STR);
         BlockchainData::new(self.fork, &self.instance.name)
     }
 
@@ -163,9 +160,10 @@ impl<'a> ExecutionContext<'a> {
     /// [`SUPERVISOR_INSTANCE_ID`]: constant.SUPERVISOR_INSTANCE_ID.html
     #[doc(hidden)]
     pub fn supervisor_extensions(&mut self) -> SupervisorExtensions<'_> {
-        if self.instance.id != SUPERVISOR_INSTANCE_ID {
-            panic!("`supervisor_extensions` called within a non-supervisor service");
-        }
+        assert_eq!(
+            self.instance.id, SUPERVISOR_INSTANCE_ID,
+            "`supervisor_extensions` called within a non-supervisor service"
+        );
         SupervisorExtensions(self.reborrow(self.instance.clone()))
     }
 
@@ -204,9 +202,7 @@ impl<'a> ExecutionContext<'a> {
 
     /// Re-borrows an execution context with the given instance descriptor.
     fn reborrow(&mut self, instance: InstanceDescriptor) -> ExecutionContext<'_> {
-        if self.call_error_flag.is_set() {
-            panic!("{}", ACCESS_ERROR_STR);
-        }
+        assert!(!self.call_error_flag.is_set(), "{}", ACCESS_ERROR_STR);
 
         ExecutionContext {
             fork: &mut *self.fork,
@@ -234,9 +230,7 @@ impl<'a> ExecutionContext<'a> {
         instance: InstanceDescriptor,
         fallthrough_auth: bool,
     ) -> ExecutionContext<'s> {
-        if self.call_error_flag.is_set() {
-            panic!("{}", ACCESS_ERROR_STR);
-        }
+        assert!(!self.call_error_flag.is_set(), "{}", ACCESS_ERROR_STR);
 
         let caller = if fallthrough_auth {
             self.caller.clone()

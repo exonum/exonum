@@ -22,9 +22,10 @@ exonum-derive = { version = "1.0.0", path = "../../components/derive" }
 exonum-explorer = { version = "1.0.0", path = "../../components/explorer" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
-actix = { version = "0.10.0", default-features = false }
-actix-web = { version = "3.3.0", default-features = false }
-actix-web-actors = "3.0.0"
+actix = { version = "0.12", default-features = false }
+actix_derive = "0.6"
+actix-web = { version = "=4.0.0-beta.19", default-features = false }
+actix-web-actors = "=4.0.0-beta.10"
 anyhow = "1.0"
 futures = "0.3.4"
 hex = "0.4.0"
@@ -40,9 +41,9 @@ exonum-supervisor = { version = "1.0.0", path = "../supervisor" }
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 
 assert_matches = "1.3.0"
-reqwest = { version = "0.10.2", features = ["json"] }
+reqwest = { version = "0.11", features = ["json"] }
 websocket = { version = "0.26.2", default-features = false, features = ["sync"] }
 
 [dev-dependencies.tokio]
-version = "0.2.22"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+version = "1"
+features = ["io-util", "macros", "rt-multi-thread", "net", "time"]

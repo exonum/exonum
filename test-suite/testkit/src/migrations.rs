@@ -333,7 +333,7 @@ where
             self.data_version.clone(),
         );
         context.helper.set_abort_handle(abort_handle);
-        let end_version = script.end_version().to_owned();
+        let end_version = script.end_version().clone();
 
         match script.execute(&mut context) {
             Ok(()) => {

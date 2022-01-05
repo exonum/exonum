@@ -97,7 +97,7 @@ struct SandboxInner {
     pub time: SharedTime,
     pub handler: NodeHandler,
     pub sent: GuardedQueue,
-    pub events: VecDeque<Event>,
+    pub _events: VecDeque<Event>,
     pub timers: BinaryHeap<TimeoutRequest>,
     pub network_requests_rx: mpsc::Receiver<NetworkRequest>,
     pub internal_requests_rx: mpsc::Receiver<InternalRequest>,
@@ -127,7 +127,7 @@ impl SandboxInner {
             match network {
                 NetworkRequest::SendMessage(peer, msg) => {
                     let msg = Message::from_signed(msg).expect("Expected valid message.");
-                    self.sent.push_back((peer, msg))
+                    self.sent.push_back((peer, msg));
                 }
                 NetworkRequest::DisconnectWithPeer(_) => {}
             }
@@ -605,6 +605,7 @@ impl Sandbox {
         self.try_broadcast_to_addrs(msg, addresses).unwrap();
     }
 
+    #[allow(clippy::unnecessary_wraps)]
     pub fn try_broadcast_to_addrs<'a, T, I>(
         &self,
         msg: &Verified<T>,
@@ -633,7 +634,7 @@ impl Sandbox {
                     panic!(
                         "Double send the same message {:?} to {:?} during broadcasting",
                         msg, real_addr
-                    )
+                    );
                 }
             } else {
                 panic!(
@@ -832,7 +833,7 @@ impl Sandbox {
         let idx = schema.transactions_pool();
 
         let mut vec: Vec<Hash> = idx.iter().collect();
-        vec.extend(self.node_state().tx_cache().keys().cloned());
+        vec.extend(self.node_state().tx_cache().keys().copied());
         vec
     }
 
@@ -947,9 +948,9 @@ impl Sandbox {
             .state()
             .peers()
             .iter()
-            .map(|(pk, connect)| (*pk, connect.to_owned()));
+            .map(|(pk, connect)| (*pk, connect.clone()));
         let connect_list = ConnectList::from_peers(peers);
-        let keys = inner.handler.state().keys().to_owned();
+        let keys = inner.handler.state().keys().clone();
 
         let config = Configuration {
             connect_list,
@@ -980,7 +981,7 @@ impl Sandbox {
 
         let inner = SandboxInner {
             sent: GuardedQueue::default(),
-            events: VecDeque::new(),
+            _events: VecDeque::new(),
             timers: BinaryHeap::new(),
             internal_requests_rx: internal_channel.1,
             network_requests_rx: network_channel.1,
@@ -1006,14 +1007,14 @@ impl Sandbox {
     }
 
     fn node_secret_key(&self) -> SecretKey {
-        self.node_state().keys().consensus_sk().to_owned()
+        self.node_state().keys().consensus_sk().clone()
     }
 }
 
 #[derive(Debug)]
 pub struct SandboxBuilder {
     initialize: bool,
-    services: Vec<InstanceInitParams>,
+    _services: Vec<InstanceInitParams>,
     validators_count: u8,
     consensus_config: ConsensusConfig,
     rust_runtime: RustRuntimeBuilder,
@@ -1040,7 +1041,7 @@ impl Default for SandboxBuilder {
 
         Self {
             initialize: true,
-            services: Vec::new(),
+            _services: Vec::new(),
             validators_count: 4,
             consensus_config,
             rust_runtime: RustRuntimeBuilder::new(),
@@ -1268,7 +1269,7 @@ fn sandbox_with_services_uninitialized(
 
     let inner = SandboxInner {
         sent: GuardedQueue::default(),
-        events: VecDeque::new(),
+        _events: VecDeque::new(),
         timers: BinaryHeap::new(),
         network_requests_rx: network_channel.1,
         api_requests_rx: api_channel.1,

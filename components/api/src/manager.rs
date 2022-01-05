@@ -14,10 +14,9 @@
 
 //! Module responsible for actix web API management after new service is deployed.
 
-use actix_cors::{Cors, CorsFactory};
-use actix_rt::time::delay_for;
+use actix_cors::Cors;
+use actix_rt::time::sleep;
 use actix_web::{
-    dev::Server,
     web::{self, JsonConfig},
     App, HttpServer,
 };
@@ -27,8 +26,6 @@ use futures::{
     prelude::*,
 };
 
-#[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, FromRawSocket, RawSocket};
 use std::{
     collections::HashMap,
     io,
@@ -70,10 +67,10 @@ impl WebServerConfig {
         }
     }
 
-    fn cors_factory(&self) -> CorsFactory {
+    fn cors_factory(&self) -> Cors {
         self.allow_origin
             .clone()
-            .map_or_else(Cors::default, CorsFactory::from)
+            .map_or_else(Cors::default, Cors::from)
     }
 }
 
@@ -181,7 +178,7 @@ async fn with_retries<T>(
             Ok(value) => return Ok(value),
             Err(e) => {
                 log::warn!("{} (attempt #{}) failed: {}", description, attempt, e);
-                delay_for(timeout).await;
+                sleep(timeout).await;
             }
         }
     }
@@ -195,30 +192,12 @@ async fn with_retries<T>(
 
 #[derive(Debug)]
 struct ServerHandle {
-    inner: Server,
-    #[cfg(windows)]
-    raw_socket: RawSocket,
+    handle: actix_server::ServerHandle,
 }
 
 impl ServerHandle {
-    #[cfg(not(windows))]
     async fn stop(self) {
-        self.inner.stop(false).await;
-    }
-
-    #[cfg(windows)]
-    #[allow(unsafe_code)]
-    async fn stop(self) {
-        self.inner.stop(false).await;
-
-        // SAFETY: The safety of `from_raw_socket` relies on the fact that the socket is not used
-        // by `actix` afterwards and is not freed by it before. That is, it relies
-        // on the incorrect behavior of external libraries (`actix` *should* free the socket
-        // on its side). Not a good guarantee, but it works with current `actix-web` (2.0.0,
-        // with actual dependencies as of 2020-03-24).
-        //
-        // See actix/actix-web#1249 for details on the issue.
-        let _socket = unsafe { TcpListener::from_raw_socket(self.raw_socket) };
+        self.handle.stop(false).await;
     }
 }
 
@@ -254,7 +233,7 @@ impl ApiManager {
         let start_servers = self.config.servers.iter().map(|(&access, server_config)| {
             let mut aggregator = self.config.api_aggregator.clone();
             aggregator.extend(self.endpoints.clone());
-            let server_config = server_config.to_owned();
+            let server_config = server_config.clone();
             let action_description = format!(
                 "starting {} api on {}",
                 access, server_config.listen_address
@@ -276,30 +255,35 @@ impl ApiManager {
         });
         let servers = try_join_all(start_servers).await?;
 
-        for (server, (&access, server_config)) in servers.iter().zip(&self.config.servers) {
-            let listen_addr = server_config.listen_address;
-            let mut server_finished = server_finished_tx.clone();
-            let server = server.inner.clone();
+        self.servers = servers
+            .into_iter()
+            .zip(&self.config.servers)
+            .map(|(server, (&access, server_config))| {
+                let listen_addr = server_config.listen_address;
+                let mut server_finished = server_finished_tx.clone();
+                let handle = server.handle();
 
-            actix_rt::spawn(async move {
-                let res = server.await;
-                if let Err(ref e) = res {
-                    // TODO: should the server be restarted on error?
-                    log::error!("{} server on {} failed: {}", access, listen_addr, e);
-                } else if !server_finished.is_closed() {
-                    log::info!(
-                        "{} server on {} terminated in response to a signal",
-                        access,
-                        listen_addr
-                    );
-                }
+                actix_rt::spawn(async move {
+                    let res = server.await;
+                    if let Err(ref e) = res {
+                        // TODO: should the server be restarted on error?
+                        log::error!("{} server on {} failed: {}", access, listen_addr, e);
+                    } else if !server_finished.is_closed() {
+                        log::info!(
+                            "{} server on {} terminated in response to a signal",
+                            access,
+                            listen_addr
+                        );
+                    }
 
-                // We're OK if the receiver of termination notification is gone.
-                server_finished.send(res).await.ok();
-            });
-        }
+                    // We're OK if the receiver of termination notification is gone.
+                    server_finished.send(res).await.ok();
+                });
 
-        self.servers = servers;
+                ServerHandle { handle }
+            })
+            .collect();
+
         Ok(())
     }
 
@@ -363,14 +347,11 @@ impl ApiManager {
         access: ApiAccess,
         server_config: WebServerConfig,
         disable_signals: bool,
-    ) -> io::Result<ServerHandle> {
+    ) -> io::Result<actix_server::Server> {
         let listen_address = server_config.listen_address;
         log::info!("Starting {} web api on {}", access, listen_address);
 
         let listener = TcpListener::bind(listen_address)?;
-        #[cfg(windows)]
-        let raw_socket = listener.as_raw_socket();
-
         let mut server_builder = HttpServer::new(move || {
             App::new()
                 .app_data(server_config.json_config())
@@ -384,10 +365,6 @@ impl ApiManager {
             server_builder = server_builder.disable_signals();
         }
 
-        Ok(ServerHandle {
-            inner: server_builder.run(),
-            #[cfg(windows)]
-            raw_socket,
-        })
+        Ok(server_builder.run())
     }
 }

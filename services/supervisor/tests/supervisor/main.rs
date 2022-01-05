@@ -203,7 +203,7 @@ async fn deploy_default(testkit: &mut TestKit) {
     // Confirmation is gone now.
     assert!(!testkit.is_tx_in_pool(&deploy_confirmation_hash));
 
-    assert!(artifact_exists(&testkit, &artifact.name));
+    assert!(artifact_exists(testkit, &artifact.name));
 }
 
 async fn start_service_instance(testkit: &mut TestKit, instance_name: &str) -> InstanceId {

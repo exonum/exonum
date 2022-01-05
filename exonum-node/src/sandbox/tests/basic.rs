@@ -217,7 +217,7 @@ fn test_query_state_hash() {
             vec![("timestamping.second", &Hash::new([128; HASH_SIZE]))]
         );
 
-        add_one_height(&sandbox, &sandbox_state)
+        add_one_height(&sandbox, &sandbox_state);
     }
 }
 
@@ -260,11 +260,11 @@ fn test_store_txs_positions() {
         KeyPair::from_seed(&Seed::new([11; SEED_LENGTH])),
     );
 
-    let committed_height = Height(rng.gen_range(2, 30_u64));
+    let committed_height = Height(rng.gen_range(2..30_u64));
     for _ in 1..committed_height.0 {
         add_one_height(&sandbox, &sandbox_state);
     }
-    let num_txs = rng.gen_range(3, 100);
+    let num_txs = rng.gen_range(3..100);
     let committed_block1 = generator
         .take(num_txs)
         .map(|tx| (tx.object_hash(), tx))
@@ -304,7 +304,7 @@ fn tx_cache_with_tx_block_limit() {
         .collect::<BTreeMap<_, _>>();
 
     for tx in txs.values() {
-        sandbox.recv(tx)
+        sandbox.recv(tx);
     }
 
     sandbox.assert_tx_cache_len(10);

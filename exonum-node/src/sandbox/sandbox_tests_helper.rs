@@ -179,7 +179,7 @@ impl<'a> ProposeBuilder<'a> {
             self.height.unwrap_or_else(|| self.sandbox.current_epoch()),
             self.round.unwrap_or_else(|| self.sandbox.current_round()),
             *self.prev_hash.unwrap_or(&self.sandbox.last_hash()),
-            self.tx_hashes.unwrap_or(&[]).iter().cloned(),
+            self.tx_hashes.unwrap_or(&[]).iter().copied(),
             self.sandbox.secret_key(
                 self.validator_id
                     .unwrap_or_else(|| self.sandbox.current_leader()),
@@ -216,7 +216,7 @@ impl Default for SandboxState {
 pub fn compute_txs_merkle_root(txs: &[Hash]) -> Hash {
     let fork = TemporaryDB::new().fork();
     let mut hashes = fork.get_proof_list("name");
-    hashes.extend(txs.iter().cloned());
+    hashes.extend(txs.iter().copied());
     hashes.object_hash()
 }
 
@@ -526,7 +526,7 @@ fn get_propose_with_transactions_for_validator(
         sandbox.current_epoch(),
         sandbox.current_round(),
         sandbox.last_hash(),
-        transactions.iter().cloned(),
+        transactions.iter().copied(),
         sandbox.secret_key(validator),
     )
 }
@@ -589,7 +589,7 @@ pub fn receive_valid_propose_with_transactions(
         sandbox.current_epoch(),
         sandbox.current_round(),
         sandbox.last_hash(),
-        transactions.iter().cloned(),
+        transactions.iter().copied(),
         sandbox.secret_key(sandbox.current_leader()),
     );
     sandbox.recv(&propose);

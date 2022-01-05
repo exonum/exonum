@@ -466,7 +466,7 @@ impl Schema<&Fork> {
         let new_status = match outcome {
             MigrationOutcome::Rollback => InstanceStatus::Stopped,
             MigrationOutcome::Commit(hash) => {
-                let mut migration = migration.to_owned();
+                let mut migration = migration.clone();
                 migration.completed_hash = Some(hash);
                 InstanceStatus::Migrating(migration)
             }

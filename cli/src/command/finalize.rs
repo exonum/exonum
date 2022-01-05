@@ -168,7 +168,7 @@ impl ExonumCommand for Finalize {
 
         let validator_keys = public_configs
             .iter()
-            .flat_map(|public_config| public_config.validator_keys)
+            .filter_map(|public_config| public_config.validator_keys)
             .collect();
         let consensus = common.consensus.with_validator_keys(validator_keys);
 

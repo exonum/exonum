@@ -30,7 +30,7 @@ pub struct Passphrase(String);
 
 impl Drop for Passphrase {
     fn drop(&mut self) {
-        self.0.zeroize()
+        self.0.zeroize();
     }
 }
 
@@ -189,7 +189,7 @@ mod tests {
         for (inp, out) in correct_cases {
             let method = <PassInputMethod as FromStr>::from_str(inp);
             assert!(method.is_ok());
-            assert_eq!(method.unwrap(), out)
+            assert_eq!(method.unwrap(), out);
         }
     }
 }

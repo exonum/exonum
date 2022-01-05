@@ -546,7 +546,7 @@ impl CallProof {
             }
 
             Some(e) => {
-                let mut full_error = e.to_owned();
+                let mut full_error = e.clone();
                 if !full_error.has_empty_aux() {
                     return Err(ProofError::MalformedStatus);
                 }
@@ -564,7 +564,7 @@ impl CallProof {
         self.call_proof
             .check_against_hash(self.block_proof.block.error_hash)
             .map_err(ProofError::IncorrectEntryProof)?;
-        Ok((call.to_owned(), call_status))
+        Ok((*call, call_status))
     }
 }
 
@@ -1035,9 +1035,9 @@ mod tests {
 
         // Check that the proof remains valid if we change the description.
         call_proof.error_description = Some("other description".to_owned());
-        let _ = call_proof.verify(&public_keys).unwrap();
+        let _res = call_proof.verify(&public_keys).unwrap();
         call_proof.error_description = None;
-        let _ = call_proof.verify(&public_keys).unwrap();
+        let _res = call_proof.verify(&public_keys).unwrap();
 
         // ...but not if we change the hashed part of the error.
         call_proof.call_proof = call_proof

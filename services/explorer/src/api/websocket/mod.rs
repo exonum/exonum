@@ -196,6 +196,7 @@ pub use exonum_explorer::api::websocket::{
 };
 
 use actix::prelude::*;
+use actix_derive::Message;
 use actix_web_actors::ws;
 use exonum::{
     blockchain::{Blockchain, Schema},
@@ -209,7 +210,9 @@ use hex::FromHex;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fmt, mem,
+    fmt,
+    future::Future,
+    mem,
     sync::{Arc, Mutex, Weak},
     time::Duration,
 };
@@ -266,7 +269,7 @@ impl SharedStateRef {
         let arc = self.inner.upgrade()?;
         let mut inner = arc.lock().expect("Cannot lock `SharedState`");
         let addr = inner.server_addr.get_or_insert_with(|| {
-            let blockchain = blockchain.to_owned();
+            let blockchain = blockchain.clone();
             Server::new(blockchain).start()
         });
         Some(addr.clone())
@@ -371,12 +374,12 @@ impl Server {
             self.subscribers
                 .entry(sub_type)
                 .or_insert_with(HashMap::new)
-                .insert(id, addr.to_owned());
+                .insert(id, addr.clone());
         }
     }
 
     fn disconnect_all(&mut self) {
-        let subscribers = mem::replace(&mut self.subscribers, BTreeMap::new());
+        let subscribers = mem::take(&mut self.subscribers);
         for (_, subscriber_group) in subscribers {
             for (_, recipient) in subscriber_group {
                 if recipient.connected() {
@@ -402,7 +405,7 @@ impl Server {
         &self,
         message: &Transaction,
     ) -> impl Future<Output = anyhow::Result<TransactionResponse>> {
-        let sender = self.blockchain.sender().to_owned();
+        let sender = self.blockchain.sender().clone();
         let verified = self.check_transaction(message);
 
         async move {

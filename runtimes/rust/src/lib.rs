@@ -312,13 +312,12 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn,
+    clippy::missing_errors_doc, clippy::missing_panics_doc, clippy::missing_const_for_fn,
     // Obviously should be removed after the next actix-web release.
-    clippy::future_not_send,
+    clippy::use_self,
     clippy::unnecessary_wraps
 )]
 
@@ -556,12 +555,11 @@ impl RustRuntime {
     }
 
     fn deploy(&mut self, artifact: &ArtifactId) -> Result<(), ExecutionError> {
-        if self.deployed_artifacts.contains(artifact) {
-            panic!(
-                "BUG: Core requested deploy of already deployed artifact {:?}",
-                artifact
-            );
-        }
+        assert!(
+            !self.deployed_artifacts.contains(artifact),
+            "BUG: Core requested deploy of already deployed artifact {:?}",
+            artifact
+        );
         if !self.available_artifacts.contains_key(artifact) {
             let description = format!(
                 "Runtime failed to deploy artifact with id {}, \
@@ -573,7 +571,7 @@ impl RustRuntime {
         }
 
         trace!("Deployed artifact: {}", artifact);
-        self.deployed_artifacts.insert(artifact.to_owned());
+        self.deployed_artifacts.insert(artifact.clone());
         Ok(())
     }
 
@@ -588,9 +586,9 @@ impl RustRuntime {
         let service = factory.create_instance();
         Instance {
             id: instance.id,
-            name: instance.name.to_owned(),
+            name: instance.name.clone(),
             service,
-            artifact_id: artifact.to_owned(),
+            artifact_id: artifact.clone(),
         }
     }
 
@@ -736,7 +734,7 @@ impl Runtime for RustRuntime {
         let maybe_instance = self.new_service_if_needed(artifact, context.instance());
         let service = maybe_instance.as_ref().map_or_else(
             || self.started_services[&context.instance().id].as_ref(),
-            |instance| instance.as_ref(),
+            AsRef::as_ref,
         );
         catch_panic(|| service.resume(context, parameters))
     }

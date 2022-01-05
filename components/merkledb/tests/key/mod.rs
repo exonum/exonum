@@ -42,7 +42,7 @@ impl BinaryKey for Key {
 
     fn read(buffer: &[u8]) -> Self::Owned {
         let mut buf = [0; 32];
-        buf.copy_from_slice(&buffer);
+        buf.copy_from_slice(buffer);
         Self(buf)
     }
 }

@@ -1046,19 +1046,19 @@ fn valid_name_for_url() {
 fn invalid_name_panic() {
     let db = TemporaryDB::new();
     let fork = db.fork();
-    let _: ListIndex<_, u8> = fork.get_list("ind\u{435}x-name");
+    let _res: ListIndex<_, u8> = fork.get_list("ind\u{435}x-name");
 }
 
 fn assert_valid_name_url(name: &str) {
     let urlencoded: String = byte_serialize(name.as_bytes()).collect();
-    assert_eq!(is_valid_identifier(name), name == urlencoded)
+    assert_eq!(is_valid_identifier(name), name == urlencoded);
 }
 
 fn check_valid_name(name: &str) -> bool {
     let db = TemporaryDB::new();
     let catch_result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let fork = db.fork();
-        let _: ListIndex<_, u8> = fork.get_list(name.as_ref());
+        let _res: ListIndex<_, u8> = fork.get_list(name.as_ref());
     }));
     catch_result.is_ok()
 }

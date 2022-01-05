@@ -8,7 +8,7 @@ on:
 name: Integration Tests
 
 env:
-  rust: 1.50.0
+  rust: 1.57.0
 
 jobs:
   shell_tests:

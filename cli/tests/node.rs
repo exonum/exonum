@@ -28,7 +28,7 @@ use lazy_static::lazy_static;
 use reqwest::RequestBuilder;
 use serde::de::DeserializeOwned;
 use tempfile::TempDir;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use std::{
     net::{Ipv4Addr, SocketAddr, TcpListener},
@@ -44,12 +44,9 @@ lazy_static! {
 }
 
 fn unused_addresses(start: u16, count: usize) -> Vec<SocketAddr> {
-    let listeners: Vec<_> = (start..)
+    (start..)
         .filter_map(|port| TcpListener::bind((Ipv4Addr::LOCALHOST, port)).ok())
         .take(count)
-        .collect();
-    listeners
-        .into_iter()
         .map(|listener| listener.local_addr().unwrap())
         .collect()
 }
@@ -112,7 +109,7 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
         .execute_command()?
         .unwrap();
     let node_task = tokio::spawn(node.run());
-    delay_for(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(2)).await;
 
     let client = reqwest::Client::default();
     // Check info about deployed artifacts returned via supervisor API.
@@ -149,7 +146,7 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
             assert_eq!(blocks[0].precommits.as_ref().unwrap().len(), 1);
             break;
         }
-        delay_for(Duration::from_millis(200)).await;
+        sleep(Duration::from_millis(200)).await;
     }
 
     // Check API of two started service instances.
@@ -165,7 +162,7 @@ async fn node_basic_workflow() -> anyhow::Result<()> {
     let url = format!("{}/system/v1/shutdown", private_api_root);
     send_request(client.post(&url)).await?;
 
-    delay_for(Duration::from_secs(5)).await; // Wait until actix workers will finish
+    sleep(Duration::from_secs(5)).await; // Wait until actix workers will finish
     node_task.await??;
 
     Ok(())

@@ -727,7 +727,7 @@ fn blockchain_next_height_does_not_panic_before_genesis() {
     let snapshot = blockchain.snapshot();
     let schema = Schema::new(&snapshot);
     let height = schema.next_height();
-    assert_eq!(height, Height(0))
+    assert_eq!(height, Height(0));
 }
 
 /// Checks that `Schema::height` and `Schema::next_height` work as expected.

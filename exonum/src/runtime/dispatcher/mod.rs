@@ -148,7 +148,7 @@ struct Migrations {
 impl Migrations {
     fn new(blockchain: &Blockchain) -> Self {
         Self {
-            db: blockchain.database().to_owned(),
+            db: blockchain.database().clone(),
             threads: HashMap::new(),
         }
     }
@@ -250,13 +250,14 @@ impl Migrations {
         );
     }
 
+    #[allow(clippy::needless_collect)]
     fn take_completed(&mut self) -> Vec<(String, MigrationStatus)> {
         let completed_names: Vec<_> = self
             .threads
             .iter()
             .filter_map(|(name, thread)| {
                 if thread.abort_handle.is_finished() {
-                    Some(name.to_owned())
+                    Some(name.clone())
                 } else {
                     None
                 }
@@ -402,7 +403,7 @@ impl Dispatcher {
 
         // Restart active service instances.
         for state in schema.instances().values() {
-            let data_version = state.data_version().to_owned();
+            let data_version = state.data_version().clone();
             self.update_service_status(snapshot, &state);
 
             // Restart a migration script if it is not finished locally.
@@ -562,7 +563,7 @@ impl Dispatcher {
         let maybe_script =
             self.get_migration_script(&new_artifact, instance_state.data_version())?;
         let migration_type = if let Some(script) = maybe_script {
-            let migration = InstanceMigration::new(new_artifact, script.end_version().to_owned());
+            let migration = InstanceMigration::new(new_artifact, script.end_version().clone());
             schema.add_pending_migration(instance_state, migration);
             MigrationType::Async
         } else {
@@ -696,7 +697,7 @@ impl Dispatcher {
     ) -> Result<(), ExecutionError> {
         let service_id = tx.as_ref().call_info.instance_id;
 
-        if let Some(cache) = cache.as_deref_mut() {
+        if let Some(ref cache) = cache {
             if let Some(res) = cache.check_service_status(service_id) {
                 return res;
             }
@@ -707,7 +708,7 @@ impl Dispatcher {
         let instance = Schema::new(snapshot)
             .get_instance(service_id)
             .ok_or_else(|| {
-                if let Some(cache) = cache.as_deref_mut() {
+                if let Some(ref mut cache) = cache {
                     cache.set_missing_service(service_id);
                 }
                 TxCheckCache::missing_error(service_id)
@@ -715,20 +716,20 @@ impl Dispatcher {
 
         match instance.status {
             Some(InstanceStatus::Active) => {
-                if let Some(cache) = cache.as_deref_mut() {
+                if let Some(ref mut cache) = cache {
                     cache.set_service_status(service_id, InstanceStatus::Active);
                 }
                 Ok(())
             }
             Some(status) => {
                 let err = TxCheckCache::non_active_error(service_id, &status);
-                if let Some(cache) = cache.as_deref_mut() {
+                if let Some(ref mut cache) = cache {
                     cache.set_service_status(service_id, status);
                 }
                 Err(err)
             }
             None => {
-                if let Some(cache) = cache.as_deref_mut() {
+                if let Some(ref mut cache) = cache {
                     cache.set_missing_service(service_id);
                 }
                 Err(TxCheckCache::missing_error(service_id))
@@ -888,7 +889,7 @@ impl Dispatcher {
 
         // Notify runtime about changes in service instances.
         for (state, modified_info) in modified_instances {
-            let data_version = state.data_version().to_owned();
+            let data_version = state.data_version().clone();
             let status = state
                 .status
                 .as_ref()
@@ -979,20 +980,23 @@ impl Dispatcher {
         global_hash: Hash,
         local_result: Option<MigrationStatus>,
     ) -> MigrationStatus {
-        let local_result = if let Some(thread) = self.migrations.threads.remove(namespace) {
-            log::info!("Blocking on migration script for service `{}`", namespace);
-            // If the migration script hasn't finished locally, wait until it's finished.
-            thread.join()
-        } else {
-            // If the local script has finished, the result should be recorded in the database.
-            local_result.unwrap_or_else(|| {
-                panic!(
-                    "BUG: migration is marked as completed for service `{}`, but its result \
+        let local_result = self.migrations.threads.remove(namespace).map_or_else(
+            || {
+                // If the local script has finished, the result should be recorded in the database.
+                local_result.unwrap_or_else(|| {
+                    panic!(
+                        "BUG: migration is marked as completed for service `{}`, but its result \
                      is missing from the database",
-                    namespace
-                );
-            })
-        };
+                        namespace
+                    );
+                })
+            },
+            |thread| {
+                log::info!("Blocking on migration script for service `{}`", namespace);
+                // If the migration script hasn't finished locally, wait until it's finished.
+                thread.join()
+            },
+        );
 
         // Check if the local result agrees with the global one. Any deviation is considered
         // a consensus failure.
@@ -1039,7 +1043,7 @@ impl Dispatcher {
 
     /// Make pending artifacts and instances active.
     pub(crate) fn activate_pending(fork: &Fork) {
-        Schema::new(fork).activate_pending()
+        Schema::new(fork).activate_pending();
     }
 
     /// Notifies runtimes about a committed block.

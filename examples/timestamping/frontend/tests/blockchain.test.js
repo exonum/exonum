@@ -6,6 +6,7 @@ import actual from './data/actual.json'
 import proof from './data/proof.json'
 import 'babel-polyfill';
 
+
 const mock = new MockAdapter(axios)
 const hexRegex = /[0-9A-Fa-f]+/i
 
@@ -32,8 +33,12 @@ describe('Interaction with blockchain', () => {
     }
     const hash = '0cf4fd1634bcb6e0cfc0ae0e111931747c81f613534a66be8f8ec0eb0ed1acf9'
     const metadata = 'Some contract'
-
-    await expect(Vue.prototype.$blockchain.createTimestamp(keyPair, hash, metadata)).resolves
+    try {
+      const response = await Vue.prototype.$blockchain.createTimestamp(keyPair, hash, metadata)
+      expect(response).resolves
+    } catch(e) {
+      console.log(e)
+    }
   })
 
   it('should get timestamp proof and verify it', async () => {

@@ -43,7 +43,7 @@ use std::{cell::Cell, collections::BTreeMap, thread, time::Duration};
 #[derive(Debug, Default)]
 struct SampleService {
     counter: Cell<u64>,
-    name: String,
+    _name: String,
 }
 
 /// Sample runtime.
@@ -76,7 +76,7 @@ impl SampleRuntime {
         assert!(!self.started_services.contains_key(&instance.id));
 
         Ok(SampleService {
-            name: instance.name.to_owned(),
+            _name: instance.name.to_owned(),
             ..SampleService::default()
         })
     }
@@ -308,13 +308,13 @@ async fn examine_runtime(blockchain: Blockchain, shutdown_handle: ShutdownHandle
 
     // Send an update counter transaction.
     let tx = AnyTx::new(CallInfo::new(instance_id, 0), 1_000_u64.into_bytes());
-    let tx = tx.sign_with_keypair(&service_keypair);
+    let tx = tx.sign_with_keypair(service_keypair);
     blockchain.sender().broadcast_transaction(tx).await.unwrap();
     thread::sleep(Duration::from_secs(2));
 
     // Send a reset counter transaction.
     let tx = AnyTx::new(CallInfo::new(instance_id, 1), vec![]);
-    let tx = tx.sign_with_keypair(&service_keypair);
+    let tx = tx.sign_with_keypair(service_keypair);
     blockchain.sender().broadcast_transaction(tx).await.unwrap();
 
     thread::sleep(Duration::from_secs(2));

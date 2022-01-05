@@ -167,7 +167,7 @@ async fn test_fuzz_transfers() {
 
     for _ in 0..64 {
         let total_balance: u64 = stream::iter(&pubkeys)
-            .fold(0, |acc, key| get_balance(&api, &key).map(move |x| x + acc))
+            .fold(0, |acc, key| get_balance(&api, key).map(move |x| x + acc))
             .await;
         assert_eq!(total_balance, (USERS as u64) * testkit.height().0);
 

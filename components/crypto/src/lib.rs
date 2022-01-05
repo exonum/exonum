@@ -32,7 +32,6 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
@@ -195,9 +194,10 @@ pub fn hash(data: &[u8]) -> Hash {
 /// exonum_crypto::init();
 /// ```
 pub fn init() {
-    if !crypto_impl::init() {
-        panic!("Cryptographic library initialization failed.");
-    }
+    assert!(
+        crypto_impl::init(),
+        "Cryptographic library initialization failed."
+    );
 }
 
 /// This structure provides a possibility to calculate a hash digest

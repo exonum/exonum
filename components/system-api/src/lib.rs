@@ -85,7 +85,6 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
@@ -119,9 +118,9 @@ pub struct SystemApiPlugin;
 impl NodePlugin for SystemApiPlugin {
     fn wire_api(&self, context: PluginApiContext<'_>) -> Vec<(String, ApiBuilder)> {
         let api_builder = system_api(
-            context.blockchain().to_owned(),
+            context.blockchain().clone(),
             context.api_sender(),
-            context.node_state().to_owned(),
+            context.node_state().clone(),
         );
         vec![("system".to_owned(), api_builder)]
     }

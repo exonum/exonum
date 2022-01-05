@@ -143,11 +143,10 @@ impl IndexAddress {
 
     /// Appends a key to the `IndexAddress`.
     pub fn append_key<K: BinaryKey + ?Sized>(self, suffix: &K) -> Self {
-        let bytes = if let Some(ref bytes) = self.id_in_group {
-            concat_keys!(bytes, suffix)
-        } else {
-            concat_keys!(suffix)
-        };
+        let bytes = self
+            .id_in_group
+            .as_ref()
+            .map_or_else(|| concat_keys!(suffix), |bytes| concat_keys!(bytes, suffix));
 
         Self {
             id_in_group: Some(bytes),

@@ -17,21 +17,21 @@ exonum-proto = { version = "1.0.0", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 
-anyhow = "1.0.26"
-bit-vec = "0.6.1"
+anyhow = "1.0"
+bit-vec = "0.6"
 chrono = { version = "0.4.6", features = ["serde"] }
-protobuf = "2.17.0"
-pretty_assertions = "0.7.1"
+protobuf = "2.25"
+pretty_assertions = "1"
 serde = "1.0"
 serde_derive = "1.0"
 
 [dev-dependencies]
 exonum-api = { version = "1.0.0", path = "../../components/api" }
-reqwest = "0.10.4"
+reqwest = "0.11"
 
 [dev-dependencies.tokio]
-version = "0.2.13"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+version = "1"
+features = ["io-util", "macros", "rt-multi-thread", "net", "time"]
 
 [build-dependencies]
 exonum-build = { version = "1.0.1", path = "../../components/build" }

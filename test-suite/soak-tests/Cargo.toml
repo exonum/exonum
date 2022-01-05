@@ -16,15 +16,15 @@ exonum-merkledb = { version = "1.0.0", path = "../../components/merkledb" }
 exonum-node = { version = "1.0.0", path = "../../exonum-node" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
-anyhow = "1.0.26"
-bincode = "1.2.1"
-futures = "0.3.4"
-log = "0.4.6"
-reqwest = { version = "0.10.2", features = ["json"] }
+anyhow = "1.0"
+bincode = "1.3"
+futures = "0.3"
+log = "0.4"
+reqwest = { version = "0.11", features = ["json"] }
 serde = "1.0"
 serde_derive = "1.0"
-structopt = "0.3.9"
+structopt = "0.3"
 
 [dependencies.tokio]
-version = "0.2.13"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+version = "1"
+features = ["io-util", "macros", "rt-multi-thread", "net", "time"]

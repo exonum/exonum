@@ -251,7 +251,7 @@ pub struct ConnectedPeerInfo {
 impl ConnectedPeerInfo {
     fn new(connect_info: &ConnectInfo, direction: ConnectDirection) -> Self {
         Self {
-            address: connect_info.address.to_owned(),
+            address: connect_info.address.clone(),
             public_key: connect_info.public_key,
             direction,
         }

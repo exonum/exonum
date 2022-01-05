@@ -70,7 +70,7 @@ impl TestNetwork {
             us
         };
 
-        Self { nodes, us }
+        Self { us, nodes }
     }
 
     /// Adds a new auditor node to this network.

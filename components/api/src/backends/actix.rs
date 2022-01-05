@@ -17,19 +17,21 @@
 //! [Actix-web](https://github.com/actix/actix-web) is an asynchronous backend
 //! for HTTP API, based on the [Actix](https://github.com/actix/actix) framework.
 
-pub use actix_cors::{Cors, CorsFactory};
+pub use actix_cors::Cors;
 pub use actix_web::{
+    body::EitherBody,
+    dev::JsonBody,
     http::{Method as HttpMethod, StatusCode as HttpStatusCode},
-    web::Payload,
+    web::{Bytes, Payload},
     HttpRequest, HttpResponse,
 };
 
 use actix_web::{
-    body::Body,
+    body::{BodySize, BoxBody, MessageBody},
     dev::ServiceResponse,
     error::ResponseError,
     http::header,
-    middleware::errhandlers::{ErrorHandlerResponse, ErrorHandlers},
+    middleware::{ErrorHandlerResponse, ErrorHandlers},
     web::{self, scope, Json, Query},
     FromRequest,
 };
@@ -94,9 +96,10 @@ impl ApiBackend for ApiBuilder {
         self
     }
 
+    #[allow(clippy::redundant_closure)]
     fn wire(&self, mut output: Self::Backend) -> Self::Backend {
-        for handler in self.handlers.clone() {
-            let inner = handler.inner;
+        for handler in &self.handlers {
+            let inner = handler.inner.clone();
             output = output.route(
                 &handler.name,
                 web::method(handler.method.clone())
@@ -113,7 +116,7 @@ impl ExtendApiBackend for actix_web::Scope {
         I: IntoIterator<Item = (&'a str, &'a ApiScope)>,
     {
         for item in items {
-            self = self.service(item.1.actix_backend.wire(scope(&item.0)))
+            self = self.service(item.1.actix_backend.wire(scope(item.0)))
         }
         self
     }
@@ -123,18 +126,19 @@ impl ResponseError for ApiError {
     fn error_response(&self) -> HttpResponse {
         let body = serde_json::to_value(&self.body).unwrap();
         let body = if body == serde_json::json!({}) {
-            Body::Empty
+            Bytes::new()
         } else {
             serde_json::to_string(&self.body).unwrap().into()
         };
 
         let mut response = HttpResponse::build(self.http_code)
-            .header(header::CONTENT_TYPE, "application/problem+json")
+            .append_header((header::CONTENT_TYPE, "application/problem+json"))
             .body(body);
 
         for (key, value) in self.headers.iter() {
             response.headers_mut().append(key.clone(), value.clone());
         }
+
         response
     }
 }
@@ -175,7 +179,7 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
 
         let warning_string = create_warning_header(&warning_text);
 
-        response.header(header::WARNING, warning_string);
+        response.append_header((header::WARNING, warning_string));
     }
 
     response.json(json_value)
@@ -264,59 +268,61 @@ where
     }
 }
 
-impl From<&AllowOrigin> for CorsFactory {
+impl From<&AllowOrigin> for Cors {
     fn from(origin: &AllowOrigin) -> Self {
         match *origin {
-            AllowOrigin::Any => Cors::new().finish(),
+            AllowOrigin::Any => Cors::default(),
             AllowOrigin::Whitelist(ref hosts) => {
-                let mut builder = Cors::new();
+                let mut cors = Cors::default();
                 for host in hosts {
-                    builder = builder.allowed_origin(host);
+                    cors = cors.allowed_origin(host);
                 }
-                builder.finish()
+
+                cors
             }
         }
     }
 }
 
-impl From<AllowOrigin> for CorsFactory {
+impl From<AllowOrigin> for Cors {
     fn from(origin: AllowOrigin) -> Self {
         Self::from(&origin)
     }
 }
 
 trait ErrorHandlersEx {
-    fn default_api_error<F: Fn(&ServiceResponse) -> ApiError + 'static>(
+    fn default_api_error<F: Fn(&ServiceResponse<EitherBody<BoxBody>>) -> ApiError + 'static>(
         self,
         status: HttpStatusCode,
         handler: F,
     ) -> Self;
 }
 
-impl ErrorHandlersEx for ErrorHandlers<actix_web::dev::Body> {
-    fn default_api_error<F: Fn(&ServiceResponse) -> ApiError + 'static>(
+impl ErrorHandlersEx for ErrorHandlers<EitherBody<BoxBody>> {
+    fn default_api_error<F: Fn(&ServiceResponse<EitherBody<BoxBody>>) -> ApiError + 'static>(
         self,
         status: HttpStatusCode,
         handler: F,
     ) -> Self {
         self.handler(status, move |res| {
-            let res = match res.response().body().as_ref() {
+            let res = match res.response().body().size() {
                 // The response has no body, just set the default body.
-                None | Some(Body::Empty) | Some(Body::None) => {
+                BodySize::None | BodySize::Sized(0) | BodySize::Stream => {
                     let error: actix_web::Error = handler(&res).into();
                     res.into_response(error.as_response_error().error_response())
+                        .map_into_left_body()
                 }
 
                 // Just use the provided body.
                 _ => res,
             };
 
-            Ok(ErrorHandlerResponse::Response(res))
+            Ok(ErrorHandlerResponse::Response(res.map_into_left_body()))
         })
     }
 }
 
-pub(crate) fn error_handlers() -> ErrorHandlers<actix_web::dev::Body> {
+pub(crate) fn error_handlers() -> ErrorHandlers<EitherBody<BoxBody>> {
     ErrorHandlers::new()
         .default_api_error(HttpStatusCode::NOT_FOUND, |res| {
             ApiError::not_found()
@@ -333,17 +339,28 @@ pub(crate) fn error_handlers() -> ErrorHandlers<actix_web::dev::Body> {
 
 #[cfg(test)]
 mod tests {
+    use actix_web::body::MessageBody;
     use pretty_assertions::assert_eq;
+    use std::{collections::BTreeSet, iter::FromIterator};
 
     use super::*;
 
     fn assert_responses_eq(left: HttpResponse, right: HttpResponse) {
         assert_eq!(left.status(), right.status());
+        assert_eq!(left.body().size(), right.body().size());
         assert_eq!(
-            left.headers().iter().collect::<Vec<_>>(),
-            right.headers().iter().collect::<Vec<_>>()
+            BTreeSet::from_iter(
+                left.headers()
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_str().ok()))
+            ),
+            BTreeSet::from_iter(
+                right
+                    .headers()
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_str().ok()))
+            )
         );
-        assert_eq!(left.body().as_ref(), right.body().as_ref());
     }
 
     #[test]
@@ -375,7 +392,7 @@ mod tests {
         assert_responses_eq(
             deprecated_response_no_deadline,
             HttpResponse::Ok()
-                .header(header::WARNING, expected_warning)
+                .append_header((header::WARNING, expected_warning))
                 .json(123),
         );
 
@@ -395,7 +412,7 @@ mod tests {
         assert_responses_eq(
             deprecated_response_with_description,
             HttpResponse::Ok()
-                .header(header::WARNING, expected_warning)
+                .append_header((header::WARNING, expected_warning))
                 .json(123),
         );
 
@@ -415,7 +432,7 @@ mod tests {
         assert_responses_eq(
             deprecated_response_deadline,
             HttpResponse::Ok()
-                .header(header::WARNING, expected_warning)
+                .append_header((header::WARNING, expected_warning))
                 .json(123),
         );
     }
@@ -438,8 +455,8 @@ mod tests {
             error_code: Some(42),
         };
         let expected = HttpResponse::build(crate::HttpStatusCode::BAD_REQUEST)
-            .header(header::CONTENT_TYPE, "application/problem+json")
-            .header(header::LOCATION, "location")
+            .append_header((header::CONTENT_TYPE, "application/problem+json"))
+            .append_header((header::LOCATION, "location"))
             .body(serde_json::to_string(&body).unwrap());
         assert_responses_eq(response, expected);
     }
@@ -448,7 +465,7 @@ mod tests {
     fn api_error_to_http_response_without_body() {
         let response = ApiError::bad_request().error_response();
         let expected = HttpResponse::build(crate::HttpStatusCode::BAD_REQUEST)
-            .header(header::CONTENT_TYPE, "application/problem+json")
+            .append_header((header::CONTENT_TYPE, "application/problem+json"))
             .finish();
         assert_responses_eq(response, expected);
     }

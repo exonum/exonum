@@ -19,8 +19,8 @@ exonum-node = { version = "1.0.0", path = "../../exonum-node" }
 exonum-supervisor = { version = "1.0.0", path = "../../services/supervisor" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
-futures = "0.3.4"
+futures = "0.3"
 
 [dependencies.tokio]
-version = "0.2.22"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+version = "1"
+features = ["io-util", "macros", "rt-multi-thread", "net", "time"]

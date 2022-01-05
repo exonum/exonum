@@ -91,7 +91,7 @@ impl NodeHandler {
         let schema = Schema::new(&snapshot);
 
         let mut hashes: Vec<Hash> = schema.transactions_pool().iter().collect();
-        hashes.extend(self.state.tx_cache().keys().cloned());
+        hashes.extend(self.state.tx_cache().keys().copied());
 
         self.send_transactions_by_hash(msg.author(), &hashes);
     }
@@ -108,10 +108,8 @@ impl NodeHandler {
             if let Some(tx) = tx_cache.get_transaction(*hash) {
                 let raw = tx.as_raw().to_bytes();
                 if txs_size + raw.len() + TX_RES_PB_OVERHEAD_PAYLOAD > unoccupied_message_size {
-                    let txs_response = self.sign_message(TransactionsResponse::new(
-                        author,
-                        mem::replace(&mut txs, vec![]),
-                    ));
+                    let txs_response =
+                        self.sign_message(TransactionsResponse::new(author, mem::take(&mut txs)));
 
                     self.send_to_peer(author, txs_response);
                     txs_size = 0;

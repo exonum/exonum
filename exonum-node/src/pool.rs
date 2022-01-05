@@ -82,7 +82,7 @@ pub struct ProposeParams<'a> {
 impl<'a> ProposeParams<'a> {
     pub(crate) fn new(state: &State, snapshot: &'a dyn Snapshot) -> Self {
         Self {
-            consensus_config: state.consensus_config().to_owned(),
+            consensus_config: state.consensus_config().clone(),
             height: state.epoch(),
             round: state.round(),
             snapshot,

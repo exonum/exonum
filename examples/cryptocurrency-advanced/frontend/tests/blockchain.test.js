@@ -22,7 +22,8 @@ Vue.use(Blockchain)
 // Mock `createWallet` transaction
 const createWalletTxHash = '060ae9f8a22f53ea127a3486a7636756027ca1dfe06976b3565d54336ad93b4e'
 mock.onPost(TRANSACTION_URL, {
-  'tx_body': '0a100a0e0a040803100212060a044976616e12220a2068110bb9aa704d8fb8e711421e2a848ff7b72f910209af8723d7b45591b21bd71a420a400c1f2260b4e1470529a66200471f57d863963647c2b0125acde0a5a381ad4363012b0f65d8c672f554f9b60edfff2be6f7de31fa42eaa9f8bb92855cb508f50b'
+  'tx_hash': '060ae9f8a22f53ea127a3486a7636756027ca1dfe06976b3565d54336ad93b4e',
+  'tx_body': '0a140a120a0408031002120a0a084a6f686e20446f6512220a2068110bb9aa704d8fb8e711421e2a848ff7b72f910209af8723d7b45591b21bd71a420a40addc93c40a6849f69094a1aedef1fa314df2ceb1bb7ecc0bc09b1f004c52906dd7a505c0a1fc96b69cd7066a66ecf871f9a46f28ef1db4fb89f8a37f1fa5200b'
 }).replyOnce(200)
 
 mock.onGet(`${TRANSACTION_EXPLORER_URL}${createWalletTxHash}`).replyOnce(200, { 'type': 'in-pool' })
@@ -68,15 +69,24 @@ describe('Interaction with blockchain', () => {
 
   it('should create new wallet', async () => {
     const name = 'John Doe'
-
-    await expect(Vue.prototype.$blockchain.createWallet(keyPair, name)).resolves
+    try {
+      const response = await Vue.prototype.$blockchain.createWallet(keyPair, name)
+      expect(response).resolves
+    } catch (e) {
+      console.log(e)
+    }
   })
 
   it('should add funds', async () => {
     const amountToAdd = '10'
     const seed = '100654575627813010'
 
-    await expect(Vue.prototype.$blockchain.addFunds(keyPair, amountToAdd, seed)).resolves
+    try {
+      const response = await Vue.prototype.$blockchain.addFunds(keyPair, amountToAdd, seed)
+      expect(response).resolves
+    } catch (e) {
+      console.log(e)
+    }
   })
 
   it('should transfer funds', async () => {
@@ -84,88 +94,97 @@ describe('Interaction with blockchain', () => {
     const amountToTransfer = '25'
     const seed = '7743941227375415562'
 
-    await expect(Vue.prototype.$blockchain.transfer(keyPair, receiver, amountToTransfer, seed)).resolves
+    try {
+      const response = await Vue.prototype.$blockchain.transfer(keyPair, receiver, amountToTransfer, seed)
+      expect(response).resolves
+    } catch (e) {
+      console.log(e)
+    }
   })
 
   it('should get wallet proof and verify it', async () => {
-    const data = await Vue.prototype.$blockchain.getWallet(keyPair.publicKey)
+    try {
+      const data = await Vue.prototype.$blockchain.getWallet(keyPair.publicKey)
 
-    expect(data.wallet)
-      .toEqual({
-          'owner': {
-            'data': [
-              16,
-              50,
-              110,
-              218,
-              148,
-              241,
-              6,
-              249,
-              181,
-              172,
-              96,
-              154,
-              25,
-              67,
-              132,
-              255,
-              239,
-              225,
-              189,
-              72,
-              92,
-              192,
-              63,
-              191,
-              221,
-              77,
-              244,
-              203,
-              153,
-              148,
-              109,
-              195]
-          },
-          'name': 'Ivan',
-          'balance': 240,
-          'history_len': 7,
-          'history_hash': {
-            'data': [
-              82,
-              43,
-              251,
-              102,
-              18,
-              193,
-              69,
-              90,
-              184,
-              25,
-              60,
-              65,
-              59,
-              156,
-              142,
-              24,
-              241,
-              61,
-              92,
-              203,
-              187,
-              11,
-              178,
-              216,
-              130,
-              196,
-              17,
-              151,
-              72,
-              217,
-              213,
-              174]
+      expect(data.wallet)
+        .toEqual({
+            'owner': {
+              'data': [
+                16,
+                50,
+                110,
+                218,
+                148,
+                241,
+                6,
+                249,
+                181,
+                172,
+                96,
+                154,
+                25,
+                67,
+                132,
+                255,
+                239,
+                225,
+                189,
+                72,
+                92,
+                192,
+                63,
+                191,
+                221,
+                77,
+                244,
+                203,
+                153,
+                148,
+                109,
+                195]
+            },
+            'name': 'Ivan',
+            'balance': 240,
+            'history_len': 7,
+            'history_hash': {
+              'data': [
+                82,
+                43,
+                251,
+                102,
+                18,
+                193,
+                69,
+                90,
+                184,
+                25,
+                60,
+                65,
+                59,
+                156,
+                142,
+                24,
+                241,
+                61,
+                92,
+                203,
+                187,
+                11,
+                178,
+                216,
+                130,
+                196,
+                17,
+                151,
+                72,
+                217,
+                213,
+                174]
+            }
           }
-        }
-      )
+        )
+    } catch (e) {
+      console.log(e)
+    }
   })
 })

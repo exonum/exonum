@@ -104,11 +104,10 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn,
+    clippy::missing_errors_doc, clippy::missing_const_for_fn, clippy::missing_panics_doc,
     // Obviously should be removed after the next actix-web release.
     clippy::future_not_send,
     clippy::unnecessary_wraps
@@ -366,7 +365,7 @@ impl TestKit {
     /// Polls the *existing* events from the event loop until exhaustion. Does not wait
     /// until new events arrive.
     pub fn poll_events(&mut self) {
-        while let Some(()) = self.events_stream.next().now_or_never().flatten() {
+        while self.events_stream.next().now_or_never().flatten() == Some(()) {
             // Do nothing; all work is done in the stream itself.
         }
     }
@@ -378,12 +377,12 @@ impl TestKit {
 
     /// Returns a blockchain used by the testkit.
     pub fn blockchain(&self) -> Blockchain {
-        self.blockchain.as_ref().to_owned()
+        self.blockchain.as_ref().clone()
     }
 
     /// Sets a checkpoint for a future [`rollback`](#method.rollback).
     pub fn checkpoint(&mut self) {
-        self.db_handler.checkpoint()
+        self.db_handler.checkpoint();
     }
 
     /// Rolls the blockchain back to the latest [`checkpoint`](#method.checkpoint).
@@ -451,10 +450,11 @@ impl TestKit {
     /// testkit.rollback();
     /// ```
     pub fn rollback(&mut self) {
-        self.db_handler.rollback()
+        self.db_handler.rollback();
     }
 
     /// Creates a block with the specified transaction hashes.
+    #[allow(clippy::needless_collect)]
     fn do_create_block(&mut self, tx_hashes: &[Hash]) -> BlockWithTransactions {
         let new_block_height = self.height().next();
         let saved_consensus_config = self.consensus_config();
@@ -782,11 +782,11 @@ impl TestKit {
         let plugins = self.plugins;
 
         StoppedTestKit {
-            network,
             db,
-            api_notifier_channel,
             #[cfg(feature = "exonum-node")]
             plugins,
+            network,
+            api_notifier_channel,
         }
     }
 }

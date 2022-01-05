@@ -49,7 +49,7 @@ fn assert_storage_times_eq(
     for (i, validator) in validators.iter().enumerate() {
         let public_key = &validator.public_keys().service_key;
         assert_eq!(
-            schema.validators_times.get(&public_key),
+            schema.validators_times.get(public_key),
             expected_validators_times[i]
         );
     }

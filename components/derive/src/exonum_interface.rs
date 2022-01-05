@@ -176,7 +176,7 @@ impl FromMeta for RemovedMethods {
     }
 }
 
-#[derive(Debug, FromMeta)]
+#[derive(Debug, Default, FromMeta)]
 #[darling(default)]
 struct ExonumInterfaceAttrs {
     #[darling(rename = "crate")]
@@ -184,17 +184,6 @@ struct ExonumInterfaceAttrs {
     auto_ids: bool,
     interface: Option<String>,
     removed_method_ids: RemovedMethods,
-}
-
-impl Default for ExonumInterfaceAttrs {
-    fn default() -> Self {
-        Self {
-            cr: RustRuntimeCratePath::default(),
-            auto_ids: false,
-            interface: None,
-            removed_method_ids: RemovedMethods::default(),
-        }
-    }
 }
 
 impl TryFrom<&[Attribute]> for ExonumInterfaceAttrs {

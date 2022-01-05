@@ -1070,12 +1070,30 @@ mod tests {
                 "123:\u{44e}\u{43d}\u{438}\u{43a}\u{43e}\u{434}\u{44b}:1.0.0",
                 "Artifact name contains an illegal character",
             ),
-            ("1:test:1", "Expected dot"),
-            ("1:test:3.141593", "Expected dot"),
-            ("1:test:what_are_versions", "Error parsing major identifier"),
-            ("1:test:1.x.0", "Error parsing minor identifier"),
-            ("1:test:1.0.x", "Error parsing patch identifier"),
-            ("1:test:1.0.0:garbage", "Extra junk after valid version"),
+            (
+                "1:test:1",
+                "unexpected end of input while parsing major version number",
+            ),
+            (
+                "1:test:3.141593",
+                "unexpected end of input while parsing minor version number",
+            ),
+            (
+                "1:test:what_are_versions",
+                "unexpected character 'w' while parsing major version number",
+            ),
+            (
+                "1:test:1.x.0",
+                "unexpected character 'x' while parsing minor version number",
+            ),
+            (
+                "1:test:1.0.x",
+                "unexpected character 'x' while parsing patch version number",
+            ),
+            (
+                "1:test:1.0.0:garbage",
+                "unexpected character ':' after patch version number",
+            ),
         ];
 
         for (artifact, expected_err) in &artifacts {

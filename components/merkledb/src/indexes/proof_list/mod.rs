@@ -354,7 +354,7 @@ where
     V: BinaryValue,
 {
     fn set_len(&mut self, len: u64) {
-        self.state.set(len)
+        self.state.set(len);
     }
 
     /// Updates levels of the tree with heights `2..` after the values in the range
@@ -565,13 +565,12 @@ where
     /// assert_eq!(Some(100), index.get(0));
     /// ```
     pub fn set(&mut self, index: u64, value: V) {
-        if index >= self.len() {
-            panic!(
-                "Index out of bounds: the len is {} but the index is {}",
-                self.len(),
-                index
-            );
-        }
+        assert!(
+            index < self.len(),
+            "Index out of bounds: the len is {} but the index is {}",
+            self.len(),
+            index
+        );
         self.base.put(
             &ProofListKey::new(1, index),
             HashTag::hash_leaf(&value.to_bytes()),
