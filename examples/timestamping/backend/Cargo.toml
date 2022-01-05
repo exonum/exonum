@@ -37,8 +37,6 @@ features = ["io-util", "macros", "rt-multi-thread", "net", "time"]
 exonum-explorer-service = { version = "1.0.0", path = "../../../services/explorer" }
 exonum-testkit = { version = "1.0.0", path = "../../../test-suite/testkit" }
 
-pretty_assertions = "1"
-
 [build-dependencies]
 exonum-build = { version = "1.0.1", path = "../../../components/build" }
 

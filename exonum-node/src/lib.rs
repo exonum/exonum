@@ -60,7 +60,6 @@ pub use crate::{
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
-use actix_rt::System;
 use anyhow::{ensure, format_err};
 use exonum::{
     blockchain::{
@@ -84,7 +83,7 @@ use futures::{
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio::time::sleep;
+use tokio::{runtime::Runtime, time::sleep};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -1338,9 +1337,9 @@ impl Reactor {
         // Creating a separate thread here seems easier than making `Node::run()` return
         // a non-`Send` future (which, e.g., precludes running nodes with `tokio::spawn`).
         thread::spawn(|| {
-            let res = System::new().block_on(api_task);
+            let res = Runtime::new().and_then(|rt| rt.block_on(api_task));
             if let Err(ref err) = res {
-                log::error!("Error in actix thread: {}", err);
+                log::error!("Error in tokio thread: {}", err);
             }
             api_part_tx.send(res).ok();
         });

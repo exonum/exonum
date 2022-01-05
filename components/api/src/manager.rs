@@ -15,7 +15,6 @@
 //! Module responsible for actix web API management after new service is deployed.
 
 use actix_cors::Cors;
-use actix_rt::time::sleep;
 use actix_web::{
     web::{self, JsonConfig},
     App, HttpServer,
@@ -25,6 +24,7 @@ use futures::{
     future::{join_all, try_join_all},
     prelude::*,
 };
+use tokio::time::sleep;
 
 use std::{
     collections::HashMap,
@@ -263,7 +263,7 @@ impl ApiManager {
                 let mut server_finished = server_finished_tx.clone();
                 let handle = server.handle();
 
-                actix_rt::spawn(async move {
+                tokio::spawn(async move {
                     let res = server.await;
                     if let Err(ref e) = res {
                         // TODO: should the server be restarted on error?

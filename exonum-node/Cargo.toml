@@ -17,7 +17,6 @@ travis-ci = { repository = "exonum/exonum" }
 
 [dependencies]
 anyhow = "1.0"
-actix-rt = "2"
 async-trait = "0.1"
 bit-vec = "0.6"
 byteorder = { version = "1.4", features = ["i128"] }
@@ -59,7 +58,7 @@ exonum-rust-runtime = { version = "1.0.0", path = "../runtimes/rust" }
 
 # Dependencies for the Unix-specific `signals` test.
 [target.'cfg(unix)'.dev_dependencies]
-nix = "0.17.0"
+nix = "0.23"
 reqwest = { version = "0.11", features = ["blocking"] }
 rusty-fork = "0.2"
 

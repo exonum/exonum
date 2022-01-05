@@ -99,11 +99,6 @@ impl TestKitActor {
         let mut api_aggregator = testkit.update_aggregator();
 
         let local_set = LocalSet::new();
-        // `System` should be spawn before the testkit actor is added to it.
-        local_set.spawn_local(async {
-            System::with_tokio_rt(|| tokio::runtime::Runtime::new().unwrap())
-        });
-        // Add the testkit actor to the system and retrieve a handle to it.
         let testkit = local_set.run_until(async { Self(testkit).start() }).await;
 
         api_aggregator.insert("testkit", Self::api(testkit));

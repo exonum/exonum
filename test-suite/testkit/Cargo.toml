@@ -32,7 +32,6 @@ exonum-proto = { version = "1.0.0", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 actix = { version = "0.12", default-features = false }
-actix-rt = "2"
 actix-test = "=0.1.0-beta.11"
 actix-web = { version = "=4.0.0-beta.19", default-features = false }
 chrono = "0.4"

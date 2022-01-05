@@ -32,7 +32,6 @@ exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 [dev-dependencies]
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
-bincode = "1.3"
 
 [dev-dependencies.tokio]
 version = "1"

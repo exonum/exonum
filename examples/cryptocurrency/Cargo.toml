@@ -35,7 +35,6 @@ exonum-cli = { version = "1.0.0", path = "../../cli" }
 exonum-explorer-service = { version = "1.0.0", path = "../../services/explorer" }
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 
-assert_matches = "1.2.0"
 pretty_assertions = "1"
 rand = "0.8"
 
