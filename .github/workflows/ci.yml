@@ -17,8 +17,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build: [ MacOS, Windows ]
+        build: [ Linux, MacOS, Windows ]
         include:
+          - build: Linux
+            os: ubuntu-latest
           - build: MacOS
             os: macos-latest
           - build: Windows
@@ -31,6 +33,8 @@ jobs:
         with:
           version: "11.0"
           directory: ${{ runner.temp }}/llvm
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb-dev
       - if: runner.os == 'Windows'
         run: |
           choco install protoc minisign -y
