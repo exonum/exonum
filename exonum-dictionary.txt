@@ -223,6 +223,7 @@ toctou
 todos
 toml
 toolchain
+tungstenite
 txvec
 tymethod
 uint
