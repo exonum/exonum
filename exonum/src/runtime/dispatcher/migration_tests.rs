@@ -40,7 +40,7 @@ use crate::{
     },
 };
 
-const DELAY: Duration = Duration::from_millis(100);
+const DELAY: Duration = Duration::from_millis(150);
 
 #[derive(Default, Debug, Clone)]
 struct MigrationRuntime {
