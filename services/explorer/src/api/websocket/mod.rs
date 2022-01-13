@@ -58,40 +58,41 @@
 //! #     IncomingMessage, Response, SubscriptionType, Notification,
 //! # };
 //! # use exonum_testkit::{Spec, TestKitBuilder};
+//! # use futures::{SinkExt, StreamExt};
 //! # use std::time::Duration;
-//! use websocket::OwnedMessage;
+//! use tokio_tungstenite::tungstenite::Message;
 //!
-//! fn stringify(data: &impl serde::Serialize) -> OwnedMessage {
-//!     OwnedMessage::Text(serde_json::to_string(data).unwrap())
+//! fn stringify(data: &impl serde::Serialize) -> Message {
+//!     Message::Text(serde_json::to_string(data).unwrap())
 //! }
 //!
-//! fn parse<T: serde::de::DeserializeOwned>(data: OwnedMessage) -> T {
+//! fn parse<T: serde::de::DeserializeOwned>(data: Message) -> T {
 //!     match data {
-//!         OwnedMessage::Text(ref s) => serde_json::from_str(s).unwrap(),
+//!         Message::Text(ref s) => serde_json::from_str(s).unwrap(),
 //!         _ => panic!("Unexpected message"),
 //!     }
 //! }
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!     .with(Spec::new(ExplorerFactory).with_default_instance())
 //!     .build();
 //! let api = testkit.api();
-//! let url = api.public_url("api/explorer/v1/ws");
-//! let mut client = websocket::ClientBuilder::new(&url)?.connect_insecure()?;
-//! # client.stream_ref().set_read_timeout(Some(Duration::from_secs(1)))?;
+//! let url = api.public_url("api/explorer/v1/ws").replace("http", "ws");
+//! let (mut client, _) = tokio_tungstenite::connect_async(&url).await?;
 //!
 //! // Send a subscription message.
 //! let subscription = SubscriptionType::Blocks;
 //! let message = IncomingMessage::SetSubscriptions(vec![subscription]);
-//! client.send_message(&stringify(&message))?;
+//! client.send(stringify(&message)).await?;
 //! // The server should respond with an empty response.
-//! let response: Response<()> = parse(client.recv_message()?);
+//! let response: Response<()> = parse(client.next().await.unwrap()?);
 //! assert_matches!(response, Response::Success { .. });
 //!
 //! // Create a block and check that it is received by the client.
 //! let block = testkit.create_block();
-//! let response = parse::<Notification>(client.recv_message()?);
+//! let response = parse::<Notification>(client.next().await.unwrap()?);
 //! assert_matches!(
 //!     response,
 //!     Notification::Block(ref header) if *header == block.header
@@ -113,15 +114,16 @@
 //! #     TransactionHex, TransactionResponse,
 //! # };
 //! # use exonum_testkit::{Spec, TestKitBuilder};
+//! # use futures::{SinkExt, StreamExt};
 //! # use std::time::Duration;
-//! # use websocket::OwnedMessage;
+//! # use tokio_tungstenite::tungstenite::Message;
 //! // `stringify` and `parse` functions are defined as in the previous example.
-//! # fn stringify(data: &impl serde::Serialize) -> OwnedMessage {
-//! #     OwnedMessage::Text(serde_json::to_string(data).unwrap())
+//! # fn stringify(data: &impl serde::Serialize) -> Message {
+//! #     Message::Text(serde_json::to_string(data).unwrap())
 //! # }
-//! # fn parse<T: serde::de::DeserializeOwned>(data: OwnedMessage) -> T {
+//! # fn parse<T: serde::de::DeserializeOwned>(data: Message) -> T {
 //! #     match data {
-//! #         OwnedMessage::Text(ref s) => serde_json::from_str(s).unwrap(),
+//! #         Message::Text(ref s) => serde_json::from_str(s).unwrap(),
 //! #         _ => panic!("Unexpected message"),
 //! #     }
 //! # }
@@ -148,7 +150,8 @@
 //! # }
 //! # impl Service for MyService {}
 //!
-//! # fn main() -> anyhow::Result<()> {
+//! #[tokio::main]
+//! # async fn main() -> anyhow::Result<()> {
 //! let mut testkit = TestKitBuilder::validator()
 //!    .with(Spec::new(ExplorerFactory).with_default_instance())
 //!    .with(Spec::new(MyService).with_default_instance())
@@ -160,19 +163,18 @@
 //!     "api/explorer/v1/transactions/subscribe?instance_id={}",
 //!     MyService::INSTANCE_ID
 //! );
-//! let mut client = websocket::ClientBuilder::new(&api.public_url(&url))?
-//!     .connect_insecure()?;
-//! # client.stream_ref().set_read_timeout(Some(Duration::from_secs(1)))?;
+//! let url = api.public_url(&url).replace("http", "ws");
+//! let (mut client, _) = tokio_tungstenite::connect_async(&url).await?;
 //!
 //! // Create a transaction and send it via WS.
 //! let tx = gen_keypair().do_nothing(MyService::INSTANCE_ID, 0);
 //! let tx_hex = TransactionHex::new(&tx);
 //! let message = IncomingMessage::Transaction(tx_hex);
-//! client.send_message(&stringify(&message))?;
+//! client.send(stringify(&message)).await?;
 //!
 //! // Receive a notification that the transaction was successfully accepted
 //! // into the memory pool.
-//! let res: Response<TransactionResponse> = parse(client.recv_message()?);
+//! let res: Response<TransactionResponse> = parse(client.next().await.unwrap()?);
 //! let response = res.into_result().unwrap();
 //! let tx_hash = response.tx_hash;
 //!
@@ -181,7 +183,7 @@
 //! assert_eq!(block.len(), 1); // The block contains the sent transaction.
 //!
 //! // Receive a notification about the committed transaction.
-//! let notification = parse::<Notification>(client.recv_message()?);
+//! let notification = parse::<Notification>(client.next().await.unwrap()?);
 //! assert_matches!(
 //!     notification,
 //!     Notification::Transaction(ref summary) if summary.tx_hash == tx_hash
@@ -196,6 +198,7 @@ pub use exonum_explorer::api::websocket::{
 };
 
 use actix::prelude::*;
+use actix_derive::Message;
 use actix_web_actors::ws;
 use exonum::{
     blockchain::{Blockchain, Schema},
@@ -209,7 +212,9 @@ use hex::FromHex;
 
 use std::{
     collections::{BTreeMap, HashMap},
-    fmt, mem,
+    fmt,
+    future::Future,
+    mem,
     sync::{Arc, Mutex, Weak},
     time::Duration,
 };
@@ -266,7 +271,7 @@ impl SharedStateRef {
         let arc = self.inner.upgrade()?;
         let mut inner = arc.lock().expect("Cannot lock `SharedState`");
         let addr = inner.server_addr.get_or_insert_with(|| {
-            let blockchain = blockchain.to_owned();
+            let blockchain = blockchain.clone();
             Server::new(blockchain).start()
         });
         Some(addr.clone())
@@ -371,12 +376,12 @@ impl Server {
             self.subscribers
                 .entry(sub_type)
                 .or_insert_with(HashMap::new)
-                .insert(id, addr.to_owned());
+                .insert(id, addr.clone());
         }
     }
 
     fn disconnect_all(&mut self) {
-        let subscribers = mem::replace(&mut self.subscribers, BTreeMap::new());
+        let subscribers = mem::take(&mut self.subscribers);
         for (_, subscriber_group) in subscribers {
             for (_, recipient) in subscriber_group {
                 if recipient.connected() {
@@ -402,7 +407,7 @@ impl Server {
         &self,
         message: &Transaction,
     ) -> impl Future<Output = anyhow::Result<TransactionResponse>> {
-        let sender = self.blockchain.sender().to_owned();
+        let sender = self.blockchain.sender().clone();
         let verified = self.check_transaction(message);
 
         async move {

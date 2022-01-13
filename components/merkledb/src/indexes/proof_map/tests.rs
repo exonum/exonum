@@ -986,167 +986,167 @@ where
 
 #[test]
 fn test_map_methods_raw() {
-    ProofMapTester::<Raw>::test_map_methods()
+    ProofMapTester::<Raw>::test_map_methods();
 }
 
 #[test]
 fn test_map_methods_hashed() {
-    ProofMapTester::<Hashed>::test_map_methods()
+    ProofMapTester::<Hashed>::test_map_methods();
 }
 
 #[test]
 fn test_insert_trivial_raw() {
-    ProofMapTester::<Raw>::test_insert_trivial()
+    ProofMapTester::<Raw>::test_insert_trivial();
 }
 
 #[test]
 fn test_insert_trivial_hashed() {
-    ProofMapTester::<Hashed>::test_insert_trivial()
+    ProofMapTester::<Hashed>::test_insert_trivial();
 }
 
 #[test]
 fn test_insert_same_key_raw() {
-    ProofMapTester::<Raw>::test_insert_same_key()
+    ProofMapTester::<Raw>::test_insert_same_key();
 }
 
 #[test]
 fn test_insert_simple_raw() {
-    ProofMapTester::<Raw>::test_insert_simple()
+    ProofMapTester::<Raw>::test_insert_simple();
 }
 
 #[test]
 fn test_insert_simple_hashed() {
-    ProofMapTester::<Hashed>::test_insert_simple()
+    ProofMapTester::<Hashed>::test_insert_simple();
 }
 
 #[test]
 fn test_insert_reverse_raw() {
-    ProofMapTester::<Raw>::test_insert_reverse()
+    ProofMapTester::<Raw>::test_insert_reverse();
 }
 
 #[test]
 fn test_insert_reverse_hashed() {
-    ProofMapTester::<Hashed>::test_insert_reverse()
+    ProofMapTester::<Hashed>::test_insert_reverse();
 }
 
 #[test]
 fn test_remove_trivial_raw() {
-    ProofMapTester::<Raw>::test_remove_trivial()
+    ProofMapTester::<Raw>::test_remove_trivial();
 }
 
 #[test]
 fn test_remove_trivial_hashed() {
-    ProofMapTester::<Hashed>::test_remove_trivial()
+    ProofMapTester::<Hashed>::test_remove_trivial();
 }
 
 #[test]
 fn test_remove_simple_raw() {
-    ProofMapTester::<Raw>::test_remove_simple()
+    ProofMapTester::<Raw>::test_remove_simple();
 }
 
 #[test]
 fn test_remove_simple_hashed() {
-    ProofMapTester::<Hashed>::test_remove_simple()
+    ProofMapTester::<Hashed>::test_remove_simple();
 }
 
 #[test]
 fn test_remove_reverse_raw() {
-    ProofMapTester::<Raw>::test_remove_reverse()
+    ProofMapTester::<Raw>::test_remove_reverse();
 }
 
 #[test]
 fn test_remove_reverse_hashed() {
-    ProofMapTester::<Hashed>::test_remove_reverse()
+    ProofMapTester::<Hashed>::test_remove_reverse();
 }
 
 #[test]
 fn test_clear_raw() {
-    ProofMapTester::<Raw>::test_clear()
+    ProofMapTester::<Raw>::test_clear();
 }
 
 #[test]
 fn test_clear_hashed() {
-    ProofMapTester::<Hashed>::test_clear()
+    ProofMapTester::<Hashed>::test_clear();
 }
 
 #[test]
 fn test_fuzz_insert_raw() {
-    ProofMapTester::<Raw>::test_fuzz_insert()
+    ProofMapTester::<Raw>::test_fuzz_insert();
 }
 
 #[test]
 fn test_fuzz_insert_hashed() {
-    ProofMapTester::<Hashed>::test_fuzz_insert()
+    ProofMapTester::<Hashed>::test_fuzz_insert();
 }
 
 #[test]
 fn test_build_proof_in_empty_tree_raw() {
-    ProofMapTester::<Raw>::test_build_proof_in_empty_tree()
+    ProofMapTester::<Raw>::test_build_proof_in_empty_tree();
 }
 
 #[test]
 fn test_build_proof_in_empty_tree_hashed() {
-    ProofMapTester::<Hashed>::test_build_proof_in_empty_tree()
+    ProofMapTester::<Hashed>::test_build_proof_in_empty_tree();
 }
 
 #[test]
 fn test_build_multiproof_in_empty_tree_raw() {
-    ProofMapTester::<Raw>::test_build_multiproof_in_empty_tree()
+    ProofMapTester::<Raw>::test_build_multiproof_in_empty_tree();
 }
 
 #[test]
 fn test_build_multiproof_in_empty_tree_hashed() {
-    ProofMapTester::<Hashed>::test_build_multiproof_in_empty_tree()
+    ProofMapTester::<Hashed>::test_build_multiproof_in_empty_tree();
 }
 
 #[test]
 fn test_build_multiproof_in_single_node_tree_raw() {
-    ProofMapTester::<Raw>::test_build_multiproof_in_single_node_tree()
+    ProofMapTester::<Raw>::test_build_multiproof_in_single_node_tree();
 }
 
 #[test]
 fn test_build_multiproof_in_single_node_tree_hashed() {
-    ProofMapTester::<Hashed>::test_build_multiproof_in_single_node_tree()
+    ProofMapTester::<Hashed>::test_build_multiproof_in_single_node_tree();
 }
 
 #[test]
 fn test_build_proof_in_complex_tree_raw() {
-    ProofMapTester::<Raw>::test_build_proof_in_complex_tree()
+    ProofMapTester::<Raw>::test_build_proof_in_complex_tree();
 }
 
 #[test]
 fn test_build_multiproof_simple_raw() {
-    ProofMapTester::<Raw>::test_build_multiproof_simple()
+    ProofMapTester::<Raw>::test_build_multiproof_simple();
 }
 
 #[test]
 fn test_fuzz_delete_raw() {
-    ProofMapTester::<Raw>::test_fuzz_delete()
+    ProofMapTester::<Raw>::test_fuzz_delete();
 }
 
 #[test]
 fn test_fuzz_delete_hashed() {
-    ProofMapTester::<Hashed>::test_fuzz_delete()
+    ProofMapTester::<Hashed>::test_fuzz_delete();
 }
 
 #[test]
 fn test_fuzz_insert_after_delete_raw() {
-    ProofMapTester::<Raw>::test_fuzz_insert_after_delete()
+    ProofMapTester::<Raw>::test_fuzz_insert_after_delete();
 }
 
 #[test]
 fn test_fuzz_insert_after_delete_hashed() {
-    ProofMapTester::<Hashed>::test_fuzz_insert_after_delete()
+    ProofMapTester::<Hashed>::test_fuzz_insert_after_delete();
 }
 
 #[test]
 fn test_iter_raw() {
-    ProofMapTester::<Raw>::test_iter()
+    ProofMapTester::<Raw>::test_iter();
 }
 
 #[test]
 fn test_iter_hashed() {
-    ProofMapTester::<Hashed>::test_iter()
+    ProofMapTester::<Hashed>::test_iter();
 }
 
 #[test]
@@ -1202,12 +1202,12 @@ fn index_as_iterator() {
 
 #[test]
 fn test_build_proof_in_single_node_tree_raw() {
-    ProofMapTester::<Raw>::test_build_proof_in_single_node_tree()
+    ProofMapTester::<Raw>::test_build_proof_in_single_node_tree();
 }
 
 #[test]
 fn test_build_proof_in_single_node_tree_hashed() {
-    ProofMapTester::<Hashed>::test_build_proof_in_single_node_tree()
+    ProofMapTester::<Hashed>::test_build_proof_in_single_node_tree();
 }
 
 #[test]

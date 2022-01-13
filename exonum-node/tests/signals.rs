@@ -28,6 +28,7 @@ use tokio::{
     runtime::Runtime,
     signal::unix::{signal, SignalKind},
 };
+use tokio_stream::wrappers::SignalStream;
 
 use std::{
     env,
@@ -70,11 +71,9 @@ fn check_child_exit(child: &mut ChildWrapper, output: &mut File) {
 
     output.seek(SeekFrom::Start(0)).unwrap();
     let reader = BufReader::new(&*output);
-    for line_res in reader.lines() {
-        if let Ok(line) = line_res {
-            if line.contains("Shutting down node handler") {
-                return;
-            }
+    for line in reader.lines().flatten() {
+        if line.contains("Shutting down node handler") {
+            return;
         }
     }
     panic!("Node did not shut down properly");
@@ -159,7 +158,7 @@ async fn start_node_without_signals(start_port: u16, with_http: bool) {
     let node = nodes.pop().unwrap();
 
     // Register a SIGTERM handler that terminates the node after several signals are received.
-    let mut signal = signal(SignalKind::terminate()).unwrap().skip(2);
+    let mut signal = SignalStream::new(signal(SignalKind::terminate()).unwrap()).skip(2);
     let shutdown_handle = node.shutdown_handle();
     tokio::spawn(async move {
         signal.next().await;
@@ -178,7 +177,7 @@ fn interrupt_node_without_http() {
         |_| {},
         |child, output| check_child(child, output, Signal::SIGINT),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_450, false));
         },
     )
@@ -193,7 +192,7 @@ fn interrupt_node_with_http() {
         |_| {},
         |child, output| check_child(child, output, Signal::SIGINT),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_460, true));
         },
     )
@@ -208,7 +207,7 @@ fn terminate_node_without_http() {
         |_| {},
         |child, output| check_child(child, output, Signal::SIGTERM),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_470, false));
         },
     )
@@ -223,7 +222,7 @@ fn terminate_node_with_http() {
         |_| {},
         |child, output| check_child(child, output, Signal::SIGTERM),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_480, true));
         },
     )
@@ -238,7 +237,7 @@ fn quit_node_without_http() {
         |_| {},
         |child, output| check_child(child, output, Signal::SIGQUIT),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_490, false));
         },
     )
@@ -253,7 +252,7 @@ fn quit_node_with_http() {
         |_| {},
         |child, output| check_child(child, output, Signal::SIGQUIT),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node(16_500, true));
         },
     )
@@ -268,7 +267,7 @@ fn term_node_with_custom_handling_and_http() {
         |_| {},
         |child, output| check_child_with_custom_handler(child, output, Some(16_511)),
         || {
-            let mut runtime = Runtime::new().unwrap();
+            let runtime = Runtime::new().unwrap();
             runtime.block_on(start_node_without_signals(16_510, true));
         },
     )
@@ -283,8 +282,8 @@ fn term_node_with_custom_handling_and_no_http() {
         |_| {},
         |child, output| check_child_with_custom_handler(child, output, None),
         || {
-            let mut runtime = Runtime::new().unwrap();
-            runtime.block_on(start_node_without_signals(16_520, true));
+            let runtime = Runtime::new().unwrap();
+            runtime.block_on(start_node_without_signals(16_520, false));
         },
     )
     .unwrap();

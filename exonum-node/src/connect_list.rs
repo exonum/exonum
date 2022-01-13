@@ -105,7 +105,7 @@ impl ConnectListConfig {
             .iter()
             .zip(validators_keys)
             .map(|(address, keys)| ConnectInfo {
-                address: address.to_owned(),
+                address: address.clone(),
                 public_key: keys.consensus_key,
             })
             .collect();
@@ -156,10 +156,10 @@ mod test {
         not_in_connect_list: &[usize],
     ) {
         for i in in_connect_list {
-            assert_eq!(connect_list.is_peer_allowed(&keys[*i]), true);
+            assert!(connect_list.is_peer_allowed(&keys[*i]));
         }
         for i in not_in_connect_list {
-            assert_eq!(connect_list.is_peer_allowed(&keys[*i]), false);
+            assert!(!connect_list.is_peer_allowed(&keys[*i]));
         }
     }
 
@@ -205,7 +205,7 @@ mod test {
             connect_list.add(ConnectInfo {
                 public_key: *peer,
                 address: address.clone(),
-            })
+            });
         }
     }
 

@@ -30,7 +30,7 @@ pub struct ProofListKey {
 impl ProofListKey {
     pub fn new(height: u8, index: u64) -> Self {
         debug_assert!(u64::from(height) <= HEIGHT_SHIFT && index <= MAX_INDEX);
-        Self { height, index }
+        Self { index, height }
     }
 
     pub fn height(&self) -> u8 {

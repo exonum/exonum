@@ -24,12 +24,12 @@ use exonum_rust_runtime::{
 };
 use futures::{
     channel::oneshot,
-    future::{self, Either, RemoteHandle},
+    future::{self, RemoteHandle},
     FutureExt,
 };
 use reqwest::Client;
 use structopt::StructOpt;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use std::{fmt, time::Duration};
 
@@ -83,22 +83,23 @@ async fn probe_api(url: &str, mut cancel_rx: oneshot::Receiver<()>) -> ApiStats 
     };
 
     loop {
-        let selected = future::select(&mut cancel_rx, delay_for(API_TIMEOUT)).await;
-        if let Either::Left(_) = selected {
+        tokio::select! {
+            _ = sleep(API_TIMEOUT) => {
+                // NB: reusing `Client` among requests makes it cache responses, which is the last thing
+                // we want in this test.
+                if let Err(e) = send_request(&Client::new(), url).await {
+                    log::info!("Call to node API resulted in an error: {}", e);
+                    stats.erroneous_answers += 1;
+                } else {
+                    log::trace!("Successfully called node API");
+                    stats.ok_answers += 1;
+                }
+            }
             // We've received the cancellation signal; we're done.
-            break;
-        }
-
-        // NB: reusing `Client` among requests makes it cache responses, which is the last thing
-        // we want in this test.
-        if let Err(e) = send_request(&Client::new(), url).await {
-            log::info!("Call to node API resulted in an error: {}", e);
-            stats.erroneous_answers += 1;
-        } else {
-            log::trace!("Successfully called node API");
-            stats.ok_answers += 1;
+            _ = &mut cancel_rx => break,
         }
     }
+
     stats
 }
 
@@ -195,7 +196,7 @@ async fn main() {
         if args.max_height.map_or(false, |max| height >= Height(max)) {
             break;
         }
-        delay_for(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
     }
 
     let snapshot = nodes[0].blockchain().snapshot();
@@ -266,7 +267,7 @@ mod tests {
                 panic!("Node did not achieve {:?}", EXPECTED_HEIGHT);
             }
 
-            delay_for(MAX_WAIT / 20).await;
+            sleep(MAX_WAIT / 20).await;
         }
         node.join().await;
     }

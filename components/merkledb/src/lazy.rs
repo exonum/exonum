@@ -130,6 +130,6 @@ mod tests {
                 actual: IndexType::List,
                 ..
             }
-        )
+        );
     }
 }

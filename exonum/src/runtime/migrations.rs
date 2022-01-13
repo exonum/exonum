@@ -498,7 +498,7 @@ impl LinearMigrations {
     /// - If `latest_version` is a prerelease.
     pub fn new(latest_version: Version) -> Self {
         assert!(
-            !latest_version.is_prerelease(),
+            latest_version.pre.is_empty(),
             "Prerelease versions require using `with_prereleases` constructor"
         );
         Self {
@@ -523,7 +523,7 @@ impl LinearMigrations {
     fn check_prerelease(&self, version: &Version) {
         if !self.support_prereleases {
             assert!(
-                !version.is_prerelease(),
+                version.pre.is_empty(),
                 "Prerelease versions require using `with_prereleases` constructor"
             );
         }
@@ -564,7 +564,7 @@ impl LinearMigrations {
     }
 
     fn check(&self, start_version: &Version) -> Result<(), InitMigrationError> {
-        if !self.support_prereleases && start_version.is_prerelease() {
+        if !self.support_prereleases && !start_version.pre.is_empty() {
             let msg = "the start version is a prerelease".to_owned();
             return Err(InitMigrationError::UnsupportedStart(msg));
         }
@@ -576,7 +576,7 @@ impl LinearMigrations {
         if let Some(ref min_supported_version) = self.min_start_version {
             if start_version < min_supported_version {
                 return Err(InitMigrationError::OldStartVersion {
-                    min_supported_version: min_supported_version.to_owned(),
+                    min_supported_version: min_supported_version.clone(),
                 });
             }
         }
@@ -690,7 +690,7 @@ mod tests {
                 version.clone(),
             );
 
-            let next_version = script.end_version().to_owned();
+            let next_version = script.end_version().clone();
             assert!(
                 version < next_version,
                 "current version = {}, next version = {}",

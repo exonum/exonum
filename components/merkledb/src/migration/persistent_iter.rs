@@ -535,6 +535,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::needless_collect)]
     fn persistent_iter_for_value_set() {
         let db = TemporaryDB::new();
         let fork = db.fork();

@@ -61,7 +61,7 @@ impl NodeHandler {
             NetworkEvent::PeerDisconnected(peer) => self.handle_disconnected(peer),
             NetworkEvent::UnableConnectToPeer(peer) => self.handle_unable_to_connect(peer),
             NetworkEvent::MessageReceived(raw) => {
-                self.execute_later(InternalRequest::VerifyMessage(raw))
+                self.execute_later(InternalRequest::VerifyMessage(raw));
             }
         }
     }

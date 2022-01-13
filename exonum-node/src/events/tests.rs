@@ -43,7 +43,7 @@ use crate::{
 #[derive(Debug)]
 struct TestHandler {
     abort_handle: AbortHandle,
-    listen_address: SocketAddr,
+    _listen_address: SocketAddr,
     network_events_rx: mpsc::Receiver<NetworkEvent>,
     network_requests_tx: mpsc::Sender<NetworkRequest>,
 }
@@ -60,7 +60,7 @@ impl TestHandler {
         tokio::spawn(network_task.unwrap_or_else(drop));
         Self {
             abort_handle,
-            listen_address,
+            _listen_address: listen_address,
             network_events_rx,
             network_requests_tx,
         }
@@ -238,9 +238,9 @@ impl ConnectionParams {
 
         Self {
             connect,
+            connect_info,
             address,
             handshake_params,
-            connect_info,
         }
     }
 
@@ -420,7 +420,7 @@ async fn test_network_multiple_connect() {
     let mut connect_list = ConnectList::default();
     let mut connection_params: Vec<_> = nodes
         .iter()
-        .cloned()
+        .copied()
         .map(ConnectionParams::from_address)
         .collect();
     for params in connection_params.iter().cloned() {

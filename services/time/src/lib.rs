@@ -108,11 +108,10 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn
+    clippy::missing_errors_doc, clippy::missing_panics_doc, clippy::missing_const_for_fn
 )]
 
 pub mod api;
@@ -164,10 +163,7 @@ impl Service for TimeService {
 ///
 /// [`SystemTimeProvider`]: struct.SystemTimeProvider.html
 #[derive(Debug, ServiceFactory)]
-#[service_factory(
-    proto_sources = "proto",
-    service_constructor = "TimeServiceFactory::create_instance"
-)]
+#[service_factory(proto_sources = "proto", service_constructor = "Self::create_instance")]
 pub struct TimeServiceFactory {
     time_provider: Arc<dyn TimeProvider>,
 }

@@ -51,8 +51,8 @@ pub fn exonum_version() -> Option<Version> {
 /// Returns a version of the rust compiler.
 #[doc(hidden)]
 pub fn rust_version() -> Option<Version> {
-    let version = USER_AGENT.split('/').nth(1)?;
-    Version::from_str(version).ok()
+    let version = USER_AGENT.split('/').nth(1)?.trim();
+    Version::parse(version).ok()
 }
 
 #[cfg(test)]

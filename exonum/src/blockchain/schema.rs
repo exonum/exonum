@@ -364,7 +364,7 @@ where
     /// data race between commit and adding transactions into the pool.
     pub(crate) fn commit_transaction(&mut self, hash: &Hash, height: Height, tx: Verified<AnyTx>) {
         if !self.transactions().contains(hash) {
-            self.transactions().put(hash, tx)
+            self.transactions().put(hash, tx);
         }
 
         self.block_transactions(height).push(*hash);

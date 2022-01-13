@@ -71,7 +71,6 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
@@ -131,7 +130,7 @@ impl Service for ExplorerService {
     }
 
     fn wire_api(&self, builder: &mut ServiceApiBuilder) {
-        let blockchain = builder.blockchain().to_owned();
+        let blockchain = builder.blockchain().clone();
         let scope = builder
             .with_root_path(ExplorerFactory::INSTANCE_NAME)
             .public_scope();

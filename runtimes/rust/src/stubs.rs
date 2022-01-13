@@ -129,9 +129,10 @@ impl GenericCall<InstanceId> for TxStub {
         method: MethodDescriptor<'_>,
         args: Vec<u8>,
     ) -> Self::Output {
-        if !method.interface_name.is_empty() {
-            panic!("Creating transactions with non-default interface is not yet supported");
-        }
+        assert!(
+            method.interface_name.is_empty(),
+            "Creating transactions with non-default interface is not yet supported"
+        );
 
         let call_info = CallInfo::new(instance_id, method.id);
         AnyTx::new(call_info, args)

@@ -228,6 +228,7 @@ pub struct ProposeState {
 /// State of a block.
 #[derive(Debug)]
 pub struct BlockState {
+    #[allow(dead_code)]
     hash: Hash,
     // Changes that should be made for block committing.
     patch: Option<BlockPatch>,
@@ -380,7 +381,7 @@ impl RequestState {
     }
 
     fn peek(&self) -> Option<PublicKey> {
-        self.known_nodes.iter().next().cloned()
+        self.known_nodes.iter().next().copied()
     }
 }
 
@@ -401,7 +402,7 @@ impl ProposeState {
 
     /// Set block hash on propose execute.
     pub fn set_block_hash(&mut self, block_hash: Hash) {
-        self.block_hash = Some(block_hash)
+        self.block_hash = Some(block_hash);
     }
 
     /// Returns propose-message.
@@ -515,7 +516,7 @@ impl SharedConnectList {
             .peers
             .iter()
             .map(|(pk, addr)| ConnectInfo {
-                address: addr.to_owned(),
+                address: addr.clone(),
                 public_key: *pk,
             })
             .collect()
@@ -856,9 +857,7 @@ impl State {
     ///
     /// Panics if the current "locked round" is bigger or equal to the new one.
     pub(super) fn lock(&mut self, round: Round, hash: Hash) {
-        if self.locked_round >= round {
-            panic!("Incorrect lock")
-        }
+        assert!(self.locked_round < round, "Incorrect lock");
         self.locked_round = round;
         self.locked_propose = Some(hash);
     }
@@ -1004,7 +1003,7 @@ impl State {
             // Compare rounds first.
             // Note that we call `cmp` on `round2` to obtain descending order.
             let cmp_result = round2.cmp(round1);
-            if let std::cmp::Ordering::Equal = cmp_result {
+            if cmp_result == std::cmp::Ordering::Equal {
                 // Rounds are equal, compare by hash (in direct order,
                 // since it doesn't affect anything).
                 hash1.cmp(hash2)
@@ -1054,9 +1053,10 @@ impl State {
     /// Panics if transaction for incomplete block is known as invalid.
     pub(super) fn remove_unknown_transaction(&mut self, tx_hash: Hash) -> RoundAction {
         if let Some(ref mut incomplete_block) = self.incomplete_block {
-            if self.invalid_txs.contains(&tx_hash) {
-                panic!("Received a block with transaction known as invalid");
-            }
+            assert!(
+                !self.invalid_txs.contains(&tx_hash),
+                "Received a block with transaction known as invalid"
+            );
 
             incomplete_block.unknown_txs.remove(&tx_hash);
             if incomplete_block.unknown_txs.is_empty() {
@@ -1086,11 +1086,10 @@ impl State {
     ///
     /// Panics if this method is called for a non-validator node.
     pub(super) fn have_prevote(&self, propose_round: Round) -> bool {
-        if let Some(ref validator_state) = *self.validator_state() {
-            validator_state.have_prevote(propose_round)
-        } else {
-            panic!("called have_prevote for auditor node")
-        }
+        self.validator_state().as_ref().map_or_else(
+            || panic!("called have_prevote for auditor node"),
+            |state| state.have_prevote(propose_round),
+        )
     }
 
     /// Adds propose from this node to the proposes list for the current height. Such propose
@@ -1212,9 +1211,10 @@ impl State {
 
         for hash in &incomplete_block.transactions {
             if tx_cache.contains_transaction(*hash) {
-                if !self.tx_cache.contains_key(hash) && !txs_pool.contains(hash) {
-                    panic!("Received block with already committed transaction");
-                }
+                assert!(
+                    !(!self.tx_cache.contains_key(hash) && !txs_pool.contains(hash)),
+                    "Received block with already committed transaction"
+                );
             } else if self.invalid_txs.contains(hash) {
                 panic!("Received a block with transaction known as invalid");
             } else {
@@ -1243,7 +1243,7 @@ impl State {
                     assert_eq!(
                         other, msg,
                         "Trying to send different prevotes for the same round"
-                    )
+                    );
                 }
             }
         }
@@ -1287,14 +1287,13 @@ impl State {
                     .our_precommits
                     .insert(msg.payload().round, msg.clone())
                 {
-                    if other.payload().propose_hash != msg.payload().propose_hash {
-                        panic!(
-                            "Trying to send different precommits for same round, old={:?}, \
-                             new={:?}",
-                            other.payload(),
-                            msg.payload()
-                        );
-                    }
+                    assert_eq!(
+                        other.payload().propose_hash,
+                        msg.payload().propose_hash,
+                        "Trying to send different precommits for same round, old={:?}, new={:?}",
+                        other.payload(),
+                        msg.payload()
+                    );
                 }
             }
         }

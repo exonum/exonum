@@ -25,7 +25,7 @@ use snow::{types::Dh, Builder};
 use tokio::{
     io::{AsyncRead, AsyncWrite},
     net::{TcpListener, TcpStream},
-    time::delay_for,
+    time::sleep,
 };
 
 use std::{net::SocketAddr, time::Duration};
@@ -371,7 +371,7 @@ async fn wait_for_handshake_result(
         err_tx,
         responder_message,
     ));
-    delay_for(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
 
     let sender_err = send_handshake(addr, params, sender_message).await;
     let listener_err = err_rx.next().await.expect("No listener error sent");
@@ -385,10 +385,9 @@ async fn run_handshake_listener(
     err_sender: mpsc::Sender<anyhow::Error>,
     bogus_message: Option<BogusMessage>,
 ) -> anyhow::Result<()> {
-    let mut listener = TcpListener::bind(addr).await?;
-    let mut incoming_connections = listener.incoming();
+    let listener = TcpListener::bind(addr).await?;
 
-    while let Some(mut stream) = incoming_connections.try_next().await? {
+    while let Ok((mut stream, _)) = listener.accept().await {
         let mut err_sender = err_sender.clone();
         let params = params.clone();
         tokio::spawn(async move {

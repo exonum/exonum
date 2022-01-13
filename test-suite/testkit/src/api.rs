@@ -18,11 +18,8 @@
 
 pub use exonum_api::ApiAccess;
 
-use actix_web::{
-    rt::System,
-    test::{self, TestServer},
-    web, App,
-};
+use actix_test::TestServer;
+use actix_web::{web, App};
 use exonum::{
     blockchain::ApiSender,
     messages::{AnyTx, Verified},
@@ -34,7 +31,6 @@ use reqwest::{
     Response, StatusCode,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::task::LocalSet;
 
 use std::{
     collections::HashMap,
@@ -137,10 +133,6 @@ impl TestKitApi {
             .redirect(RedirectPolicy::none())
             .build()
             .unwrap();
-
-        let local_set = LocalSet::new();
-        // `System` should be spawn before the test server is ran.
-        local_set.spawn_local(System::run_in_tokio("test_server", &local_set));
 
         let test_server = create_test_server(aggregator);
         let test_client = TestKitApiClient {
@@ -486,7 +478,7 @@ where
 
 /// Create a test server.
 fn create_test_server(aggregator: ApiAggregator) -> TestServer {
-    let server = test::start(move || {
+    let server = actix_test::start(move || {
         let public_apis = aggregator.extend_backend(ApiAccess::Public, web::scope("public/api"));
         let private_apis = aggregator.extend_backend(ApiAccess::Private, web::scope("private/api"));
         App::new().service(public_apis).service(private_apis)

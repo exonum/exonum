@@ -15,8 +15,8 @@
 //! The set of errors for the Exonum API module.
 
 pub use actix_web::http::{
-    header::{self, HeaderName},
-    HeaderMap, StatusCode as HttpStatusCode,
+    header::{self, HeaderMap, HeaderName},
+    StatusCode as HttpStatusCode,
 };
 use serde::{Deserialize, Serialize};
 use std::fmt;

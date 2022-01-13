@@ -35,13 +35,12 @@ exonum-cli = { version = "1.0.0", path = "../../cli" }
 exonum-explorer-service = { version = "1.0.0", path = "../../services/explorer" }
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
 
-assert_matches = "1.2.0"
-pretty_assertions = "0.7.1"
+pretty_assertions = "1"
 rand = "0.8"
 
 [dev-dependencies.tokio]
-version = "0.2.13"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+version = "1"
+features = ["io-util", "macros", "rt-multi-thread", "net", "time"]
 
 [build-dependencies]
 exonum-build = { version = "1.0.1", path = "../../components/build" }

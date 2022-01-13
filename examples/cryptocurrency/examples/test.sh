@@ -23,7 +23,7 @@ function launch-server {
     CTR=0
     MAXCTR=60
     while [[
-      ( -z `lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'` )
+      ( -z $(lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }') )
       && ( $CTR -lt $MAXCTR )
     ]]; do
       sleep 1
@@ -39,13 +39,13 @@ function launch-server {
 # Kills whatever program is listening on the TCP port 8080, on which the cryptocurrency
 # demo needs to bind to.
 function kill-server {
-    SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'`
+    SERVER_PID=$(lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }')
     if [[ -n $SERVER_PID ]]; then
         # First, try to send the shutdown message to the node in order to shut down it gracefully.
         curl -X POST http://127.0.0.1:8081/api/system/v1/shutdown &>/dev/null
         sleep 1
 
-        SERVER_PID=`lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }'`
+        SERVER_PID=$(lsof -iTCP -sTCP:LISTEN -n -P 2>/dev/null | awk '{ if ($9 == "127.0.0.1:8080") { print $2 } }')
         if [[ -n $SERVER_PID ]]; then
             kill -KILL $SERVER_PID
         fi
@@ -57,7 +57,7 @@ function kill-server {
 # Arguments:
 # - $1: filename with the transaction data
 function create-wallet {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $TRANSACTION_URL 2>/dev/null`
+    RESP=$(curl -H "Content-Type: application/json" -X POST -d @$1 $TRANSACTION_URL 2>/dev/null)
 }
 
 # Performs a transfer in the cryptocurrency demo.
@@ -65,7 +65,7 @@ function create-wallet {
 # Arguments:
 # - $1: filename with the transaction data
 function transfer {
-    RESP=`curl -H "Content-Type: application/json" -X POST -d @$1 $TRANSACTION_URL 2>/dev/null`
+    RESP=$(curl -H "Content-Type: application/json" -X POST -d @$1 $TRANSACTION_URL 2>/dev/null)
 }
 
 # Checks a response to an Exonum transaction.
@@ -73,7 +73,7 @@ function transfer {
 # Arguments:
 # - $1: expected start of the transaction hash returned by the server
 function check-transaction {
-    if [[ `echo $RESP | jq .tx_hash` =~ ^\"$1 ]]; then
+    if [[ $(echo $RESP | jq .tx_hash) =~ ^\"$1 ]]; then
         echo "OK, got expected transaction hash $1"
     else
         echo "Unexpected response: $RESP"
@@ -88,7 +88,7 @@ function check-transaction {
 # - $2: expected user balance
 # - $3: response JSON that encodes user's wallet information
 function check-request {
-    if [[ ( `echo $3 | jq .name` == "\"$1\"" ) && ( `echo $3 | jq .balance` == $2 ) ]]; then
+    if [[ ( $(echo $3 | jq .name) == "\"$1\"" ) && ( $(echo $3 | jq .balance) == $2 ) ]]; then
         echo "OK, got expected transaction balance $2 for user $1"
     else
         # $RESP here is intentional; we want to output the entire incorrect response
@@ -105,8 +105,8 @@ function check-request {
 # - $3: response JSON
 function check-create-tx {
     if [[ \
-      ( `echo $3 | jq .type` == \"committed\" ) && \
-      ( `echo $3 | jq ".message == $2"` == "true") \
+      ( $(echo $3 | jq .type) == \"committed\" ) && \
+      ( $(echo $3 | jq ".message == $2") == "true") \
     ]]; then
         echo "OK, got expected TxCreateWallet for user $1"
     else
@@ -122,8 +122,8 @@ function check-create-tx {
 # - $2: response JSON
 function check-transfer-tx {
     if [[ \
-      ( `echo $2 | jq .type` == \"committed\" ) && \
-      ( `echo $2 | jq ".message == $1"` == "true" ) \
+      ( $(echo $2 | jq .type) == \"committed\" ) && \
+      ( $(echo $2 | jq ".message == $1") == "true" ) \
     ]]; then
         echo "OK, got expected TxTransfer between wallets"
     else
@@ -166,8 +166,8 @@ check-request "Alice" 95 "$RESP"
 
 echo "Retrieving Alice's transaction info..."
 TXID=abe9ac1eef23b4cda7fc408ce488b233c3446331ac0f8195b7d21a210908b447
-RESP=`curl $TRANSACTION_URL?hash=$TXID 2>/dev/null`
-EXP=`cat "$ROOT_DIR/create-wallet-1.json" | jq ".tx_body"`
+RESP=$(curl $TRANSACTION_URL?hash=$TXID 2>/dev/null)
+EXP=$(cat "$ROOT_DIR/create-wallet-1.json" | jq ".tx_body")
 check-create-tx "Alice" "$EXP" "$RESP"
 
 echo "Retrieving transfer transaction info..."

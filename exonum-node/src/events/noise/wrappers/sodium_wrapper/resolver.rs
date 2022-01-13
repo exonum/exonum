@@ -68,13 +68,8 @@ impl CryptoResolver for SodiumResolver {
 }
 
 // Random data generator.
+#[derive(Default)]
 struct SodiumRandom;
-
-impl Default for SodiumRandom {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl Random for SodiumRandom {}
 
@@ -280,6 +275,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     // Random data generator.
+    #[derive(Default)]
     struct MockRandom(u8);
 
     impl Random for MockRandom {}
@@ -303,12 +299,6 @@ mod tests {
 
         fn try_fill_bytes(&mut self, _dest: &mut [u8]) -> Result<(), Error> {
             unreachable!()
-        }
-    }
-
-    impl Default for MockRandom {
-        fn default() -> Self {
-            Self(0)
         }
     }
 

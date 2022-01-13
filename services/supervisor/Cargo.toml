@@ -32,11 +32,10 @@ exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 [dev-dependencies]
 exonum-testkit = { version = "1.0.0", path = "../../test-suite/testkit" }
-bincode = "1.3"
 
 [dev-dependencies.tokio]
-version = "0.2.22"
-features = ["blocking", "dns", "io-util", "macros", "rt-threaded", "tcp", "time"]
+version = "1"
+features = ["io-util", "macros", "rt-multi-thread", "net", "time"]
 
 [build-dependencies]
 exonum-build = { version = "1.0.1", path = "../../components/build" }

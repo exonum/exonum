@@ -88,14 +88,14 @@ fn execution_error_binary_value_unexpected_with_code() {
             .unwrap_err()
             .to_string(),
         "Error code for panic should be zero"
-    )
+    );
 }
 
 #[allow(clippy::let_and_return)] // does not compile otherwise
 fn error_hash(db: &TemporaryDB, err: &ExecutionError) -> Hash {
     let fork = db.fork();
     let mut schema = Schema::new(&fork);
-    schema.save_error(Height(1), CallInBlock::transaction(1), err.to_owned());
+    schema.save_error(Height(1), CallInBlock::transaction(1), err.clone());
     let error_hash = schema.call_errors_map(Height(1)).object_hash();
     error_hash
 }

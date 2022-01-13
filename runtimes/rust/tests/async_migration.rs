@@ -167,7 +167,7 @@ impl MigrateData for CounterFactory {
             Ok(vec![])
         } else {
             let mut end_version = start_version.to_owned();
-            end_version.increment_patch();
+            end_version.patch += 1;
             let script = MigrationScript::new(migration_script, end_version);
             Ok(vec![script])
         }
@@ -491,7 +491,7 @@ fn perform_first_migration(blockchain: &mut BlockchainMut, new_artifact: Artifac
     execute_transaction(blockchain, tx).unwrap();
 
     // Commit migration.
-    let commit = CommitMigration::for_counter(&blockchain, 2);
+    let commit = CommitMigration::for_counter(blockchain, 2);
     let tx = keypair.commit_migration(ToySupervisorService::INSTANCE_ID, commit);
     execute_transaction(blockchain, tx).unwrap();
 

@@ -40,17 +40,18 @@ pub struct NoiseWrapper {
 
 impl NoiseWrapper {
     pub fn initiator(params: &HandshakeParams) -> Self {
-        if let Some(ref remote_key) = params.remote_key {
-            let builder: Builder<'_> = Self::noise_builder()
-                .local_private_key(params.secret_key.as_ref())
-                .remote_public_key(remote_key.as_ref());
-            let state = builder
-                .build_initiator()
-                .expect("Noise session initiator failed to initialize");
-            Self { state }
-        } else {
-            panic!("Remote public key is not specified")
-        }
+        params.remote_key.as_ref().map_or_else(
+            || panic!("Remote public key is not specified"),
+            |remote_key| {
+                let builder: Builder<'_> = Self::noise_builder()
+                    .local_private_key(params.secret_key.as_ref())
+                    .remote_public_key(remote_key.as_ref());
+                let state = builder
+                    .build_initiator()
+                    .expect("Noise session initiator failed to initialize");
+                Self { state }
+            },
+        )
     }
 
     pub fn responder(params: &HandshakeParams) -> Self {
@@ -142,7 +143,7 @@ impl TransportWrapper {
     ///
     /// 1. Message splits to packets of length smaller or equal to 65535 bytes.
     /// 2. Then each packet is encrypted by selected noise algorithm.
-    /// 3. Result message: first 4 bytes is message length(`len').
+    /// 3. Result message: first 4 bytes is message length(`len`).
     /// 4. Append all encrypted packets in corresponding order.
     /// 5. Write result message to `buf`
     pub fn encrypt_msg(&mut self, msg: &[u8], buf: &mut BytesMut) -> anyhow::Result<()> {

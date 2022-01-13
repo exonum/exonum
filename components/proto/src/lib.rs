@@ -46,7 +46,6 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
@@ -327,7 +326,7 @@ impl ProtobufBase64 {
     pub fn decode(value: &str) -> Result<Vec<u8>, base64::DecodeError> {
         // Remove padding if any.
         let value_without_padding = value.strip_suffix("==").map_or_else(
-            || value.strip_suffix("=").map_or(value, |stripped| stripped),
+            || value.strip_suffix('=').map_or(value, |stripped| stripped),
             |stripped| stripped,
         );
 

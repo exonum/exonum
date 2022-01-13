@@ -8,7 +8,7 @@ on:
 name: Integration Tests
 
 env:
-  rust: 1.55.0
+  rust: 1.57.0
 
 jobs:
   shell_tests:
@@ -32,3 +32,30 @@ jobs:
           cd $GITHUB_WORKSPACE/examples/cryptocurrency/examples && ./test.sh
           cd $GITHUB_WORKSPACE/examples/cryptocurrency/examples && ./test.ps1
           cd $GITHUB_WORKSPACE/test-suite/testkit/server && npm run test:unix
+  examples:
+    name: Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get install build-essential librocksdb-dev libsodium-dev libsnappy-dev libssl-dev protobuf-compiler jq
+      - name: Run examples
+        run: |
+          cargo run -p exonum-merkledb --example manual_migration
+          cargo run -p exonum-merkledb --example migration_with_helper
+          cargo run -p exonum-merkledb --example migration_with_iter_loop
+          cargo run -p exonum-merkledb --example blockchain
+          cargo run -p exonum-sample-runtime
+          cargo run -p exonum-explorer --example explorer
+          cargo run -p exonum-testkit --example timestamping
+          cargo run -p exonum-supervisor --example configuration_change
+          cargo run -p exonum-time --example simple_service
+          cargo run -p exonum-soak-tests --bin toggle -- -H 10
+          cargo run -p exonum-soak-tests --bin send_txs -- -T 100
+          cargo run -p exonum-soak-tests --bin sleepy -- -H 10
+          cargo run -p exonum-soak-tests --bin tx_filtering -- -H 10
+          cargo run -p exonum-keys --example key-generator -- -p passphrase -s a7839ea524f38d0e91a5ec96a723092719dc8a5b8a75f9131d9eb38f45e76344

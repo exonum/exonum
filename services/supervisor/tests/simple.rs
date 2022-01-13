@@ -51,7 +51,7 @@ pub fn sign_config_propose_transaction_by_us(
     config: ConfigPropose,
 ) -> Verified<AnyTx> {
     let initiator_id = testkit.us().validator_id().unwrap();
-    sign_config_propose_transaction(&testkit, config, initiator_id)
+    sign_config_propose_transaction(testkit, config, initiator_id)
 }
 
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]

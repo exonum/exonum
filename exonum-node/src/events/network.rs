@@ -23,13 +23,13 @@ use exonum::{
 use futures::{channel::mpsc, future, prelude::*};
 use futures_retry::{ErrorHandler, FutureRetry, RetryPolicy};
 use rand::{thread_rng, Rng};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener, TcpSocket, TcpStream};
 use tokio_util::codec::Framed;
 
 use std::{
     collections::HashMap,
     io,
-    net::SocketAddr,
+    net::{SocketAddr, ToSocketAddrs},
     ops,
     sync::{Arc, RwLock},
     time::Duration,
@@ -79,7 +79,7 @@ impl ErrorHandler<io::Error> for ErrorAction {
         if attempt >= self.max_retries {
             RetryPolicy::ForwardError(e)
         } else {
-            let jitter = thread_rng().gen_range(0.5, 1.0);
+            let jitter = thread_rng().gen_range(0.5..1.0);
             let timeout = self.retry_timeout.mul_f64(jitter);
             RetryPolicy::WaitRetry(timeout)
         }
@@ -329,13 +329,12 @@ impl NetworkHandler {
     }
 
     async fn listener(self) -> anyhow::Result<()> {
-        let mut listener = TcpListener::bind(&self.listen_address).await?;
-        let mut incoming_connections = listener.incoming();
+        let listener = TcpListener::bind(&self.listen_address).await?;
 
         // Incoming connections limiter
         let incoming_connections_limit = self.network_config.max_incoming_connections;
 
-        while let Some(mut socket) = incoming_connections.try_next().await? {
+        while let Ok((mut socket, _)) = listener.accept().await {
             let peer_address = match socket.peer_addr() {
                 Ok(address) => address,
                 Err(err) => {
@@ -424,7 +423,21 @@ impl NetworkHandler {
         let on_error = ErrorAction::new(&network_config, description);
 
         async move {
-            let connect = || TcpStream::connect(&unresolved_address);
+            let socket_address = unresolved_address
+                .to_socket_addrs()?
+                .next()
+                .ok_or_else(|| format_err!("no one ip belongs to {}", &unresolved_address))?;
+
+            let connect = || async {
+                let socket = match socket_address {
+                    SocketAddr::V4(_) => TcpSocket::new_v4(),
+                    SocketAddr::V6(_) => TcpSocket::new_v6(),
+                }?;
+
+                Self::configure_socket(&socket, network_config)?;
+                socket.connect(socket_address).await
+            };
+
             // The second component in returned value / error is the number of retries,
             // which we ignore.
             let (mut socket, _) = FutureRetry::new(connect, on_error)
@@ -432,14 +445,12 @@ impl NetworkHandler {
                 .map_err(|(err, _)| err)?;
 
             let peer_address = match socket.peer_addr() {
-                Ok(addr) => addr,
+                Ok(address) => address,
                 Err(err) => {
-                    let err = format_err!("Couldn't take peer addr from socket: {}", err);
+                    let err = format_err!("Couldn't take peer address from socket: {}", err);
                     return Err(err);
                 }
             };
-
-            Self::configure_socket(&mut socket, network_config)?;
 
             let HandshakeData {
                 codec,
@@ -510,16 +521,23 @@ impl NetworkHandler {
                 );
             }
         });
-        task.await
+        task.await;
     }
 
     fn configure_socket(
-        socket: &mut TcpStream,
+        socket: &TcpSocket,
         network_config: NetworkConfiguration,
-    ) -> anyhow::Result<()> {
-        socket.set_nodelay(network_config.tcp_nodelay)?;
-        let duration = network_config.tcp_keep_alive.map(Duration::from_millis);
-        socket.set_keepalive(duration)?;
+    ) -> io::Result<()> {
+        let socket_ref = socket2::SockRef::from(socket);
+
+        socket_ref.set_nodelay(network_config.tcp_nodelay)?;
+
+        if let Some(duration) = network_config.tcp_keep_alive.map(Duration::from_millis) {
+            let keepalive = socket2::TcpKeepalive::new().with_interval(duration);
+            socket_ref.set_keepalive(true)?;
+            socket_ref.set_tcp_keepalive(&keepalive)?;
+        }
+
         Ok(())
     }
 

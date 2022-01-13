@@ -228,9 +228,9 @@ impl<T: RawAccess> View<T> {
         let address = address.into();
         let changes = index_access.changes(&address);
         Self::Real(ViewInner {
+            address,
             index_access,
             changes,
-            address,
         })
     }
 
@@ -341,11 +341,10 @@ impl<T: RawAccess> View<T> {
         V: BinaryValue,
     {
         let iter_prefix = key_bytes(detached_prefix);
-        let iter_from = if let Some(from) = from {
-            Cow::Owned(concat_keys!(detached_prefix, from))
-        } else {
-            Cow::Borrowed(&*iter_prefix)
-        };
+        let iter_from = from.map_or_else(
+            || Cow::Borrowed(&*iter_prefix),
+            |from| Cow::Owned(concat_keys!(detached_prefix, from)),
+        );
         Iter {
             base_iter: self.iter_bytes(&iter_from),
             prefix: iter_prefix,

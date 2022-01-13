@@ -654,7 +654,7 @@ fn different_supervisor_modes_in_public_configs() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn mock_old_db_files(blockchain_dir: &PathBuf) -> PathBuf {
+fn mock_old_db_files(blockchain_dir: &Path) -> PathBuf {
     let db_dir = blockchain_dir.join("db");
     fs::create_dir_all(&db_dir).unwrap();
     let old_db_file = db_dir.join("content.foo");

@@ -161,14 +161,14 @@ impl<K, V> OptionalEntry<K, V> {
     fn as_missing(&self) -> Option<&K> {
         match self {
             Self::Missing { missing } => Some(missing),
-            _ => None,
+            Self::KV { .. } => None,
         }
     }
 
     fn as_kv(&self) -> Option<(&K, &V)> {
         match self {
             Self::KV { key, value } => Some((key, value)),
-            _ => None,
+            Self::Missing { .. } => None,
         }
     }
 
@@ -379,7 +379,7 @@ impl<K, V, KeyMode> MapProof<K, V, KeyMode> {
     pub fn proof_unchecked(&self) -> Vec<(ProofPath, Hash)> {
         self.proof
             .iter()
-            .cloned()
+            .copied()
             .map(|e| (e.path, e.hash))
             .collect()
     }

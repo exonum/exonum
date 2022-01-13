@@ -47,13 +47,12 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
     clippy::missing_errors_doc, clippy::missing_const_for_fn,
     // Seems should be fixed in thiserror crate.
-    clippy::used_underscore_binding
+    clippy::used_underscore_binding, clippy::use_self
 )]
 
 pub use crate::{
@@ -61,7 +60,6 @@ pub use crate::{
     plugin::{NodePlugin, PluginApiContext, SharedNodeState},
 };
 
-use actix_rt::System;
 use anyhow::{ensure, format_err};
 use exonum::{
     blockchain::{
@@ -81,11 +79,11 @@ use exonum_api::{
 };
 use futures::{
     channel::{mpsc, oneshot},
-    prelude::*,
+    FutureExt,
 };
 use log::{info, trace};
 use serde_derive::{Deserialize, Serialize};
-use tokio::time::delay_for;
+use tokio::{runtime::Runtime, time::sleep};
 
 use std::{
     collections::{HashMap, HashSet},
@@ -983,11 +981,13 @@ pub trait ConfigManager: Send {
 #[derive(Debug)]
 pub struct Node {
     api_manager_config: ApiManagerConfig,
+    #[allow(dead_code)]
     api_options: NodeApiConfig,
     network_config: NetworkConfiguration,
     handler: NodeHandler,
     channel: NodeChannel,
     max_message_len: u32,
+    #[allow(dead_code)]
     thread_pool_size: Option<u8>,
     disable_signals: bool,
 }
@@ -1268,7 +1268,7 @@ impl Node {
         // We assume that waiting `STOP_TIMEOUT` is acceptable for typical use cases;
         // even if the process does not terminate with the node exit,
         // running a node is generally understood as a long-term task.
-        delay_for(STOP_TIMEOUT).await;
+        sleep(STOP_TIMEOUT).await;
         res
     }
 
@@ -1331,15 +1331,15 @@ impl Reactor {
         let needs_signal_handler = !node.disable_signals && api_config.servers.is_empty();
         let api_manager = ApiManager::new(api_config);
         let endpoints = node.channel.endpoints.1;
-        let api_task = api_manager.run(endpoints);
+        let api_task = api_manager.run(endpoints).boxed();
         let (api_part_tx, api_part) = oneshot::channel();
 
         // Creating a separate thread here seems easier than making `Node::run()` return
         // a non-`Send` future (which, e.g., precludes running nodes with `tokio::spawn`).
         thread::spawn(|| {
-            let res = System::new("exonum-node").block_on(api_task);
+            let res = Runtime::new().and_then(|rt| rt.block_on(api_task));
             if let Err(ref err) = res {
-                log::error!("Error in actix thread: {}", err);
+                log::error!("Error in tokio thread: {}", err);
             }
             api_part_tx.send(res).ok();
         });
@@ -1386,6 +1386,7 @@ impl Reactor {
     async fn listen_to_signals() {
         use futures::StreamExt;
         use tokio::signal::unix::{signal, SignalKind};
+        use tokio_stream::wrappers::SignalStream;
 
         let int_listener = tokio::signal::ctrl_c().fuse();
         futures::pin_mut!(int_listener);
@@ -1393,23 +1394,31 @@ impl Reactor {
         // If setting the signal listener fails, we replace the listener with a stream
         // that never resolves.
         let mut term_listener = signal(SignalKind::terminate())
-            .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
+            .map(SignalStream::new)
+            .map_or_else(
+                |_| tokio_stream::pending().right_stream(),
+                StreamExt::left_stream,
+            )
             .fuse();
 
         let mut quit_listener = signal(SignalKind::quit())
-            .map_or_else(|_| stream::pending().right_stream(), StreamExt::left_stream)
+            .map(SignalStream::new)
+            .map_or_else(
+                |_| tokio_stream::pending().right_stream(),
+                StreamExt::left_stream,
+            )
             .fuse();
 
         // We also register a SIGHUP listener which ignores the signal.
         if let Ok(mut hangup_listener) = signal(SignalKind::hangup()) {
             tokio::spawn(async move {
-                while let Some(()) = hangup_listener.next().await {
+                while hangup_listener.recv().await == Some(()) {
                     log::info!("Received SIGHUP; ignoring");
                 }
             });
         }
 
-        futures::select! {
+        tokio::select! {
             _ = int_listener => (),
             _ = term_listener.next() => (),
             _ = quit_listener.next() => (),
@@ -1451,7 +1460,7 @@ impl Reactor {
 
             res = api_task => {
                 let res = match res {
-                    Err(_) => Err(format_err!("Actix thread panicked")),
+                    Err(e) => Err(format_err!("Actix thread panicked, error: {}", e)),
                     Ok(res) => res.map_err(From::from),
                 };
                 (res, true)

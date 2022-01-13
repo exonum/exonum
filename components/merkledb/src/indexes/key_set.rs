@@ -141,7 +141,7 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn insert(&mut self, item: &K) {
-        self.base.put(item, ())
+        self.base.put(item, ());
     }
 
     /// Removes a key from the set.
@@ -162,7 +162,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn remove(&mut self, item: &K) {
-        self.base.remove(item)
+        self.base.remove(item);
     }
 
     /// Clears the set, removing all values.
@@ -188,7 +188,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn clear(&mut self) {
-        self.base.clear()
+        self.base.clear();
     }
 }
 
@@ -232,11 +232,11 @@ mod tests {
         let fork = db.fork();
 
         let mut index: KeySetIndex<_, str> = fork.get_key_set(INDEX_NAME);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
         index.insert(KEY);
-        assert_eq!(true, index.contains(KEY));
+        assert!(index.contains(KEY));
         index.remove(KEY);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
     }
 
     #[test]
@@ -246,11 +246,11 @@ mod tests {
         let fork = db.fork();
 
         let mut index = fork.get_key_set(INDEX_NAME);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
         index.insert(KEY);
-        assert_eq!(true, index.contains(KEY));
+        assert!(index.contains(KEY));
         index.remove(KEY);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
     }
 
     #[test]
@@ -287,7 +287,6 @@ mod tests {
         fork.flush();
 
         let set = fork.get_key_set::<_, u8>(INDEX_NAME);
-        let items: Vec<_> = set.iter().collect();
-        assert!(items.is_empty());
+        assert_eq!(set.iter().count(), 0);
     }
 }
