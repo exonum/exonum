@@ -1,0 +1,9 @@
+version: 2
+updates:
+- package-ecosystem: cargo
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "18:00"
+    timezone: Europe/Kiev
+  open-pull-requests-limit: 100
