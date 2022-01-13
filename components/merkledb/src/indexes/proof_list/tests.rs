@@ -105,7 +105,7 @@ fn extend_is_equivalent_to_sequential_pushes() {
         let hash_after_pushes = index.object_hash();
 
         index.clear();
-        index.extend(values.iter().cloned());
+        index.extend(values.iter().copied());
         assert_eq!(index.object_hash(), hash_after_pushes);
     }
 
@@ -119,7 +119,7 @@ fn extend_is_equivalent_to_sequential_pushes() {
         let hash_after_pushes = index.object_hash();
 
         index.clear();
-        let mut iter = values.iter().cloned();
+        let mut iter = values.iter().copied();
         index.extend(iter.by_ref().take(5));
         index.extend(iter.by_ref().take(8));
         index.extend(iter.by_ref().take(3));
@@ -137,7 +137,7 @@ fn extend_is_equivalent_to_sequential_pushes() {
         let hash_after_pushes = index.object_hash();
 
         index.clear();
-        let mut iter = values.iter().cloned();
+        let mut iter = values.iter().copied();
         index.extend(iter.by_ref().take(5));
         for value in iter.by_ref().take(3) {
             index.push(value);
@@ -766,7 +766,7 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
             .collect();
 
         list.clear();
-        list.extend(new_values.iter().cloned());
+        list.extend(new_values.iter().copied());
         let list_hash = list.object_hash();
         let expected_proofs: Vec<_> = proof_ranges
             .iter()
@@ -774,7 +774,7 @@ fn setting_elements_leads_to_correct_list_hash_randomized() {
             .collect();
 
         list.clear();
-        list.extend(values.iter().cloned());
+        list.extend(values.iter().copied());
         for i in 0..values.len() {
             if values[i] != new_values[i] {
                 list.set(i as u64, new_values[i]);

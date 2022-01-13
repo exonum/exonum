@@ -97,14 +97,14 @@ impl ExonumCommand for Maintenance {
     fn execute(self) -> Result<StandardResult, Error> {
         match self.action {
             MaintenanceAction::ClearCache => {
-                MaintenanceAction::clear_cache(&self.node_config, &self.db_path)?
+                MaintenanceAction::clear_cache(&self.node_config, &self.db_path)?;
             }
             MaintenanceAction::RestartMigration { ref service_name } => {
                 MaintenanceAction::restart_migration(
                     &self.node_config,
                     &self.db_path,
                     service_name,
-                )?
+                )?;
             }
         }
 

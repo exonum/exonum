@@ -123,7 +123,7 @@ fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<ProtobufFile> {
 
                 Some(ProtobufFile {
                     full_path,
-                    relative_path: canonicalize_protobuf_path(&relative_path),
+                    relative_path: canonicalize_protobuf_path(relative_path),
                 })
             } else {
                 None
@@ -419,10 +419,7 @@ fn protobuf_generate(
 }
 
 fn get_included_files(includes: &[&str]) -> Vec<ProtobufFile> {
-    includes
-        .iter()
-        .flat_map(|path| get_proto_files(path))
-        .collect()
+    includes.iter().flat_map(get_proto_files).collect()
 }
 
 /// Get path to the folder containing `exonum` protobuf files.

@@ -171,7 +171,7 @@ impl Runtime for SampleRuntime {
 
     fn on_resume(&mut self) {
         if !self.new_services.is_empty() {
-            let changes = mem::replace(&mut self.new_services, BTreeMap::new());
+            let changes = mem::take(&mut self.new_services);
             self.new_service_sender
                 .send((self.runtime_type, changes.into_iter().collect()))
                 .ok();
@@ -220,8 +220,8 @@ impl Runtime for SampleRuntime {
             .map_or(true, |status| status != new_status);
 
         if status_changed {
-            self.services.insert(spec.id, new_status.to_owned());
-            self.new_services.insert(spec.id, new_status.to_owned());
+            self.services.insert(spec.id, new_status.clone());
+            self.new_services.insert(spec.id, new_status.clone());
         }
     }
 
@@ -746,8 +746,8 @@ fn test_shutdown() {
         .finalize(&Blockchain::build_for_tests());
     drop(dispatcher);
 
-    assert_eq!(turned_off_a.load(Ordering::Relaxed), true);
-    assert_eq!(turned_off_b.load(Ordering::Relaxed), true);
+    assert!(turned_off_a.load(Ordering::Relaxed));
+    assert!(turned_off_b.load(Ordering::Relaxed));
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -905,7 +905,7 @@ impl Runtime for DeploymentRuntime {
     }
 
     fn after_commit(&mut self, _snapshot: &dyn Snapshot, mailbox: &mut Mailbox) {
-        for action in mem::replace(&mut *self.mailbox_actions.lock().unwrap(), vec![]) {
+        for action in mem::take(&mut *self.mailbox_actions.lock().unwrap()) {
             mailbox.push(action);
         }
     }

@@ -99,9 +99,6 @@ impl TestKitActor {
         let mut api_aggregator = testkit.update_aggregator();
 
         let local_set = LocalSet::new();
-        // `System` should be spawn before the testkit actor is added to it.
-        local_set.spawn_local(System::run_in_tokio("testkit", &local_set));
-        // Add the testkit actor to the system and retrieve a handle to it.
         let testkit = local_set.run_until(async { Self(testkit).start() }).await;
 
         api_aggregator.insert("testkit", Self::api(testkit));
@@ -270,7 +267,6 @@ mod tests {
     use exonum_merkledb::ObjectHash;
     use exonum_rust_runtime::{api, spec::Spec, Service};
     use pretty_assertions::assert_eq;
-    use tokio::time::delay_for;
 
     use std::time::Duration;
 
@@ -327,7 +323,7 @@ mod tests {
     }
 
     async fn sleep() {
-        delay_for(Duration::from_millis(20)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
     }
 
     async fn test_status(api: TestKitApi) {

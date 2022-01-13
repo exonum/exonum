@@ -105,7 +105,8 @@ impl RocksDB {
     ///
     /// [`RocksDB` docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
-        let checkpoint = Checkpoint::new(&*self.get_lock_guard())?;
+        let lock = self.get_lock_guard();
+        let checkpoint = Checkpoint::new(&lock)?;
         checkpoint.create_checkpoint(path)?;
         Ok(())
     }
@@ -142,9 +143,9 @@ impl RocksDB {
                 // is mostly used for testing, this optimization leads to practical
                 // performance improvement.
                 if key.len() < LARGER_KEY.len() {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], LARGER_KEY);
+                    batch.delete_range_cf(cf, [].as_ref(), LARGER_KEY.as_ref());
                 } else {
-                    batch.delete_range_cf::<&[u8]>(cf, &[], key);
+                    batch.delete_range_cf(cf, [].as_ref(), key.as_ref());
                     batch.delete_cf(cf, &key);
                 }
             }
@@ -269,14 +270,14 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        if let Some(cf) = self.get_lock_guard().cf_handle(&resolved_addr.name) {
-            match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
-                Ok(value) => value.map(|v| v.to_vec()),
-                Err(e) => panic!("{}", e),
-            }
-        } else {
-            None
-        }
+        self.get_lock_guard()
+            .cf_handle(&resolved_addr.name)
+            .and_then(
+                |cf| match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
+                    Ok(value) => value,
+                    Err(e) => panic!("{}", e),
+                },
+            )
     }
 
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {

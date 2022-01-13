@@ -112,6 +112,7 @@ impl From<Verified<BlockResponse>> for Responses {
 }
 
 /// Request messages.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Requests {
     /// Propose request message.
@@ -412,7 +413,7 @@ mod tests {
         let keys = KeyPair::random();
         let msg = TransactionsResponse::new(keys.public_key(), vec![]);
         let msg = Verified::from_value(msg, keys.public_key(), keys.secret_key());
-        assert_eq!(TX_RES_EMPTY_SIZE, msg.into_bytes().len())
+        assert_eq!(TX_RES_EMPTY_SIZE, msg.into_bytes().len());
     }
 
     #[test]
@@ -430,7 +431,7 @@ mod tests {
 
         let msg = TransactionsResponse::new(keys.public_key(), txs);
         let msg = Verified::from_value(msg, keys.public_key(), keys.secret_key());
-        assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.into_bytes().len())
+        assert!(TX_RES_EMPTY_SIZE + txs_size + pb_max_overhead >= msg.into_bytes().len());
     }
 
     #[test]
@@ -515,7 +516,7 @@ mod tests {
                 keys.public_key(),
                 content.clone(),
                 precommits_buf.clone(),
-                transactions.iter().cloned(),
+                transactions.iter().copied(),
             ),
             keys.public_key(),
             keys.secret_key(),

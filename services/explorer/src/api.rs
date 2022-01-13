@@ -687,7 +687,7 @@ impl ExplorerApi {
                 future::ready(Self::transaction_info(state.data().for_core(), &query))
             });
 
-        let tx_sender = self.blockchain.sender().to_owned();
+        let tx_sender = self.blockchain.sender().clone();
         api_scope.endpoint_mut("v1/transactions", move |state, query| {
             Self::add_transaction(state.snapshot(), &tx_sender, query)
         });

@@ -213,8 +213,9 @@ impl WorkingPatch {
         };
 
         if let Some(ref view_changes) = view_changes {
-            assert!(
-                Rc::strong_count(view_changes) == 1,
+            assert_eq!(
+                Rc::strong_count(view_changes),
+                1,
                 "Attempting to borrow {:?} mutably while it's borrowed immutably",
                 address
             );
@@ -659,7 +660,7 @@ pub trait DatabaseExt: Database {
             }
 
             rev_changes.insert(
-                name.to_owned(),
+                name.clone(),
                 ViewChanges {
                     data: view_changes,
                     is_cleared: false,
@@ -836,8 +837,7 @@ impl Fork {
         // Replacing `changed_aggregated_addrs` has a beneficial side-effect: if the patch
         // returned by this method is converted back to a `Fork`, we won't need to update
         // its state aggregator unless the *new* changes in the `Fork` concern aggregated indexes.
-        let changed_aggregated_addrs =
-            mem::replace(&mut self.patch.changed_aggregated_addrs, HashMap::new());
+        let changed_aggregated_addrs = mem::take(&mut self.patch.changed_aggregated_addrs);
         let updated_entries = changed_aggregated_addrs.into_iter().map(|(addr, ns)| {
             let index_name = addr.name.clone();
             let is_in_migration = !ns.is_empty();
@@ -846,8 +846,7 @@ impl Fork {
         });
         SystemSchema::new(&self).update_state_aggregators(updated_entries);
 
-        let removed_aggregated_addrs =
-            mem::replace(&mut self.patch.removed_aggregated_addrs, HashSet::new());
+        let removed_aggregated_addrs = mem::take(&mut self.patch.removed_aggregated_addrs);
         SystemSchema::new(&self).remove_aggregated_indexes(removed_aggregated_addrs);
 
         self.flush(); // flushes changes in the state aggregator
@@ -1256,7 +1255,7 @@ mod tests {
         let mut patch_set: HashSet<_> = HashSet::new();
         for (name, changes) in &patch.changes {
             for (key, value) in &changes.data {
-                patch_set.insert((name.to_owned(), key.as_slice(), value.to_owned()));
+                patch_set.insert((name.clone(), key.as_slice(), value.clone()));
             }
         }
         let expected_set: HashSet<_> = changes

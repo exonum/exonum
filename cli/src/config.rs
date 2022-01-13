@@ -89,17 +89,17 @@ pub struct NodeConfig {
     pub public_config: NodePublicConfig,
 }
 
-impl Into<CoreNodeConfig> for NodeConfig {
-    fn into(self) -> CoreNodeConfig {
-        CoreNodeConfig {
-            consensus: self.public_config.consensus,
-            listen_address: self.private_config.listen_address,
-            external_address: self.private_config.external_address,
-            network: self.private_config.network,
-            api: self.private_config.api,
-            mempool: self.private_config.mempool,
-            connect_list: self.private_config.connect_list,
-            thread_pool_size: self.private_config.thread_pool_size,
+impl From<NodeConfig> for CoreNodeConfig {
+    fn from(config: NodeConfig) -> Self {
+        Self {
+            consensus: config.public_config.consensus,
+            listen_address: config.private_config.listen_address,
+            external_address: config.private_config.external_address,
+            network: config.private_config.network,
+            api: config.private_config.api,
+            mempool: config.private_config.mempool,
+            connect_list: config.private_config.connect_list,
+            thread_pool_size: config.private_config.thread_pool_size,
         }
     }
 }

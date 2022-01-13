@@ -450,7 +450,7 @@ impl SupervisorExtensions<'_> {
         let action = DispatcherAction::StartDeploy {
             artifact,
             spec: spec.into_bytes(),
-            then: Box::new(|res| then(res)),
+            then: Box::new(then),
         };
         self.mailbox.push(action);
     }

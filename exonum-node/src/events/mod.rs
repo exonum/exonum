@@ -231,9 +231,9 @@ impl<H: EventHandler + 'static + Send> HandlerPart<H> {
     }
 }
 
-impl Into<InternalRequest> for TimeoutRequest {
-    fn into(self) -> InternalRequest {
-        InternalRequest::Timeout(self)
+impl From<TimeoutRequest> for InternalRequest {
+    fn from(request: TimeoutRequest) -> Self {
+        Self::Timeout(request)
     }
 }
 
@@ -249,33 +249,33 @@ impl Ord for TimeoutRequest {
     }
 }
 
-impl Into<Event> for NetworkEvent {
-    fn into(self) -> Event {
-        Event::Network(self)
+impl From<NetworkEvent> for Event {
+    fn from(event: NetworkEvent) -> Self {
+        Self::Network(event)
     }
 }
 
-impl Into<Event> for NodeTimeout {
-    fn into(self) -> Event {
-        Event::Internal(InternalEvent::timeout(self))
+impl From<NodeTimeout> for Event {
+    fn from(timeout: NodeTimeout) -> Self {
+        Self::Internal(InternalEvent::timeout(timeout))
     }
 }
 
-impl Into<Event> for Verified<AnyTx> {
-    fn into(self) -> Event {
-        Event::Transaction(self)
+impl From<Verified<AnyTx>> for Event {
+    fn from(tx: Verified<AnyTx>) -> Self {
+        Self::Transaction(tx)
     }
 }
 
-impl Into<Event> for ExternalMessage {
-    fn into(self) -> Event {
-        Event::Api(self)
+impl From<ExternalMessage> for Event {
+    fn from(msg: ExternalMessage) -> Self {
+        Self::Api(msg)
     }
 }
 
-impl Into<Event> for InternalEvent {
-    fn into(self) -> Event {
-        Event::Internal(self)
+impl From<InternalEvent> for Event {
+    fn from(event: InternalEvent) -> Self {
+        Self::Internal(event)
     }
 }
 

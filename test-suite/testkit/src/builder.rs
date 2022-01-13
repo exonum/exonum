@@ -206,7 +206,7 @@ impl TestKitBuilder {
     /// See [`server` module](server/index.html) for the description of testkit server API.
     pub async fn serve(self, public_api_address: SocketAddr, private_api_address: SocketAddr) {
         let testkit = self.build();
-        testkit.run(public_api_address, private_api_address).await
+        testkit.run(public_api_address, private_api_address).await;
     }
 
     // Creates testkit for validator or auditor node.

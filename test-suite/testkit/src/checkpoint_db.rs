@@ -182,7 +182,7 @@ impl<T: Database> CheckpointDbInner<T> {
     }
 
     fn checkpoint(&mut self) {
-        self.backup_stack.push(Vec::new())
+        self.backup_stack.push(Vec::new());
     }
 
     fn rollback(&mut self) {

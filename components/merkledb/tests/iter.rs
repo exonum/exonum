@@ -196,7 +196,7 @@ where
         }
 
         if self.extend_entries {
-            self.entries.extend(self.more_entries.drain(..));
+            self.entries.append(&mut self.more_entries);
         }
     }
 

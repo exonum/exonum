@@ -40,7 +40,7 @@ use crate::{
     },
 };
 
-const DELAY: Duration = Duration::from_millis(100);
+const DELAY: Duration = Duration::from_millis(150);
 
 #[derive(Default, Debug, Clone)]
 struct MigrationRuntime {
@@ -249,7 +249,7 @@ impl Rig {
 
     /// Emulates node restart by recreating the dispatcher.
     fn restart(&mut self) {
-        let blockchain = self.blockchain.as_ref().to_owned();
+        let blockchain = self.blockchain.as_ref().clone();
         let blockchain = blockchain
             .into_mut_with_dummy_config()
             .with_runtime(MigrationRuntime::default())
@@ -1154,7 +1154,7 @@ fn test_migration_restart() {
     std::panic::catch_unwind(|| {
         // Set script flag to fail migration.
         let mut rig = Rig::with_db_and_flag(Arc::clone(&db), false);
-        test_migration_commit_with_local_error(&mut rig, LocalResult::Saved, artifact_name)
+        test_migration_commit_with_local_error(&mut rig, LocalResult::Saved, artifact_name);
     })
     .expect_err("Node should panic on unsuccessful migration commit");
 

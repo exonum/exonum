@@ -28,7 +28,7 @@ use exonum_rust_runtime::{
 };
 use futures::future;
 use structopt::StructOpt;
-use tokio::time::delay_for;
+use tokio::time::sleep;
 
 use std::{
     fmt,
@@ -149,7 +149,7 @@ async fn transaction_task(
             }
         }
 
-        delay_for(POLL_DELAY).await;
+        sleep(POLL_DELAY).await;
     }
 }
 
@@ -186,7 +186,7 @@ async fn main() {
         if height > Height(0) {
             break;
         }
-        delay_for(Duration::from_millis(200)).await;
+        sleep(Duration::from_millis(200)).await;
     }
     log::info!("Started sending transactions");
 
@@ -206,7 +206,7 @@ async fn main() {
             Arc::clone(&times_to_commit),
         );
         tokio::spawn(tx_task);
-        delay_for(delay).await;
+        sleep(delay).await;
 
         let now = Instant::now();
         if now - prev_report_time >= Duration::from_secs(1) {

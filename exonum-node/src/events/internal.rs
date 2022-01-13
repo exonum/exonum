@@ -14,7 +14,7 @@
 
 use exonum::{merkledb::BinaryValue, messages::SignedMessage};
 use futures::{channel::mpsc, prelude::*};
-use tokio::{task, time::delay_for};
+use tokio::{task, time::sleep};
 
 use std::time::{Duration, SystemTime};
 
@@ -74,7 +74,7 @@ impl InternalPart {
                         .unwrap_or_else(|_| Duration::from_millis(0));
 
                     tokio::spawn(async move {
-                        delay_for(duration).await;
+                        sleep(duration).await;
                         Self::send_event(internal_tx, InternalEvent::timeout(timeout)).await;
                     });
                 }

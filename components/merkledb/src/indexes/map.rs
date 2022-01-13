@@ -340,11 +340,11 @@ mod tests {
         let fork = db.fork();
 
         let mut index = fork.get_map(IDX_NAME);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
         index.put(KEY, 0);
-        assert_eq!(true, index.contains(KEY));
+        assert!(index.contains(KEY));
         index.remove(KEY);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
     }
 
     #[test]
@@ -354,13 +354,13 @@ mod tests {
         let fork = db.fork();
 
         let mut index = fork.get_map(IDX_NAME);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
 
         index.put(KEY, 0);
-        assert_eq!(true, index.contains(KEY));
+        assert!(index.contains(KEY));
 
         index.remove(KEY);
-        assert_eq!(false, index.contains(KEY));
+        assert!(!index.contains(KEY));
     }
 
     #[test]

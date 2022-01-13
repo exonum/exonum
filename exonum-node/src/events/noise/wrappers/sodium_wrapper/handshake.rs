@@ -52,7 +52,7 @@ impl HandshakeParams {
         max_message_len: u32,
     ) -> Self {
         let (_, secret_key) =
-            into_x25519_keypair(keypair.public_key(), keypair.secret_key().to_owned()).unwrap();
+            into_x25519_keypair(keypair.public_key(), keypair.secret_key().clone()).unwrap();
 
         Self {
             secret_key,

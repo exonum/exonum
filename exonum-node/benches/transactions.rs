@@ -209,7 +209,7 @@ fn bench_verify_messages_simple(b: &mut Bencher<'_>, &size: &usize) {
 
 fn bench_verify_messages_event_loop(b: &mut Bencher<'_>, &size: &usize) {
     let messages = gen_messages(MESSAGES_COUNT, size);
-    let mut rt = Runtime::new().unwrap();
+    let rt = Runtime::new().unwrap();
     let mut verifier = MessageVerifier::new(&rt);
 
     b.iter_with_setup(

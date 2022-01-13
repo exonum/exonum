@@ -396,7 +396,7 @@ impl NodeHandler {
             );
         } else {
             // Propose state is OK, send precommit.
-            self.broadcast_precommit(round, propose_hash, block_hash)
+            self.broadcast_precommit(round, propose_hash, block_hash);
         }
     }
 
@@ -543,13 +543,12 @@ impl NodeHandler {
         {
             // Check that propose is valid and should be executed.
             let propose_state = self.state.propose(&propose_hash).unwrap();
-            if propose_state.has_invalid_txs() {
-                panic!(
-                    "handle_majority_prevotes: propose contains invalid transaction(s). \
+            assert!(
+                !propose_state.has_invalid_txs(),
+                "handle_majority_prevotes: propose contains invalid transaction(s). \
                      Either a node's implementation is incorrect \
                      or validators majority works incorrectly"
-                );
-            }
+            );
 
             self.lock(prevote_round, propose_hash)
         } else {
@@ -599,15 +598,14 @@ impl NodeHandler {
         }
 
         // Check that propose is valid and should be executed.
-        if propose_state.has_invalid_txs() {
+        assert!(
+            !propose_state.has_invalid_txs(),
             // Propose is known to have invalid transactions, but is confirmed by
             // the majority of nodes; we can't operate in those conditions.
-            panic!(
-                "handle_majority_precommits: propose contains invalid transaction(s). \
-                 Either a node's implementation is incorrect \
-                 or validators majority works incorrectly"
-            );
-        }
+            "handle_majority_precommits: propose contains invalid transaction(s). \
+             Either a node's implementation is incorrect \
+             or validators majority works incorrectly"
+        );
 
         // Execute block and verify that the block hash matches expected one.
         let our_block_hash = self.execute(propose_hash);
@@ -927,7 +925,7 @@ impl NodeHandler {
             )
         }
         for tx in &msg.payload().transactions {
-            self.execute_later(InternalRequest::VerifyMessage(tx.to_owned()));
+            self.execute_later(InternalRequest::VerifyMessage(tx.clone()));
         }
         Ok(())
     }
@@ -1089,7 +1087,7 @@ impl NodeHandler {
                         .unwrap()
                         .unknown_txs()
                         .iter()
-                        .cloned()
+                        .copied()
                         .collect();
                     self.sign_message(TransactionsRequest::new(peer, txs))
                         .into()
@@ -1102,7 +1100,7 @@ impl NodeHandler {
                 RequestData::BlockTransactions => {
                     let txs: Vec<_> = match self.state.incomplete_block() {
                         Some(incomplete_block) => {
-                            incomplete_block.unknown_txs().iter().cloned().collect()
+                            incomplete_block.unknown_txs().iter().copied().collect()
                         }
                         None => return,
                     };
@@ -1159,7 +1157,7 @@ impl NodeHandler {
             return hash;
         }
 
-        let propose = propose_state.message().payload().to_owned();
+        let propose = propose_state.message().payload().clone();
         let block_contents = match block_kind {
             BlockKind::Normal => BlockContents::Transactions(&propose.transactions),
             BlockKind::Skip => BlockContents::Skip,

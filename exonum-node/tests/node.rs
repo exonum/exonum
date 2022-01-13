@@ -23,7 +23,7 @@ use exonum::{
 };
 use exonum_rust_runtime::{RustRuntime, ServiceFactory};
 use futures::prelude::*;
-use tokio::time::{delay_for, timeout};
+use tokio::time::{sleep, timeout};
 
 use std::{
     net::{Ipv4Addr, SocketAddr, TcpListener},
@@ -73,7 +73,7 @@ async fn node_frees_sockets_on_shutdown() {
     commit_rx.next().await;
     node.join().await;
 
-    delay_for(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // The sockets used by the node should be freed now.
     TcpListener::bind(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 16_350)).unwrap();
@@ -89,7 +89,7 @@ async fn nodes_flush_transactions_to_storage_before_commit() {
         ..Options::default()
     };
     let (nodes, _) = run_nodes(4, 16_400, options);
-    delay_for(Duration::from_secs(5)).await;
+    sleep(Duration::from_secs(5)).await;
 
     // Send some transactions over `blockchain`s.
     let keys = KeyPair::random();
@@ -106,7 +106,7 @@ async fn nodes_flush_transactions_to_storage_before_commit() {
 
     // Nodes need order of 100ms to create a column family for the tx pool in the debug mode,
     // so we sleep here to make it happen for all nodes.
-    delay_for(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(500)).await;
 
     // All transactions should be persisted on all nodes now.
     for node in &nodes {
@@ -149,7 +149,7 @@ async fn nodes_commit_blocks_with_custom_proposal_logic() {
     assert!(schema.transactions_locations().contains(&tx_hash));
 
     // Check that no new blocks are being approved when there are no transactions.
-    delay_for(TIMEOUT / 2).await;
+    sleep(TIMEOUT / 2).await;
     for commit_rx in &mut commit_rxs {
         assert!(commit_rx.next().now_or_never().is_none());
     }

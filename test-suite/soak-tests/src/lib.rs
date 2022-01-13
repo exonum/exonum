@@ -23,7 +23,7 @@ use exonum_node::{
 };
 use exonum_rust_runtime::{DefaultInstance, RustRuntime, RustRuntimeBuilder};
 use futures::TryFutureExt;
-use tokio::{task::JoinHandle, time::delay_for};
+use tokio::{task::JoinHandle, time::sleep};
 
 use std::{fmt, sync::Arc, time::Duration};
 
@@ -164,6 +164,6 @@ pub async fn send_transactions(sender: ApiSender, interval: Duration) {
             return;
         }
         counter.increment();
-        delay_for(interval).await;
+        sleep(interval).await;
     }
 }

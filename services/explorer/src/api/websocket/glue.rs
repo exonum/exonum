@@ -85,7 +85,7 @@ impl ExplorerApi {
 
                 // `future::Ready<_>` type annotation is redundant; it's here to check that
                 // `now_or_never` will not fail due to changes in `actix`.
-                let extract: future::Ready<_> = Query::<TransactionFilter>::extract(request);
+                let extract = Query::<TransactionFilter>::extract(request);
                 extract
                     .now_or_never()
                     .expect("`Ready` futures always have their output immediately available")

@@ -131,7 +131,7 @@ mod tests {
     fn test_signed_message_min_size() {
         let keys = KeyPair::random();
         let msg = SignedMessage::new(vec![], keys.public_key(), keys.secret_key());
-        assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.into_bytes().len())
+        assert_eq!(SIGNED_MESSAGE_MIN_SIZE, msg.into_bytes().len());
     }
 
     #[test]
@@ -187,7 +187,7 @@ mod tests {
         let deserialized_precommit = message
             .into_verified::<Precommit>()
             .expect("Failed to check precommit");
-        assert_eq!(precommit_msg, *deserialized_precommit.payload())
+        assert_eq!(precommit_msg, *deserialized_precommit.payload());
     }
 
     #[test]

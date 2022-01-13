@@ -153,7 +153,7 @@ impl NodeHandler {
                 );
                 self.state
                     .connect_list()
-                    .update_peer(&public_key, message.payload().host.to_string())
+                    .update_peer(&public_key, message.payload().host.to_string());
             }
         }
 
@@ -248,7 +248,7 @@ impl NodeHandler {
             let to = self.state.peers().len();
             let gen_peer_id = || -> usize {
                 let mut rng = rand::thread_rng();
-                rng.gen_range(0, to)
+                rng.gen_range(0..to)
             };
 
             let peer = self

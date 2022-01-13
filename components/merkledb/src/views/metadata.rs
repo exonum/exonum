@@ -103,7 +103,7 @@ impl BinaryAttribute for u64 {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.write_u64::<LittleEndian>(*self).unwrap()
+        buffer.write_u64::<LittleEndian>(*self).unwrap();
     }
 
     fn read(mut buffer: &[u8]) -> Result<Self, Error> {
@@ -117,7 +117,7 @@ impl BinaryAttribute for Hash {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(self.as_ref())
+        buffer.extend_from_slice(self.as_ref());
     }
 
     fn read(buffer: &[u8]) -> Result<Self, Error> {
@@ -141,7 +141,7 @@ impl BinaryAttribute for Vec<u8> {
     }
 
     fn write(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(self)
+        buffer.extend_from_slice(self);
     }
 
     fn read(buffer: &[u8]) -> Result<Self, Error> {
@@ -589,7 +589,7 @@ where
         index_type: IndexType,
     ) -> Result<Self, AccessError> {
         check_index_valid_full_name(&index_address.name).map_err(|kind| AccessError {
-            addr: index_address.to_owned(),
+            addr: index_address.clone(),
             kind,
         })?;
         Self::get_or_create_unchecked(index_access, index_address, index_type)
@@ -602,7 +602,7 @@ where
         index_address: &IndexAddress,
     ) -> Result<Option<IndexMetadata>, AccessError> {
         check_index_valid_full_name(index_address.name()).map_err(|kind| AccessError {
-            addr: index_address.to_owned(),
+            addr: index_address.clone(),
             kind,
         })?;
         Ok(Self::get_metadata_unchecked(index_access, index_address))
@@ -632,7 +632,7 @@ where
         if index_type == IndexType::Tombstone && !index_address.in_migration {
             return Err(AccessError {
                 kind: AccessErrorKind::InvalidTombstone,
-                addr: index_address.to_owned(),
+                addr: index_address.clone(),
             });
         }
 

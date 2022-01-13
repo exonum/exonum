@@ -404,7 +404,7 @@ impl BinaryKey for ProofPath {
                 reset_bits(&mut buffer[right], self.end() % 8);
             }
             for i in buffer.iter_mut().take(KEY_SIZE + 1).skip(right + 1) {
-                *i = 0
+                *i = 0;
             }
         }
         self.size()
@@ -917,17 +917,17 @@ mod tests {
     fn test_proof_path_is_leaf() {
         let b = ProofPath::from_inner(*b"\x01qwertyuiopasdfghjklzxcvbnm123456\x00");
         assert_eq!(b.len(), 256);
-        assert_eq!(b.suffix(4).is_leaf(), true);
-        assert_eq!(b.suffix(8).is_leaf(), true);
-        assert_eq!(b.suffix(250).is_leaf(), true);
-        assert_eq!(b.prefix(16).is_leaf(), false);
+        assert!(b.suffix(4).is_leaf());
+        assert!(b.suffix(8).is_leaf());
+        assert!(b.suffix(250).is_leaf());
+        assert!(!b.prefix(16).is_leaf());
     }
 
     #[test]
     fn test_proof_path_is_branch() {
         let b = ProofPath::from_inner(*b"\x00qwertyuiopasdfghjklzxcvbnm123456\xFF");
         assert_eq!(b.len(), 255);
-        assert_eq!(b.is_leaf(), false);
+        assert!(!b.is_leaf());
     }
 
     #[test]

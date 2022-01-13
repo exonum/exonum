@@ -2045,7 +2045,7 @@ fn handle_receive_multiple_proposals_same_round() {
             block_hash,
             sandbox.time().into(),
             sandbox.secret_key(ValidatorId(i)),
-        ))
+        ));
     }
 
     sandbox.recv(&propose_1);
@@ -2187,7 +2187,7 @@ fn handle_precommit_remove_propose_request_ask_precommitters() {
             block.object_hash(),
             sandbox.time().into(),
             sandbox.secret_key(ValidatorId(i)),
-        ))
+        ));
     }
 
     // Propose request shouldn't be sent now.

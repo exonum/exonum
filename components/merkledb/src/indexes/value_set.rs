@@ -213,7 +213,7 @@ where
     /// assert!(index.contains(&1));
     /// ```
     pub fn insert(&mut self, item: V) {
-        self.base.put(&item.object_hash(), item)
+        self.base.put(&item.object_hash(), item);
     }
 
     /// Removes a value from the set.
@@ -234,7 +234,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn remove(&mut self, item: &V) {
-        self.remove_by_hash(&item.object_hash())
+        self.remove_by_hash(&item.object_hash());
     }
 
     /// Removes a value corresponding to the specified hash from the set.
@@ -258,7 +258,7 @@ where
     /// assert!(!index.contains_by_hash(&data_hash));
     /// ```
     pub fn remove_by_hash(&mut self, hash: &Hash) {
-        self.base.remove(hash)
+        self.base.remove(hash);
     }
 
     /// Clears the set, removing all values.
@@ -284,7 +284,7 @@ where
     /// assert!(!index.contains(&1));
     /// ```
     pub fn clear(&mut self) {
-        self.base.clear()
+        self.base.clear();
     }
 }
 

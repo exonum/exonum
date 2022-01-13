@@ -39,6 +39,7 @@ use std::sync::Arc;
 use super::Broadcaster;
 
 /// Extracts request payload, which is encoded in either JSON or Protobuf.
+#[allow(clippy::future_not_send)]
 async fn extract_pb_request<Q>(request: actix::HttpRequest, payload: actix::Payload) -> Result<Q>
 where
     Q: DeserializeOwned + ProtobufConvert + 'static,
@@ -268,7 +269,8 @@ impl ScopeData {
     ) -> impl Future<Output = exonum_api::Result<I>>
     where
         F: Fn(ServiceApiState, Q) -> R + 'static,
-        R: Future<Output = exonum_api::Result<I>>,
+        I: Send,
+        R: Future<Output = exonum_api::Result<I>> + Send,
     {
         let maybe_state = ServiceApiState::new(
             &self.blockchain,
@@ -307,9 +309,9 @@ impl ServiceApiScope {
     pub fn endpoint<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static + Send,
-        I: Serialize + 'static,
+        I: Serialize + Send + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = exonum_api::Result<I>>,
+        R: Future<Output = exonum_api::Result<I>> + Send,
     {
         let data = self.data.clone();
         self.inner
@@ -323,9 +325,9 @@ impl ServiceApiScope {
     pub fn endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
+        I: Serialize + Send + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = exonum_api::Result<I>>,
+        R: Future<Output = exonum_api::Result<I>> + Send,
     {
         let data = self.data.clone();
         self.inner
@@ -342,11 +344,11 @@ impl ServiceApiScope {
     /// of more requirements to the response type.
     pub fn pb_endpoint_mut<Q, I, F, R>(&mut self, name: &'static str, handler: F) -> &mut Self
     where
-        Q: DeserializeOwned + ProtobufConvert + 'static,
-        Q::ProtoStruct: Message,
-        I: Serialize + 'static,
+        Q: DeserializeOwned + ProtobufConvert + Send + 'static,
+        Q::ProtoStruct: Message + Send,
+        I: Serialize + Send + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = exonum_api::Result<I>>,
+        R: Future<Output = exonum_api::Result<I>> + Send,
     {
         let data = self.data.clone();
         let raw_handler = move |http_request, payload| {
@@ -379,9 +381,9 @@ impl ServiceApiScope {
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
+        I: Serialize + Send + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = exonum_api::Result<I>>,
+        R: Future<Output = exonum_api::Result<I>> + Send,
     {
         let data = self.data.clone();
         let handler = deprecated.handler.clone();
@@ -403,9 +405,9 @@ impl ServiceApiScope {
     ) -> &mut Self
     where
         Q: DeserializeOwned + 'static,
-        I: Serialize + 'static,
+        I: Serialize + Send + 'static,
         F: Fn(ServiceApiState, Q) -> R + 'static + Clone + Send + Sync,
-        R: Future<Output = exonum_api::Result<I>>,
+        R: Future<Output = exonum_api::Result<I>> + Send,
     {
         let data = self.data.clone();
         let handler = deprecated.handler.clone();

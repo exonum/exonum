@@ -152,13 +152,12 @@
     clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
     // Next lints produce too much noise/false positives.
     clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    clippy::pub_enum_variant_names,
     // '... may panic' lints.
     clippy::indexing_slicing,
     // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn,
-    // Seems should be fixed in `thiserror` crate.
-    clippy::reversed_empty_ranges
+    clippy::missing_errors_doc, clippy::missing_const_for_fn, clippy::missing_panics_doc,
+    clippy::missing_safety_doc,
+    clippy::reversed_empty_ranges, clippy::use_self
 )]
 
 #[allow(unused_imports)]
