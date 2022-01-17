@@ -209,10 +209,7 @@ impl Handler<CreateBlock> for TestKitActor {
             if let Some(missing_tx) = maybe_missing_tx {
                 return Err(api::Error::bad_request()
                     .title("Creating block failed")
-                    .detail(format!(
-                        "Transaction not in mempool: {}",
-                        missing_tx.to_string()
-                    )));
+                    .detail(format!("Transaction not in mempool: {}", missing_tx)));
             }
 
             // NB: checkpoints must correspond 1-to-1 to blocks.
