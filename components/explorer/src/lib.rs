@@ -49,7 +49,6 @@
     clippy::doc_markdown
 )]
 
-use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{Block, CallInBlock, CallProof, Schema, TxLocation},
     crypto::Hash,
@@ -68,6 +67,7 @@ use std::{
     slice,
     time::UNIX_EPOCH,
 };
+use time::OffsetDateTime;
 
 pub mod api;
 
@@ -473,7 +473,7 @@ pub struct CommittedTransaction {
     location: TxLocation,
     location_proof: ListProof<Hash>,
     status: ExecutionStatus,
-    time: DateTime<Utc>,
+    time: OffsetDateTime,
 }
 
 impl CommittedTransaction {
@@ -498,7 +498,7 @@ impl CommittedTransaction {
     }
 
     /// Returns an approximate commit time of the block which includes this transaction.
-    pub fn time(&self) -> &DateTime<Utc> {
+    pub fn time(&self) -> &OffsetDateTime {
         &self.time
     }
 }
@@ -821,7 +821,7 @@ impl<'a> DoubleEndedIterator for Blocks<'a> {
 }
 
 /// Calculates a median time from precommits.
-pub fn median_precommits_time(precommits: &[Verified<Precommit>]) -> DateTime<Utc> {
+pub fn median_precommits_time(precommits: &[Verified<Precommit>]) -> OffsetDateTime {
     if precommits.is_empty() {
         UNIX_EPOCH.into()
     } else {

@@ -27,10 +27,10 @@ serde_str = "0.1"
 env_logger = "0.9"
 futures = "0.3.5"
 os_info = "3.0"
-chrono = { version = "0.4.6", features = ["serde"] }
 protobuf = { version = "2", features = ["with-serde"] }
 semver = { version = "1.0", features = ["serde"] }
 thiserror = "1.0"
+time = { version = "0.3", features = ["serde"] }
 
 exonum-crypto = { version = "1.0.0", path = "../components/crypto" }
 exonum-derive = { version = "1.0.0", path = "../components/derive" }

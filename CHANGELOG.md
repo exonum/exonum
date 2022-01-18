@@ -41,6 +41,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 - Inner rocksdb database has been replaced for in-memory data structure in
   TemporaryDB. (#1872)
 
+- `chrono` crate has been replaced with `time` as outdated and unsupported.
+
 ## 1.0.0 - 2020-03-31
 
 ### Breaking Changes

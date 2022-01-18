@@ -21,7 +21,6 @@ async-trait = "0.1"
 bit-vec = "0.6"
 byteorder = { version = "1.4", features = ["i128"] }
 bytes = "1"
-chrono = "0.4.6"
 futures = "0.3"
 futures-retry = "0.6"
 log = "0.4.6"
@@ -32,6 +31,7 @@ serde_derive = "1.0"
 snow = { version = "0.9", default-features = false }
 socket2 = { version = "0.4", features = [ "all" ] }
 thiserror = "1.0"
+time = "0.3"
 tokio-stream = { version = "0.1", features = [ "signal" ] }
 tokio-util = { version = "0.7", features = ["codec"] }
 

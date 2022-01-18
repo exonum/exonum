@@ -12,24 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Utc};
-
 use exonum::{blockchain::ValidatorKeys, crypto::PublicKey};
 use exonum_derive::{FromAccess, RequireArtifact};
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},
     ProofEntry, ProofMapIndex,
 };
-
 use std::cmp::Reverse;
+use time::OffsetDateTime;
 
 /// Database schema of the time service. The schema is fully public.
 #[derive(Debug, FromAccess, RequireArtifact)]
 pub struct TimeSchema<T: Access> {
     /// `DateTime` for every validator. May contain keys corresponding to past validators.
-    pub validators_times: ProofMapIndex<T::Base, PublicKey, DateTime<Utc>>,
+    pub validators_times: ProofMapIndex<T::Base, PublicKey, OffsetDateTime>,
     /// Consolidated blockchain time, approved by validators.
-    pub time: ProofEntry<T::Base, DateTime<Utc>>,
+    pub time: ProofEntry<T::Base, OffsetDateTime>,
 }
 
 impl<T: Access> TimeSchema<T> {
@@ -46,7 +44,7 @@ where
     pub(crate) fn update_validator_time(
         &mut self,
         author: PublicKey,
-        time: DateTime<Utc>,
+        time: OffsetDateTime,
     ) -> Result<(), ()> {
         match self.validators_times.get(&author) {
             // The validator time in the storage should be less than in the transaction.

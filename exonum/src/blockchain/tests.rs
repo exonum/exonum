@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::Utc;
 use exonum_crypto::{Hash, KeyPair};
 use exonum_derive::{BinaryValue, FromAccess};
 use exonum_merkledb::{
@@ -21,6 +20,7 @@ use exonum_merkledb::{
 };
 use pretty_assertions::assert_eq;
 use semver::Version;
+use time::OffsetDateTime;
 
 use std::{
     cell::RefCell,
@@ -839,7 +839,7 @@ fn executing_block_skip() {
         round: Round(1),
         propose_hash: Hash::zero(),
         block_hash: patch.block_hash(),
-        time: Utc::now(),
+        time: OffsetDateTime::now_utc(),
     };
     let precommit = Verified::from_value(
         precommit,
@@ -880,7 +880,7 @@ fn clearing_block_skip() {
         round: Round(1),
         propose_hash: Hash::zero(),
         block_hash,
-        time: Utc::now(),
+        time: OffsetDateTime::now_utc(),
     };
     let precommit = Verified::from_value(
         precommit_payload.clone(),

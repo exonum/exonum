@@ -24,18 +24,19 @@
 //! | Path        | `/api/services/{INSTANCE_NAME}/v1/current_time` |
 //! | Method      | GET   |
 //! | Query type  | - |
-//! | Return type | `Option<DateTime<Utc>>` |
+//! | Return type | `Option<OffsetDateTime>` |
 //!
 //! Returns the current stored time available in `exonum-time` service.
 //! `None` will be returned if there is no enough data to provide a trusted
 //! time yet.
 //!
 //! ```
-//! # use chrono::{DateTime, Utc};
 //! # use exonum::{helpers::Height, runtime::InstanceId};
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //! # use exonum_time::TimeServiceFactory;
+//! # use time::OffsetDateTime;
+//!
 //! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
@@ -48,7 +49,7 @@
 //! let api = testkit.api();
 //!
 //! // Make request to the `current_time` endpoint.
-//! let response: Option<DateTime<Utc>> = api
+//! let response: Option<OffsetDateTime> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
 //!     .get("v1/current_time")
 //!     .await?;
@@ -57,7 +58,7 @@
 //!
 //! // Create some blocks and try again.
 //! testkit.create_blocks_until(Height(5));
-//! let response: Option<DateTime<Utc>> = api
+//! let response: Option<OffsetDateTime> = api
 //!     .public(ApiKind::Service(TIME_SERVICE_NAME))
 //!     .get("v1/current_time")
 //!     .await?;
@@ -84,11 +85,11 @@
 //! a validator.
 //!
 //! ```
-//! # use chrono::{DateTime, Utc};
 //! # use exonum::{helpers::Height, runtime::InstanceId};
 //! # use exonum_rust_runtime::ServiceFactory;
 //! # use exonum_testkit::{ApiKind, Spec, TestKit, TestKitBuilder};
 //! # use exonum_time::{TimeServiceFactory, ValidatorTime};
+//!
 //! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
 //!
@@ -130,11 +131,11 @@
 //! [`ValidatorTime`]: struct.ValidatorTime.html
 //! [`/validator_times`]: #get-validator-times
 
-use chrono::{DateTime, Utc};
 use exonum::crypto::PublicKey;
 use exonum_api::Result;
 use exonum_rust_runtime::api;
 use serde_derive::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 use crate::TimeSchema;
 
@@ -144,7 +145,7 @@ pub struct ValidatorTime {
     /// Public key of the validator.
     pub public_key: PublicKey,
     /// Time of the validator.
-    pub time: Option<DateTime<Utc>>,
+    pub time: Option<OffsetDateTime>,
 }
 
 /// Implement the public API for Exonum time.
@@ -156,7 +157,7 @@ impl PublicApi {
     async fn current_time(
         state: api::ServiceApiState,
         _query: (),
-    ) -> Result<Option<DateTime<Utc>>> {
+    ) -> Result<Option<OffsetDateTime>> {
         Ok(TimeSchema::new(state.service_data()).time.get())
     }
 

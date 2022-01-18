@@ -327,7 +327,6 @@ impl ObjectHash for Message {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
     use exonum::{
         blockchain::{AdditionalHeaders, Block, BlockProof},
         crypto::{self, KeyPair},
@@ -437,7 +436,7 @@ mod tests {
     #[test]
     fn test_block() {
         let keys = KeyPair::random();
-        let ts = Utc::now();
+        let ts = time::OffsetDateTime::now_utc();
         let txs = [2];
         let tx_count = txs.len() as u32;
 

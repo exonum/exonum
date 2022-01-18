@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
-
 use std::sync::{Arc, RwLock};
+use time::{Duration, OffsetDateTime};
 
 /// A helper trait that provides the node with a current time.
 pub trait TimeProvider: Send + Sync + std::fmt::Debug {
     /// Returns the current time.
-    fn current_time(&self) -> DateTime<Utc>;
+    fn current_time(&self) -> OffsetDateTime;
 }
 
 #[derive(Debug)]
@@ -27,8 +26,8 @@ pub trait TimeProvider: Send + Sync + std::fmt::Debug {
 pub struct SystemTimeProvider;
 
 impl TimeProvider for SystemTimeProvider {
-    fn current_time(&self) -> DateTime<Utc> {
-        Utc::now()
+    fn current_time(&self) -> OffsetDateTime {
+        OffsetDateTime::now_utc()
     }
 }
 
@@ -43,10 +42,10 @@ impl TimeProvider for SystemTimeProvider {
 /// # Examples
 ///
 /// ```
-/// use chrono::{Utc, Duration, TimeZone};
 /// use exonum::{helpers::Height, runtime::SnapshotExt};
 /// use exonum_testkit::TestKit;
 /// use exonum_time::{MockTimeProvider, TimeSchema, TimeServiceFactory};
+/// use time::{Duration, OffsetDateTime};
 ///
 /// let service_name = "time";
 /// let service_id = 12;
@@ -65,7 +64,7 @@ impl TimeProvider for SystemTimeProvider {
 /// let snapshot = testkit.snapshot();
 /// let schema: TimeSchema<_> = snapshot.service_schema(service_name).unwrap();
 /// assert_eq!(
-///     Utc.timestamp(15, 0),
+///     OffsetDateTime::from_unix_timestamp(15).unwrap(),
 ///     schema.time.get().unwrap()
 /// );
 /// ```
@@ -75,20 +74,20 @@ impl TimeProvider for SystemTimeProvider {
 #[derive(Debug, Clone)]
 pub struct MockTimeProvider {
     /// Local time value.
-    time: Arc<RwLock<DateTime<Utc>>>,
+    time: Arc<RwLock<OffsetDateTime>>,
 }
 
 impl Default for MockTimeProvider {
     /// Initializes the provider with the time set to the Unix epoch start.
     fn default() -> Self {
-        Self::new(Utc.timestamp(0, 0))
+        Self::new(OffsetDateTime::UNIX_EPOCH)
     }
 }
 
 impl MockTimeProvider {
     /// Creates a new `MockTimeProvider` with time value equal to `time`.
     #[must_use]
-    pub fn new(time: DateTime<Utc>) -> Self {
+    pub fn new(time: OffsetDateTime) -> Self {
         Self {
             time: Arc::new(RwLock::new(time)),
         }
@@ -96,12 +95,12 @@ impl MockTimeProvider {
 
     /// Gets the time value currently reported by the provider.
     #[must_use]
-    pub fn time(&self) -> DateTime<Utc> {
+    pub fn time(&self) -> OffsetDateTime {
         *self.time.read().unwrap()
     }
 
     /// Sets the time value to `new_time`.
-    pub fn set_time(&self, new_time: DateTime<Utc>) {
+    pub fn set_time(&self, new_time: OffsetDateTime) {
         let mut time = self.time.write().unwrap();
         *time = new_time;
     }
@@ -109,12 +108,12 @@ impl MockTimeProvider {
     /// Adds `duration` to the value of `time`.
     pub fn add_time(&self, duration: Duration) {
         let mut time = self.time.write().unwrap();
-        *time = *time + duration;
+        *time += duration;
     }
 }
 
 impl TimeProvider for MockTimeProvider {
-    fn current_time(&self) -> DateTime<Utc> {
+    fn current_time(&self) -> OffsetDateTime {
         self.time()
     }
 }

@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use bit_vec::BitVec;
-use chrono::{DateTime, TimeZone, Utc};
 use exonum::{
     crypto::{self, Hash, PublicKey},
     merkledb::BinaryValue,
@@ -25,16 +24,16 @@ use exonum_rust_runtime::{ProtoSourceFile, ProtoSourcesQuery};
 use exonum_testkit::{ApiKind, TestKitBuilder};
 use pretty_assertions::assert_eq;
 use reqwest::{Client, StatusCode};
-
 use std::{borrow::Cow, collections::HashMap};
+use time::{macros::datetime, OffsetDateTime};
 
 use crate::{assert_exonum_core_protos, service::Transfer, testkit_with_rust_service};
 
 #[test]
 fn test_date_time_pb_convert() {
-    let dt = Utc.ymd(2018, 1, 26).and_hms_micro(18, 30, 9, 453_829);
+    let dt = datetime!(2018-1-26 18:30:09.453_829 UTC);
     let pb_dt = dt.to_pb();
-    let pb_round_trip: DateTime<Utc> = ProtobufConvert::from_pb(pb_dt).unwrap();
+    let pb_round_trip: OffsetDateTime = ProtobufConvert::from_pb(pb_dt).unwrap();
     assert_eq!(pb_round_trip, dt);
 }
 
@@ -66,7 +65,7 @@ struct StructWithScalarTypes {
     key: PublicKey,
     hash: Hash,
     bit_vec: BitVec,
-    time: DateTime<Utc>,
+    time: OffsetDateTime,
     unsigned_32: u32,
     unsigned_64: u64,
     regular_i32: i32,
@@ -91,7 +90,7 @@ fn test_scalar_struct_round_trip() {
         key: PublicKey::from_slice(&[8; crypto::PUBLIC_KEY_LENGTH]).unwrap(),
         hash: Hash::from_slice(&[7; crypto::HASH_SIZE]).unwrap(),
         bit_vec: BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]),
-        time: Utc.ymd(2018, 1, 26).and_hms_micro(18, 30, 9, 453_829),
+        time: datetime!(2018-1-26 18:30:09.453_829 UTC),
         unsigned_32: u32::max_value(),
         unsigned_64: u64::max_value(),
         regular_i32: i32::min_value(),

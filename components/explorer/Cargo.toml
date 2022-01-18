@@ -18,10 +18,10 @@ travis-ci = { repository = "exonum/exonum" }
 [dependencies]
 exonum = { version = "1.0.0", path = "../../exonum" }
 
-chrono = { version = "0.4.6", features = ["serde"] }
 hex = "0.4.2"
 serde = "1.0"
 serde_derive = "1.0"
+time = { version = "0.3", features = ["serde"] }
 
 [dev-dependencies]
 exonum-derive = { version = "1.0.0", path = "../derive" }
