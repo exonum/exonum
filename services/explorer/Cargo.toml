@@ -24,7 +24,7 @@ exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 actix = { version = "0.12", default-features = false }
 actix_derive = "0.6"
-actix-web = { version = "=4.0.0-beta.20", default-features = false }
+actix-web = { version = "=4.0.0-beta.21", default-features = false }
 actix-web-actors = "=4.0.0-beta.10"
 anyhow = "1.0"
 futures = "0.3.4"
