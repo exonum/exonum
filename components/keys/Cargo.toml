@@ -15,7 +15,7 @@ description = "Exonum node keys management."
 [dependencies]
 anyhow = "1.0"
 rand = "0.8"
-pwbox = "0.4"
+pwbox = "0.5"
 secrecy = "0.8"
 secret-tree = "0.4"
 serde = "1.0"
