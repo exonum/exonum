@@ -40,7 +40,7 @@ exonum-api = { version = "1.0.0", path = "../components/api" }
 exonum-derive = { version = "1.0.0", path = "../components/derive" }
 exonum-merkledb = { version = "1.0.0", path = "../components/merkledb" }
 exonum-proto = { version = "1.0.0", path = "../components/proto" }
-exonum_sodiumoxide = { version = "0.0.23", optional = true }
+exonum_sodiumoxide = { version = "0.0.24", optional = true }
 
 [dependencies.tokio]
 version = "1"
