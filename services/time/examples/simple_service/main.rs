@@ -48,6 +48,7 @@ use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory
 #[binary_value(codec = "bincode")]
 pub struct TxMarker {
     mark: i32,
+    #[serde(with = "time::serde::timestamp")]
     time: OffsetDateTime,
 }
 
