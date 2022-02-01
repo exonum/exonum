@@ -20,7 +20,7 @@ exonum = { version = "1.0.0", path = "../../exonum" }
 exonum-api = { version = "1.0.0", path = "../api" }
 exonum-node = { version = "1.0.0", path = "../../exonum-node" }
 
-actix-web = { version = "=4.0.0-beta.20", default-features = false }
+actix-web = { version = "=4.0.0-rc.1", default-features = false }
 futures = "0.3.4"
 semver = "1.0"
 serde = "1.0"
