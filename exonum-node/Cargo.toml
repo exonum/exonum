@@ -29,7 +29,7 @@ protobuf = { version = "2.25", features = ["with-serde"] }
 rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
-snow = { version = "0.8.0", default-features = false }
+snow = { version = "0.9.0", default-features = false }
 socket2 = { version = "0.4", features = [ "all" ] }
 thiserror = "1.0"
 tokio-stream = { version = "0.1", features = [ "signal" ] }
