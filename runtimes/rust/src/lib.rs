@@ -37,19 +37,18 @@
 //! ## Minimal complete example
 //!
 //! ```
-//! #![allow(proc_macro_derive_resolution_fallback)]
-//! use exonum::runtime::{BlockchainData, ExecutionError};
-//! use exonum_rust_runtime::{ExecutionContext, Service};
-//! use exonum_derive::*;
-//! use serde_derive::*;
+//! # use exonum::runtime::{BlockchainData, ExecutionError};
+//! # use exonum_rust_runtime::{ExecutionContext, Service};
+//! # use exonum_derive::*;
+//! # use serde_derive::*;
 //!
 //! // Determine the types of data that will be used in service transactions.
 //!
-//! #[derive(Debug, PartialEq, Serialize, Deserialize, BinaryValue)]
-//! #[binary_value(codec = "bincode")]
-//! pub struct CreateWallet {
-//!     pub name: String,
-//! }
+//! # #[derive(Debug, PartialEq, Serialize, Deserialize, BinaryValue)]
+//! # #[binary_value(codec = "bincode")]
+//! # pub struct CreateWallet {
+//! #     pub name: String,
+//! # }
 //!
 //! // You may create service-specific error types.
 //!
