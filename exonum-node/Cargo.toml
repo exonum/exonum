@@ -33,7 +33,7 @@ snow = { version = "0.8.0", default-features = false }
 socket2 = { version = "0.4", features = [ "all" ] }
 thiserror = "1.0"
 tokio-stream = { version = "0.1", features = [ "signal" ] }
-tokio-util = { version = "0.6", features = ["codec"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 
 exonum = { version = "1.0.0", path = "../exonum" }
 exonum-api = { version = "1.0.0", path = "../components/api" }
