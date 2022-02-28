@@ -33,7 +33,7 @@ exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 actix = { version = "0.12", default-features = false }
 actix-test = "=0.1.0-beta.11"
-actix-web = { version = "=4.0.0-beta.20", default-features = false }
+actix-web = { version = "=4.0.1", default-features = false }
 chrono = "0.4"
 futures = "0.3"
 log = "0.4.6"
