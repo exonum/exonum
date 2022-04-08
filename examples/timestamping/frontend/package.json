@@ -28,7 +28,7 @@
     "express": "^4.17.1",
     "http-proxy-middleware": "^1.0.5",
     "jquery": "^3.5.0",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "noty": "^3.2.0-beta",
     "popper.js": "^1.16.1",
     "protobufjs": "^6.8.9",
