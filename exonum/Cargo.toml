@@ -28,7 +28,7 @@ env_logger = "0.9"
 futures = "0.3.5"
 os_info = "3.0"
 chrono = { version = "0.4.6", features = ["serde"] }
-protobuf = { version = "2.25", features = ["with-serde"] }
+protobuf = { version = "3.0", features = ["with-serde"] }
 semver = { version = "1.0", features = ["serde"] }
 thiserror = "1.0"
 

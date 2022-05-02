@@ -25,7 +25,7 @@ chrono = "0.4.6"
 futures = "0.3"
 futures-retry = "0.6"
 log = "0.4.6"
-protobuf = { version = "2.25", features = ["with-serde"] }
+protobuf = { version = "3.0", features = ["with-serde"] }
 rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
