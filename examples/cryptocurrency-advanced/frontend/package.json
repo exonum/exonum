@@ -29,7 +29,7 @@
     "jquery": "^3.5.0",
     "noty": "^3.2.0-beta",
     "numeral": "^2.0.6",
-    "protobufjs": "^6.8.9",
+    "protobufjs": "^6.11.3",
     "vue": "^2.6.11",
     "vue-router": "^3.1.6",
     "vuex": "^3.1.3",
