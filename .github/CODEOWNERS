@@ -1,8 +1,8 @@
 # Default owners for everything in the repository:
-* @aleksuss @slowli @alekseysidorov @popzxc @Kormick
+* @aleksuss
 
 # Integration python tests:
-test-suite/exonum-py-tests/* @aleksuss @alekseysidorov @popzxc @Kormick @ivan-ochc
+test-suite/exonum-py-tests/* @aleksuss
 
 # Javascript specific changes:
-*.js @aleksuss @qvantor
+*.js @aleksuss

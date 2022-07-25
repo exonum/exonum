@@ -15,7 +15,7 @@
 //! This module contains utilities for passphrase entry.
 
 use anyhow::{bail, Context, Error};
-use rpassword::read_password_from_tty;
+use rpassword::prompt_password;
 use serde_derive::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
@@ -36,21 +36,24 @@ impl Drop for Passphrase {
 
 impl Passphrase {
     /// Creates new passphrase
-    pub fn new(passphrase: String) -> Self {
+    #[must_use]
+    pub const fn new(passphrase: String) -> Self {
         Self(passphrase)
     }
 
     /// Reads the passphrase from stdin.
     pub fn read_from_tty(prompt: &str) -> Result<Self, Error> {
-        Ok(Self(read_password_from_tty(Some(prompt))?))
+        Ok(Self(prompt_password(prompt)?))
     }
 
     /// Returns true if the passphrase is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Returns byte representation of the passphrase.
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }

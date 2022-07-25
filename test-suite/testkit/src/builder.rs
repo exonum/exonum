@@ -84,6 +84,7 @@ impl TestKitBuilder {
     }
 
     /// Creates the validator nodes from the specified keys.
+    #[must_use]
     pub fn with_keys(mut self, keys: impl IntoIterator<Item = Keys>) -> Self {
         assert!(
             self.test_network.is_none(),
@@ -98,6 +99,7 @@ impl TestKitBuilder {
     }
 
     /// Sets the number of validator nodes in the test network.
+    #[must_use]
     pub fn with_validators(mut self, validator_count: u16) -> Self {
         assert!(
             self.test_network.is_none(),
@@ -113,6 +115,7 @@ impl TestKitBuilder {
 
     /// Adds a deploy spec to this builder. The spec may contain artifacts and service instances
     /// to deploy at the blockchain start.
+    #[must_use]
     pub fn with(mut self, spec: impl Deploy) -> Self {
         spec.deploy(&mut self.genesis_config, &mut self.rust_runtime);
         self
@@ -123,12 +126,14 @@ impl TestKitBuilder {
     /// This method is only available if the crate is compiled with the `exonum-node` feature,
     /// which is off by default.
     #[cfg(feature = "exonum-node")]
+    #[must_use]
     pub fn with_plugin(mut self, plugin: impl NodePlugin + 'static) -> Self {
         self.plugins.push(Box::new(plugin));
         self
     }
 
     /// Enables a logger inside the testkit.
+    #[must_use]
     pub fn with_logger(mut self) -> Self {
         self.logger = true;
         self
@@ -139,6 +144,7 @@ impl TestKitBuilder {
     /// # Panics
     ///
     /// - Panics if the builder already contains specified runtime.
+    #[must_use]
     pub fn with_additional_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         let instance: RuntimeInstance = runtime.into();
         if instance.id == RustRuntime::ID

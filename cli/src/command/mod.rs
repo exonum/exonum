@@ -77,6 +77,7 @@ pub enum Command {
 
 impl Command {
     /// Wrapper around `StructOpt::from_args` method.
+    #[must_use]
     pub fn from_args() -> Self {
         <Self as StructOpt>::from_args()
     }

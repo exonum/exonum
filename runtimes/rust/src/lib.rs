@@ -37,6 +37,7 @@
 //! ## Minimal complete example
 //!
 //! ```
+//! #![allow(proc_macro_derive_resolution_fallback)]
 //! use exonum::runtime::{BlockchainData, ExecutionError};
 //! use exonum_rust_runtime::{ExecutionContext, Service};
 //! use exonum_derive::*;
@@ -456,6 +457,7 @@ impl RustRuntimeBuilder {
     /// # Return value
     ///
     /// Returns a modified `RustRuntime` object for further chaining.
+    #[must_use]
     pub fn with_factory<S: ServiceFactory>(mut self, service_factory: S) -> Self {
         let artifact = service_factory.artifact_id();
         trace!(
@@ -473,6 +475,7 @@ impl RustRuntimeBuilder {
     /// # Return value
     ///
     /// Returns a modified `RustRuntime` object for further chaining.
+    #[must_use]
     pub fn with_migrating_factory<S>(mut self, service_factory: S) -> Self
     where
         S: ServiceFactory + MigrateData,

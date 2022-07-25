@@ -16,12 +16,12 @@ links = "exonum_protobuf_common"
 [dependencies]
 anyhow = "1.0"
 base64 = "0.13"
-chrono = { version = "0.4.6", features = ["serde"] }
-protobuf = { version = "2.17.0", features = ["with-serde"] }
-bit-vec = "0.6.1"
+chrono = { version = "0.4", features = ["serde"] }
+protobuf = "2"
+bit-vec = "0.6"
 serde = "1.0"
 serde_derive = "1.0"
-protobuf-convert = "0.4.0"
+protobuf-convert = "0.4"
 
 [dev-dependencies]
 rand = "0.8"

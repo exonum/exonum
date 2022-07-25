@@ -39,7 +39,8 @@ pub struct TxTime {
 
 impl TxTime {
     /// Creates a new transaction.
-    pub fn new(time: DateTime<Utc>) -> Self {
+    #[must_use]
+    pub const fn new(time: DateTime<Utc>) -> Self {
         Self { time }
     }
 }

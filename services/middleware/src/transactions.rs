@@ -127,11 +127,13 @@ pub struct Batch {
 
 impl Batch {
     /// Creates an empty batch.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Appends a call into the batch.
+    #[must_use]
     pub fn with_call(mut self, call: AnyTx) -> Self {
         self.inner.push(call);
         self

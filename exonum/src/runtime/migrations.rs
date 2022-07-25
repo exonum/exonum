@@ -535,6 +535,7 @@ impl LinearMigrations {
     ///
     /// - If `version` is a prerelease and this instance was not created by the `with_prereleases`
     ///   constructor.
+    #[must_use]
     pub fn set_min_version(mut self, version: Version) -> Self {
         self.check_prerelease(&version);
         self.min_start_version = Some(version);
@@ -547,6 +548,7 @@ impl LinearMigrations {
     ///
     /// - If `version` is a prerelease and this instance was not created by the `with_prereleases`
     ///   constructor.
+    #[must_use]
     pub fn add_script<F>(mut self, version: Version, script: F) -> Self
     where
         F: FnOnce(&mut MigrationContext) -> Result<(), MigrationError> + Send + 'static,
@@ -765,7 +767,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Prerelease versions require using `with_prereleases`")]
     fn prerelease_in_migration_spec_leads_to_panic() {
-        LinearMigrations::new(Version::new(0, 3, 1))
+        let _res = LinearMigrations::new(Version::new(0, 3, 1))
             .add_script("0.2.0-pre.1".parse().unwrap(), migration_02);
     }
 

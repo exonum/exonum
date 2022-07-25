@@ -418,6 +418,7 @@ where
     ///
     /// Limiting the number of merges is useful to test that a migration script does not hang up
     /// with an "unfriendly" abort schedule.
+    #[must_use]
     pub fn limit_merges(mut self, max_merges: usize) -> Self {
         let lock = self
             .inner

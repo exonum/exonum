@@ -141,7 +141,7 @@ impl BinaryValue for () {
 #[allow(clippy::use_self)] // false positives
 impl BinaryValue for bool {
     fn to_bytes(&self) -> Vec<u8> {
-        vec![*self as u8]
+        vec![u8::from(*self)]
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {

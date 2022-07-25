@@ -142,7 +142,7 @@ impl Dh for SodiumDh25519 {
         self.privkey.as_ref()
     }
 
-    fn dh(&self, pubkey: &[u8], out: &mut [u8]) -> Result<(), ()> {
+    fn dh(&self, pubkey: &[u8], out: &mut [u8]) -> Result<(), snow::Error> {
         assert_ne!(
             self.privkey,
             x25519::SecretKey::zero(),
@@ -151,14 +151,12 @@ impl Dh for SodiumDh25519 {
 
         let pubkey = x25519::PublicKey::from_slice(&pubkey[..x25519::PUBLIC_KEY_LENGTH])
             .expect("Can't construct public key for Dh25519");
-        let result = x25519::scalarmult(&self.privkey, &pubkey);
-
-        if result.is_err() {
+        let result = x25519::scalarmult(&self.privkey, &pubkey).map_err(|_| {
             error!("Can't calculate dh, public key {:?}", &pubkey[..]);
-            return Err(());
-        }
+            snow::Error::Input
+        })?;
 
-        out[..self.pub_len()].copy_from_slice(&result.unwrap()[..self.pub_len()]);
+        out[..self.pub_len()].copy_from_slice(&result[..self.pub_len()]);
         Ok(())
     }
 }
@@ -216,7 +214,7 @@ impl Cipher for SodiumChaChaPoly {
         authtext: &[u8],
         ciphertext: &[u8],
         out: &mut [u8],
-    ) -> Result<usize, ()> {
+    ) -> Result<usize, snow::Error> {
         assert_ne!(
             self.key,
             Self::default().key,
@@ -232,7 +230,7 @@ impl Cipher for SodiumChaChaPoly {
                 out[..buf.len()].copy_from_slice(buf);
                 Ok(buf.len())
             }
-            Err(_) => Err(()),
+            Err(()) => Err(snow::Error::Decrypt),
         }
     }
 }

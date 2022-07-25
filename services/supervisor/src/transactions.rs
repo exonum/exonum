@@ -782,6 +782,7 @@ impl Supervisor {
 
     /// Confirms a deploy by the given author's public key and checks
     /// if all the confirmations are collected. If so, starts the artifact registration.
+    #[allow(clippy::unnecessary_wraps)]
     fn confirm_deploy(
         mut context: ExecutionContext<'_>,
         deploy_request: DeployRequest,

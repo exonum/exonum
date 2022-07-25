@@ -296,6 +296,7 @@ where
     }
 
     /// Allows to modify a request before sending it by executing a provided closure.
+    #[must_use]
     pub fn with<F>(self, f: F) -> Self
     where
         F: FnOnce(ReqwestBuilder) -> ReqwestBuilder + Send + 'b,
@@ -307,6 +308,7 @@ where
     }
 
     /// Allows to check that response will contain a specific header.
+    #[must_use]
     pub fn expect_header(self, header: &str, value: &str) -> Self {
         let mut expected_headers = self.expected_headers;
         expected_headers.insert(header.into(), value.into());

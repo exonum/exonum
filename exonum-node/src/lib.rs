@@ -1087,12 +1087,14 @@ impl NodeBuilder {
     }
 
     /// Adds a genesis config to use if the blockchain is not initialized yet.
+    #[must_use]
     pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
         self.blockchain_builder = self.blockchain_builder.with_genesis_config(genesis_config);
         self
     }
 
     /// Adds a runtime to the blockchain.
+    #[must_use]
     pub fn with_runtime<T>(mut self, runtime: T) -> Self
     where
         T: Into<RuntimeInstance>,
@@ -1102,6 +1104,7 @@ impl NodeBuilder {
     }
 
     /// Adds a runtime which depends on a `NodeChannel` (e.g., to update HTTP API of the node).
+    #[must_use]
     pub fn with_runtime_fn<T, F>(mut self, runtime_fn: F) -> Self
     where
         T: Into<RuntimeInstance>,
@@ -1113,6 +1116,7 @@ impl NodeBuilder {
     }
 
     /// Adds the configuration manager.
+    #[must_use]
     pub fn with_config_manager<T: ConfigManager + 'static>(mut self, manager: T) -> Self {
         self.config_manager = Some(Box::new(manager));
         self
@@ -1128,12 +1132,14 @@ impl NodeBuilder {
     /// See the [`pool`] module docs for more details.
     ///
     /// [`pool`]: pool/index.html
+    #[must_use]
     pub fn with_pool_manager<T: ManagePool + 'static>(mut self, manager: T) -> Self {
         self.pool_manager = Box::new(manager);
         self
     }
 
     /// Adds a plugin.
+    #[must_use]
     pub fn with_plugin<T: NodePlugin + 'static>(mut self, plugin: T) -> Self {
         self.plugins.push(Box::new(plugin));
         self
@@ -1148,6 +1154,7 @@ impl NodeBuilder {
     ///
     /// [`ShutdownHandle`]: struct.ShutdownHandle.html
     /// [default signal handling]: struct.Node.html#signal-handling
+    #[must_use]
     pub fn disable_signals(mut self) -> Self {
         self.disable_signals = true;
         self
@@ -1382,7 +1389,7 @@ impl Reactor {
 
     /// Listens to the same 3 signals as `actix`: SIGINT, SIGTERM, and SIGQUIT.
     #[cfg(unix)]
-    #[allow(clippy::mut_mut, clippy::unused_unit)] // occurs in the `select!` macro
+    #[allow(clippy::redundant_pub_crate)] // occurs in the `select!` macro
     async fn listen_to_signals() {
         use futures::StreamExt;
         use tokio::signal::unix::{signal, SignalKind};

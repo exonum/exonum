@@ -18,11 +18,16 @@
 /// `BinaryKey` trait.
 ///
 /// ```
+/// # #[macro_use] extern crate exonum_merkledb;
+/// # use exonum_merkledb::BinaryKey;
+/// # fn main() {
 /// let prefix = vec![0_u8; 10];
-/// let key = PublicKey::zero();
+/// let key = exonum_crypto::PublicKey::zero();
 ///
-/// let _result = concat_keys!(prefix, key);
+/// let _result = concat_keys!(&prefix, &key);
+/// # }
 /// ```
+#[macro_export]
 macro_rules! concat_keys {
     (@capacity $key:expr) => ( $key.size() );
     (@capacity $key:expr, $($tail:expr),+) => (

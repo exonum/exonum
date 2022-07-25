@@ -439,6 +439,7 @@ impl NodeHandler {
                  incorrect or validators majority works incorrectly."
             );
 
+            #[allow(clippy::unnecessary_to_owned)]
             let precommits = self
                 .state
                 .precommits(round, our_block_hash)

@@ -156,6 +156,7 @@ impl ConsensusConfig {
     pub const TIMEOUT_LINEAR_INCREASE_PERCENT: u64 = 10; // 10%
 
     /// Replaces validator keys in existing object with provided ones.
+    #[must_use]
     pub fn with_validator_keys(mut self, validator_keys: Vec<ValidatorKeys>) -> Self {
         self.validator_keys = validator_keys;
         self
@@ -323,6 +324,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `validator_keys` field of `ConsensusConfig`.
+    #[must_use]
     pub fn validator_keys(self, validator_keys: Vec<ValidatorKeys>) -> Self {
         let config = ConsensusConfig {
             validator_keys,
@@ -333,6 +335,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `first_round_timeout` field of `ConsensusConfig`.
+    #[must_use]
     pub fn first_round_timeout(self, first_round_timeout: Milliseconds) -> Self {
         let config = ConsensusConfig {
             first_round_timeout,
@@ -343,6 +346,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `status_timeout` field of `ConsensusConfig`.
+    #[must_use]
     pub fn status_timeout(self, status_timeout: Milliseconds) -> Self {
         let config = ConsensusConfig {
             status_timeout,
@@ -353,6 +357,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `peers_timeout` field of `ConsensusConfig`.
+    #[must_use]
     pub fn peers_timeout(self, peers_timeout: Milliseconds) -> Self {
         let config = ConsensusConfig {
             peers_timeout,
@@ -363,6 +368,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `txs_block_limit` field of `ConsensusConfig`.
+    #[must_use]
     pub fn txs_block_limit(self, txs_block_limit: u32) -> Self {
         let config = ConsensusConfig {
             txs_block_limit,
@@ -373,6 +379,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `min_propose_timeout` field of `ConsensusConfig`.
+    #[must_use]
     pub fn min_propose_timeout(self, min_propose_timeout: Milliseconds) -> Self {
         let config = ConsensusConfig {
             min_propose_timeout,
@@ -383,6 +390,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `max_propose_timeout` field of `ConsensusConfig`.
+    #[must_use]
     pub fn max_propose_timeout(self, max_propose_timeout: Milliseconds) -> Self {
         let config = ConsensusConfig {
             max_propose_timeout,
@@ -393,6 +401,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `max_message_len` field of `ConsensusConfig`.
+    #[must_use]
     pub fn max_message_len(self, max_message_len: u32) -> Self {
         let config = ConsensusConfig {
             max_message_len,
@@ -403,6 +412,7 @@ impl ConsensusConfigBuilder {
     }
 
     /// Sets the `propose_timeout_threshold` field of `ConsensusConfig`.
+    #[must_use]
     pub fn propose_timeout_threshold(self, propose_timeout_threshold: u32) -> Self {
         let config = ConsensusConfig {
             propose_timeout_threshold,
@@ -509,6 +519,7 @@ impl InstanceInitParams {
     }
 
     /// Converts into `InstanceInitParams` with specific constructor.
+    #[must_use]
     pub fn with_constructor(self, constructor: impl BinaryValue) -> Self {
         Self {
             instance_spec: self.instance_spec,
@@ -549,12 +560,14 @@ impl GenesisConfigBuilder {
 
     /// Adds an artifact with no deploy argument. Does nothing in case artifact with given id is
     /// already added.
+    #[must_use]
     pub fn with_artifact(self, artifact: impl Into<ArtifactId>) -> Self {
         self.with_parametric_artifact(artifact, ())
     }
 
     /// Adds an artifact with corresponding deploy argument. Does nothing in case artifact with
     /// given id is already added.
+    #[must_use]
     pub fn with_parametric_artifact(
         mut self,
         artifact: impl Into<ArtifactId>,
@@ -568,6 +581,7 @@ impl GenesisConfigBuilder {
     }
 
     /// Adds service instance initialization parameters.
+    #[must_use]
     pub fn with_instance(mut self, instance_params: InstanceInitParams) -> Self {
         self.builtin_instances.push(instance_params);
         self

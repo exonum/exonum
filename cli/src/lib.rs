@@ -119,14 +119,9 @@
 )]
 #![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
-    // Next `cast_*` lints don't give alternatives.
-    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // '... may panic' lints.
-    clippy::indexing_slicing,
-    // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc,
+    clippy::use_self
 )]
 
 pub use crate::{
@@ -179,6 +174,7 @@ impl Default for NodeBuilder {
 
 impl NodeBuilder {
     /// Creates a new builder.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             genesis_config: GenesisConfigBuilder::default(),
@@ -225,6 +221,7 @@ impl NodeBuilder {
 
     /// Adds a deploy spec to this builder. The spec may contain artifacts and service instances
     /// to deploy at the blockchain start.
+    #[must_use]
     pub fn with(mut self, spec: impl Deploy) -> Self {
         spec.deploy(&mut self.genesis_config, &mut self.rust_runtime);
         self
@@ -233,6 +230,7 @@ impl NodeBuilder {
     /// Adds a new `Runtime` to the list of available runtimes.
     ///
     /// Note that you don't have to add the Rust runtime, since it is included by default.
+    #[must_use]
     pub fn with_external_runtime(mut self, runtime: impl WellKnownRuntime) -> Self {
         self.external_runtimes.push(runtime.into());
         self

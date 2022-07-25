@@ -87,6 +87,7 @@ impl Default for MockTimeProvider {
 
 impl MockTimeProvider {
     /// Creates a new `MockTimeProvider` with time value equal to `time`.
+    #[must_use]
     pub fn new(time: DateTime<Utc>) -> Self {
         Self {
             time: Arc::new(RwLock::new(time)),
@@ -94,6 +95,7 @@ impl MockTimeProvider {
     }
 
     /// Gets the time value currently reported by the provider.
+    #[must_use]
     pub fn time(&self) -> DateTime<Utc> {
         *self.time.read().unwrap()
     }

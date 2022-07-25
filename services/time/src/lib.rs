@@ -104,14 +104,10 @@
 )]
 #![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
-    // Next `cast_*` lints don't give alternatives.
-    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // '... may panic' lints.
-    clippy::indexing_slicing,
-    // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_panics_doc, clippy::missing_const_for_fn
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::use_self
 )]
 
 pub mod api;

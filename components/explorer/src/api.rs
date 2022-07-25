@@ -252,6 +252,7 @@ impl TransactionStatusQuery {
     }
 
     /// Requests to return a call status with a cryptographic proof of authenticity.
+    #[must_use]
     pub fn with_proof(mut self) -> Self {
         self.with_proof = true;
         self
@@ -283,6 +284,7 @@ impl CallStatusQuery {
     }
 
     /// Requests to return a call status with a cryptographic proof of authenticity.
+    #[must_use]
     pub fn with_proof(mut self) -> Self {
         self.with_proof = true;
         self
