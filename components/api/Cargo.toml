@@ -20,13 +20,13 @@ actix-cors = "0.6"
 actix-server = "2.1"
 actix-web = { version = "4.1", default-features = false }
 anyhow = "1.0"
-chrono = { version = "0.4.15", features = ["serde"] }
 futures = "0.3"
 log = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_urlencoded = "0.7"
 thiserror = "1.0"
+time = { version = "0.3", features = [ "formatting", "macros", "serde" ] }
 
 [dependencies.tokio]
 version = "1"

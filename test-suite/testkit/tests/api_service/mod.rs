@@ -15,7 +15,6 @@
 //! Service with API, but without any transactions.
 //! This service can be used for testing features related only to the API.
 
-use chrono::{TimeZone, Utc};
 use exonum::runtime::{
     migrations::{InitMigrationError, MigrateData, MigrationScript},
     versioning::Version,
@@ -27,6 +26,7 @@ use exonum_rust_runtime::{
     DefaultInstance, Service,
 };
 use serde_derive::{Deserialize, Serialize};
+use time::macros::datetime;
 
 pub const SERVICE_NAME: &str = "api-service";
 // We need supervisor privileges to start service migration.
@@ -80,8 +80,7 @@ impl Api {
             .deprecated_endpoint("ping-pong-deprecated", Deprecated::new(Self::ping_pong))
             .deprecated_endpoint(
                 "ping-pong-deprecated-with-deadline",
-                Deprecated::new(Self::ping_pong)
-                    .with_date(Utc.ymd(2055, 12, 31).and_hms(23, 59, 59)),
+                Deprecated::new(Self::ping_pong).with_date(datetime!(2055-12-31 23:59:59 UTC)),
             )
             .deprecated_endpoint_mut("ping-pong-deprecated-mut", Deprecated::new(Self::ping_pong));
 

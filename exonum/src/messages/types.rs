@@ -14,12 +14,12 @@
 
 pub use crate::{proto::schema, runtime::AnyTx};
 
-use chrono::{DateTime, Utc};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_merkledb::BinaryValue;
 use exonum_proto::ProtobufConvert;
 
 use std::convert::TryFrom;
+use time::OffsetDateTime;
 
 use crate::{
     crypto::{self, Hash, PublicKey, SecretKey, Signature},
@@ -76,7 +76,7 @@ pub struct Precommit {
     /// Hash of the new block.
     pub block_hash: Hash,
     /// Local time of the validator node when the `Precommit` was created.
-    pub time: DateTime<Utc>,
+    pub time: OffsetDateTime,
 }
 
 impl Precommit {
@@ -87,7 +87,7 @@ impl Precommit {
         round: Round,
         propose_hash: Hash,
         block_hash: Hash,
-        time: DateTime<Utc>,
+        time: OffsetDateTime,
     ) -> Self {
         Self {
             validator,

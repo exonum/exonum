@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use bit_vec::BitVec;
-use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::Block,
     crypto::{Hash, PublicKey},
@@ -24,8 +23,8 @@ use exonum::{
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-
 use std::convert::TryFrom;
+use time::OffsetDateTime;
 
 use crate::proto::consensus;
 
@@ -51,7 +50,7 @@ pub struct Connect {
     /// The node's public address.
     pub host: String,
     /// Time when the message was created.
-    pub time: DateTime<Utc>,
+    pub time: OffsetDateTime,
     /// String containing information about this node including Exonum, Rust and OS versions.
     pub user_agent: String,
 }
@@ -60,7 +59,7 @@ impl Connect {
     /// Create new `Connect` message.
     pub fn new(
         host: impl Into<String>,
-        time: DateTime<Utc>,
+        time: OffsetDateTime,
         user_agent: impl Into<String>,
     ) -> Self {
         Self {
@@ -76,7 +75,7 @@ impl Connect {
     }
 
     /// Time when the message was created.
-    pub fn time(&self) -> DateTime<Utc> {
+    pub fn time(&self) -> OffsetDateTime {
         self.time
     }
 

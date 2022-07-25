@@ -322,7 +322,7 @@ impl Sandbox {
     pub fn create_connect(
         public_key: &PublicKey,
         addr: String,
-        time: chrono::DateTime<chrono::Utc>,
+        time: time::OffsetDateTime,
         user_agent: &str,
         secret_key: &SecretKey,
     ) -> Verified<Connect> {
@@ -393,7 +393,7 @@ impl Sandbox {
         propose_round: Round,
         propose_hash: Hash,
         block_hash: Hash,
-        system_time: chrono::DateTime<chrono::Utc>,
+        system_time: time::OffsetDateTime,
         secret_key: &SecretKey,
     ) -> Verified<Precommit> {
         Verified::from_value(

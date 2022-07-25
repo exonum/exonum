@@ -39,12 +39,13 @@
 //! A new signed message can be created as follows.
 //!
 //! ```
-//! # use chrono::Utc;
 //! # use exonum::{
 //! #     crypto::{hash, Hash, KeyPair},
 //! #     helpers::{Height, Round, ValidatorId},
 //! #     messages::{Precommit, Verified},
 //! # };
+//! use time::OffsetDateTime;
+//!
 //! # fn send<T>(_: T) {}
 //! let keypair = KeyPair::random();
 //! // For example, let's create a `Precommit` message.
@@ -54,7 +55,7 @@
 //!     Round::first(),
 //!     hash(b"propose_hash"),
 //!     hash(b"block_hash"),
-//!     Utc::now(),
+//!     OffsetDateTime::now_utc(),
 //! );
 //! // Sign the message with some keypair to get a trusted `Precommit` message.
 //! let signed_payload = Verified::from_value(payload, keypair.public_key(), keypair.secret_key());
@@ -68,12 +69,13 @@
 //!
 //! ```
 //! # use assert_matches::assert_matches;
-//! # use chrono::Utc;
 //! # use exonum::{
 //! #     crypto::{hash, Hash, KeyPair},
 //! #     helpers::{Height, Round, ValidatorId},
 //! #     messages::{CoreMessage, Precommit, Verified, SignedMessage},
 //! # };
+//! use time::OffsetDateTime;
+//!
 //! # fn get_signed_message() -> SignedMessage {
 //! #     let keypair = KeyPair::random();
 //! #     let payload = Precommit::new(
@@ -82,7 +84,7 @@
 //! #         Round::first(),
 //! #         hash(b"propose_hash"),
 //! #         hash(b"block_hash"),
-//! #         Utc::now(),
+//! #         OffsetDateTime::now_utc(),
 //! #     );
 //! #     Verified::from_value(payload, keypair.public_key(), keypair.secret_key()).into_raw()
 //! # }
@@ -115,11 +117,11 @@ pub const SIGNED_MESSAGE_MIN_SIZE: usize = PUBLIC_KEY_LENGTH + SIGNATURE_LENGTH 
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
     use exonum_crypto::{self as crypto, KeyPair};
     use exonum_merkledb::BinaryValue;
     use exonum_proto::ProtobufConvert;
     use protobuf::Message;
+    use time::OffsetDateTime;
 
     use super::{Precommit, SignedMessage, Verified, SIGNED_MESSAGE_MIN_SIZE};
     use crate::{
@@ -137,7 +139,7 @@ mod tests {
     #[test]
     fn test_message_roundtrip() {
         let keys = KeyPair::random();
-        let ts = Utc::now();
+        let ts = OffsetDateTime::now_utc();
 
         let msg = Verified::from_value(
             Precommit::new(
@@ -172,7 +174,7 @@ mod tests {
             Round(25),
             crypto::hash(&[1, 2, 3]),
             crypto::hash(&[3, 2, 1]),
-            Utc::now(),
+            OffsetDateTime::now_utc(),
         );
         ex_msg.set_precommit(precommit_msg.to_pb());
         let mut payload = ex_msg.write_to_bytes().unwrap();
@@ -193,7 +195,7 @@ mod tests {
     #[test]
     fn test_precommit_serde_correct() {
         let keys = KeyPair::random();
-        let ts = Utc::now();
+        let ts = OffsetDateTime::now_utc();
 
         let precommit = Verified::from_value(
             Precommit::new(

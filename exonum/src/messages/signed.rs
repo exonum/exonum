@@ -249,9 +249,9 @@ impl<T: Debug> Debug for Verified<T> {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
     use exonum_crypto::{self as crypto, Signature};
     use pretty_assertions::assert_eq;
+    use time::OffsetDateTime;
 
     use super::{BinaryValue, ObjectHash, ProtobufConvert, Verified};
     use crate::{
@@ -286,7 +286,7 @@ mod tests {
     #[should_panic(expected = "Failed to verify signature.")]
     fn test_precommit_serde_wrong_signature() {
         let keys = crypto::KeyPair::random();
-        let ts = Utc::now();
+        let ts = OffsetDateTime::now_utc();
 
         let mut precommit = Verified::from_value(
             Precommit::new(

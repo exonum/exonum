@@ -159,10 +159,16 @@ fn json_response<T: Serialize>(actuality: Actuality, json_value: T) -> HttpRespo
         // about endpoint deprecation is setting the `Warning` header.
         let expiration_note = match discontinued_on {
             // Date is formatted according to HTTP-date format.
-            Some(date) => format!(
-                "The old API is maintained until {}.",
-                date.format("%a, %d %b %Y %T GMT")
-            ),
+            Some(date) => {
+                let date_format = time::format_description::parse(
+                    "[weekday repr:short], [day] [month repr:short] [year] [hour]:[minute]:[second] GMT",
+                )
+                .unwrap();
+                format!(
+                    "The old API is maintained until {}.",
+                    date.format(&date_format).unwrap_or_default()
+                )
+            }
             None => "Currently there is no specific date for disabling this endpoint.".into(),
         };
 
@@ -373,7 +379,7 @@ mod tests {
 
     #[test]
     fn json_responses() {
-        use chrono::TimeZone;
+        use time::macros::datetime;
 
         let actual_response = json_response(Actuality::Actual, 123);
         assert_responses_eq(actual_response, HttpResponse::Ok().json(123));
@@ -416,7 +422,7 @@ mod tests {
                 .json(123),
         );
 
-        let deadline = chrono::Utc.ymd(2020, 12, 31).and_hms(23, 59, 59);
+        let deadline = datetime!(2020-12-31 23:59:59 UTC);
 
         let deprecated_response_deadline = json_response(
             Actuality::Deprecated {

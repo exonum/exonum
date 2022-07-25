@@ -17,7 +17,6 @@
 //! The types are bundled together with the explorer (rather than the explorer service)
 //! in order to ease dependency management for client apps.
 
-use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{Block, CallProof},
     crypto::Hash,
@@ -28,6 +27,7 @@ use exonum::{
 };
 use serde_derive::{Deserialize, Serialize};
 use std::ops::Range;
+use time::OffsetDateTime;
 
 use crate::median_precommits_time;
 
@@ -83,7 +83,7 @@ pub struct BlockInfo {
 
     /// Median time from the block precommits.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time: Option<DateTime<Utc>>,
+    pub time: Option<OffsetDateTime>,
 }
 
 impl From<crate::BlockInfo<'_>> for BlockInfo {

@@ -15,8 +15,8 @@
 //! A definition of `BinaryKey` trait and implementations for common types.
 
 use byteorder::{BigEndian, ByteOrder};
-use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use exonum_crypto::{Hash, PublicKey, Signature, HASH_SIZE, PUBLIC_KEY_LENGTH, SIGNATURE_LENGTH};
@@ -288,27 +288,23 @@ impl BinaryKey for str {
     }
 }
 
-/// `chrono::DateTime` uses only 12 bytes in the storage. It is represented by number of seconds
-/// since `1970-01-01 00:00:00 UTC`, which are stored in the first 8 bytes as per the `BinaryKey`
-/// implementation for `i64`, and nanoseconds, which are stored in the remaining 4 bytes as per
-/// the `BinaryKey` implementation for `u32`.
-impl BinaryKey for DateTime<Utc> {
+/// `time::OffsetDateTime` uses only 128 bits of 16 bytes in the storage. It is represented by
+/// number of nanoseconds since `1970-01-01 00:00:00 UTC`, which are stored as per the `BinaryKey`
+/// implementation for `i128`.
+impl BinaryKey for OffsetDateTime {
     fn size(&self) -> usize {
-        12
+        16
     }
 
     fn write(&self, buffer: &mut [u8]) -> usize {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
-        secs.write(&mut buffer[0..8]);
-        nanos.write(&mut buffer[8..12]);
+        let nanos = self.unix_timestamp_nanos();
+        nanos.write(&mut buffer[0..16]);
         self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        let secs = i64::read(&buffer[0..8]);
-        let nanos = u32::read(&buffer[8..12]);
-        Self::from_utc(NaiveDateTime::from_timestamp(secs, nanos), Utc)
+        let nanos = i128::read(&buffer[0..16]);
+        Self::from_unix_timestamp_nanos(nanos).unwrap()
     }
 }
 
@@ -346,15 +342,14 @@ impl BinaryKey for Decimal {
 
 #[cfg(test)]
 mod tests {
+    use hex::FromHex;
+    use std::{fmt::Debug, str::FromStr};
+    use time::Duration;
+
     use super::{
-        BigEndian, BinaryKey, ByteOrder, DateTime, Decimal, Hash, PublicKey, Signature, Utc, Uuid,
+        BigEndian, BinaryKey, ByteOrder, Decimal, Hash, OffsetDateTime, PublicKey, Signature, Uuid,
     };
     use crate::access::CopyAccessExt;
-
-    use std::{fmt::Debug, str::FromStr};
-
-    use chrono::{Duration, TimeZone};
-    use hex::FromHex;
 
     // Number of samples for fuzz testing
     const FUZZ_SAMPLES: usize = 100_000;
@@ -528,12 +523,11 @@ mod tests {
     #[test]
     fn test_storage_key_for_chrono_date_time_round_trip() {
         let times = [
-            Utc.timestamp(0, 0),
-            Utc.timestamp(13, 23),
-            Utc::now(),
-            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
-            Utc.timestamp(0, 999_999_999),
-            Utc.timestamp(0, 1_500_000_000), // leap second
+            OffsetDateTime::from_unix_timestamp(0).unwrap(),
+            OffsetDateTime::now_utc(),
+            OffsetDateTime::now_utc() + Duration::seconds(17) + Duration::nanoseconds(15),
+            OffsetDateTime::from_unix_timestamp_nanos(999_999_999).unwrap(),
+            OffsetDateTime::from_unix_timestamp_nanos(1_500_000_000).unwrap(), // leap second
         ];
 
         assert_round_trip_eq(&times);
@@ -541,20 +535,16 @@ mod tests {
 
     #[test]
     fn test_storage_key_for_system_time_ordering() {
-        use rand::{thread_rng, Rng};
+        use rand::{distributions::Uniform, thread_rng, Rng};
 
         let mut rng = thread_rng();
+        let range = Uniform::new_inclusive(-377_705_116_800, 253_402_300_799);
 
-        let (mut buffer1, mut buffer2) = ([0_u8; 12], [0_u8; 12]);
+        let (mut buffer1, mut buffer2) = ([0_u8; 16], [0_u8; 16]);
         for _ in 0..FUZZ_SAMPLES {
-            let time1 = Utc.timestamp(
-                rng.gen::<i64>() % i64::from(i32::max_value()),
-                rng.gen::<u32>() % 1_000_000_000,
-            );
-            let time2 = Utc.timestamp(
-                rng.gen::<i64>() % i64::from(i32::max_value()),
-                rng.gen::<u32>() % 1_000_000_000,
-            );
+            let time1 = OffsetDateTime::from_unix_timestamp_nanos(rng.sample(range)).unwrap();
+            let time2 = OffsetDateTime::from_unix_timestamp_nanos(rng.sample(range)).unwrap();
+
             time1.write(&mut buffer1);
             time2.write(&mut buffer2);
             assert_eq!(time1.cmp(&time2), buffer1.cmp(&buffer2));
@@ -566,37 +556,45 @@ mod tests {
         use crate::{Database, MapIndex, TemporaryDB};
 
         let db: Box<dyn Database> = Box::new(TemporaryDB::default());
-        let x1 = Utc.timestamp(80, 0);
-        let x2 = Utc.timestamp(10, 0);
-        let y1 = Utc::now();
+        let x1 = OffsetDateTime::from_unix_timestamp(80).unwrap();
+        let x2 = OffsetDateTime::from_unix_timestamp(10).unwrap();
+        let y1 = OffsetDateTime::now_utc();
         let y2 = y1 + Duration::seconds(10);
         let fork = db.fork();
         {
-            let mut index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> = fork.get_map("test_index");
+            let mut index: MapIndex<_, OffsetDateTime, OffsetDateTime> = fork.get_map("test_index");
             index.put(&x1, y1);
             index.put(&x2, y2);
         }
         db.merge(fork.into_patch()).unwrap();
 
         let snapshot = db.snapshot();
-        let index: MapIndex<_, DateTime<Utc>, DateTime<Utc>> = snapshot.get_map("test_index");
+        let index: MapIndex<_, OffsetDateTime, OffsetDateTime> = snapshot.get_map("test_index");
         assert_eq!(index.get(&x1), Some(y1));
         assert_eq!(index.get(&x2), Some(y2));
 
         assert_eq!(
-            index.iter_from(&Utc.timestamp(0, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&OffsetDateTime::from_unix_timestamp(0).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x2, y2), (x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp(20, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&OffsetDateTime::from_unix_timestamp(20).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp(80, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&OffsetDateTime::from_unix_timestamp(80).unwrap())
+                .collect::<Vec<_>>(),
             vec![(x1, y1)]
         );
         assert_eq!(
-            index.iter_from(&Utc.timestamp(90, 0)).collect::<Vec<_>>(),
+            index
+                .iter_from(&OffsetDateTime::from_unix_timestamp(90).unwrap())
+                .collect::<Vec<_>>(),
             vec![]
         );
 

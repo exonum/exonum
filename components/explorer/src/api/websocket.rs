@@ -14,7 +14,6 @@
 
 //! Types used in WebSocket communication with the explorer service.
 
-use chrono::{DateTime, Utc};
 use exonum::{
     blockchain::{Block, Schema, TxLocation},
     crypto::Hash,
@@ -23,6 +22,7 @@ use exonum::{
 };
 use serde_derive::{Deserialize, Serialize};
 use std::fmt;
+use time::OffsetDateTime;
 
 use crate::{api::TransactionHex, median_precommits_time};
 
@@ -137,7 +137,7 @@ pub struct CommittedTransactionSummary {
     /// Proof of existence.
     pub location_proof: ListProof<Hash>,
     /// Approximate finalization time.
-    pub time: DateTime<Utc>,
+    pub time: OffsetDateTime,
 }
 
 impl CommittedTransactionSummary {

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Utc};
-
 use std::{future::Future, marker::PhantomData};
+use time::OffsetDateTime;
 
 use crate::{error, EndpointMutability};
 
@@ -55,7 +54,7 @@ pub enum Actuality {
     /// Endpoint is not recommended to use, the support of it will end soon.
     Deprecated {
         /// Optional value denoting the endpoint expiration date.
-        discontinued_on: Option<DateTime<Utc>>,
+        discontinued_on: Option<OffsetDateTime>,
         /// Optional additional description.
         description: Option<String>,
     },
@@ -67,7 +66,7 @@ pub struct Deprecated<Q, I, R, F> {
     /// Underlying API handler.
     pub handler: F,
     /// Optional endpoint expiration date.
-    pub discontinued_on: Option<DateTime<Utc>>,
+    pub discontinued_on: Option<OffsetDateTime>,
     /// Optional additional note.
     pub description: Option<String>,
     _query_type: PhantomData<Q>,
@@ -89,7 +88,7 @@ impl<Q, I, R, F> Deprecated<Q, I, R, F> {
     }
 
     /// Adds an expiration date for endpoint.
-    pub fn with_date(self, discontinued_on: DateTime<Utc>) -> Self {
+    pub fn with_date(self, discontinued_on: OffsetDateTime) -> Self {
         Self {
             discontinued_on: Some(discontinued_on),
             ..self

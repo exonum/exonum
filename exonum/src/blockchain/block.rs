@@ -571,12 +571,12 @@ impl CallProof {
 #[cfg(test)]
 mod tests {
     use assert_matches::assert_matches;
-    use chrono::Utc;
     use exonum_crypto::{hash, KeyPair};
     use exonum_merkledb::{
         access::CopyAccessExt, Database, HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
     use pretty_assertions::{assert_eq, assert_ne};
+    use time::OffsetDateTime;
 
     use super::{
         AdditionalHeaders, BinaryValue, Block, BlockHeaderKey, BlockProof, CallInBlock, CallProof,
@@ -746,7 +746,7 @@ mod tests {
                 Round(1),
                 Hash::zero(),
                 block.object_hash(),
-                Utc::now(),
+                OffsetDateTime::now_utc(),
             );
             Verified::from_value(precommit, keypair.public_key(), keypair.secret_key())
         });
@@ -789,7 +789,7 @@ mod tests {
             Round(1),
             Hash::zero(),
             block.object_hash(),
-            Utc::now(),
+            OffsetDateTime::now_utc(),
         );
         let precommit = Verified::from_value(precommit, keypair.public_key(), keypair.secret_key());
 
@@ -846,7 +846,7 @@ mod tests {
             Round(1),
             Hash::zero(),
             proof.block.object_hash(),
-            Utc::now(),
+            OffsetDateTime::now_utc(),
         );
         let bogus_precommit =
             Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());
@@ -865,7 +865,7 @@ mod tests {
             Round(1),
             Hash::zero(),
             Hash::zero(),
-            Utc::now(),
+            OffsetDateTime::now_utc(),
         );
         let bogus_precommit =
             Verified::from_value(bogus_precommit, public_keys[3], keys[3].secret_key());

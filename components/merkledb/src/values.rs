@@ -18,8 +18,8 @@ use std::{borrow::Cow, io::Read};
 
 use anyhow::{self, ensure, format_err};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
-use chrono::{DateTime, NaiveDateTime, Utc};
 use rust_decimal::Decimal;
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE};
@@ -77,7 +77,7 @@ pub trait BinaryValue: Sized {
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self>;
 }
 
-impl_object_hash_for_binary_value! { (), bool, Vec<u8>, String, PublicKey, DateTime<Utc>, Uuid, Decimal }
+impl_object_hash_for_binary_value! { (), bool, Vec<u8>, String, PublicKey, OffsetDateTime, Uuid, Decimal }
 
 macro_rules! impl_binary_value_scalar {
     ($type:tt, $read:ident) => {
@@ -200,27 +200,19 @@ impl BinaryValue for PublicKey {
     }
 }
 
-// FIXME Maybe we should remove this implementations. [ECR-2775]
-
-impl BinaryValue for DateTime<Utc> {
+impl BinaryValue for OffsetDateTime {
     fn to_bytes(&self) -> Vec<u8> {
-        let secs = self.timestamp();
-        let nanos = self.timestamp_subsec_nanos();
+        let nanos = self.unix_timestamp_nanos();
 
-        let mut buffer = vec![0; 12];
-        LittleEndian::write_i64(&mut buffer[0..8], secs);
-        LittleEndian::write_u32(&mut buffer[8..12], nanos);
+        let mut buffer = vec![0; 16];
+        LittleEndian::write_i128(&mut buffer[0..16], nanos);
         buffer
     }
 
     fn from_bytes(bytes: Cow<'_, [u8]>) -> anyhow::Result<Self> {
         let mut value = bytes.as_ref();
-        let secs = value.read_i64::<LittleEndian>()?;
-        let nanos = value.read_u32::<LittleEndian>()?;
-        Ok(Self::from_utc(
-            NaiveDateTime::from_timestamp(secs, nanos),
-            Utc,
-        ))
+        let nanos = value.read_i128::<LittleEndian>()?;
+        Self::from_unix_timestamp_nanos(nanos).map_err(From::from)
     }
 }
 
@@ -268,10 +260,9 @@ impl BinaryValue for [u8; HASH_SIZE] {
 mod tests {
     use std::fmt::Debug;
     use std::str::FromStr;
+    use time::Duration;
 
-    use chrono::Duration;
-
-    use super::{BinaryValue, Decimal, Utc, Uuid, HASH_SIZE};
+    use super::{BinaryValue, Decimal, OffsetDateTime, Uuid, HASH_SIZE};
 
     fn assert_round_trip_eq<T: BinaryValue + PartialEq + Debug>(values: &[T]) {
         for value in values {
@@ -349,15 +340,12 @@ mod tests {
 
     #[test]
     fn test_binary_form_datetime() {
-        use chrono::TimeZone;
-
         let times = [
-            Utc.timestamp(0, 0),
-            Utc.timestamp(13, 23),
-            Utc::now(),
-            Utc::now() + Duration::seconds(17) + Duration::nanoseconds(15),
-            Utc.timestamp(0, 999_999_999),
-            Utc.timestamp(0, 1_500_000_000), // leap second
+            OffsetDateTime::from_unix_timestamp(0).unwrap(),
+            OffsetDateTime::now_utc(),
+            OffsetDateTime::now_utc() + Duration::seconds(17) + Duration::nanoseconds(15),
+            OffsetDateTime::from_unix_timestamp_nanos(999_999_999).unwrap(),
+            OffsetDateTime::from_unix_timestamp_nanos(1_500_000_000).unwrap(), // leap second
         ];
         assert_round_trip_eq(&times);
     }

@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Utc};
 use exonum::runtime::{CommonError, ExecutionContext, ExecutionError};
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 use crate::{proto, schema::TimeSchema, TimeService};
 
@@ -34,13 +34,13 @@ pub enum Error {
 #[protobuf_convert(source = "proto::TxTime")]
 pub struct TxTime {
     /// Time of the validator.
-    pub time: DateTime<Utc>,
+    pub time: OffsetDateTime,
 }
 
 impl TxTime {
     /// Creates a new transaction.
     #[must_use]
-    pub const fn new(time: DateTime<Utc>) -> Self {
+    pub const fn new(time: OffsetDateTime) -> Self {
         Self { time }
     }
 }

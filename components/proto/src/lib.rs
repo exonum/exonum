@@ -61,9 +61,9 @@ pub use protobuf_convert::*;
 pub mod proto;
 
 use anyhow::{ensure, format_err, Error};
-use chrono::{DateTime, TimeZone, Utc};
 use protobuf::well_known_types;
 use serde::{de::Visitor, Deserializer, Serializer};
+use time::OffsetDateTime;
 
 use std::{collections::HashMap, convert::TryFrom, fmt};
 
@@ -83,20 +83,19 @@ pub trait ProtobufConvert: Sized {
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error>;
 }
 
-impl ProtobufConvert for DateTime<Utc> {
+impl ProtobufConvert for OffsetDateTime {
     type ProtoStruct = well_known_types::Timestamp;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut ts = Self::ProtoStruct::new();
-        ts.set_seconds(self.timestamp());
-        ts.set_nanos(self.timestamp_subsec_nanos() as i32);
+        ts.set_seconds(self.unix_timestamp());
+        ts.set_nanos(self.nanosecond() as i32);
         ts
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        Utc.timestamp_opt(pb.get_seconds(), pb.get_nanos() as u32)
-            .single()
-            .ok_or_else(|| format_err!("Failed to convert timestamp from bytes"))
+        let timestamp = i128::from(pb.get_seconds() * 1_000_000_000 + i64::from(pb.get_nanos()));
+        OffsetDateTime::from_unix_timestamp_nanos(timestamp).map_err(Into::into)
     }
 }
 

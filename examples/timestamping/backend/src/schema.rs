@@ -14,7 +14,6 @@
 
 //! Timestamping database schema.
 
-use chrono::{DateTime, Utc};
 use exonum::{
     crypto::Hash,
     merkledb::{
@@ -24,6 +23,7 @@ use exonum::{
 };
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use time::OffsetDateTime;
 
 use crate::{proto, transactions::Config};
 
@@ -59,12 +59,12 @@ pub struct TimestampEntry {
     /// Hash of transaction.
     pub tx_hash: Hash,
     /// Timestamp time.
-    pub time: DateTime<Utc>,
+    pub time: OffsetDateTime,
 }
 
 impl TimestampEntry {
     /// New TimestampEntry.
-    pub fn new(timestamp: Timestamp, tx_hash: Hash, time: DateTime<Utc>) -> Self {
+    pub fn new(timestamp: Timestamp, tx_hash: Hash, time: OffsetDateTime) -> Self {
         Self {
             timestamp,
             tx_hash,

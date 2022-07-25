@@ -43,7 +43,6 @@
 //! ## Use with `TestKit`
 //!
 //! ```
-//! use chrono::{TimeZone, Utc};
 //! use exonum::{
 //!     helpers::Height,
 //!     runtime::{InstanceId, SnapshotExt},
@@ -51,8 +50,8 @@
 //! use exonum_rust_runtime::ServiceFactory;
 //! use exonum_testkit::{Spec, TestKit, TestKitBuilder};
 //! use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
-//!
 //! use std::sync::Arc;
+//! use time::OffsetDateTime;
 //!
 //! const TIME_SERVICE_ID: InstanceId = 100;
 //! const TIME_SERVICE_NAME: &'static str = "time-oracle";
@@ -76,7 +75,7 @@
 //!     .build();
 //!
 //! // Set time in `MockTimeProvider`.
-//! time_provider.set_time(Utc.timestamp(10, 0));
+//! time_provider.set_time(OffsetDateTime::from_unix_timestamp(10).unwrap());
 //! // Create some blocks for time to appear in the blockchain.
 //! testkit.create_blocks_until(Height(2));
 //!

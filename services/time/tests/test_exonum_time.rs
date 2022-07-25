@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{KeyPair, PublicKey},
     helpers::Height,
@@ -22,8 +21,8 @@ use exonum::{
 use exonum_supervisor::{ConfigPropose, Supervisor, SupervisorInterface};
 use exonum_testkit::{ApiKind, Spec, TestKit, TestKitApi, TestKitBuilder, TestNode};
 use pretty_assertions::assert_eq;
-
 use std::collections::HashMap;
+use time::{Duration, OffsetDateTime};
 
 use exonum_time::{
     Error, MockTimeProvider, TimeOracleInterface, TimeSchema, TimeServiceFactory, TxTime,
@@ -40,8 +39,8 @@ fn get_schema(snapshot: &dyn Snapshot) -> TimeSchema<impl Access + '_> {
 fn assert_storage_times_eq(
     snapshot: &dyn Snapshot,
     validators: &[TestNode],
-    expected_current_time: Option<DateTime<Utc>>,
-    expected_validators_times: &[Option<DateTime<Utc>>],
+    expected_current_time: Option<OffsetDateTime>,
+    expected_validators_times: &[Option<OffsetDateTime>],
 ) {
     let schema = get_schema(snapshot);
     assert_eq!(schema.time.get(), expected_current_time);
@@ -75,7 +74,7 @@ fn test_exonum_time_service_with_3_validators() {
     //
     // Consolidated time will have the value `time0`.
 
-    let time0 = Utc::now();
+    let time0 = OffsetDateTime::now_utc();
     let tx0 = validators[0]
         .service_keypair()
         .report_time(INSTANCE_ID, TxTime::new(time0));
@@ -137,7 +136,7 @@ fn test_exonum_time_service_with_4_validators() {
     //
     // Consolidated time doesn't change.
 
-    let time0 = Utc::now();
+    let time0 = OffsetDateTime::now_utc();
     let tx0 = validators[0]
         .service_keypair()
         .report_time(INSTANCE_ID, TxTime::new(time0));
@@ -222,7 +221,7 @@ fn test_exonum_time_service_with_7_validators() {
 
     assert_storage_times_eq(&testkit.snapshot(), &validators, None, &validators_times);
 
-    let time = Utc::now();
+    let time = OffsetDateTime::now_utc();
     let times = (0..7)
         .map(|x| time + Duration::seconds(x * 10))
         .collect::<Vec<_>>();
@@ -272,28 +271,40 @@ fn test_mock_provider() {
     };
 
     mock_provider.add_time(Duration::seconds(10));
-    assert_eq!(Utc.timestamp(10, 0), mock_provider.time());
+    assert_eq!(
+        OffsetDateTime::from_unix_timestamp(10).unwrap(),
+        mock_provider.time()
+    );
     testkit.create_blocks_until(Height(2));
     assert_storage_times(testkit.snapshot());
 
-    mock_provider.set_time(Utc.timestamp(50, 0));
-    assert_eq!(Utc.timestamp(50, 0), mock_provider.time());
+    mock_provider.set_time(OffsetDateTime::from_unix_timestamp(50).unwrap());
+    assert_eq!(
+        OffsetDateTime::from_unix_timestamp(50).unwrap(),
+        mock_provider.time()
+    );
     testkit.create_blocks_until(Height(4));
     assert_storage_times(testkit.snapshot());
 
     mock_provider.add_time(Duration::seconds(20));
-    assert_eq!(Utc.timestamp(70, 0), mock_provider.time());
+    assert_eq!(
+        OffsetDateTime::from_unix_timestamp(70).unwrap(),
+        mock_provider.time()
+    );
     testkit.create_blocks_until(Height(6));
     assert_storage_times(testkit.snapshot());
 
-    mock_provider.set_time(Utc.timestamp(30, 0));
-    assert_eq!(Utc.timestamp(30, 0), mock_provider.time());
+    mock_provider.set_time(OffsetDateTime::from_unix_timestamp(30).unwrap());
+    assert_eq!(
+        OffsetDateTime::from_unix_timestamp(30).unwrap(),
+        mock_provider.time()
+    );
     testkit.create_blocks_until(Height(8));
     assert_storage_times_eq(
         &testkit.snapshot(),
         &validators,
-        Some(Utc.timestamp(70, 0)),
-        &[Some(Utc.timestamp(70, 0))],
+        Some(OffsetDateTime::from_unix_timestamp(70).unwrap()),
+        &[Some(OffsetDateTime::from_unix_timestamp(70).unwrap())],
     );
 }
 
@@ -370,7 +381,7 @@ fn test_creating_transaction_is_not_validator() {
     let mut testkit = create_testkit_with_validators(1);
 
     let keypair = KeyPair::random();
-    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(Utc::now()));
+    let tx = keypair.report_time(INSTANCE_ID, TxTime::new(OffsetDateTime::now_utc()));
     let block = testkit.create_block_with_transaction(tx);
     assert_eq!(
         *block[0].status().unwrap_err(),
@@ -388,7 +399,7 @@ fn test_transaction_time_less_than_validator_time_in_storage() {
     let mut testkit = create_testkit_with_validators(1);
     let validator = testkit.network().validators()[0].service_keypair();
 
-    let time0 = Utc::now();
+    let time0 = OffsetDateTime::now_utc();
     let tx0 = validator.report_time(INSTANCE_ID, TxTime::new(time0));
     let block = testkit.create_block_with_transaction(tx0);
     block[0].status().unwrap();
@@ -427,7 +438,7 @@ fn create_testkit_with_validators(validators_count: u16) -> TestKit {
         .build()
 }
 
-async fn get_current_time(api: &mut TestKitApi) -> Option<DateTime<Utc>> {
+async fn get_current_time(api: &mut TestKitApi) -> Option<OffsetDateTime> {
     api.public(ApiKind::Service(INSTANCE_NAME))
         .get("v1/current_time")
         .await
@@ -448,14 +459,14 @@ async fn get_all_validators_times(api: &mut TestKitApi) -> Vec<ValidatorTime> {
         .unwrap()
 }
 
-async fn assert_current_time_eq(api: &mut TestKitApi, expected_time: Option<DateTime<Utc>>) {
+async fn assert_current_time_eq(api: &mut TestKitApi, expected_time: Option<OffsetDateTime>) {
     let current_time = get_current_time(api).await;
     assert_eq!(expected_time, current_time);
 }
 
 async fn assert_current_validators_times_eq(
     api: &mut TestKitApi,
-    expected_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
+    expected_times: &HashMap<PublicKey, Option<OffsetDateTime>>,
 ) {
     let validators_times: HashMap<_, _> = get_current_validators_times(api)
         .await
@@ -468,7 +479,7 @@ async fn assert_current_validators_times_eq(
 
 async fn assert_all_validators_times_eq(
     api: &mut TestKitApi,
-    expected_validators_times: &HashMap<PublicKey, Option<DateTime<Utc>>>,
+    expected_validators_times: &HashMap<PublicKey, Option<OffsetDateTime>>,
 ) {
     let validators_times: HashMap<_, _> = get_all_validators_times(api)
         .await
@@ -501,7 +512,7 @@ async fn test_endpoint_api() {
     assert_current_validators_times_eq(&mut api, &current_validators_times).await;
     assert_all_validators_times_eq(&mut api, &all_validators_times).await;
 
-    let time0 = Utc::now();
+    let time0 = OffsetDateTime::now_utc();
     let keypair = validators[0].service_keypair();
     let tx = keypair.report_time(INSTANCE_ID, TxTime::new(time0));
     testkit.create_block_with_transaction(tx);

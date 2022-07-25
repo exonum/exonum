@@ -20,7 +20,6 @@
 //! `main` function of example runs the `testkit` with both `exonum-time` and
 //! example services, and demonstrates their interaction.
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
 use exonum::{
     crypto::{KeyPair, PublicKey},
     helpers::Height,
@@ -37,9 +36,10 @@ use exonum_derive::{
 use exonum_rust_runtime::Service;
 use exonum_testkit::{Spec, TestKitBuilder};
 use serde_derive::{Deserialize, Serialize};
+use std::sync::Arc;
+use time::{Duration, OffsetDateTime};
 
 use exonum_time::{MockTimeProvider, TimeProvider, TimeSchema, TimeServiceFactory};
-use std::sync::Arc;
 
 /// The argument of the `MarkerInterface::mark` method.
 #[derive(Clone, Debug)]
@@ -48,11 +48,12 @@ use std::sync::Arc;
 #[binary_value(codec = "bincode")]
 pub struct TxMarker {
     mark: i32,
-    time: DateTime<Utc>,
+    #[serde(with = "time::serde::timestamp")]
+    time: OffsetDateTime,
 }
 
 impl TxMarker {
-    fn new(mark: i32, time: DateTime<Utc>) -> Self {
+    fn new(mark: i32, time: OffsetDateTime) -> Self {
         Self { mark, time }
     }
 }
@@ -135,7 +136,7 @@ fn main() {
         .with(marker_service)
         .build();
 
-    mock_provider.set_time(Utc.timestamp(10, 0));
+    mock_provider.set_time(OffsetDateTime::from_unix_timestamp(10).unwrap());
     testkit.create_blocks_until(Height(2));
 
     let snapshot = testkit.snapshot();
@@ -162,7 +163,10 @@ fn main() {
     assert_eq!(schema.marks.get(&keypair2.public_key()), Some(2));
     assert_eq!(schema.marks.get(&keypair3.public_key()), None);
 
-    let tx4 = keypair3.mark(SERVICE_ID, TxMarker::new(4, Utc.timestamp(15, 0)));
+    let tx4 = keypair3.mark(
+        SERVICE_ID,
+        TxMarker::new(4, OffsetDateTime::from_unix_timestamp(15).unwrap()),
+    );
     testkit.create_block_with_transactions(vec![tx4]);
 
     let snapshot = testkit.snapshot();
