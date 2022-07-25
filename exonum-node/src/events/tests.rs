@@ -392,6 +392,7 @@ async fn test_network_reconnect() {
     e1.disconnect_with(second_key).await;
     drop(e2);
     assert_eq!(e1.wait_for_disconnect().await, second_key);
+    tokio::time::sleep(Duration::from_millis(100)).await; // wait for a closing socket
 
     // Handle second attempt.
     let e2 = TestEvents::with_addr(second, &connect_list);

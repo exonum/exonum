@@ -12,7 +12,7 @@ env:
 
 jobs:
   partial_unit_tests:
-    name: Partially Unit Tests
+    name: Unit Tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -49,21 +49,6 @@ jobs:
           command: test
           # Not enough space on a VM to test with param: --all-targets
           args: -p exonum -p exonum-merkledb -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
-        env:
-          RUST_BACKTRACE: full
-
-  all_unit_tests:
-    name: All Unit Tests
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ env.rust }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --all-targets
         env:
           RUST_BACKTRACE: full
 
