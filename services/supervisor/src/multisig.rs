@@ -168,6 +168,7 @@ impl<T: Ord + BinaryValue> BinaryValue for BinarySet<T> {
             if reader.len() < mem::size_of::<u64>() {
                 return Err(MerkledbError::new("Insufficient buffer size").into());
             }
+            #[allow(clippy::cast_possible_truncation)]
             let bytes_len = LittleEndian::read_u64(reader) as usize;
             reader = &reader[mem::size_of::<u64>()..];
 

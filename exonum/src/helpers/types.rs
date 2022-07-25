@@ -54,6 +54,7 @@ impl Height {
     /// let next_height = height.next();
     /// assert_eq!(11, next_height.0);
     /// ```
+    #[must_use]
     pub fn next(self) -> Self {
         Self(self.0 + 1)
     }
@@ -73,6 +74,7 @@ impl Height {
     /// let previous_height = height.previous();
     /// assert_eq!(9, previous_height.0);
     /// ```
+    #[must_use]
     pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
         Self(self.0 - 1)
@@ -212,6 +214,7 @@ impl Round {
     /// let next_round = round.next();
     /// assert_eq!(21, next_round.0);
     /// ```
+    #[must_use]
     pub fn next(self) -> Self {
         Self(self.0 + 1)
     }
@@ -231,6 +234,7 @@ impl Round {
     /// let previous_round = round.previous();
     /// assert_eq!(9, previous_round.0);
     /// ```
+    #[must_use]
     pub fn previous(self) -> Self {
         assert_ne!(0, self.0);
         Self(self.0 - 1)

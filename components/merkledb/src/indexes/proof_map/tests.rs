@@ -1232,6 +1232,7 @@ fn test_merkle_root_leaf() {
     assert_eq!(HashTag::hash_map_node(merkle_root), index.object_hash());
 }
 
+#[allow(clippy::trait_duplication_in_bounds)]
 fn check_map_proof<K, V, S>(
     proof: &MapProof<K::Owned, V, S>,
     key: Option<K>,

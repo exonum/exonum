@@ -222,7 +222,7 @@ impl<T: Access> Schema<T> {
             let status = instance
                 .pending_status
                 .as_ref()
-                .or_else(|| instance.status.as_ref());
+                .or(instance.status.as_ref());
             if let Some(InstanceStatus::Migrating(migration)) = status {
                 if migration.target == *artifact {
                     let msg = format!(

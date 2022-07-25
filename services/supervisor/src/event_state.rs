@@ -44,13 +44,15 @@ pub enum AsyncEventState {
 
 impl AsyncEventState {
     /// Returns `true` if state of this deployment considered failed.
-    pub fn is_failed(&self) -> bool {
+    #[must_use]
+    pub const fn is_failed(&self) -> bool {
         matches!(self, Self::Timeout | Self::Failed { .. })
     }
 
     /// Attempts to get a height from the state.
     /// Returns `None` if state is not `Failed`.
-    pub fn height(&self) -> Option<Height> {
+    #[must_use]
+    pub const fn height(&self) -> Option<Height> {
         match self {
             Self::Failed { height, .. } => Some(*height),
             _ => None,
@@ -59,6 +61,7 @@ impl AsyncEventState {
 
     /// Attempts to get an execution error from the state.
     /// Returns `None` if state is not `Failed`.
+    #[must_use]
     pub fn execution_error(&self) -> Option<ExecutionError> {
         match self {
             Self::Failed { error, .. } => Some(error.clone()),
@@ -67,12 +70,14 @@ impl AsyncEventState {
     }
 
     /// Returns `true` if current state is `AsyncEventState::Pending`.
-    pub fn is_pending(&self) -> bool {
+    #[must_use]
+    pub const fn is_pending(&self) -> bool {
         matches!(self, Self::Pending)
     }
 
     /// Returns `true` if current state is `AsyncEventState::Succeed`.
-    pub fn is_succeed(&self) -> bool {
+    #[must_use]
+    pub const fn is_succeed(&self) -> bool {
         matches!(self, Self::Succeed)
     }
 }

@@ -39,7 +39,8 @@ pub struct SupervisorConfig {
 
 impl SupervisorConfig {
     /// Creates a new configuration with the specified supervisor mode.
-    pub fn new(mode: Mode) -> Self {
+    #[must_use]
+    pub const fn new(mode: Mode) -> Self {
         Self { mode }
     }
 }
@@ -67,7 +68,8 @@ pub struct DeployRequest {
 
 impl DeployRequest {
     /// Creates a deploy request with an empty artifact specification.
-    pub fn new(artifact: ArtifactId, deadline_height: Height) -> Self {
+    #[must_use]
+    pub const fn new(artifact: ArtifactId, deadline_height: Height) -> Self {
         Self {
             artifact,
             deadline_height,
@@ -77,6 +79,7 @@ impl DeployRequest {
     }
 
     /// Sets the artifact specification for this request.
+    #[must_use]
     pub fn with_spec(mut self, spec: Vec<u8>) -> Self {
         self.spec = spec;
         self
@@ -97,6 +100,7 @@ pub struct DeployResult {
 
 impl DeployResult {
     /// Creates a new `DeployRequest` object with a positive result.
+    #[must_use]
     pub fn ok(request: DeployRequest) -> Self {
         Self {
             request,
@@ -133,6 +137,7 @@ pub struct StartService {
 impl StartService {
     /// Given the instance ID, splits the `StartService` request into `InstanceSpec`
     /// and config value.
+    #[must_use]
     pub fn into_parts(self, id: InstanceId) -> (InstanceSpec, Vec<u8>) {
         let spec = InstanceSpec::from_raw_parts(id, self.name, self.artifact);
 
@@ -247,6 +252,7 @@ pub struct ConfigPropose {
 
 impl ConfigPropose {
     /// Creates a new proposal which activates at the specified height.
+    #[must_use]
     pub fn new(configuration_number: u64, actual_from: Height) -> Self {
         Self {
             actual_from,
@@ -256,17 +262,20 @@ impl ConfigPropose {
     }
 
     /// Creates a new proposal which should be activated at the next height.
+    #[must_use]
     pub fn immediate(configuration_number: u64) -> Self {
         Self::new(configuration_number, Height(0))
     }
 
     /// Adds a change of consensus configuration to this proposal.
+    #[must_use]
     pub fn consensus_config(mut self, config: ConsensusConfig) -> Self {
         self.changes.push(ConfigChange::Consensus(config));
         self
     }
 
     /// Adds change of the configuration for the specified service instance.
+    #[must_use]
     pub fn service_config(mut self, instance_id: InstanceId, config: impl BinaryValue) -> Self {
         self.changes.push(ConfigChange::Service(ServiceConfig {
             instance_id,
@@ -276,6 +285,7 @@ impl ConfigPropose {
     }
 
     /// Adds a service start request to this proposal.
+    #[must_use]
     pub fn start_service(
         mut self,
         artifact: ArtifactId,
@@ -293,6 +303,7 @@ impl ConfigPropose {
     }
 
     /// Adds a service stop request to this proposal.
+    #[must_use]
     pub fn stop_service(mut self, instance_id: InstanceId) -> Self {
         self.changes
             .push(ConfigChange::StopService(StopService { instance_id }));
@@ -300,6 +311,7 @@ impl ConfigPropose {
     }
 
     /// Adds a service freeze request to this proposal.
+    #[must_use]
     pub fn freeze_service(mut self, instance_id: InstanceId) -> Self {
         self.changes
             .push(ConfigChange::FreezeService(FreezeService { instance_id }));
@@ -307,6 +319,7 @@ impl ConfigPropose {
     }
 
     /// Adds a service resume request to this proposal.
+    #[must_use]
     pub fn resume_service(mut self, instance_id: InstanceId, params: impl BinaryValue) -> Self {
         self.changes
             .push(ConfigChange::ResumeService(ResumeService {
@@ -317,6 +330,7 @@ impl ConfigPropose {
     }
 
     /// Adds an artifact unloading request to this proposal.
+    #[must_use]
     pub fn unload_artifact(mut self, artifact_id: ArtifactId) -> Self {
         self.changes
             .push(ConfigChange::UnloadArtifact(UnloadArtifact { artifact_id }));
@@ -336,7 +350,8 @@ pub struct ConfigVote {
 
 impl ConfigVote {
     /// Creates a vote for the proposal with the specified hash.
-    pub fn new(propose_hash: Hash) -> Self {
+    #[must_use]
+    pub const fn new(propose_hash: Hash) -> Self {
         Self { propose_hash }
     }
 }

@@ -84,6 +84,7 @@ pub struct Spec<T, Kind> {
 
 impl<T: ServiceFactory, Kind> Spec<T, Kind> {
     /// Adds a new built-in service instance to instantiate at the genesis block.
+    #[must_use]
     pub fn with_instance(
         mut self,
         id: InstanceId,
@@ -106,6 +107,7 @@ impl<T: DefaultInstance, Kind> Spec<T, Kind> {
     ///
     /// Calling this method several times still results in a *single* default instance added
     /// to the blockchain upon creation.
+    #[must_use]
     pub fn with_default_instance(mut self) -> Self {
         self.default_instance = Some(self.service.default_instance());
         self
@@ -274,12 +276,14 @@ impl ForeignSpec {
     }
 
     /// Adds a deploy specification to use together with the artifact.
+    #[must_use]
     pub fn with_deploy_spec(mut self, spec: impl BinaryValue) -> Self {
         self.deploy_spec = Some(spec.into_bytes());
         self
     }
 
     /// Adds a new built-in service instance to instantiate at the genesis block.
+    #[must_use]
     pub fn with_instance(
         mut self,
         id: InstanceId,

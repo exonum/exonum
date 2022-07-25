@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! WebSocket API of the explorer service.
+//! `WebSocket` API of the explorer service.
 //!
 //! # Overview
 //!
-//! All communication via WebSockets uses JSON encoding.
+//! All communication via `WebSockets` uses JSON encoding.
 //!
 //! The API follows the publisher-subscriber pattern. Clients can subscribe to events. There are
 //! two types of events encapsulated in [`Notification`]:
@@ -278,7 +278,7 @@ impl SharedStateRef {
     }
 }
 
-/// WebSocket message for communication between clients(`Session`) and server(`Server`).
+/// `WebSocket` message for communication between clients(`Session`) and server(`Server`).
 #[derive(Message, Debug)]
 #[rtype(result = "()")]
 enum Message {
@@ -385,12 +385,7 @@ impl Server {
         for (_, subscriber_group) in subscribers {
             for (_, recipient) in subscriber_group {
                 if recipient.connected() {
-                    if let Err(err) = recipient.do_send(Message::Close) {
-                        log::warn!(
-                            "Can't send `Close` message to a websocket client: {:?}",
-                            err
-                        );
-                    }
+                    recipient.do_send(Message::Close);
                 }
             }
         }
@@ -560,7 +555,7 @@ impl Server {
 
         let serialized = serde_json::to_string(data).unwrap();
         for addr in subscriber_group.values() {
-            addr.do_send(Message::Data(serialized.clone())).ok();
+            addr.do_send(Message::Data(serialized.clone()));
         }
     }
 }

@@ -132,7 +132,7 @@ where
     }
 }
 
-impl<'a, Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, R, F> {
+impl<Q, I, R, F> From<Deprecated<Q, I, R, F>> for With<Q, I, R, F> {
     fn from(deprecated: Deprecated<Q, I, R, F>) -> Self {
         Self {
             handler: deprecated.handler,

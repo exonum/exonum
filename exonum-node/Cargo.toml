@@ -25,22 +25,22 @@ chrono = "0.4.6"
 futures = "0.3"
 futures-retry = "0.6"
 log = "0.4.6"
-protobuf = { version = "2.25", features = ["with-serde"] }
+protobuf = { version = "2", features = ["with-serde"] }
 rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
-snow = { version = "0.8.0", default-features = false }
+snow = { version = "0.9", default-features = false }
 socket2 = { version = "0.4", features = [ "all" ] }
 thiserror = "1.0"
 tokio-stream = { version = "0.1", features = [ "signal" ] }
-tokio-util = { version = "0.6", features = ["codec"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 
 exonum = { version = "1.0.0", path = "../exonum" }
 exonum-api = { version = "1.0.0", path = "../components/api" }
 exonum-derive = { version = "1.0.0", path = "../components/derive" }
 exonum-merkledb = { version = "1.0.0", path = "../components/merkledb" }
 exonum-proto = { version = "1.0.0", path = "../components/proto" }
-exonum_sodiumoxide = { version = "0.0.23", optional = true }
+exonum_sodiumoxide = { version = "0.0.24", optional = true }
 
 [dependencies.tokio]
 version = "1"

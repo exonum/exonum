@@ -44,6 +44,7 @@ impl BlockchainBuilder {
     }
 
     /// Adds the genesis config to use if the blockchain is not yet initialized.
+    #[must_use]
     pub fn with_genesis_config(mut self, genesis_config: GenesisConfig) -> Self {
         self.genesis_config = Some(genesis_config);
         self
@@ -51,6 +52,7 @@ impl BlockchainBuilder {
 
     /// Adds a runtime with the specified identifier and returns a modified `Self` object for
     /// further chaining.
+    #[must_use]
     pub fn with_runtime(mut self, runtime: impl Into<RuntimeInstance>) -> Self {
         self.runtimes.push(runtime.into());
         self

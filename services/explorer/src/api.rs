@@ -483,7 +483,7 @@ pub(crate) struct ExplorerApi {
 
 impl ExplorerApi {
     /// Creates a new `ExplorerApi` instance.
-    pub fn new(blockchain: Blockchain) -> Self {
+    pub const fn new(blockchain: Blockchain) -> Self {
         Self { blockchain }
     }
 

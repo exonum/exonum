@@ -25,15 +25,15 @@ crossbeam = "0.8"
 enum-primitive-derive = "0.2"
 leb128 = "0.2"
 num-traits = "0.2"
-protobuf = { version = "2.25", features = ["with-serde"], optional = true }
-rocksdb = { version = "0.17", default-features = false }
+protobuf = { version = "2", features = ["with-serde"], optional = true }
+rocksdb = { version = "0.18", default-features = false }
 rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
 smallvec = "1.6"
 tempfile = "3.2"
 thiserror = "1.0"
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
 
 [dev-dependencies]
 exonum-derive = { version = "1.0.0", path = "../derive" }

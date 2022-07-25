@@ -134,17 +134,10 @@
 )]
 #![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
-    // Next `cast_*` lints don't give alternatives.
-    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // '... may panic' lints.
-    clippy::indexing_slicing,
-    // Too much work to fix.
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
-    clippy::missing_const_for_fn,
-    clippy::unnecessary_wraps
+    clippy::module_name_repetitions,
+    clippy::use_self
 )]
 
 pub use self::{
@@ -364,12 +357,14 @@ impl Supervisor {
     pub const NAME: &'static str = "supervisor";
 
     /// Creates a configuration for a simple `Supervisor`.
-    pub fn simple_config() -> SupervisorConfig {
+    #[must_use]
+    pub const fn simple_config() -> SupervisorConfig {
         SupervisorConfig { mode: Mode::Simple }
     }
 
     /// Creates a configuration for a decentralized `Supervisor`.
-    pub fn decentralized_config() -> SupervisorConfig {
+    #[must_use]
+    pub const fn decentralized_config() -> SupervisorConfig {
         SupervisorConfig {
             mode: Mode::Decentralized,
         }
@@ -377,18 +372,21 @@ impl Supervisor {
 
     /// Creates a deploy spec for a builtin `Supervisor` instance with
     /// simple configuration.
+    #[must_use]
     pub fn simple() -> Spec<Self, Simple> {
         Self::builtin_instance(Self::simple_config())
     }
 
     /// Creates an `InstanceCollection` for builtin `Supervisor` instance with
     /// decentralized configuration.
+    #[must_use]
     pub fn decentralized() -> Spec<Self, Simple> {
         Self::builtin_instance(Self::decentralized_config())
     }
 
     /// Creates an `InstanceCollection` with builtin `Supervisor` instance given the
     /// configuration.
+    #[must_use]
     pub fn builtin_instance(config: SupervisorConfig) -> Spec<Self, Simple> {
         Spec::new(Self).with_instance(SUPERVISOR_INSTANCE_ID, Self::NAME, config)
     }

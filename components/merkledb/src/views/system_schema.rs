@@ -183,15 +183,15 @@ mod tests {
             vec!["entry".to_owned(), "list".to_owned(), "map".to_owned()]
         );
         assert_eq!(
-            aggregator.get(&"entry".to_owned()).unwrap(),
+            aggregator.get("entry").unwrap(),
             patch.get_proof_entry::<_, String>("entry").object_hash()
         );
         assert_eq!(
-            aggregator.get(&"list".to_owned()).unwrap(),
+            aggregator.get("list").unwrap(),
             patch.get_proof_list::<_, u32>("list").object_hash()
         );
         assert_eq!(
-            aggregator.get(&"map".to_owned()).unwrap(),
+            aggregator.get("map").unwrap(),
             patch.get_proof_map::<_, i32, String>("map").object_hash()
         );
         assert_eq!(aggregator.object_hash(), system_schema.state_hash());
@@ -217,11 +217,11 @@ mod tests {
         ];
         assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
         assert_eq!(
-            aggregator.get(&"list".to_owned()).unwrap(),
+            aggregator.get("list").unwrap(),
             patch.get_proof_list::<_, u32>("list").object_hash()
         );
         assert_eq!(
-            aggregator.get(&"map".to_owned()).unwrap(),
+            aggregator.get("map").unwrap(),
             patch.get_proof_map::<_, i32, String>("map").object_hash()
         );
         assert_eq!(aggregator.object_hash(), system_schema.state_hash());
@@ -232,11 +232,11 @@ mod tests {
         let aggregator = system_schema.state_aggregator();
         assert_eq!(aggregator.keys().collect::<Vec<_>>(), expected_index_names);
         assert_eq!(
-            aggregator.get(&"list".to_owned()).unwrap(),
+            aggregator.get("list").unwrap(),
             snapshot.get_proof_list::<_, u32>("list").object_hash()
         );
         assert_eq!(
-            aggregator.get(&"map".to_owned()).unwrap(),
+            aggregator.get("map").unwrap(),
             snapshot
                 .get_proof_map::<_, i32, String>("map")
                 .object_hash()

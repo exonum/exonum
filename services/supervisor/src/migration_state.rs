@@ -48,7 +48,8 @@ pub struct MigrationState {
 
 impl MigrationState {
     /// Creates a new `MigrationState` object.
-    pub fn new(inner: AsyncEventState, version: Version) -> Self {
+    #[must_use]
+    pub const fn new(inner: AsyncEventState, version: Version) -> Self {
         Self {
             inner,
             version,
@@ -76,12 +77,14 @@ impl MigrationState {
     }
 
     /// Checks whether migration is failed.
-    pub fn is_failed(&self) -> bool {
+    #[must_use]
+    pub const fn is_failed(&self) -> bool {
         self.inner.is_failed()
     }
 
     /// Checks whether migration is pending.
-    pub fn is_pending(&self) -> bool {
+    #[must_use]
+    pub const fn is_pending(&self) -> bool {
         self.inner.is_pending()
     }
 
@@ -100,7 +103,8 @@ impl MigrationState {
 
     /// Returns the reference state hash.
     #[doc(hidden)] // Public for tests.
-    pub fn reference_state_hash(&self) -> &Option<Hash> {
+    #[must_use]
+    pub const fn reference_state_hash(&self) -> &Option<Hash> {
         &self.reference_state_hash
     }
 }

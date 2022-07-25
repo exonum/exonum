@@ -232,6 +232,7 @@ impl HashStream {
     }
 
     /// Processes a chunk of stream and returns a `HashStream` with the updated internal state.
+    #[must_use]
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self
@@ -300,6 +301,7 @@ impl SignStream {
     ///     stream = stream.update(chunk);
     /// }
     /// ```
+    #[must_use]
     pub fn update(mut self, chunk: &[u8]) -> Self {
         self.0.update(chunk);
         self

@@ -212,17 +212,20 @@ impl WorkingPatch {
             })
         };
 
-        if let Some(ref view_changes) = view_changes {
-            assert_eq!(
-                Rc::strong_count(view_changes),
-                1,
-                "Attempting to borrow {:?} mutably while it's borrowed immutably",
-                address
-            );
-        } else {
-            panic!("Multiple mutable borrows of an index at {:?}", address);
-        }
-        view_changes
+        view_changes.map_or_else(
+            || {
+                panic!("Multiple mutable borrows of an index at {:?}", address);
+            },
+            |view_changes| {
+                assert_eq!(
+                    Rc::strong_count(&view_changes),
+                    1,
+                    "Attempting to borrow {:?} mutably while it's borrowed immutably",
+                    address
+                );
+                Some(view_changes)
+            },
+        )
     }
 
     /// Clones changes for a specific `View` from the patch. Panics if the changes
@@ -430,7 +433,7 @@ pub struct Patch {
     removed_aggregated_addrs: HashSet<String>,
 }
 
-pub(super) struct ForkIter<'a, T: StdIterator> {
+pub struct ForkIter<'a, T: StdIterator> {
     snapshot: Iter<'a>,
     changes: Option<Peekable<T>>,
 }
@@ -700,6 +703,7 @@ pub trait Snapshot: Send + Sync + 'static {
 
     /// Returns an iterator over the entries of the snapshot in ascending order starting from
     /// the specified key. The iterator element type is `(&[u8], &[u8])`.
+    #[allow(clippy::iter_not_returning_iterator)]
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_>;
 }
 
@@ -1456,15 +1460,15 @@ mod tests {
         let patch = fork.into_patch();
         let aggregator = SystemSchema::new(&patch).state_aggregator();
         assert_eq!(
-            aggregator.get(&"foo".to_owned()).unwrap(),
+            aggregator.get("foo").unwrap(),
             patch.get_proof_list::<_, u64>("foo").object_hash()
         );
         assert_eq!(
-            aggregator.get(&"bar".to_owned()).unwrap(),
+            aggregator.get("bar").unwrap(),
             patch.get_proof_map::<_, u64, u64>("bar").object_hash()
         );
         assert_eq!(
-            aggregator.get(&"other_list".to_owned()).unwrap(),
+            aggregator.get("other_list").unwrap(),
             patch.get_proof_list::<_, u64>("other_list").object_hash()
         );
     }

@@ -14,7 +14,7 @@
 
 //! Exonum explorer service.
 //!
-//! The explorer service does not define transactions, but it has several REST / WebSocket
+//! The explorer service does not define transactions, but it has several REST / `WebSocket`
 //! endpoints allowing to retrieve information from the blockchain in a structured way.
 //! Usually, the explorer service should be instantiated at the blockchain start
 //! with the default identifiers. There may be no more than one explorer service on a blockchain;
@@ -23,14 +23,14 @@
 //!
 //! The API types necessary to interact with the service HTTP API are defined in a separate
 //! crate, [`exonum-explorer`]. The base explorer provides Rust language APIs for retrieving info
-//! from the blockchain, while this crate translates these APIs into REST and WebSocket endpoints
+//! from the blockchain, while this crate translates these APIs into REST and `WebSocket` endpoints
 //! and packages this logic as an Exonum service. Thus, this crate is useful if you want to provide
 //! the way for external apps to query the blockchain info.
 //!
 //! # HTTP API
 //!
 //! REST API of the service is documented in the [`api` module](api/index.html), and its
-//! WebSocket API in the [`api::websocket` module](api/websocket/index.html).
+//! `WebSocket` API in the [`api::websocket` module](api/websocket/index.html).
 //!
 //! # Examples
 //!
@@ -67,21 +67,14 @@
 )]
 #![warn(clippy::pedantic, clippy::nursery)]
 #![allow(
-    // Next `cast_*` lints don't give alternatives.
-    clippy::cast_possible_wrap, clippy::cast_possible_truncation, clippy::cast_sign_loss,
-    // Next lints produce too much noise/false positives.
-    clippy::module_name_repetitions, clippy::similar_names, clippy::must_use_candidate,
-    // '... may panic' lints.
-    clippy::indexing_slicing,
-    // Too much work to fix.
-    clippy::missing_errors_doc, clippy::missing_const_for_fn,
-    // False positive: WebSocket
-    clippy::doc_markdown
+    clippy::module_name_repetitions,
+    clippy::missing_errors_doc,
+    clippy::use_self
 )]
 
 use exonum::{
     merkledb::ObjectHash,
-    runtime::{ExecutionContext, ExecutionError, ExecutionFail},
+    runtime::{ExecutionContext, ExecutionError},
 };
 use exonum_derive::{ExecutionFail, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{api::ServiceApiBuilder, AfterCommitContext, DefaultInstance, Service};
@@ -110,6 +103,7 @@ impl Service for ExplorerService {
         context: ExecutionContext<'_>,
         _params: Vec<u8>,
     ) -> Result<(), ExecutionError> {
+        use exonum::runtime::ExecutionFail;
         // Check that there are no other explorer services.
         let instances = context.data().for_dispatcher().service_instances();
         for instance in instances.values() {

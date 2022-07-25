@@ -92,18 +92,21 @@ impl ErrorMatch {
     }
 
     /// Accepts an error with any description.
+    #[must_use]
     pub fn with_any_description(mut self) -> Self {
         self.description = StringMatch::Any;
         self
     }
 
     /// Accepts an error with any description containing the specified string.
+    #[must_use]
     pub fn with_description_containing(mut self, pat: impl Into<String>) -> Self {
         self.description = StringMatch::Contains(pat.into());
         self
     }
 
     /// Accepts an error with any description matching the specified closure.
+    #[must_use]
     pub fn with_description_matching<P>(mut self, pat: P) -> Self
     where
         P: Fn(&str) -> bool + 'static,
@@ -113,18 +116,21 @@ impl ErrorMatch {
     }
 
     /// Accepts an error that has occurred in a runtime with the specified ID.
+    #[must_use]
     pub fn in_runtime(mut self, runtime_id: u32) -> Self {
         self.runtime_id = Some(runtime_id);
         self
     }
 
     /// Accepts an error that has occurred in a service with the specified ID.
+    #[must_use]
     pub fn for_service(mut self, instance_id: InstanceId) -> Self {
         self.instance_id = Some(instance_id);
         self
     }
 
     /// Accepts an error that has occurred in a call of the specified format.
+    #[must_use]
     pub fn in_call(mut self, call_type: CallType) -> Self {
         self.call_type = Some(call_type);
         self

@@ -44,6 +44,7 @@ pub struct RocksDB {
 }
 
 impl From<DbOptions> for RocksDbOptions {
+    #[allow(clippy::only_used_in_recursion)]
     fn from(opts: DbOptions) -> Self {
         Self::from(&opts)
     }

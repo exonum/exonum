@@ -291,7 +291,7 @@ async fn test_noise_handshake_errors_ee_standard() {
     let (_, listener_err) = wait_for_handshake_result(addr, params, bogus_message, None).await;
     let listener_err = listener_err.to_string();
     assert!(
-        listener_err.contains("diffie-hellman error"),
+        listener_err.contains("Snow error: input error"),
         "{}",
         listener_err
     );
@@ -339,7 +339,7 @@ async fn test_noise_handshake_errors_ee_standard_listen() {
     let (sender_res, _) = wait_for_handshake_result(addr, params, None, bogus_message).await;
     let sender_err = sender_res.unwrap_err().to_string();
     assert!(
-        sender_err.contains("diffie-hellman error"),
+        sender_err.contains("Snow error: input error"),
         "{}",
         sender_err
     );

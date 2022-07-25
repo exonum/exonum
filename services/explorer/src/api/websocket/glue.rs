@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! Glue between WebSocket server and `actix-web` HTTP server.
+//! Glue between `WebSocket` server and `actix-web` HTTP server.
 
 use actix_web::{
     http,
