@@ -37,6 +37,7 @@
 //! ## Minimal complete example
 //!
 //! ```
+//! #![allow(proc_macro_derive_resolution_fallback)]
 //! # use exonum::runtime::{BlockchainData, ExecutionError};
 //! # use exonum_rust_runtime::{ExecutionContext, Service};
 //! # use exonum_derive::*;
