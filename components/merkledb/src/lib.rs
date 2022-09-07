@@ -157,7 +157,7 @@
     // Too much work to fix.
     clippy::missing_errors_doc, clippy::missing_const_for_fn, clippy::missing_panics_doc,
     clippy::missing_safety_doc,
-    clippy::reversed_empty_ranges, clippy::use_self
+    clippy::reversed_empty_ranges, clippy::use_self, clippy::mismatching_type_param_order
 )]
 
 #[allow(unused_imports)]

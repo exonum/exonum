@@ -29,7 +29,7 @@ use crate::{BinaryValue, HashTag};
 #[cfg(feature = "with-protobuf")]
 use crate::{proto, ProtobufConvert};
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "with-protobuf", derive(ProtobufConvert))]
 #[cfg_attr(
     feature = "with-protobuf",
@@ -129,7 +129,7 @@ impl HashedEntry {
 /// [`get_proof()`]: struct.ProofListIndex.html#method.get_proof
 /// [`get_range_proof()`]: struct.ProofListIndex.html#method.get_range_proof
 /// [`check()`]: #method.check
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ListProof<V> {
     proof: Vec<HashedEntry>,
     entries: Vec<(u64, V)>,
@@ -577,7 +577,7 @@ impl<V: BinaryValue> ListProof<V> {
 /// See [`ListProof`] for an example of usage.
 ///
 /// [`ListProof`]: struct.ListProof.html#workflow
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CheckedListProof<'a, V> {
     entries: &'a [(u64, V)],
     length: u64,

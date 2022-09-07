@@ -99,7 +99,7 @@ impl DefaultInstance for MiddlewareService {
 /// const SERVICE_ID: InstanceId = 100;
 /// let checked_call: CheckedCall = req.do_something(SERVICE_ID, "Arg".into());
 /// ```
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct ArtifactReq(pub versioning::ArtifactReq);
 
 impl From<versioning::ArtifactReq> for ArtifactReq {

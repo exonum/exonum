@@ -22,7 +22,7 @@ use crate::{proto::schema::errors as errors_proto, runtime::ExecutionError};
 /// This result may be either an empty unit type, in case of success,
 /// or an `ExecutionError`, if execution has failed.
 #[derive(Clone, Debug, Serialize, Deserialize, BinaryValue)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct ExecutionStatus(#[serde(with = "self::serde")] pub Result<(), ExecutionError>);
 
 impl ExecutionStatus {

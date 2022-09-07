@@ -49,7 +49,7 @@ use std::{
 };
 
 /// Status of a migration script execution.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ScriptStatus {
     /// The script has successfully completed and the migration data was flushed.
     Ok,

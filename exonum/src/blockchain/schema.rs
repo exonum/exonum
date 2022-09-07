@@ -62,7 +62,7 @@ define_names!(
 
 /// Transaction location in a block. Defines the block where the transaction was
 /// included and the position of this transaction in the block.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "pb_blockchain::TxLocation")]

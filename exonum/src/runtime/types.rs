@@ -382,7 +382,7 @@ impl Display for InstanceSpec {
 }
 
 /// Allows to query a service instance by either of the two identifiers.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum InstanceQuery<'a> {
     /// Query by an instance ID.
@@ -446,7 +446,7 @@ impl ProtobufConvert for ArtifactStatus {
 }
 
 /// Information about a migration of a service instance.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceMigration")]
 #[non_exhaustive]
@@ -494,7 +494,7 @@ impl InstanceMigration {
 }
 
 /// Status of a service instance.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[derive(BinaryValue)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
@@ -649,7 +649,7 @@ impl ArtifactState {
 }
 
 /// Current state of service instance in dispatcher.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "schema::lifecycle::InstanceState")]
@@ -831,7 +831,7 @@ impl ProtobufConvert for MigrationStatus {
 /// [`address()`](#method.address) method. Services may use this representation to compare
 /// or index callers without the necessity to care about all possible kinds of authorization
 /// supported by the framework.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[derive(BinaryValue, ObjectHash)]
 #[non_exhaustive]
 pub enum Caller {

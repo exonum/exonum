@@ -72,7 +72,7 @@ impl_serde_hex_for_binary_value! { SignedMessage }
 /// # Examples
 ///
 /// See [module documentation](index.html#examples) for examples.
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct Verified<T> {
     raw: SignedMessage,
     inner: T,

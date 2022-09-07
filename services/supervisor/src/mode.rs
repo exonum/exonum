@@ -32,7 +32,7 @@ use std::{fmt, str::FromStr};
 use super::{multisig::MultisigIndex, proto, DeployRequest, MigrationRequest};
 
 /// Supervisor operating mode.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum Mode {

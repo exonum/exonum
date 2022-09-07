@@ -64,12 +64,14 @@ impl RunHandle {
 }
 
 type ManagerGen = Box<dyn Fn() -> Box<dyn ManagePool>>;
+type ModifyCfg<'a> = Option<Box<dyn FnMut(&mut NodeConfig) + 'a>>;
+type InitNode<'a> = Option<Box<dyn FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder) + 'a>>;
 
 pub struct NetworkBuilder<'a> {
     count: u16,
     start_port: u16,
-    modify_cfg: Option<Box<dyn FnMut(&mut NodeConfig) + 'a>>,
-    init_node: Option<Box<dyn FnMut(&mut GenesisConfigBuilder, &mut RustRuntimeBuilder) + 'a>>,
+    modify_cfg: ModifyCfg<'a>,
+    init_node: InitNode<'a>,
     pool_manager: Option<ManagerGen>,
 }
 

@@ -26,7 +26,7 @@ use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 use crate::{schema::SchemaImpl, wallet::Wallet};
 
 /// Describes the query parameters for the `get_wallet` endpoint.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WalletQuery {
     /// Public key of the queried wallet.
     pub pub_key: PublicKey,

@@ -27,7 +27,7 @@ use std::{collections::HashMap, iter};
 use crate::RustRuntime;
 
 /// Artifact Protobuf file sources.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct ProtoSourceFile {
     /// File name.
@@ -47,7 +47,7 @@ impl ProtoSourceFile {
 }
 
 /// Protobuf sources query parameters.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ProtoSourcesQuery {
@@ -63,7 +63,7 @@ pub enum ProtoSourcesQuery {
 }
 
 /// Artifact Protobuf specification for the Exonum clients.
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ArtifactProtobufSpec {
     /// List of Protobuf files that make up the service interface.

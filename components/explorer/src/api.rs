@@ -38,7 +38,7 @@ pub mod websocket;
 pub const MAX_BLOCKS_PER_REQUEST: usize = 1000;
 
 /// Information on blocks coupled with the corresponding range in the blockchain.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BlocksRange {
     /// Exclusive range of blocks.
@@ -56,7 +56,7 @@ impl BlocksRange {
 }
 
 /// Information about a transaction included in the block.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct TxInfo {
     /// Transaction hash.
@@ -66,7 +66,7 @@ pub struct TxInfo {
 }
 
 /// Information about a block in the blockchain.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct BlockInfo {
     /// Block header as recorded in the blockchain.
@@ -138,7 +138,7 @@ impl BlockInfo {
 }
 
 /// Blocks in range parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct BlocksQuery {
     /// The number of blocks to return. Should not be greater than `MAX_BLOCKS_PER_REQUEST`.
@@ -170,7 +170,7 @@ pub struct BlocksQuery {
 }
 
 /// Block query parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct BlockQuery {
     /// The height of the desired block.
@@ -185,7 +185,7 @@ impl BlockQuery {
 }
 
 /// Raw transaction in hex representation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TransactionHex {
     /// The hex value of the transaction to be broadcasted.
@@ -202,7 +202,7 @@ impl TransactionHex {
 }
 
 /// Response to a request to broadcast a transaction over the blockchain network.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TransactionResponse {
     /// The hash digest of the transaction.
@@ -217,7 +217,7 @@ impl TransactionResponse {
 }
 
 /// Transaction query parameters.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct TransactionQuery {
     /// The hash of the transaction to be searched.

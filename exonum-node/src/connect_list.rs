@@ -91,7 +91,7 @@ impl ConnectList {
 }
 
 /// Stores mapping between IP addresses / domain names and public keys.
-#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ConnectListConfig {
     /// Peers to which the node knows how to connect.
     pub peers: Vec<ConnectInfo>,

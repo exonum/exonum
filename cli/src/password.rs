@@ -25,7 +25,7 @@ use std::{env, str::FromStr};
 pub const DEFAULT_MASTER_PASS_ENV_VAR: &str = "EXONUM_MASTER_PASS";
 
 /// A wrapper around `String` which securely erases itself on drop.
-#[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Passphrase(String);
 
 impl Drop for Passphrase {
@@ -62,7 +62,7 @@ impl Passphrase {
 /// Passphrase input method.
 ///
 /// Defaults to `Terminal`.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum PassInputMethod {
     /// Prompt passphrase from terminal.
     Terminal,
@@ -82,7 +82,7 @@ impl Default for PassInputMethod {
 }
 
 /// Determines the usage of the passphrase received from user.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PassphraseUsage {
     /// The user will be asked to enter the sane passphrase twice. Empty passphrase is not allowed.
     ///

@@ -27,7 +27,7 @@ use time::OffsetDateTime;
 use crate::{api::TransactionHex, median_precommits_time};
 
 /// Messages proactively sent by WebSocket clients to the server.
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone)]
 #[serde(tag = "type", content = "payload", rename_all = "snake_case")]
 pub enum IncomingMessage {
     /// Set subscription for websocket connection.
@@ -75,7 +75,7 @@ impl TransactionFilter {
 }
 
 /// Response to a WebSocket client. Roughly equivalent to `Result<T, String>`.
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "result", rename_all = "snake_case")]
 pub enum Response<T> {
     /// Successful response.

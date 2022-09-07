@@ -33,7 +33,7 @@ pub const SERVICE_NAME: &str = "api-service";
 pub const SERVICE_ID: InstanceId = 3;
 
 /// Sample query supported by API.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[derive(Serialize, Deserialize)]
 pub struct PingQuery {
     pub value: u64,

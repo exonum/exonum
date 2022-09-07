@@ -34,7 +34,7 @@ pub enum Node {
 }
 
 /// Structure that encapsulates a raw representation of the branch node.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct BranchNode {
     raw: Vec<u8>,
 }

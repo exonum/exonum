@@ -40,7 +40,7 @@ pub const TX_RES_EMPTY_SIZE: usize = SIGNED_MESSAGE_MIN_SIZE + PUBLIC_KEY_LENGTH
 pub const TX_RES_PB_OVERHEAD_PAYLOAD: usize = 8;
 
 /// Service messages.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Service {
     /// Transaction message.
     AnyTx(Verified<AnyTx>),
@@ -61,7 +61,7 @@ impl Service {
 }
 
 /// Consensus messages.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Consensus {
     /// `Precommit` message.
     Precommit(Verified<Precommit>),
@@ -82,7 +82,7 @@ impl Consensus {
 }
 
 /// Response messages.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Responses {
     /// Transactions response message.
     TransactionsResponse(Verified<TransactionsResponse>),
@@ -113,7 +113,7 @@ impl From<Verified<BlockResponse>> for Responses {
 
 /// Request messages.
 #[allow(clippy::enum_variant_names)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Requests {
     /// Propose request message.
     ProposeRequest(Verified<ProposeRequest>),
@@ -143,7 +143,7 @@ impl Requests {
 }
 
 /// Representation of the Exonum message which is divided into categories.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     /// Service messages.
     Service(Service),

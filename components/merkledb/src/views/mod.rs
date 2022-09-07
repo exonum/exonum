@@ -79,7 +79,7 @@ impl ChangeSet for () {
 
 impl ChangeSet for ChangesRef<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
-        Some(&*self)
+        Some(self)
     }
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         None
@@ -88,7 +88,7 @@ impl ChangeSet for ChangesRef<'_> {
 
 impl ChangeSet for ChangesMut<'_> {
     fn as_ref(&self) -> Option<&ViewChanges> {
-        Some(&*self)
+        Some(self)
     }
     fn as_mut(&mut self) -> Option<&mut ViewChanges> {
         Some(&mut *self)

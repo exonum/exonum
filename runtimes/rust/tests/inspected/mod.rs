@@ -110,7 +110,7 @@ pub fn assert_no_endpoint_update(endpoints_rx: &mut mpsc::Receiver<UpdateEndpoin
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RuntimeEvent {
     InitializeRuntime,
     ResumeRuntime,

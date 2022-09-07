@@ -25,7 +25,7 @@ use exonum_merkledb::{impl_object_hash_for_binary_value, BinaryKey, BinaryValue,
 const CHUNK_SIZE: usize = 64;
 const SEED: [u8; 32] = [100; 32];
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SimpleData {
     id: u16,
     class: i16,
@@ -60,7 +60,7 @@ impl BinaryValue for SimpleData {
 
 impl_object_hash_for_binary_value! { SimpleData, CursorData }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CursorData {
     id: u16,
     class: i16,

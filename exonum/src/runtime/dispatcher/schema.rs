@@ -55,7 +55,7 @@ pub(super) struct ModifiedInstanceInfo {
     pub migration_transition: Option<MigrationTransition>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum MigrationTransition {
     Start,
     Commit,
