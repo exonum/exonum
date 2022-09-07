@@ -26,7 +26,7 @@ use serde_derive::{Deserialize, Serialize};
 )]
 pub struct TestRuntimeApiService;
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue)]
 #[protobuf_convert(source = "crate::proto::Transfer")]
 pub struct Transfer {

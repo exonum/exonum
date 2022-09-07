@@ -128,14 +128,14 @@ pub enum MapProofError {
 }
 
 // Used instead of `(ProofPath, Hash)` only for the purpose of clearer (de)serialization.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 struct MapProofEntry {
     path: ProofPath,
     hash: Hash,
 }
 
 // Used instead of `(K, Option<V>)` only for the purpose of clearer (de)serialization.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 enum OptionalEntry<K, V> {
     Missing { missing: K },
@@ -266,7 +266,7 @@ impl<K, V> OptionalEntry<K, V> {
 /// [`get_multiproof()`]: struct.ProofMapIndex.html#method.get_multiproof
 /// [`check()`]: #method.check
 /// [`ProofPath`]: struct.ProofPath.html
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MapProof<K, V, KeyMode = Hashed> {
     entries: Vec<OptionalEntry<K, V>>,
     proof: Vec<MapProofEntry>,

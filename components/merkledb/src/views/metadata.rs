@@ -31,10 +31,10 @@ use crate::{
 /// Name of the column family used to store `IndexesPool`.
 const INDEXES_POOL_NAME: &str = "__INDEXES_POOL__";
 
-/// Type of an index supported by Exonum.
+/// Type of index supported by Exonum.
 ///
 /// `IndexType` is used for type checking indexes when they are created/accessed.
-#[derive(Debug, Copy, Clone, PartialEq, Primitive, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Primitive, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum IndexType {
     /// Non-merkelized map index.
@@ -159,7 +159,7 @@ impl Default for IndexType {
 /// In metadata one can store any arbitrary data serialized as byte array.
 ///
 /// See also `BinaryAttribute`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IndexMetadata<V = Vec<u8>> {
     identifier: NonZeroU64,
     index_type: IndexType,

@@ -357,7 +357,6 @@ mod tests {
     macro_rules! test_storage_key_for_int_type {
         (full $type:ident, $size:expr => $test_name:ident) => {
             #[test]
-            #[allow(clippy::replace_consts)]
             fn $test_name() {
                 use std::iter::once;
 

@@ -210,7 +210,7 @@ pub(crate) struct NodeHandler {
 }
 
 /// HTTP API configuration options.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NodeApiConfig {
     /// Timeout to update API state.
     pub state_update_timeout: usize,
@@ -252,7 +252,7 @@ impl Default for NodeApiConfig {
 }
 
 /// HTTP server restart policy.
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ServerRestartPolicy {
     /// The number of attempts to restart the HTTP server.
     pub max_retries: u16,
@@ -270,7 +270,7 @@ impl Default for ServerRestartPolicy {
 }
 
 /// P2P network configuration of an Exonum node.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NetworkConfiguration {
     /// Maximum number of incoming connections established with peers at any given time.
     pub max_incoming_connections: usize,
@@ -303,7 +303,7 @@ impl Default for NetworkConfiguration {
 }
 
 /// Events pool capacities.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EventsPoolCapacity {
     /// Maximum number of queued outgoing network messages.
     network_requests_capacity: usize,
@@ -342,7 +342,7 @@ impl Default for EventsPoolCapacity {
 /// };
 /// // Use the config somewhere...
 /// ```
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct MemoryPoolConfig {
     /// Sets the maximum number of messages that can be buffered on the event loop's
@@ -363,7 +363,7 @@ pub struct MemoryPoolConfig {
 }
 
 /// Strategy to flush transactions into the pool.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum FlushPoolStrategy {
@@ -394,7 +394,7 @@ impl Default for FlushPoolStrategy {
 }
 
 /// Configuration for the `Node`.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NodeConfig {
     /// Initial consensus configuration that will be written in the genesis block.
     pub consensus: ConsensusConfig,

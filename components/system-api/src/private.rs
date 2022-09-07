@@ -213,7 +213,7 @@ pub struct NodeStats {
 }
 
 /// Consensus status of the current node.
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq)]
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ConsensusStatus {
@@ -226,7 +226,7 @@ pub enum ConsensusStatus {
 }
 
 /// Type of the network connection.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ConnectDirection {
@@ -237,7 +237,7 @@ pub enum ConnectDirection {
 }
 
 /// Info about connected peer.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ConnectedPeerInfo {
     /// Address of the peer.

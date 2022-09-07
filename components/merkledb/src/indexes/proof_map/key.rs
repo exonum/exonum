@@ -169,7 +169,7 @@ impl ops::Not for ChildKind {
 /// Serialized as a string of `'0'` and `'1'` chars, corresponding exactly to bits in the slice.
 ///
 /// [`PROOF_MAP_KEY_SIZE`]: constant.PROOF_MAP_KEY_SIZE.html
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq)]
 pub struct ProofPath {
     bytes: [u8; PROOF_PATH_SIZE],
     start: u16,

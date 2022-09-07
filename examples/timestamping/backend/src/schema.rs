@@ -28,7 +28,7 @@ use time::OffsetDateTime;
 use crate::{proto, transactions::Config};
 
 /// Stores content's hash and some metadata about it.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Timestamp")]

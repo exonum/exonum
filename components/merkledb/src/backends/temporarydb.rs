@@ -17,7 +17,7 @@
 use crossbeam::sync::ShardedLock;
 use smallvec::SmallVec;
 use std::{
-    collections::{btree_map::Range, BTreeMap, HashMap},
+    collections::{btree_map::Range, BTreeMap},
     iter::{Iterator, Peekable},
     sync::Arc,
 };
@@ -28,7 +28,7 @@ use crate::{
     Database, Iter, Patch, ResolvedAddress, Result, Snapshot,
 };
 
-type MemoryDB = HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;
+type MemoryDB = im::HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;
 
 /// This in-memory database is only used for testing and experimenting; is not designed to
 /// operate under load in production.
@@ -50,7 +50,7 @@ struct TemporaryDBIterator<'a> {
 impl TemporaryDB {
     /// Creates a new, empty database.
     pub fn new() -> Self {
-        let mut db = HashMap::new();
+        let mut db = im::HashMap::new();
 
         db.insert(ResolvedAddress::system("default"), BTreeMap::new());
         let inner = Arc::new(ShardedLock::new(db));
@@ -60,12 +60,15 @@ impl TemporaryDB {
     }
 
     /// Clears the contents of the database.
-    pub fn clear(&self) -> crate::Result<()> {
+    pub fn clear(&self) -> Result<()> {
         let mut rw_lock = self.inner.write().expect("Couldn't get read-write lock");
+        let empty_tables = rw_lock
+            .keys()
+            .map(|k| (k.clone(), BTreeMap::default()))
+            .collect::<Vec<_>>();
 
-        for collection in rw_lock.values_mut() {
-            collection.clear();
-        }
+        rw_lock.clear();
+        rw_lock.extend(empty_tables);
 
         Ok(())
     }

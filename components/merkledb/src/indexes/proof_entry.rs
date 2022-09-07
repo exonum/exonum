@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn entry_with_custom_hashing() {
-        #[derive(Debug, PartialEq)]
+        #[derive(Debug, PartialEq, Eq)]
         struct CustomHash(u8);
 
         impl BinaryValue for CustomHash {

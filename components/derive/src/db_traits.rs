@@ -41,7 +41,7 @@ impl FromDeriveInput for BinaryValueStruct {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Codec {
     Protobuf,
     Bincode,

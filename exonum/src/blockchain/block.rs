@@ -228,7 +228,7 @@ impl Block {
 /// This structure contains enough information to prove the correctness of
 /// a block. It consists of the block itself and the `Precommit`
 /// messages related to this block.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ProtobufConvert)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ProtobufConvert)]
 #[protobuf_convert(source = "schema::proofs::BlockProof")]
 #[non_exhaustive]
 pub struct BlockProof {

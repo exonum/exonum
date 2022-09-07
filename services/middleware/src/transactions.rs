@@ -33,7 +33,7 @@ pub enum Error {
 }
 
 /// Checked call to the service.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[derive(BinaryValue, ProtobufConvert)]
 #[protobuf_convert(source = "proto::CheckedCall")]
 pub struct CheckedCall {

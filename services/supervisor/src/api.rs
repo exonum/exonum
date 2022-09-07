@@ -629,7 +629,7 @@ use exonum_proto::ProtobufBase64;
 /// Query for retrieving information about deploy state.
 /// This is flattened version of `DeployRequest` which can be
 /// encoded via URL query parameters.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub struct DeployInfoQuery {
     /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0".
@@ -689,7 +689,7 @@ impl From<DeployRequest> for DeployInfoQuery {
 /// Query for retrieving information about migration state.
 /// This is flattened version of `MigrationRequest` which can be
 /// encoded via URL query parameters.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 pub struct MigrationInfoQuery {
     /// Artifact identifier as string, e.g. `0:exonum-supervisor:1.0.0"
@@ -740,7 +740,7 @@ impl From<MigrationRequest> for MigrationInfoQuery {
 }
 
 /// Services info response.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[non_exhaustive]
 pub struct DispatcherInfo {
     /// List of deployed artifacts.

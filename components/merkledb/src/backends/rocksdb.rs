@@ -131,7 +131,7 @@ impl RocksDB {
     /// Clears the column family completely, removing all keys from it.
     pub(super) fn clear_column_family(&self, batch: &mut WriteBatch, cf: &ColumnFamily) {
         /// Some lexicographically large key.
-        const LARGER_KEY: &[u8] = &[u8::max_value(); 1_024];
+        const LARGER_KEY: &[u8] = &[u8::MAX; 1_024];
 
         let db_reader = self.get_lock_guard();
         let mut iter = db_reader.raw_iterator_cf(cf);
@@ -211,7 +211,6 @@ impl RocksDB {
     }
 
     #[allow(unsafe_code)]
-    #[allow(clippy::useless_transmute)]
     pub(super) fn rocksdb_snapshot(&self) -> RocksDBSnapshot {
         RocksDBSnapshot {
             // SAFETY:
@@ -236,7 +235,9 @@ impl RocksDBSnapshot {
         use rocksdb::{Direction, IteratorMode};
 
         let from = name.keyed(from);
-        let iter = match self.get_lock_guard().cf_handle(&name.name) {
+        let lock = self.get_lock_guard();
+        let cf_handle = lock.cf_handle(&name.name);
+        let iter = match cf_handle {
             Some(cf) => self
                 .snapshot
                 .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward)),
@@ -273,12 +274,13 @@ impl Snapshot for RocksDBSnapshot {
     fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
         self.get_lock_guard()
             .cf_handle(&resolved_addr.name)
-            .and_then(
-                |cf| match self.snapshot.get_cf(cf, resolved_addr.keyed(key)) {
+            .and_then(|cf| {
+                let value = self.snapshot.get_cf(cf, resolved_addr.keyed(key));
+                match value {
                     Ok(value) => value,
                     Err(e) => panic!("{}", e),
-                },
-            )
+                }
+            })
     }
 
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
@@ -292,7 +294,7 @@ impl<'a> Iterator for RocksDBIterator<'a> {
             return None;
         }
 
-        let (key, value) = self.iter.next()?;
+        let (key, value) = self.iter.next()?.ok()?;
         if let Some(ref prefix) = self.prefix {
             if &key[..ID_SIZE] != prefix {
                 self.ended = true;
@@ -315,7 +317,7 @@ impl<'a> Iterator for RocksDBIterator<'a> {
             return None;
         }
 
-        let (key, value) = self.iter.peek()?;
+        let (key, value) = self.iter.peek()?.as_ref().ok()?;
         let key = if let Some(prefix) = self.prefix {
             if key[..ID_SIZE] != prefix {
                 self.ended = true;

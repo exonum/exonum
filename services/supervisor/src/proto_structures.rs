@@ -27,7 +27,7 @@ use super::{mode::Mode, proto};
 
 /// Supervisor service configuration (not to be confused with `ConfigPropose`, which
 /// contains core/service configuration change proposal).
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "proto::Config")]
@@ -46,7 +46,7 @@ impl SupervisorConfig {
 }
 
 /// Request for the artifact deployment.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::DeployRequest")]
 #[non_exhaustive]
@@ -339,7 +339,7 @@ impl ConfigPropose {
 }
 
 /// Confirmation vote for the configuration change.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::ConfigVote")]
 #[non_exhaustive]
@@ -365,7 +365,7 @@ impl From<ConfigPropose> for ConfigVote {
 }
 
 /// Request for the service data migration.
-#[derive(Debug, Clone, PartialEq, ProtobufConvert, BinaryValue, ObjectHash)]
+#[derive(Debug, Clone, PartialEq, Eq, ProtobufConvert, BinaryValue, ObjectHash)]
 #[derive(Serialize, Deserialize)]
 #[protobuf_convert(source = "proto::MigrationRequest")]
 #[non_exhaustive]

@@ -207,7 +207,7 @@ use crate::runtime::{ArtifactId, CoreError, ExecutionError, ExecutionFail};
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ArtifactReq {
     /// Artifact name.

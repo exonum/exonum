@@ -37,7 +37,7 @@ fn test_date_time_pb_convert() {
     assert_eq!(pb_round_trip, dt);
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "crate::proto::Point")]
 struct Point {
@@ -118,7 +118,7 @@ fn test_scalar_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, scalar_struct);
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "crate::proto::TestProtobufConvertRepeated")]
 struct StructWithRepeatedTypes {
@@ -149,7 +149,7 @@ fn test_repeated_struct_round_trip() {
     assert_eq!(struct_encode_round_trip, rep_struct);
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "crate::proto::TestProtobufConvertMap")]
 struct StructWithMaps {
@@ -191,7 +191,7 @@ fn test_struct_with_maps_roundtrip() {
     assert_eq!(struct_encode_round_trip, map_struct);
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[derive(ProtobufConvert, BinaryValue, ObjectHash)]
 #[protobuf_convert(source = "crate::proto::TestFixedArrays")]
 struct StructWithFixedArrays {

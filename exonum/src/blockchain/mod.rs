@@ -389,7 +389,7 @@ pub enum BlockContents<'a> {
 }
 
 /// Block kind, acting as an abridged version of `BlockContents`.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum BlockKind {
     /// Ordinary block with transactions.

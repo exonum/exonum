@@ -194,7 +194,7 @@ fn complex_migration_part2(ctx: &mut MigrationContext) -> Result<(), MigrationEr
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LocalResult {
     None,
     InMemory,

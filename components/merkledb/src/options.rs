@@ -20,7 +20,7 @@ use serde_derive::{Deserialize, Serialize};
 /// Options for the database.
 ///
 /// These parameters apply to the underlying database of Exonum, currently `RocksDB`.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct DbOptions {
     /// Number of open files that can be used by the database.
@@ -76,7 +76,7 @@ impl DbOptions {
 /// sequence of key-value pairs. Each block may be compressed before
 /// being stored in a file. The following enum describes which
 /// compression algorithm (if any) is used to compress a block.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum CompressionType {
     Bz2,

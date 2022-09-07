@@ -30,7 +30,7 @@ use crate::{
 };
 
 /// Persistent iterator position.
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 enum IteratorPosition<K: BinaryKey + ?Sized> {
     /// There is a next key to start iteration from.
     NextKey(K::Owned),

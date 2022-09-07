@@ -47,7 +47,7 @@ use exonum_soak_tests::{
 #[structopt(name = "send_txs", set_term_width = 80)]
 struct Args {
     /// Number of nodes in the network.
-    #[structopt(name = "nodes", default_value = "4")]
+    #[structopt(name = "nodes", long, short = "n", default_value = "4")]
     node_count: u16,
 
     /// Blockchain height to reach. If not specified, the test will run infinitely.
@@ -194,7 +194,7 @@ async fn main() {
     let times_to_commit = Arc::new(Mutex::new(TimingStats::default()));
     let mut prev_report_time = Instant::now();
 
-    for i in 0..args.tx_count.unwrap_or_else(u64::max_value) {
+    for i in 0..args.tx_count.unwrap_or(u64::MAX) {
         let tx = keys.timestamp(MainService::INSTANCE_ID, Height(i));
         let sender = nodes[0].blockchain().sender().to_owned();
         let blockchain = nodes.last().unwrap().blockchain().to_owned();

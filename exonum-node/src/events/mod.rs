@@ -106,7 +106,7 @@ impl<T: Send + 'static> SyncSender<T> {
 
 /// This kind of events is used to schedule execution in next event-loop ticks
 /// Usable to make flat logic and remove recursions.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct InternalEvent(pub(crate) InternalEventInner);
 
 impl InternalEvent {
@@ -127,7 +127,7 @@ impl InternalEvent {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum InternalEventInner {
     /// Round update event.
     JumpToRound(Height, Round),
@@ -178,7 +178,7 @@ pub enum Event {
 }
 
 /// Denotes the execution status of an event.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventOutcome {
     /// Event processing may continue normally.
     Ok,

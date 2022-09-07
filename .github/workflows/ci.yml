@@ -8,7 +8,7 @@ on:
 name: CI
 
 env:
-  rust: 1.62.1
+  rust: 1.63.0
 
 jobs:
   partial_unit_tests:

@@ -127,7 +127,7 @@ pub trait ExecutionFail {
 /// [`ErrorKind`]: enum.ErrorKind.html
 /// [`CallSite`]: struct.CallSite.html
 #[derive(Clone, Error, BinaryValue)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 // ^-- Comparing `ExecutionError`s directly is error-prone, since the call info is not controlled
 // by the caller. It is useful for roundtrip tests, though.
 pub struct ExecutionError {
@@ -181,12 +181,12 @@ where
 ///
 /// Note that an error may occur in the runtime code (including the code glue provided by the runtime)
 /// or in the service code, depending on the `kind` of the error.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, BinaryValue)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, BinaryValue)]
 #[non_exhaustive]
 pub struct CallSite {
     /// ID of the service instance handling the call.
     pub instance_id: InstanceId,
-    /// Type of a call.
+    /// Type of call.
     #[serde(flatten)]
     pub call_type: CallType,
 }
@@ -255,8 +255,8 @@ impl ProtobufConvert for CallSite {
     }
 }
 
-/// Type of a call to a service.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Type of call to a service.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "call_type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum CallType {

@@ -29,7 +29,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{net::SocketAddr, path::PathBuf};
 
 /// Part of the template configuration.
-#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Clone, Debug, Serialize, Deserialize)]
 pub struct GeneralConfig {
     /// Count of the validator nodes in the network.
     pub validators_count: u32,
@@ -38,7 +38,7 @@ pub struct GeneralConfig {
 }
 
 /// Public configuration of the node. Is shared among validators.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NodePublicConfig {
     /// Consensus configuration.
     pub consensus: ConsensusConfig,
@@ -55,7 +55,7 @@ pub struct NodePublicConfig {
 }
 
 /// Private configuration of the node.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NodePrivateConfig {
     /// Network listening address.
     pub listen_address: SocketAddr,
@@ -81,7 +81,7 @@ pub struct NodePrivateConfig {
 }
 
 /// Configuration for the `Node`.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct NodeConfig {
     /// Private configuration of the node.
     pub private_config: NodePrivateConfig,

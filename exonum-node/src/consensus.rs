@@ -71,7 +71,7 @@ impl PersistChanges for BlockchainMut {
 }
 
 /// Result of an action within a round.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RoundAction {
     /// New height was achieved.
     NewEpoch,
