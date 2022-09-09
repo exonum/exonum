@@ -690,8 +690,13 @@ impl Schema<&Fork> {
                 };
                 (artifact, action)
             })
-            .collect();
-        index.clear();
+            .collect::<Vec<_>>();
+
+        if !pending_artifacts.is_empty() {
+            // Clear the index only if there are entities because it's not a cheap operation.
+            index.clear();
+        }
+
         pending_artifacts
     }
 
@@ -709,8 +714,12 @@ impl Schema<&Fork> {
                     .expect("BUG: Instance marked as modified is not saved in `instances`");
                 (state, info)
             })
-            .collect();
-        modified_instances.clear();
+            .collect::<Vec<_>>();
+
+        if !output.is_empty() {
+            // Clear the index only if there are entities because it's not a cheap operation.
+            modified_instances.clear();
+        }
 
         output
     }

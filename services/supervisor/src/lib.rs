@@ -571,8 +571,11 @@ impl Supervisor {
             .map(|(_, request)| request)
             .collect::<Vec<_>>();
 
-        // Clear the index, since we will flush all the migrations now.
-        schema.migrations_to_flush.clear();
+        // Clear the index, since we will flush all the migrations now. Clear the index only if
+        // there are entities because it's not a cheap operation.
+        if !finished_migrations.is_empty() {
+            schema.migrations_to_flush.clear();
+        }
 
         drop(schema);
         for request in finished_migrations {

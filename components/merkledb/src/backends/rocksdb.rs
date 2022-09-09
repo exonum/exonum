@@ -237,11 +237,16 @@ impl RocksDBSnapshot {
         let from = name.keyed(from);
         let lock = self.get_lock_guard();
         let cf_handle = lock.cf_handle(&name.name);
+        let read_options = RocksDBSnapshot::read_options();
         let iter = match cf_handle {
-            Some(cf) => self
+            Some(cf) => self.snapshot.iterator_cf_opt(
+                cf,
+                read_options,
+                IteratorMode::From(from.as_ref(), Direction::Forward),
+            ),
+            None => self
                 .snapshot
-                .iterator_cf(cf, IteratorMode::From(from.as_ref(), Direction::Forward)),
-            None => self.snapshot.iterator(IteratorMode::Start),
+                .iterator_opt(IteratorMode::Start, read_options),
         };
         RocksDBIterator {
             iter: iter.peekable(),
@@ -250,6 +255,15 @@ impl RocksDBSnapshot {
             value: None,
             ended: false,
         }
+    }
+
+    fn read_options() -> rocksdb::ReadOptions {
+        let mut options = rocksdb::ReadOptions::default();
+        // Important!!! Without this option, there is a significant regression in the
+        // performance of getting iterator when actively used `delete_range`.
+        options.set_ignore_range_deletions(true);
+
+        options
     }
 }
 
@@ -272,10 +286,13 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
+        let read_options = RocksDBSnapshot::read_options();
         self.get_lock_guard()
             .cf_handle(&resolved_addr.name)
             .and_then(|cf| {
-                let value = self.snapshot.get_cf(cf, resolved_addr.keyed(key));
+                let value = self
+                    .snapshot
+                    .get_cf_opt(cf, resolved_addr.keyed(key), read_options);
                 match value {
                     Ok(value) => value,
                     Err(e) => panic!("{}", e),
