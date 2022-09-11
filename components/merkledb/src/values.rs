@@ -278,7 +278,7 @@ mod tests {
         ($name:ident, $type:tt) => {
             #[test]
             fn $name() {
-                let values = [$type::min_value(), 1, $type::max_value()];
+                let values = [$type::MIN, 1, $type::MAX];
                 assert_round_trip_eq(&values);
             }
         };
@@ -288,7 +288,7 @@ mod tests {
         ($name:ident, $type:tt) => {
             #[test]
             fn $name() {
-                let values = [$type::min_value(), -1, 0, 1, $type::max_value()];
+                let values = [$type::MIN, -1, 0, 1, $type::MAX];
                 assert_round_trip_eq(&values);
             }
         };

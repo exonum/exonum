@@ -929,7 +929,7 @@ mod prop_tests {
         ("foo", Some(0)),
         ("foo", Some(1)),
         ("foo", Some(256)),
-        ("foo", Some(u32::max_value())),
+        ("foo", Some(u32::MAX)),
         ("foo_", None),
         ("foo1", Some(0)),
     ];

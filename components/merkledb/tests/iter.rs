@@ -304,7 +304,7 @@ where
 
     let large_starts = (10..64)
         .map(|pow| 1_u64 << pow)
-        .chain((0..10).map(|diff| u64::max_value() - diff));
+        .chain((0..10).map(|diff| u64::MAX - diff));
     for start in large_starts {
         prop_assert_eq!(index.index_iter(Some(&start)).count(), 0);
     }

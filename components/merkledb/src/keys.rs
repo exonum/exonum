@@ -121,12 +121,12 @@ impl BinaryKey for i8 {
     }
 
     fn write(&self, buffer: &mut [u8]) -> usize {
-        buffer[0] = self.wrapping_add(Self::min_value()) as u8;
+        buffer[0] = self.wrapping_add(Self::MIN) as u8;
         self.size()
     }
 
     fn read(buffer: &[u8]) -> Self::Owned {
-        buffer[0].wrapping_sub(Self::min_value() as u8) as Self
+        buffer[0].wrapping_sub(Self::MIN as u8) as Self
     }
 }
 
@@ -158,12 +158,12 @@ macro_rules! storage_key_for_ints {
             }
 
             fn write(&self, buffer: &mut [u8]) -> usize {
-                BigEndian::$write_method(buffer, self.wrapping_add(Self::min_value()) as $utype);
+                BigEndian::$write_method(buffer, self.wrapping_add(Self::MIN) as $utype);
                 self.size()
             }
 
             fn read(buffer: &[u8]) -> Self {
-                BigEndian::$read_method(buffer).wrapping_sub(Self::min_value() as $utype) as Self
+                BigEndian::$read_method(buffer).wrapping_sub(Self::MIN as $utype) as Self
             }
         }
     };
@@ -388,7 +388,7 @@ mod tests {
 
                 // Fuzzed roundtrip
                 let mut buffer = [0_u8; $size];
-                let handpicked_vals = vec![$type::min_value(), $type::max_value()];
+                let handpicked_vals = vec![$type::MIN, $type::MAX];
                 for x in rng
                     .sample_iter(&Standard)
                     .take(FUZZ_SAMPLES)

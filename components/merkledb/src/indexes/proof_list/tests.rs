@@ -75,8 +75,8 @@ fn get_and_iter_from_with_overly_large_index() {
         (1_u64 << 56) + 10,
         1_u64 << 57,
         1_u64 << 60,
-        u64::max_value() - 10,
-        u64::max_value(),
+        u64::MAX - 10,
+        u64::MAX,
     ];
 
     let db = TemporaryDB::new();
@@ -378,8 +378,8 @@ fn proofs_with_overly_large_indexes() {
         (1_u64 << 56) + 10,
         1_u64 << 57,
         1_u64 << 60,
-        u64::max_value() - 10,
-        u64::max_value(),
+        u64::MAX - 10,
+        u64::MAX,
     ];
 
     let db = TemporaryDB::new();
@@ -401,7 +401,7 @@ fn proofs_with_overly_large_index_ranges() {
         (1_u64 << 56) + 10,
         1_u64 << 57,
         1_u64 << 60,
-        u64::max_value() - 10,
+        u64::MAX - 10,
     ];
 
     let db = TemporaryDB::new();
@@ -423,11 +423,11 @@ fn proofs_with_overly_large_index_ranges() {
         assert!(checked_proof.entries().is_empty());
     }
 
-    let proof = index.get_range_proof(..=u64::max_value());
+    let proof = index.get_range_proof(..=u64::MAX);
     let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
     assert_eq!(checked_proof.entries().len(), 10);
 
-    let proof = index.get_range_proof(7..u64::max_value());
+    let proof = index.get_range_proof(7..u64::MAX);
     let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
     assert_eq!(checked_proof.entries().len(), 3);
 }

@@ -627,7 +627,7 @@ mod tests {
     fn gen_validator_keys(i: u8) -> ValidatorKeys {
         ValidatorKeys::new(
             gen_keypair_from_seed(&Seed::new([i; SEED_LENGTH])).0,
-            gen_keypair_from_seed(&Seed::new([u8::max_value() - i; SEED_LENGTH])).0,
+            gen_keypair_from_seed(&Seed::new([u8::MAX - i; SEED_LENGTH])).0,
         )
     }
 
