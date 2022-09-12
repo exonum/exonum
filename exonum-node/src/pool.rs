@@ -270,7 +270,7 @@ impl ManagePool for StandardPoolManager {
     }
 
     fn remove_transactions(&mut self, pool: Pool<'_>, snapshot: &dyn Snapshot) -> Vec<Hash> {
-        let tx_limit = self.removal_limit.unwrap_or_else(usize::max_value);
+        let tx_limit = self.removal_limit.unwrap_or(usize::MAX);
         let mut cache = TxCheckCache::new();
 
         pool.transactions()

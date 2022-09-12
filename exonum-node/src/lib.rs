@@ -1561,7 +1561,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_internal_events_capacity_too_large() {
-        let accidental_large_value = usize::max_value();
+        let accidental_large_value = usize::MAX;
         let db = TemporaryDB::new();
 
         let (mut node_cfg, node_keys) = generate_testnet_config(1, 16_500).pop().unwrap();
@@ -1575,7 +1575,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must be smaller than 65536")]
     fn test_bad_network_requests_capacity_too_large() {
-        let accidental_large_value = usize::max_value();
+        let accidental_large_value = usize::MAX;
         let db = TemporaryDB::new();
 
         let (mut node_cfg, node_keys) = generate_testnet_config(1, 16_500)[0].clone();

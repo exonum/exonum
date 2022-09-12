@@ -68,7 +68,7 @@ where
         // Exclusive upper boundary of the proof range.
         let to = match indexes.end_bound() {
             Bound::Unbounded => self.len(),
-            // Saturation below doesn't matter: if `to == u64::max_value()`, it is guaranteed
+            // Saturation below doesn't matter: if `to == u64::MAX`, it is guaranteed
             // to be larger than any possible list length.
             Bound::Included(to) => to.saturating_add(1),
             Bound::Excluded(to) => *to,

@@ -46,13 +46,12 @@ use exonum::{
     },
     crypto::{Hash, KeyPair},
     helpers::{Height, ValidatorId},
-    merkledb::{Database, DbOptions, ObjectHash, RocksDB},
+    merkledb::{Database, ObjectHash},
     messages::{AnyTx, Verified},
     runtime::SnapshotExt,
 };
+use exonum_merkledb::TemporaryDB;
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use tempfile::TempDir;
-
 use std::{iter, sync::Arc};
 
 use exonum_rust_runtime::{DefaultInstance, RustRuntime};
@@ -70,11 +69,6 @@ fn gen_keypair_from_rng(rng: &mut StdRng) -> KeyPair {
     let mut bytes = [0_u8; SEED_LENGTH];
     rng.fill(&mut bytes);
     KeyPair::from_seed(&Seed::new(bytes))
-}
-
-fn create_rocksdb(tempdir: &TempDir) -> RocksDB {
-    let options = DbOptions::default();
-    RocksDB::open(tempdir.path(), &options).unwrap()
 }
 
 fn create_blockchain(
@@ -365,12 +359,12 @@ mod foreign_interface_call {
         runtime::{AnyTx, ExecutionContext, ExecutionError, InstanceId},
     };
     use exonum_derive::{exonum_interface, ServiceDispatcher, ServiceFactory};
+    use exonum_merkledb::TemporaryDB;
     use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory as _};
     use rand::rngs::StdRng;
-    use tempfile::TempDir;
 
     use super::{
-        create_blockchain_from_parts, create_consensus_config_and_blockchain_base, create_rocksdb,
+        create_blockchain_from_parts, create_consensus_config_and_blockchain_base,
         gen_keypair_from_rng,
     };
 
@@ -459,8 +453,7 @@ mod foreign_interface_call {
     }
 
     pub fn build_blockchain() -> BlockchainMut {
-        let tempdir = TempDir::new().unwrap();
-        let db = create_rocksdb(&tempdir);
+        let db = TemporaryDB::new();
         let (consensus_config, blockchain_base) = create_consensus_config_and_blockchain_base(db);
 
         let rust_runtime = RustRuntime::builder()
@@ -542,8 +535,7 @@ fn execute_block_rocksdb(
     service: impl DefaultInstance + Clone,
     tx_generator: impl Iterator<Item = Verified<AnyTx>>,
 ) {
-    let tempdir = TempDir::new().unwrap();
-    let db = create_rocksdb(&tempdir);
+    let db = TemporaryDB::new();
     let blockchain = create_blockchain(db, service);
 
     execute_block_rocksdb_with_blockchain(criterion, bench_name, blockchain, tx_generator);

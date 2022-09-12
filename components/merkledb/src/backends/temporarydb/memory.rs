@@ -1,4 +1,4 @@
-// Copyright 2020 The Exonum Team
+// Copyright 2022 The Exonum Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! An implementation of `TemporaryDB` database.
+//! An implementation of `TemporaryDB` database stored in RAM.
 
-use crossbeam::sync::ShardedLock;
 use smallvec::SmallVec;
 use std::{
     collections::{btree_map::Range, BTreeMap},
     iter::{Iterator, Peekable},
-    sync::Arc,
+    sync::{Arc, RwLock},
 };
 
 use crate::{
@@ -34,7 +33,7 @@ type MemoryDB = im::HashMap<ResolvedAddress, BTreeMap<Vec<u8>, Vec<u8>>>;
 /// operate under load in production.
 #[derive(Debug)]
 pub struct TemporaryDB {
-    inner: Arc<ShardedLock<MemoryDB>>,
+    inner: Arc<RwLock<MemoryDB>>,
 }
 
 struct TemporarySnapshot {
@@ -53,7 +52,7 @@ impl TemporaryDB {
         let mut db = im::HashMap::new();
 
         db.insert(ResolvedAddress::system("default"), BTreeMap::new());
-        let inner = Arc::new(ShardedLock::new(db));
+        let inner = Arc::new(RwLock::new(db));
         let mut db = Self { inner };
         check_database(&mut db).unwrap();
         db
@@ -206,45 +205,4 @@ impl Snapshot for TemporarySnapshot {
             ended: false,
         })
     }
-}
-
-impl Default for TemporaryDB {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[allow(clippy::use_self)] // false positive
-impl From<TemporaryDB> for Arc<dyn Database> {
-    fn from(db: TemporaryDB) -> Self {
-        Arc::new(db)
-    }
-}
-
-#[test]
-fn clearing_database() {
-    use crate::access::CopyAccessExt;
-
-    let db = TemporaryDB::new();
-    let fork = db.fork();
-
-    fork.get_list("foo").extend(vec![1_u32, 2, 3]);
-    fork.get_proof_entry(("bar", &0_u8)).set("!".to_owned());
-    fork.get_proof_entry(("bar", &1_u8)).set("?".to_owned());
-    db.merge(fork.into_patch()).unwrap();
-    db.clear().unwrap();
-
-    let fork = db.fork();
-
-    assert!(fork.index_type("foo").is_none());
-    assert!(fork.index_type(("bar", &0_u8)).is_none());
-    assert!(fork.index_type(("bar", &1_u8)).is_none());
-    fork.get_proof_list("foo").extend(vec![4_u32, 5, 6]);
-    db.merge(fork.into_patch()).unwrap();
-
-    let snapshot = db.snapshot();
-    let list = snapshot.get_proof_list::<_, u32>("foo");
-
-    assert_eq!(list.len(), 3);
-    assert_eq!(list.iter().collect::<Vec<_>>(), vec![4, 5, 6]);
 }

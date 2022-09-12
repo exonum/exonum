@@ -28,7 +28,7 @@ use exonum_merkledb::{
 mod work;
 use self::work::*;
 
-const ACTIONS_MAX_LEN: usize = 25;
+const ACTIONS_MAX_LEN: usize = 15;
 
 const NAMESPACES: Strings = &["test", "other", "tes"];
 
