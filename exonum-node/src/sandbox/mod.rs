@@ -1036,7 +1036,7 @@ impl Default for SandboxBuilder {
             .max_message_len(1024 * 1024)
             .min_propose_timeout(PROPOSE_TIMEOUT)
             .max_propose_timeout(PROPOSE_TIMEOUT)
-            .propose_timeout_threshold(u32::max_value())
+            .propose_timeout_threshold(u32::MAX)
             .build();
 
         Self {

@@ -75,8 +75,8 @@ fn get_and_iter_from_with_overly_large_index() {
         (1_u64 << 56) + 10,
         1_u64 << 57,
         1_u64 << 60,
-        u64::max_value() - 10,
-        u64::max_value(),
+        u64::MAX - 10,
+        u64::MAX,
     ];
 
     let db = TemporaryDB::new();
@@ -378,8 +378,8 @@ fn proofs_with_overly_large_indexes() {
         (1_u64 << 56) + 10,
         1_u64 << 57,
         1_u64 << 60,
-        u64::max_value() - 10,
-        u64::max_value(),
+        u64::MAX - 10,
+        u64::MAX,
     ];
 
     let db = TemporaryDB::new();
@@ -401,7 +401,7 @@ fn proofs_with_overly_large_index_ranges() {
         (1_u64 << 56) + 10,
         1_u64 << 57,
         1_u64 << 60,
-        u64::max_value() - 10,
+        u64::MAX - 10,
     ];
 
     let db = TemporaryDB::new();
@@ -423,11 +423,11 @@ fn proofs_with_overly_large_index_ranges() {
         assert!(checked_proof.entries().is_empty());
     }
 
-    let proof = index.get_range_proof(..=u64::max_value());
+    let proof = index.get_range_proof(..=u64::MAX);
     let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
     assert_eq!(checked_proof.entries().len(), 10);
 
-    let proof = index.get_range_proof(7..u64::max_value());
+    let proof = index.get_range_proof(7..u64::MAX);
     let checked_proof = proof.check_against_hash(index.object_hash()).unwrap();
     assert_eq!(checked_proof.entries().len(), 3);
 }
@@ -651,8 +651,8 @@ fn ranges_work_similar_to_vec_slicing() {
 
     let v = vec![1, 2, 3, 4, 5];
     check_bounds(&v, .., ..);
-    for start in 0_usize..10 {
-        for end in 0_usize..10 {
+    for start in 0..5 {
+        for end in 0..5 {
             check_bounds(&v, start..end, (start as u64)..(end as u64));
             check_bounds(&v, start..=end, (start as u64)..=(end as u64));
             if start == 0 {
@@ -1215,11 +1215,11 @@ mod root_hash {
 
     #[test]
     fn object_hash_with_strings() {
-        const STRING: &str = "All human beings are born free and equal in dignity and rights. \
-             They are endowed with reason and conscience and should act towards one another \
-             in a spirit of brotherhood.";
+        let words = "All human beings are born free and equal in dignity and rights."
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
 
-        let words: Vec<_> = STRING.split_whitespace().map(str::to_owned).collect();
         for i in 1..words.len() {
             assert_object_hash_correct(&words[..i]);
         }

@@ -91,19 +91,19 @@ fn test_scalar_struct_round_trip() {
         hash: Hash::from_slice(&[7; crypto::HASH_SIZE]).unwrap(),
         bit_vec: BitVec::from_bytes(&[0b_1010_0000, 0b_0001_0010]),
         time: datetime!(2018-1-26 18:30:09.453_829 UTC),
-        unsigned_32: u32::max_value(),
-        unsigned_64: u64::max_value(),
-        regular_i32: i32::min_value(),
-        regular_i64: i64::min_value(),
-        fixed_u32: u32::max_value(),
-        fixed_u64: u64::max_value(),
-        fixed_i32: i32::min_value(),
-        fixed_i64: i64::min_value(),
-        float_32: std::f32::MAX,
-        float_64: std::f64::MAX,
+        unsigned_32: u32::MAX,
+        unsigned_64: u64::MAX,
+        regular_i32: i32::MIN,
+        regular_i64: i64::MIN,
+        fixed_u32: u32::MAX,
+        fixed_u64: u64::MAX,
+        fixed_i32: i32::MIN,
+        fixed_i64: i64::MIN,
+        float_32: f32::MAX,
+        float_64: f64::MAX,
         boolean: true,
-        s_i32: i32::min_value(),
-        s_i64: i64::min_value(),
+        s_i32: i32::MIN,
+        s_i64: i64::MIN,
         bytes_field: vec![1, 2, 3, 4],
         string_field: "test".to_string(),
         message_field: Point { x: 1, y: 2 },
@@ -163,7 +163,7 @@ struct StructWithMaps {
 #[test]
 fn test_struct_with_maps_roundtrip() {
     let map_struct = StructWithMaps {
-        num_map: vec![(1, 1), (2, u64::max_value())].into_iter().collect(),
+        num_map: vec![(1, 1), (2, u64::MAX)].into_iter().collect(),
         string_map: vec![(1, String::from("abc")), (2, String::from("def"))]
             .into_iter()
             .collect(),
@@ -173,12 +173,9 @@ fn test_struct_with_maps_roundtrip() {
         point_map: vec![(1, Point { x: 1, y: 2 }), (2, Point { x: 3, y: 4 })]
             .into_iter()
             .collect(),
-        key_string_map: vec![
-            (String::from("abc"), 0),
-            (String::from("def"), u64::max_value()),
-        ]
-        .into_iter()
-        .collect(),
+        key_string_map: vec![(String::from("abc"), 0), (String::from("def"), u64::MAX)]
+            .into_iter()
+            .collect(),
     };
 
     let map_struct_pb = map_struct.to_pb();

@@ -447,7 +447,7 @@ async fn test_explorer_transaction_statuses() {
     let (mut testkit, api) = init_testkit();
     let tx = KeyPair::random().increment(SERVICE_ID, 5);
     let error_tx = KeyPair::random().increment(SERVICE_ID, 0);
-    let panicking_tx = KeyPair::random().increment(SERVICE_ID, u64::max_value() - 3);
+    let panicking_tx = KeyPair::random().increment(SERVICE_ID, u64::MAX - 3);
 
     let block = testkit.create_block_with_transactions(vec![
         tx.clone(),

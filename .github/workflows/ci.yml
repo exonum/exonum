@@ -48,7 +48,47 @@ jobs:
         with:
           command: test
           # Not enough space on a VM to test with param: --all-targets
-          args: -p exonum -p exonum-merkledb -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
+          args: -p exonum -p exonum-rust-runtime -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
+        env:
+          RUST_BACKTRACE: full
+
+  merkle_db_unit_tests:
+    name: MerkleDB Unit Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [ Linux, MacOS, Windows ]
+        include:
+          - build: Linux
+            os: ubuntu-latest
+          - build: MacOS
+            os: macos-latest
+          - build: Windows
+            os: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install LLVM and Clang # required for bindgen to work, see https://github.com/rust-lang/rust-bindgen/issues/1797
+        uses: KyleMayes/install-llvm-action@32c4866ebb71e0949e8833eb49beeebed48532bd
+        if: runner.os == 'Windows'
+        with:
+          version: "11.0"
+          directory: ${{ runner.temp }}/llvm
+      - if: runner.os == 'Linux'
+        run: sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb-dev
+      - if: runner.os == 'Windows'
+        run: |
+          choco install protoc minisign -y
+          echo "LIBCLANG_PATH=$((gcm clang).source -replace "clang.exe")" >> $env:GITHUB_ENV
+      - if: runner.os == 'MacOS'
+        run: brew install libsodium rocksdb pkg-config protobuf
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.rust }}
+      - run: |
+          cd components/merkledb
+          cargo test --all-targets
+          cargo test --all-targets -F persisted_tempdb
         env:
           RUST_BACKTRACE: full
 

@@ -910,7 +910,7 @@ mod prop_tests {
 
     use std::collections::{BTreeSet, HashMap};
 
-    const ACTIONS_MAX_LEN: usize = 30;
+    const ACTIONS_MAX_LEN: usize = 10;
     const DEFAULT_BUFFER_SIZE: usize = 1_000;
     const SMALL_BUFFER_SIZE: usize = 3;
 
@@ -929,7 +929,7 @@ mod prop_tests {
         ("foo", Some(0)),
         ("foo", Some(1)),
         ("foo", Some(256)),
-        ("foo", Some(u32::max_value())),
+        ("foo", Some(u32::MAX)),
         ("foo_", None),
         ("foo1", Some(0)),
     ];

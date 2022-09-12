@@ -25,7 +25,7 @@ use exonum_merkledb::{
     access::CopyAccessExt, Database, IndexAddress, ObjectHash, Patch, SystemSchema, TemporaryDB,
 };
 
-const ACTIONS_MAX_LEN: usize = 50;
+const ACTIONS_MAX_LEN: usize = 10;
 
 #[derive(Debug, Clone)]
 enum Action {

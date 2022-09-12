@@ -16,9 +16,9 @@
 
 pub use rocksdb::{BlockBasedOptions as RocksBlockOptions, WriteOptions as RocksDBWriteOptions};
 
-use crossbeam::sync::{ShardedLock, ShardedLockReadGuard};
 use rocksdb::{
-    self, checkpoint::Checkpoint, ColumnFamily, DBIterator, Options as RocksDbOptions, WriteBatch,
+    self, checkpoint::Checkpoint, BoundColumnFamily, DBIterator, Options as RocksDbOptions,
+    WriteBatch,
 };
 use smallvec::SmallVec;
 use std::{fmt, iter::Peekable, mem, path::Path, sync::Arc};
@@ -39,7 +39,7 @@ pub const ID_SIZE: usize = mem::size_of::<u64>();
 /// This structure is required to potentially adapt the interface to
 /// use different databases.
 pub struct RocksDB {
-    db: Arc<ShardedLock<rocksdb::DB>>,
+    db: Arc<rocksdb::DB>,
     options: DbOptions,
 }
 
@@ -64,7 +64,7 @@ impl From<&DbOptions> for RocksDbOptions {
 /// A snapshot of a `RocksDB`.
 pub struct RocksDBSnapshot {
     snapshot: rocksdb::Snapshot<'static>,
-    db: Arc<ShardedLock<rocksdb::DB>>,
+    db: Arc<rocksdb::DB>,
 }
 
 /// An iterator over the entries of a `RocksDB`.
@@ -92,7 +92,7 @@ impl RocksDB {
             }
         };
         let mut db = Self {
-            db: Arc::new(ShardedLock::new(inner)),
+            db: Arc::new(inner),
             options: *options,
         };
         check_database(&mut db)?;
@@ -106,65 +106,59 @@ impl RocksDB {
     ///
     /// [`RocksDB` docs]: https://github.com/facebook/rocksdb/wiki/Checkpoints
     pub fn create_checkpoint<T: AsRef<Path>>(&self, path: T) -> crate::Result<()> {
-        let lock = self.get_lock_guard();
-        let checkpoint = Checkpoint::new(&lock)?;
+        let checkpoint = Checkpoint::new(&self.db)?;
         checkpoint.create_checkpoint(path)?;
         Ok(())
     }
 
     fn cf_exists(&self, cf_name: &str) -> bool {
-        self.get_lock_guard().cf_handle(cf_name).is_some()
+        self.db.cf_handle(cf_name).is_some()
     }
 
     fn create_cf(&self, cf_name: &str) -> crate::Result<()> {
         self.db
-            .write()
-            .expect("Couldn't get write lock to DB")
             .create_cf(cf_name, &self.options.into())
             .map_err(Into::into)
     }
 
-    pub(super) fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
-        self.db.read().expect("Couldn't get read lock to DB")
-    }
-
     /// Clears the column family completely, removing all keys from it.
-    pub(super) fn clear_column_family(&self, batch: &mut WriteBatch, cf: &ColumnFamily) {
+    pub(super) fn clear_column_family(&self, batch: &mut WriteBatch, cf: &Arc<BoundColumnFamily>) {
         /// Some lexicographically large key.
         const LARGER_KEY: &[u8] = &[u8::MAX; 1_024];
+        let from = [].as_ref();
 
-        let db_reader = self.get_lock_guard();
-        let mut iter = db_reader.raw_iterator_cf(cf);
+        let mut iter = self.db.raw_iterator_cf(cf);
         iter.seek_to_last();
-        if iter.valid() {
-            if let Some(key) = iter.key() {
-                // For some reason, removing a range to a very large key is
-                // significantly faster than removing the exact range.
-                // This is specific to the debug mode, but since `TemporaryDB`
-                // is mostly used for testing, this optimization leads to practical
-                // performance improvement.
-                if key.len() < LARGER_KEY.len() {
-                    batch.delete_range_cf(cf, [].as_ref(), LARGER_KEY.as_ref());
-                } else {
-                    batch.delete_range_cf(cf, [].as_ref(), key.as_ref());
-                    batch.delete_cf(cf, &key);
-                }
+
+        if let Some(key) = iter.key() {
+            // For some reason, removing a range to a very large key is
+            // significantly faster than removing the exact range.
+            // This is specific to the debug mode, but since `TemporaryDB`
+            // is mostly used for testing, this optimization leads to practical
+            // performance improvement.
+            if key.len() < LARGER_KEY.len() {
+                batch.delete_range_cf(cf, from, LARGER_KEY.as_ref());
+            } else {
+                batch.delete_range_cf(cf, from, key.as_ref());
+                batch.delete_cf(cf, &key);
             }
         }
     }
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
+        let mut cfs_to_flush = vec![];
+
         for (resolved, changes) in patch.into_changes() {
             if !self.cf_exists(&resolved.name) {
                 self.create_cf(&resolved.name)?;
             }
 
-            let db_reader = self.get_lock_guard();
-            let cf = db_reader.cf_handle(&resolved.name).unwrap();
+            let cf = self.db.cf_handle(&resolved.name).unwrap();
 
             if changes.is_cleared() {
-                self.clear_prefix(&mut batch, cf, &resolved);
+                self.clear_prefix(&mut batch, &cf, &resolved);
+                cfs_to_flush.push(cf.clone());
             }
 
             if let Some(id_bytes) = resolved.id_to_bytes() {
@@ -180,28 +174,37 @@ impl RocksDB {
                     buffer.truncate(ID_SIZE);
                     buffer.extend_from_slice(&key);
                     match change {
-                        Change::Put(ref value) => batch.put_cf(cf, &buffer, value),
-                        Change::Delete => batch.delete_cf(cf, &buffer),
+                        Change::Put(ref value) => batch.put_cf(&cf, &buffer, value),
+                        Change::Delete => batch.delete_cf(&cf, &buffer),
                     }
                 }
             } else {
                 // Write changes to the column family as-is.
                 for (key, change) in changes.into_data() {
                     match change {
-                        Change::Put(ref value) => batch.put_cf(cf, &key, value),
-                        Change::Delete => batch.delete_cf(cf, &key),
+                        Change::Put(ref value) => batch.put_cf(&cf, &key, value),
+                        Change::Delete => batch.delete_cf(&cf, &key),
                     }
                 }
             }
         }
 
-        self.get_lock_guard()
-            .write_opt(batch, w_opts)
-            .map_err(Into::into)
+        self.db.write_opt(batch, w_opts)?;
+        for cf in cfs_to_flush {
+            // We need to flush cfs after range deletion to prevent performance regression.
+            self.db.flush_cf(&cf)?;
+        }
+
+        Ok(())
     }
 
     /// Removes all keys with the specified prefix from a column family.
-    fn clear_prefix(&self, batch: &mut WriteBatch, cf: &ColumnFamily, resolved: &ResolvedAddress) {
+    fn clear_prefix(
+        &self,
+        batch: &mut WriteBatch,
+        cf: &Arc<BoundColumnFamily>,
+        resolved: &ResolvedAddress,
+    ) {
         if let Some(id_bytes) = resolved.id_to_bytes() {
             let next_bytes = next_id_bytes(id_bytes);
             batch.delete_range_cf(cf, id_bytes, next_bytes);
@@ -220,33 +223,28 @@ impl RocksDB {
             // the snapshot (`*mut ffi::rocksdb_t`) is never changed, i.e., not affected
             // by potential incoherence if the `ShardedLock` is being concurrently written to.
             // FIXME: Investigate changing `rocksdb::Snapshot` / `DB` to remove `unsafe` (ECR-4273).
-            snapshot: unsafe { mem::transmute(self.get_lock_guard().snapshot()) },
+            snapshot: unsafe { mem::transmute(self.db.snapshot()) },
             db: Arc::clone(&self.db),
         }
+    }
+
+    #[cfg(feature = "persisted_tempdb")]
+    pub(super) fn get_inner(&self) -> Arc<rocksdb::DB> {
+        self.db.clone()
     }
 }
 
 impl RocksDBSnapshot {
-    fn get_lock_guard(&self) -> ShardedLockReadGuard<'_, rocksdb::DB> {
-        self.db.read().expect("Couldn't get read lock to DB")
-    }
-
     fn rocksdb_iter(&self, name: &ResolvedAddress, from: &[u8]) -> RocksDBIterator<'_> {
         use rocksdb::{Direction, IteratorMode};
 
         let from = name.keyed(from);
-        let lock = self.get_lock_guard();
-        let cf_handle = lock.cf_handle(&name.name);
-        let read_options = RocksDBSnapshot::read_options();
+        let cf_handle = self.db.cf_handle(&name.name);
         let iter = match cf_handle {
-            Some(cf) => self.snapshot.iterator_cf_opt(
-                cf,
-                read_options,
-                IteratorMode::From(from.as_ref(), Direction::Forward),
-            ),
-            None => self
+            Some(cf) => self
                 .snapshot
-                .iterator_opt(IteratorMode::Start, read_options),
+                .iterator_cf(&cf, IteratorMode::From(from.as_ref(), Direction::Forward)),
+            None => self.snapshot.iterator(IteratorMode::Start),
         };
         RocksDBIterator {
             iter: iter.peekable(),
@@ -255,15 +253,6 @@ impl RocksDBSnapshot {
             value: None,
             ended: false,
         }
-    }
-
-    fn read_options() -> rocksdb::ReadOptions {
-        let mut options = rocksdb::ReadOptions::default();
-        // Important!!! Without this option, there is a significant regression in the
-        // performance of getting iterator when actively used `delete_range`.
-        options.set_ignore_range_deletions(true);
-
-        options
     }
 }
 
@@ -286,18 +275,13 @@ impl Database for RocksDB {
 
 impl Snapshot for RocksDBSnapshot {
     fn get(&self, resolved_addr: &ResolvedAddress, key: &[u8]) -> Option<Vec<u8>> {
-        let read_options = RocksDBSnapshot::read_options();
-        self.get_lock_guard()
-            .cf_handle(&resolved_addr.name)
-            .and_then(|cf| {
-                let value = self
-                    .snapshot
-                    .get_cf_opt(cf, resolved_addr.keyed(key), read_options);
-                match value {
-                    Ok(value) => value,
-                    Err(e) => panic!("{}", e),
-                }
-            })
+        self.db.cf_handle(&resolved_addr.name).and_then(|cf| {
+            let value = self.snapshot.get_cf(&cf, resolved_addr.keyed(key));
+            match value {
+                Ok(value) => value,
+                Err(e) => panic!("{}", e),
+            }
+        })
     }
 
     fn iter(&self, name: &ResolvedAddress, from: &[u8]) -> Iter<'_> {
@@ -367,11 +351,11 @@ impl fmt::Debug for RocksDBSnapshot {
 }
 
 /// Generates the sequence of bytes lexicographically following the provided one. Assumes that
-/// the provided sequence is less than `[u8::max_value(); ID_SIZE]`.
+/// the provided sequence is less than `[u8::MAX; ID_SIZE]`.
 pub fn next_id_bytes(id_bytes: [u8; ID_SIZE]) -> [u8; ID_SIZE] {
     let mut next_id_bytes = id_bytes;
     for byte in next_id_bytes.iter_mut().rev() {
-        if *byte == u8::max_value() {
+        if *byte == u8::MAX {
             *byte = 0;
         } else {
             *byte += 1;

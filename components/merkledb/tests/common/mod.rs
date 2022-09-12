@@ -22,7 +22,7 @@ use std::rc::Rc;
 use exonum_merkledb::{Database, Fork, TemporaryDB};
 
 // Max size of the generated sequence of actions.
-pub const ACTIONS_MAX_LEN: usize = 100;
+pub const ACTIONS_MAX_LEN: usize = 10;
 
 pub trait FromFork {
     fn from_fork(fork: Rc<Fork>) -> Self;

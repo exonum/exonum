@@ -31,7 +31,7 @@ use exonum_merkledb::{
 mod work;
 use self::work::*;
 
-const ACTIONS_MAX_LEN: usize = 20;
+const ACTIONS_MAX_LEN: usize = 10;
 
 #[derive(Debug, Clone)]
 enum Action {

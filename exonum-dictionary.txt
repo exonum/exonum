@@ -206,6 +206,7 @@ supermajority
 supervisorctl
 supervisord
 symm
+tempdb
 tempdir
 tempfile
 TemporaryDB
