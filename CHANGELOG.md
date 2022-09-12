@@ -43,7 +43,7 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `rocksdb` has been bumped to 0.19. (#2069)
 
-- `TemporaryDB` could be used in two variants: 
+- `TemporaryDB` could be used in two variants:
   - In-memory (default);
   - Wrapper over `RockDB` (feature `persisted_tempdb`). (#2071)
 
