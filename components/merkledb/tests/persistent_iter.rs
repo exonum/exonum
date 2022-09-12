@@ -28,7 +28,7 @@ use exonum_merkledb::{
     Database, Fork, IndexAddress, IndexType, TemporaryDB,
 };
 
-const ACTIONS_MAX_LEN: usize = 50;
+const ACTIONS_MAX_LEN: usize = 10;
 
 #[derive(Debug, Clone, Copy)]
 struct Collection {

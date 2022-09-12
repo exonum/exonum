@@ -910,7 +910,7 @@ mod prop_tests {
 
     use std::collections::{BTreeSet, HashMap};
 
-    const ACTIONS_MAX_LEN: usize = 30;
+    const ACTIONS_MAX_LEN: usize = 10;
     const DEFAULT_BUFFER_SIZE: usize = 1_000;
     const SMALL_BUFFER_SIZE: usize = 3;
 

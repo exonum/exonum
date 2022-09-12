@@ -651,8 +651,8 @@ fn ranges_work_similar_to_vec_slicing() {
 
     let v = vec![1, 2, 3, 4, 5];
     check_bounds(&v, .., ..);
-    for start in 0_usize..10 {
-        for end in 0_usize..10 {
+    for start in 0..5 {
+        for end in 0..5 {
             check_bounds(&v, start..end, (start as u64)..(end as u64));
             check_bounds(&v, start..=end, (start as u64)..=(end as u64));
             if start == 0 {
@@ -1215,11 +1215,11 @@ mod root_hash {
 
     #[test]
     fn object_hash_with_strings() {
-        const STRING: &str = "All human beings are born free and equal in dignity and rights. \
-             They are endowed with reason and conscience and should act towards one another \
-             in a spirit of brotherhood.";
+        let words = "All human beings are born free and equal in dignity and rights."
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
 
-        let words: Vec<_> = STRING.split_whitespace().map(str::to_owned).collect();
         for i in 1..words.len() {
             assert_object_hash_correct(&words[..i]);
         }
