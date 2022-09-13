@@ -24,7 +24,7 @@ enum-primitive-derive = "0.2"
 im = "15"
 leb128 = "0.2"
 num-traits = "0.2"
-protobuf = { version = "2", features = ["with-serde"], optional = true }
+protobuf = { version = "3", features = ["with-serde"], optional = true }
 rocksdb = { version = "0.19", default-features = false, features = [ "multi-threaded-cf" ] }
 rust_decimal = "1.0"
 serde = "1.0"

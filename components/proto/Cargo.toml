@@ -16,7 +16,7 @@ links = "exonum_protobuf_common"
 [dependencies]
 anyhow = "1.0"
 base64 = "0.13"
-protobuf = { version = "2", features = ["with-serde"] }
+protobuf = { version = "3", features = ["with-serde"] }
 bit-vec = "0.6.1"
 serde = "1.0"
 serde_derive = "1.0"

@@ -27,7 +27,7 @@ serde_str = "0.1"
 env_logger = "0.9"
 futures = "0.3.5"
 os_info = "3.0"
-protobuf = { version = "2", features = ["with-serde"] }
+protobuf = { version = "3", features = ["with-serde"] }
 semver = { version = "1.0", features = ["serde"] }
 thiserror = "1.0"
 time = { version = "0.3", features = ["serde"] }

@@ -24,7 +24,7 @@ exonum-cli = { version = "1.0.0", path = "../../../cli" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../../runtimes/rust" }
 
 anyhow = "1.0"
-protobuf = "2"
+protobuf = "3"
 serde = "1.0"
 serde_derive = "1.0"
 

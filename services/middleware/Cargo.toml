@@ -23,7 +23,7 @@ exonum-proto = { version = "1.0.0", path = "../../components/proto" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../runtimes/rust" }
 
 anyhow = "1.0"
-protobuf = "2"
+protobuf = "3"
 semver = { version = "1.0", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
