@@ -175,7 +175,7 @@ fn panicking_migration(_ctx: &mut MigrationContext) -> Result<(), MigrationError
 fn migration_modifying_state_hash(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     for i in 1_u32..=2 {
         ctx.helper.new_data().get_proof_entry("entry").set(i);
-        thread::sleep(DELAY / 2);
+        thread::sleep(DELAY);
         ctx.helper.merge()?;
     }
     Ok(())
@@ -645,7 +645,7 @@ fn migration_threads_are_timely_aborted() {
         .unwrap();
     rig.create_block(fork);
 
-    thread::sleep(DELAY * 2 / 3);
+    thread::sleep(DELAY);
     let blockchain = rig.stop();
     thread::sleep(DELAY * 10);
     let snapshot = blockchain.snapshot();
@@ -770,7 +770,7 @@ fn concurrent_migrations_to_same_artifact() {
     assert!(!threads.contains_key(&another_service.name));
 
     // ...and one more in the following block.
-    thread::sleep(DELAY * 2 / 3);
+    thread::sleep(DELAY);
     let fork = rig.blockchain.fork();
     rig.dispatcher()
         .initiate_migration(&fork, new_artifact, &another_service.name)
@@ -780,7 +780,7 @@ fn concurrent_migrations_to_same_artifact() {
     assert!(rig.migration_threads().contains_key(&another_service.name));
 
     // Wait for first two migrations to finish.
-    thread::sleep(DELAY / 2);
+    thread::sleep(DELAY);
     rig.create_block(rig.blockchain.fork());
     let snapshot = rig.blockchain.snapshot();
     let schema = DispatcherSchema::new(&snapshot);
@@ -820,7 +820,7 @@ fn migration_influencing_state_hash() {
     for _ in 0..2 {
         // The sleeping interval is chosen to be larger than the interval of DB merges
         // in the migration script.
-        thread::sleep(DELAY * 2 / 3);
+        thread::sleep(DELAY * 2);
 
         let fork = rig.blockchain.fork();
         // Check that we can access the old service data from outside.
