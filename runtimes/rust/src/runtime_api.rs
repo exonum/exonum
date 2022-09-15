@@ -20,7 +20,7 @@ use exonum::{
 };
 use exonum_api::{self as api, ApiBuilder};
 use futures::future;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::{collections::HashMap, iter};
 

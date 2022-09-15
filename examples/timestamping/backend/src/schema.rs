@@ -23,6 +23,7 @@ use exonum::{
 };
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::{proto, transactions::Config};

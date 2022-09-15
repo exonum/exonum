@@ -53,6 +53,8 @@ The project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html)
 
 - `chrono` crate has been replaced with `time` as outdated and unsupported. (#2009)
 
+- `protobuf` has been bumped up to 3 version. (#2073)
+
 ### Performance Improvements
 
 #### exonum-merkledb

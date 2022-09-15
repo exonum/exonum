@@ -20,7 +20,7 @@ use exonum::{
     },
 };
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[derive(Serialize, Deserialize)]

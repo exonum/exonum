@@ -85,7 +85,7 @@ mod v01 {
         },
     };
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use crate::TestUser;
 
@@ -168,7 +168,7 @@ mod v05 {
         ProofEntry, ProofMapIndex, Snapshot,
     };
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use crate::TestUser;
 
@@ -225,7 +225,6 @@ mod v05 {
 }
 
 /// First migration script. Merkelizes the wallets table and records the total number of tokens.
-#[allow(clippy::unnecessary_wraps)]
 fn merkelize_wallets(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v01::Schema::new(ctx.helper.old_data());
     let mut new_schema = v02::Schema::new(ctx.helper.new_data());
@@ -260,7 +259,6 @@ fn merkelize_wallets_with_merges(ctx: &mut MigrationContext) -> Result<(), Migra
 }
 
 /// Second migration script. Transforms the wallet type and reorganizes the service summary.
-#[allow(clippy::unnecessary_wraps)]
 fn transform_wallet_type(ctx: &mut MigrationContext) -> Result<(), MigrationError> {
     let old_schema = v02::Schema::new(ctx.helper.old_data());
     let mut new_schema = v05::Schema::new(ctx.helper.new_data());

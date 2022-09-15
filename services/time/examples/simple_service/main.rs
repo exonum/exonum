@@ -35,7 +35,7 @@ use exonum_derive::{
 };
 use exonum_rust_runtime::Service;
 use exonum_testkit::{Spec, TestKitBuilder};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use time::{Duration, OffsetDateTime};
 

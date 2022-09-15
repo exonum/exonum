@@ -15,7 +15,7 @@
 use criterion::{black_box, Bencher, Criterion, Throughput};
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{rngs::StdRng, Rng, SeedableRng};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use exonum_crypto::Hash;
 use exonum_merkledb::{

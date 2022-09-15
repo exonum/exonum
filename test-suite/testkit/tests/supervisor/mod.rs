@@ -26,7 +26,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{DefaultInstance, Service};
-use serde_derive::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(FromAccess)]
 struct Schema<T: Access> {

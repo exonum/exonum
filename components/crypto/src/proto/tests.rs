@@ -21,7 +21,7 @@ fn test_hash_pb_convert() {
     let hash = Hash::from_slice(&data).unwrap();
 
     let pb_hash = hash.to_pb();
-    assert_eq!(&pb_hash.get_data(), &data);
+    assert_eq!(&pb_hash.data(), &data);
 
     let hash_round_trip: Hash = ProtobufConvert::from_pb(pb_hash).unwrap();
     assert_eq!(hash_round_trip, hash);
@@ -47,7 +47,7 @@ fn test_pubkey_pb_convert() {
     let key = PublicKey::from_slice(&data).unwrap();
 
     let pb_key = key.to_pb();
-    assert_eq!(&pb_key.get_data(), &data);
+    assert_eq!(&pb_key.data(), &data);
 
     let key_round_trip: PublicKey = ProtobufConvert::from_pb(pb_key).unwrap();
     assert_eq!(key_round_trip, key);
@@ -73,7 +73,7 @@ fn test_signature_pb_convert() {
     let sign = Signature::from_slice(data).unwrap();
 
     let pb_sign = sign.to_pb();
-    assert_eq!(pb_sign.get_data(), data);
+    assert_eq!(pb_sign.data(), data);
 
     let sign_round_trip: Signature = ProtobufConvert::from_pb(pb_sign).unwrap();
     assert_eq!(sign_round_trip, sign);

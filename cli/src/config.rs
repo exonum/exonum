@@ -24,7 +24,7 @@ use exonum_node::{
     NodeConfig as CoreNodeConfig,
 };
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::{net::SocketAddr, path::PathBuf};
 

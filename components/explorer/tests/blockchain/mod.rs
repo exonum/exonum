@@ -26,7 +26,7 @@ use exonum::{
 };
 use exonum_derive::*;
 use exonum_rust_runtime::{RustRuntime, Service, ServiceFactory};
-use serde_derive::*;
+use serde::*;
 
 pub const SERVICE_ID: InstanceId = 118;
 

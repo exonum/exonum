@@ -17,7 +17,7 @@
 
 use anyhow::Error;
 use exonum::keys::{read_keys_from_file, Keys};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{
     net::SocketAddr,
     path::{Path, PathBuf},

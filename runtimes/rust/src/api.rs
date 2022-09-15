@@ -432,7 +432,7 @@ impl ServiceApiScope {
 /// The example below shows a common practice of the API implementation.
 ///
 /// ```
-/// use serde_derive::{Deserialize, Serialize};
+/// use serde::{Deserialize, Serialize};
 /// use exonum::{blockchain::Schema, crypto::Hash, merkledb::ObjectHash};
 /// use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
 ///

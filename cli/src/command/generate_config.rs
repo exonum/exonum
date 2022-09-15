@@ -22,7 +22,7 @@ use exonum::{
     merkledb::DbOptions,
 };
 use exonum_node::{ConnectListConfig, MemoryPoolConfig, NetworkConfiguration, NodeApiConfig};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::{

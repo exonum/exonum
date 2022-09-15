@@ -233,7 +233,7 @@ impl<T: ServiceFactory + MigrateData> Deploy for JustFactory<T, Migrating> {
 /// # use exonum::runtime::{versioning::Version, ArtifactId};
 /// # use exonum_derive::*;
 /// # use exonum_rust_runtime::spec::ForeignSpec;
-/// # use serde_derive::*;
+/// # use serde::*;
 /// #
 /// # #[derive(Serialize, Deserialize, BinaryValue)]
 /// # #[binary_value(codec = "bincode")]

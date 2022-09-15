@@ -2,7 +2,7 @@
 name = "exonum-sample-runtime"
 version = "0.0.0"
 authors = ["The Exonum Team <contact@exonum.com>"]
-edition = "2018"
+edition = "2021"
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
 license = "Apache-2.0"

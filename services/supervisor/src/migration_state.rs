@@ -18,7 +18,7 @@ use exonum::{
 };
 use exonum_derive::BinaryValue;
 use exonum_proto::ProtobufConvert;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use super::{proto, AsyncEventState, MigrationError};
 

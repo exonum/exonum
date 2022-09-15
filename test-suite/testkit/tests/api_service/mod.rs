@@ -25,7 +25,7 @@ use exonum_rust_runtime::{
     api::{self, Deprecated, ServiceApiBuilder, ServiceApiState},
     DefaultInstance, Service,
 };
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use time::macros::datetime;
 
 pub const SERVICE_NAME: &str = "api-service";

@@ -22,7 +22,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_interface, BinaryValue, ObjectHash, ServiceDispatcher, ServiceFactory};
 use exonum_rust_runtime::{DefaultInstance, Service, TxStub};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[exonum_interface(auto_ids)]
 pub trait Supervisor<Ctx> {

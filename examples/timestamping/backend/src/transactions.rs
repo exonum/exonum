@@ -19,6 +19,7 @@ use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFa
 use exonum_proto::ProtobufConvert;
 use exonum_time::TimeSchema;
 use log::trace;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     proto,

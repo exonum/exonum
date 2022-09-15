@@ -15,6 +15,7 @@
 use anyhow::ensure;
 use exonum_derive::BinaryValue;
 use exonum_proto::ProtobufConvert;
+use serde::{Deserialize, Serialize};
 
 use crate::{proto::schema::errors as errors_proto, runtime::ExecutionError};
 
@@ -23,7 +24,7 @@ use crate::{proto::schema::errors as errors_proto, runtime::ExecutionError};
 /// or an `ExecutionError`, if execution has failed.
 #[derive(Clone, Debug, Serialize, Deserialize, BinaryValue)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub struct ExecutionStatus(#[serde(with = "self::serde")] pub Result<(), ExecutionError>);
+pub struct ExecutionStatus(#[serde(with = "self::serializing")] pub Result<(), ExecutionError>);
 
 impl ExecutionStatus {
     /// Creates status for the successful execution.
@@ -49,8 +50,8 @@ impl ProtobufConvert for ExecutionStatus {
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut inner = Self::ProtoStruct::default();
         match &self.0 {
-            Result::Ok(_) => inner.set_ok(protobuf::well_known_types::Empty::new()),
-            Result::Err(e) => inner.set_error(e.to_pb()),
+            Ok(_) => inner.set_ok(protobuf::well_known_types::empty::Empty::new()),
+            Err(e) => inner.set_error(e.to_pb()),
         }
         inner
     }
@@ -66,7 +67,7 @@ impl ProtobufConvert for ExecutionStatus {
     }
 }
 
-pub mod serde {
+pub mod serializing {
     //! More convenient `serde` layout for `Result<(), ExecutionError>`.
 
     use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};

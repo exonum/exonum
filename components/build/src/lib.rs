@@ -56,7 +56,7 @@
 #![warn(missing_docs, missing_debug_implementations)]
 
 use proc_macro2::{Ident, Span, TokenStream};
-use protoc_rust::Customize;
+use protobuf_codegen::Customize;
 use quote::{quote, ToTokens};
 use std::{
     collections::HashSet,
@@ -107,7 +107,7 @@ struct ProtobufFile {
     relative_path: String,
 }
 
-/// Finds all .proto files in `path` and sub-directories and returns a vector
+/// Finds all .proto files in `path` and subdirectories and returns a vector
 /// with metadata on found files.
 fn get_proto_files<P: AsRef<Path>>(path: &P) -> Vec<ProtobufFile> {
     WalkDir::new(path)
@@ -167,7 +167,6 @@ fn include_proto_files(proto_files: HashSet<&ProtobufFile>, name: &str) -> impl 
         /// Original proto files which were be used to generate this module.
         /// First element in tuple is file name, second is proto file content.
         #[allow(dead_code)]
-        #[allow(clippy::unseparated_literal_suffix)]
         pub const #name: [(&str, &str); #proto_files_len] = [
             #( #proto_files )*
         ];
@@ -406,16 +405,17 @@ fn protobuf_generate(
         generate_mod_rs_without_sources(&out_dir, &proto_files, mod_file_name);
     }
 
-    protoc_rust::Codegen::new()
+    protobuf_codegen::Codegen::new()
+        .pure()
         .out_dir(out_dir)
         .inputs(proto_files.into_iter().map(|f| f.full_path))
         .includes(&includes)
-        .customize(Customize {
-            serde_derive: Some(true),
-            ..Default::default()
-        })
-        .run()
-        .expect("protoc")
+        .customize(
+            Customize::default()
+                .generate_accessors(true)
+                .gen_mod_rs(true),
+        )
+        .run_from_script()
 }
 
 fn get_included_files(includes: &[&str]) -> Vec<ProtobufFile> {

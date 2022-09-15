@@ -45,12 +45,13 @@ pub use self::{
     error_match::ErrorMatch, execution_status::ExecutionStatus,
 };
 
-use errors_proto::CallSite_Type::{
+use errors_proto::call_site::Type::{
     AFTER_TRANSACTIONS, BEFORE_TRANSACTIONS, CONSTRUCTOR, METHOD, RESUME,
 };
 use exonum_derive::{BinaryValue, ExecutionFail};
 use exonum_merkledb::Error as MerkledbError;
 use exonum_proto::ProtobufConvert;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::{
@@ -241,17 +242,17 @@ impl ProtobufConvert for CallSite {
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-        let call_type = match pb.get_call_type() {
+        let call_type = match pb.call_type() {
             CONSTRUCTOR => CallType::Constructor,
             RESUME => CallType::Resume,
             BEFORE_TRANSACTIONS => CallType::BeforeTransactions,
             AFTER_TRANSACTIONS => CallType::AfterTransactions,
             METHOD => CallType::Method {
                 interface: pb.take_interface(),
-                id: pb.get_method_id(),
+                id: pb.method_id(),
             },
         };
-        Ok(Self::new(pb.get_instance_id(), call_type))
+        Ok(Self::new(pb.instance_id(), call_type))
     }
 }
 

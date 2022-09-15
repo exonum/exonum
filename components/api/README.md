@@ -19,7 +19,7 @@ Providing HTTP API for a plugin:
 
 ```rust
 use exonum_api::{ApiBuilder};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct SomeQuery {

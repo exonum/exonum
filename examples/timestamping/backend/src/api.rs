@@ -13,13 +13,13 @@
 // limitations under the License.
 
 //! REST API.
-
 use exonum::{
     blockchain::{BlockProof, IndexProof},
     crypto::Hash,
 };
 use exonum_merkledb::{proof_map::Raw, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     schema::{Schema, TimestampEntry},

@@ -17,7 +17,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use enum_primitive_derive::Primitive;
 use exonum_crypto::Hash;
 use num_traits::FromPrimitive;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::{borrow::Cow, io::Error, mem, num::NonZeroU64, vec};
 

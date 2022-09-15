@@ -38,9 +38,6 @@
     clippy::missing_errors_doc, clippy::missing_const_for_fn
 )]
 
-#[macro_use]
-extern crate serde_derive; // Required for Protobuf.
-
 #[doc(inline)]
 pub use self::crypto_impl::{
     HASH_SIZE, PUBLIC_KEY_LENGTH, SECRET_KEY_LENGTH, SEED_LENGTH, SIGNATURE_LENGTH,
@@ -54,8 +51,8 @@ pub mod proto;
 
 use hex::{encode as encode_hex, FromHex, FromHexError, ToHex};
 use serde::{
-    de::{self, Deserialize, Deserializer, Visitor},
-    Serialize, Serializer,
+    de::{self, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use std::{

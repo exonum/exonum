@@ -25,7 +25,7 @@ use exonum_merkledb::{access::Access, BinaryValue, Snapshot};
 use exonum_rust_runtime::{
     DefaultInstance, FallthroughAuth, GenericCallMut, MethodDescriptor, Service,
 };
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     error::Error,

@@ -24,7 +24,7 @@
 //!     helpers::Height,
 //!     runtime::{BlockchainData, SnapshotExt, ExecutionError},
 //! };
-//! use serde_derive::*;
+//! use serde::*;
 //! use exonum_derive::*;
 //! use exonum_merkledb::{ObjectHash, Snapshot};
 //! use exonum_testkit::{ApiKind, Spec, TestKitBuilder};
@@ -393,7 +393,7 @@ impl TestKit {
     /// in different order and/or in different blocks) that require an expensive setup:
     ///
     /// ```
-    /// # use serde_derive::{Serialize, Deserialize};
+    /// # use serde::{Serialize, Deserialize};
     /// # use exonum_derive::{exonum_interface, interface_method, ServiceFactory, ServiceDispatcher, BinaryValue};
     /// # use exonum_testkit::{Spec, TestKit, TestKitBuilder};
     /// # use exonum_merkledb::Snapshot;
