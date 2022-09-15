@@ -17,7 +17,7 @@
 use anyhow::Error;
 use exonum::blockchain::ConsensusConfig;
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use structopt::StructOpt;
 

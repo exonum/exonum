@@ -780,7 +780,6 @@ where
 mod proto {
     use anyhow::ensure;
     use exonum_proto::ProtobufConvert;
-    use protobuf::RepeatedField;
 
     use std::borrow::Cow;
 
@@ -804,8 +803,8 @@ mod proto {
         }
 
         fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-            let index = pb.get_index();
-            let height = pb.get_height();
+            let index = pb.index();
+            let height = pb.height();
 
             // ProtobufConvert is implemented manually to add these checks.
             ensure!(index <= MAX_INDEX, "index is out of range");
@@ -856,8 +855,8 @@ mod proto {
                 .map(HashedEntry::to_pb)
                 .collect();
 
-            list_proof.set_proof(RepeatedField::from_vec(proof));
-            list_proof.set_entries(RepeatedField::from_vec(entries));
+            list_proof.set_proof(proof);
+            list_proof.set_entries(entries);
 
             list_proof
         }
@@ -870,17 +869,12 @@ mod proto {
                 .collect::<anyhow::Result<_>>()?;
 
             let entries = pb
-                .get_entries()
+                .entries()
                 .iter()
-                .map(|entry| {
-                    Ok((
-                        entry.get_index(),
-                        V::from_bytes(Cow::Borrowed(entry.get_value()))?,
-                    ))
-                })
+                .map(|entry| Ok((entry.index(), V::from_bytes(Cow::Borrowed(entry.value()))?)))
                 .collect::<anyhow::Result<_>>()?;
 
-            Ok(Self::from_raw_parts(proof, entries, pb.get_length()))
+            Ok(Self::from_raw_parts(proof, entries, pb.length()))
         }
     }
 }

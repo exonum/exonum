@@ -44,20 +44,26 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust }}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          # Not enough space on a VM to test with param: --all-targets
-          args: -p exonum -p exonum-rust-runtime -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
+      # Not enough space on a VM to test with param: --all-targets
+      - name: Run on Unix
+        if: runner.os != 'Windows'
+        run: | 
+            cargo test -p exonum -p exonum-rust-runtime -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node \
+                -p exonum-testkit -p exonum-api -p exonum-system-api -p exonum-explorer-service --tests
+      - name: Run on Windows
+        if: runner.os == 'Windows'
+        run: |
+            cargo test -p exonum -p exonum-rust-runtime -p exonum-crypto -p exonum-cli -p exonum-keys -p exonum-node --tests
         env:
           RUST_BACKTRACE: full
 
   merkle_db_unit_tests:
-    name: MerkleDB Unit Tests
+    name: MerkleDB Tests
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        tempdb: [ memory, persisted ]
         build: [ Linux, MacOS, Windows ]
         include:
           - build: Linux
@@ -85,10 +91,12 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust }}
-      - run: |
-          cd components/merkledb
-          cargo test --all-targets
-          cargo test --all-targets -F persisted_tempdb
+      - name: Run with db in memory
+        if: ${{ matrix.tempdb == 'memory' }}
+        run: cd components/merkledb && cargo test --all-targets
+      - name: Run with persisted db
+        if: ${{ matrix.tempdb == 'persisted' }}
+        run: cd components/merkledb && cargo test --all-targets -F persisted_tempdb
         env:
           RUST_BACKTRACE: full
 

@@ -22,7 +22,7 @@ use anyhow::{bail, ensure};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use log::warn;
-
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use crate::{

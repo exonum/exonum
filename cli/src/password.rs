@@ -16,7 +16,7 @@
 
 use anyhow::{bail, Context, Error};
 use rpassword::prompt_password;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use std::{env, str::FromStr};

@@ -79,7 +79,7 @@ pub mod pb_optional_hash {
 
     /// Deserializes `Option<Hash>` from Protobuf.
     pub fn from_pb(pb: PbHash) -> anyhow::Result<Option<Hash>> {
-        if pb.get_data().is_empty() {
+        if pb.data().is_empty() {
             Ok(None)
         } else {
             Hash::from_pb(pb).map(Some)

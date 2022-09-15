@@ -22,6 +22,7 @@ use exonum::{
 };
 use exonum_merkledb::{proof_map::Raw, ListProof, MapProof};
 use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
+use serde::{Deserialize, Serialize};
 
 use crate::{schema::SchemaImpl, wallet::Wallet};
 

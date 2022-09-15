@@ -21,7 +21,7 @@ use exonum::{
 };
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::{ProtobufBase64, ProtobufConvert};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use super::{mode::Mode, proto};
 

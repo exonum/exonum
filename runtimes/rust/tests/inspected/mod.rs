@@ -35,7 +35,7 @@ use exonum::{
 use exonum_api::UpdateEndpoints;
 use exonum_derive::{exonum_interface, BinaryValue, ServiceDispatcher, ServiceFactory};
 use futures::{channel::mpsc, FutureExt, StreamExt};
-use serde_derive::*;
+use serde::*;
 
 use std::{
     collections::HashSet,

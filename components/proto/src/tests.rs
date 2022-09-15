@@ -16,6 +16,7 @@
 
 use bit_vec::BitVec;
 use rand::{rngs::StdRng, Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::{ProtobufBase64, ProtobufConvert};

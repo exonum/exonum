@@ -194,7 +194,7 @@ mod cryptocurrency {
     use exonum_proto::ProtobufConvert;
     use exonum_rust_runtime::{DefaultInstance, Service};
     use rand::{rngs::StdRng, seq::SliceRandom};
-    use serde_derive::{Deserialize, Serialize};
+    use serde::{Deserialize, Serialize};
 
     use super::gen_keypair_from_rng;
     use crate::proto;

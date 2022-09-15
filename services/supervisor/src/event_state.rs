@@ -16,7 +16,7 @@ use anyhow::format_err;
 use exonum::{helpers::Height, runtime::ExecutionError};
 use exonum_derive::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::proto as pb_supervisor;
 
@@ -86,7 +86,7 @@ impl ProtobufConvert for AsyncEventState {
     type ProtoStruct = pb_supervisor::AsyncEventState;
 
     fn to_pb(&self) -> Self::ProtoStruct {
-        use pb_supervisor::AsyncEventState_Type::{FAIL, PENDING, SUCCESS, TIMEOUT};
+        use pb_supervisor::async_event_state::Type::{FAIL, PENDING, SUCCESS, TIMEOUT};
 
         let mut pb = Self::ProtoStruct::new();
         match self {
@@ -106,8 +106,8 @@ impl ProtobufConvert for AsyncEventState {
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-        use pb_supervisor::AsyncEventState_Type::{FAIL, PENDING, SUCCESS, TIMEOUT};
-        let state = match pb.get_state() {
+        use pb_supervisor::async_event_state::Type::{FAIL, PENDING, SUCCESS, TIMEOUT};
+        let state = match pb.state() {
             PENDING => Self::Pending,
             SUCCESS => Self::Succeed,
             TIMEOUT => Self::Timeout,
@@ -121,7 +121,7 @@ impl ProtobufConvert for AsyncEventState {
                 }
                 let mut pb_error = pb.take_error();
                 let error = ExecutionError::from_pb(pb_error.take_error())?;
-                let height = Height(pb_error.get_height());
+                let height = Height(pb_error.height());
                 Self::Failed { height, error }
             }
         };

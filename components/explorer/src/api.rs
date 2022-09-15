@@ -25,7 +25,7 @@ use exonum::{
     messages::{Precommit, Verified},
     runtime::{AnyTx, CallInfo, ExecutionStatus, InstanceId},
 };
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::ops::Range;
 use time::OffsetDateTime;
 

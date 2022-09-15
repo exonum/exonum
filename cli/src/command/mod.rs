@@ -34,7 +34,7 @@ mod run;
 mod run_dev;
 
 use anyhow::Error;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use structopt::StructOpt;
 
 use std::path::PathBuf;

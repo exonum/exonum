@@ -23,9 +23,6 @@
     bare_trait_objects
 )]
 
-#[macro_use]
-extern crate serde_derive; // Required for Protobuf.
-
 mod api;
 #[doc(hidden)]
 pub mod proto;

@@ -134,7 +134,7 @@
 use exonum::crypto::PublicKey;
 use exonum_api::Result;
 use exonum_rust_runtime::api;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use crate::TimeSchema;

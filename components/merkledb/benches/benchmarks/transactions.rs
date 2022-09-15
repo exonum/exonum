@@ -21,7 +21,7 @@ use exonum_merkledb::{
     ProofMapIndex, TemporaryDB,
 };
 use rand::{rngs::StdRng, Rng, RngCore, SeedableRng};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt};
 
 const SEED: [u8; 32] = [100; 32];

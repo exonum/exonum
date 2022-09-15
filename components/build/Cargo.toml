@@ -1,7 +1,7 @@
 [package]
 name = "exonum-build"
 version = "1.0.1"
-edition = "2018"
+edition = "2021"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -13,7 +13,7 @@ categories = ["development-tools"]
 description = "Helper functions for writing build.rs for exonum services."
 
 [dependencies]
-protoc-rust = "2.27"
-walkdir = "2.3"
-quote = "1.0"
-proc-macro2 = "1.0"
+protobuf-codegen = "3"
+walkdir = "2"
+quote = "1"
+proc-macro2 = "1"

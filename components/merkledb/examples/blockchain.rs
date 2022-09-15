@@ -19,7 +19,7 @@
 
 use exonum_crypto::{Hash, KeyPair, PublicKey};
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use exonum_merkledb::{
     access::{Access, FromAccess, RawAccessMut},

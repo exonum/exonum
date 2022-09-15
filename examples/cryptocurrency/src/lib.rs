@@ -30,9 +30,6 @@
     bare_trait_objects
 )]
 
-#[macro_use]
-extern crate serde_derive; // Required for Protobuf.
-
 pub mod proto;
 #[cfg(test)]
 mod tx_tests;
@@ -48,6 +45,7 @@ pub mod schema {
     };
     use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
     use exonum_proto::ProtobufConvert;
+    use serde::{Deserialize, Serialize};
 
     use crate::proto;
 
@@ -115,6 +113,7 @@ pub mod transactions {
     use exonum::crypto::PublicKey;
     use exonum_derive::{BinaryValue, ObjectHash};
     use exonum_proto::ProtobufConvert;
+    use serde::{Deserialize, Serialize};
 
     use super::proto;
 
@@ -288,6 +287,7 @@ pub mod contracts {
 pub mod api {
     use exonum::crypto::PublicKey;
     use exonum_rust_runtime::api::{self, ServiceApiBuilder, ServiceApiState};
+    use serde::{Deserialize, Serialize};
 
     use crate::schema::{CurrencySchema, Wallet};
 

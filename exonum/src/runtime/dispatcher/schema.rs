@@ -25,7 +25,7 @@ use PbMigrationTransition::{COMMIT, NONE, ROLLBACK, START};
 
 use crate::{
     proto::schema::{
-        self, details::ModifiedInstanceInfo_MigrationTransition as PbMigrationTransition,
+        self, details::modified_instance_info::MigrationTransition as PbMigrationTransition,
     },
     runtime::{
         migrations::{InstanceMigration, MigrationStatus},

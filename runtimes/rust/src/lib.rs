@@ -41,7 +41,7 @@
 //! # use exonum::runtime::{BlockchainData, ExecutionError};
 //! # use exonum_rust_runtime::{ExecutionContext, Service};
 //! # use exonum_derive::*;
-//! # use serde_derive::*;
+//! # use serde::*;
 //!
 //! // Determine the types of data that will be used in service transactions.
 //!

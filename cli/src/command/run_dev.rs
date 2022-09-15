@@ -17,7 +17,7 @@
 
 use anyhow::{Context, Error};
 use exonum_supervisor::mode::Mode as SupervisorMode;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{fs, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 

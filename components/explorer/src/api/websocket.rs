@@ -20,7 +20,7 @@ use exonum::{
     merkledb::{access::Access, ListProof},
     runtime::{ExecutionStatus, InstanceId, MethodId},
 };
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use time::OffsetDateTime;
 

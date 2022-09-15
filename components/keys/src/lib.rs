@@ -58,7 +58,7 @@ use pwbox::{sodium::Sodium, ErasedPwBox, Eraser, SensitiveData, Suite};
 use rand::thread_rng;
 use secrecy::ExposeSecret;
 use secret_tree::{Name, SecretTree};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[cfg(unix)]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};

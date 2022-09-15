@@ -20,6 +20,7 @@ use exonum_merkledb::{
 };
 use pretty_assertions::assert_eq;
 use semver::Version;
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 
 use std::{

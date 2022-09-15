@@ -18,7 +18,7 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 use anyhow::bail;
 use exonum_proto::ProtobufConvert;
-use protobuf::well_known_types::Empty;
+use protobuf::well_known_types::empty::Empty;
 
 use std::{
     any::Any,
@@ -31,7 +31,7 @@ use crate::{
     proto::schema,
     runtime::{
         error::{
-            execution_status::serde::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError,
+            execution_status::serializing::ExecutionStatus, ErrorKind, ErrorMatch, ExecutionError,
             ExecutionErrorAux,
         },
         CallSite, RuntimeIdentifier,
@@ -240,15 +240,15 @@ impl ProtobufConvert for ExecutionError {
     }
 
     fn from_pb(mut pb: Self::ProtoStruct) -> anyhow::Result<Self> {
-        let kind = pb.get_kind();
-        let code = u8::try_from(pb.get_code())?;
+        let kind = pb.kind();
+        let code = u8::try_from(pb.code())?;
 
         let kind = ErrorKind::from_raw(kind, code)?;
 
         let runtime_id = if pb.has_no_runtime_id() {
             None
         } else if pb.has_runtime_id() {
-            Some(pb.get_runtime_id())
+            Some(pb.runtime_id())
         } else {
             bail!("No runtime info or no_runtime_id marker");
         };

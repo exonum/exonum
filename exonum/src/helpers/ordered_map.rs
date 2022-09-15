@@ -17,7 +17,7 @@ use exonum_crypto::Hash;
 use exonum_merkledb::{BinaryValue, ObjectHash};
 use exonum_proto::ProtobufConvert;
 use protobuf::Message;
-
+use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, collections::BTreeMap};
 
 use crate::proto;
@@ -81,8 +81,7 @@ where
             .iter()
             .map(pair_to_key_value_pb)
             .collect::<anyhow::Result<Vec<_>>>()
-            .expect("Map contains invalid utf-8 keys")
-            .into();
+            .expect("Map contains invalid utf-8 keys");
         proto_struct
     }
 
@@ -140,7 +139,6 @@ where
 #[cfg(test)]
 mod tests {
     use exonum_proto::ProtobufConvert;
-    use protobuf::RepeatedField;
 
     use super::OrderedMap;
     use crate::proto::schema::key_value_sequence::{
@@ -167,7 +165,7 @@ mod tests {
 
         // Unordered keys.
         let mut map = PbKeyValueSequence::new();
-        map.set_entries(RepeatedField::from_vec(vec![kv.clone(), kv2.clone()]));
+        map.set_entries(vec![kv.clone(), kv2.clone()]);
 
         let res = OrderedMap::<String, Vec<u8>>::from_pb(map);
         res.unwrap_err()
@@ -176,7 +174,7 @@ mod tests {
 
         // Duplicate keys.
         let mut map = PbKeyValueSequence::new();
-        map.set_entries(RepeatedField::from_vec(vec![kv2.clone(), kv, kv2]));
+        map.set_entries(vec![kv2.clone(), kv, kv2]);
 
         let res = OrderedMap::<String, Vec<u8>>::from_pb(map);
         res.unwrap_err()

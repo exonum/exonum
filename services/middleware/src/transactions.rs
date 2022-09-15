@@ -19,7 +19,7 @@ use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFa
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{FallthroughAuth, GenericCall, GenericCallMut, MethodDescriptor, TxStub};
 use semver::VersionReq;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{proto, ArtifactReq, MiddlewareService};
 

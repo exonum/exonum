@@ -22,9 +22,9 @@ use exonum_merkledb::{
     BinaryKey, BinaryValue, ObjectHash,
 };
 use exonum_proto::ProtobufConvert;
-use protobuf::well_known_types::Empty;
+use protobuf::well_known_types::empty::Empty;
 use semver::Version;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::{
     borrow::Cow,
@@ -32,11 +32,15 @@ use std::{
     str::FromStr,
 };
 
-use self::schema::lifecycle::ArtifactState_Status::{ACTIVE, DEPLOYING, UNLOADING};
 use super::InstanceDescriptor;
 use crate::{
-    blockchain::config::InstanceInitParams, helpers::ValidateInput, messages::Verified,
-    proto::schema,
+    blockchain::config::InstanceInitParams,
+    helpers::ValidateInput,
+    messages::Verified,
+    proto::schema::{
+        self,
+        lifecycle::artifact_state::Status::{ACTIVE, DEPLOYING, UNLOADING},
+    },
 };
 
 /// Unique service instance identifier.
@@ -426,7 +430,7 @@ impl Display for ArtifactStatus {
 }
 
 impl ProtobufConvert for ArtifactStatus {
-    type ProtoStruct = schema::lifecycle::ArtifactState_Status;
+    type ProtoStruct = schema::lifecycle::artifact_state::Status;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         match self {
@@ -577,7 +581,7 @@ impl InstanceStatus {
     }
 
     fn create_pb(status: Option<&Self>) -> schema::lifecycle::InstanceStatus {
-        use schema::lifecycle::InstanceStatus_Simple::{ACTIVE, FROZEN, NONE, STOPPED};
+        use schema::lifecycle::instance_status::Simple::{ACTIVE, FROZEN, NONE, STOPPED};
 
         let mut pb = schema::lifecycle::InstanceStatus::new();
         match status {
@@ -593,10 +597,10 @@ impl InstanceStatus {
     pub(super) fn from_pb(
         mut pb: schema::lifecycle::InstanceStatus,
     ) -> anyhow::Result<Option<Self>> {
-        use schema::lifecycle::InstanceStatus_Simple::{ACTIVE, FROZEN, NONE, STOPPED};
+        use schema::lifecycle::instance_status::Simple::{ACTIVE, FROZEN, NONE, STOPPED};
 
         if pb.has_simple() {
-            Ok(match pb.get_simple() {
+            Ok(match pb.simple() {
                 NONE => None,
                 ACTIVE => Some(Self::Active),
                 STOPPED => Some(Self::Stopped),
@@ -911,7 +915,7 @@ impl ProtobufConvert for Caller {
             Self::Transaction { author }
         } else if pb.has_instance_id() {
             Self::Service {
-                instance_id: pb.get_instance_id(),
+                instance_id: pb.instance_id(),
             }
         } else if pb.has_blockchain() {
             Self::Blockchain

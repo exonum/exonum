@@ -17,9 +17,6 @@
 #![deny(unsafe_code, bare_trait_objects)]
 #![warn(missing_docs, missing_debug_implementations)]
 
-#[macro_use]
-extern crate serde_derive; // Required for Protobuf.
-
 pub use crate::{schema::Schema, transactions::CryptocurrencyInterface};
 
 pub mod api;

@@ -21,7 +21,7 @@ use exonum_merkledb::{
     Entry, KeySetIndex, ListIndex, MapIndex, ObjectHash, ProofEntry, ProofListIndex, ProofMapIndex,
 };
 use exonum_proto::ProtobufConvert;
-
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::{
@@ -567,15 +567,15 @@ impl ProtobufConvert for CallInBlock {
     fn from_pb(pb: Self::ProtoStruct) -> anyhow::Result<Self> {
         if pb.has_before_transactions() {
             Ok(Self::BeforeTransactions {
-                id: pb.get_before_transactions(),
+                id: pb.before_transactions(),
             })
         } else if pb.has_transaction() {
             Ok(Self::Transaction {
-                index: pb.get_transaction(),
+                index: pb.transaction(),
             })
         } else if pb.has_after_transactions() {
             Ok(Self::AfterTransactions {
-                id: pb.get_after_transactions(),
+                id: pb.after_transactions(),
             })
         } else {
             Err(format_err!("Invalid location format"))

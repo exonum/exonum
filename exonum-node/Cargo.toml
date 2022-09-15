@@ -1,7 +1,7 @@
 [package]
 name = "exonum-node"
 version = "1.0.0"
-edition = "2018"
+edition = "2021"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -24,7 +24,7 @@ bytes = "1"
 futures = "0.3"
 futures-retry = "0.6"
 log = "0.4.6"
-protobuf = { version = "2", features = ["with-serde"] }
+protobuf = "3"
 rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"

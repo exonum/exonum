@@ -20,6 +20,7 @@ use exonum::{
 };
 use exonum_derive::{exonum_interface, interface_method, BinaryValue, ExecutionFail, ObjectHash};
 use exonum_proto::ProtobufConvert;
+use serde::{Deserialize, Serialize};
 
 use crate::{proto, schema::SchemaImpl, CryptocurrencyService};
 

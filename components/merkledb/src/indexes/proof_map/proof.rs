@@ -15,8 +15,8 @@
 pub use crate::ValidationError;
 
 use exonum_crypto::Hash;
+use serde::{Deserialize, Serialize};
 use serde::{Deserializer, Serializer};
-use serde_derive::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::{borrow::Cow, marker::PhantomData};

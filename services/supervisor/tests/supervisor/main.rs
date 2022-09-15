@@ -75,7 +75,6 @@ async fn assert_count_is_not_set(api: &TestKitApi, service_name: &'static str) {
     assert!(response.is_err());
 }
 
-#[allow(clippy::let_and_return)] // doesn't work otherwise
 fn artifact_exists(testkit: &TestKit, name: &str) -> bool {
     let snapshot = testkit.snapshot();
     let artifacts = snapshot.for_dispatcher().service_artifacts();

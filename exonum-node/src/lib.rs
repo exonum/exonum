@@ -82,7 +82,7 @@ use futures::{
     FutureExt,
 };
 use log::{info, trace};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tokio::{runtime::Runtime, time::sleep};
 
 use std::{

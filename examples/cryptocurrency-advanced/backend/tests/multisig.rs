@@ -26,7 +26,7 @@ use exonum::{
 use exonum_derive::*;
 use exonum_rust_runtime::{ExecutionContext, GenericCallMut, MethodDescriptor, Service, TxStub};
 use exonum_testkit::{Spec, TestKit, TestKitBuilder};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use exonum_cryptocurrency_advanced::{
     transactions::{CreateWallet, Transfer},

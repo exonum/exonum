@@ -21,7 +21,7 @@ pub use self::{list_proof::*, map_proof::*};
 use anyhow::{ensure, Error};
 use exonum_crypto::{proto::*, HASH_SIZE};
 use exonum_proto::ProtobufConvert;
-use protobuf::{well_known_types::Empty, RepeatedField};
+use protobuf::well_known_types::empty::Empty;
 
 use std::borrow::Cow;
 
@@ -35,7 +35,7 @@ include!(concat!(env!("OUT_DIR"), "/protobuf_mod.rs"));
 fn parse_map_proof_entry(
     mut entry: MapProofEntry,
 ) -> Result<(ProofPath, exonum_crypto::Hash), Error> {
-    let padding = entry.get_path_padding();
+    let padding = entry.path_padding();
     ensure!(padding < 8, "`padding` is not in 0..8 interval");
     let mut path_buffer = entry.take_path();
     ensure!(!path_buffer.is_empty(), "Empty `path`");
@@ -96,8 +96,8 @@ where
             })
             .collect();
 
-        map_proof.set_proof(RepeatedField::from_vec(proof));
-        map_proof.set_entries(RepeatedField::from_vec(entries));
+        map_proof.set_proof(proof);
+        map_proof.set_entries(entries);
 
         map_proof
     }
@@ -146,7 +146,6 @@ where
 mod tests {
     use exonum_crypto::{hash, proto::types, PublicKey};
     use exonum_proto::ProtobufConvert;
-    use protobuf::RepeatedField;
 
     use std::fmt;
 
@@ -203,7 +202,7 @@ mod tests {
         hash.set_data(vec![0_u8; 31]);
         proof_entry.set_hash(hash);
         proof_entry.set_path(vec![0_u8; 32]);
-        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        proof.set_proof(vec![proof_entry]);
 
         let res = MapProof::<u8, u8>::from_pb(proof.clone());
         assert!(res.unwrap_err().to_string().contains("Wrong Hash size"));
@@ -211,7 +210,7 @@ mod tests {
         let mut entry = proto::OptionalEntry::new();
         entry.set_key(vec![0_u8; 32]);
         proof.clear_proof();
-        proof.set_entries(RepeatedField::from_vec(vec![entry]));
+        proof.set_entries(vec![entry]);
 
         let res = MapProof::<PublicKey, u8>::from_pb(proof);
         assert!(res.unwrap_err().to_string().contains("malformed message"));
@@ -222,7 +221,7 @@ mod tests {
         let mut proof = proto::MapProof::new();
         let mut proof_entry = proto::MapProofEntry::new();
         proof_entry.set_hash(hash(b"foo").to_pb());
-        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        proof.set_proof(vec![proof_entry]);
         let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
         assert!(err.to_string().contains("Empty `path`"));
 
@@ -230,7 +229,7 @@ mod tests {
         let mut proof_entry = proto::MapProofEntry::new();
         proof_entry.set_hash(hash(b"foo").to_pb());
         proof_entry.set_path(vec![1; 33]);
-        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        proof.set_proof(vec![proof_entry]);
         let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
         assert!(err.to_string().contains("`path` is too long"));
 
@@ -239,7 +238,7 @@ mod tests {
         proof_entry.set_hash(hash(b"foo").to_pb());
         proof_entry.set_path(vec![11; 32]);
         proof_entry.set_path_padding(8);
-        proof.set_proof(RepeatedField::from_vec(vec![proof_entry]));
+        proof.set_proof(vec![proof_entry]);
         let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
         assert!(err
             .to_string()
@@ -252,7 +251,7 @@ mod tests {
         let mut entry = proto::OptionalEntry::new();
         entry.set_key(vec![1]); // invalid `u16` serialization.
         entry.set_value(vec![2]);
-        proof.set_entries(RepeatedField::from_vec(vec![entry]));
+        proof.set_entries(vec![entry]);
 
         let err = MapProof::<u16, u8>::from_pb(proof).unwrap_err();
         assert!(err.to_string().contains("failed to fill whole buffer"));
@@ -304,7 +303,7 @@ mod tests {
         let mut hashed_entry = proto::HashedEntry::new();
         hashed_entry.set_key(key.clone());
 
-        proof.set_proof(RepeatedField::from_vec(vec![hashed_entry]));
+        proof.set_proof(vec![hashed_entry]);
 
         let de_proof = ListProof::<u8>::from_pb(proof.clone());
         assert!(de_proof
@@ -317,7 +316,7 @@ mod tests {
         let mut hashed_entry = proto::HashedEntry::new();
         hashed_entry.set_key(key);
 
-        proof.set_proof(RepeatedField::from_vec(vec![hashed_entry]));
+        proof.set_proof(vec![hashed_entry]);
 
         let de_proof = ListProof::<u8>::from_pb(proof);
         assert!(de_proof
@@ -334,7 +333,7 @@ mod tests {
         let mut hash = types::Hash::new();
         hash.set_data(vec![0_u8; 31]);
         hashed_entry.set_hash(hash);
-        proof.set_proof(RepeatedField::from_vec(vec![hashed_entry]));
+        proof.set_proof(vec![hashed_entry]);
 
         let de_proof = ListProof::<u8>::from_pb(proof);
         assert!(de_proof

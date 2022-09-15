@@ -52,10 +52,6 @@
     clippy::missing_errors_doc
 )]
 
-#[allow(unused_imports)]
-#[macro_use]
-extern crate serde_derive; // Required for Protobuf.
-
 pub use protobuf_convert::*;
 
 pub mod proto;
@@ -84,17 +80,17 @@ pub trait ProtobufConvert: Sized {
 }
 
 impl ProtobufConvert for OffsetDateTime {
-    type ProtoStruct = well_known_types::Timestamp;
+    type ProtoStruct = well_known_types::timestamp::Timestamp;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         let mut ts = Self::ProtoStruct::new();
-        ts.set_seconds(self.unix_timestamp());
-        ts.set_nanos(self.nanosecond() as i32);
+        ts.seconds = self.unix_timestamp();
+        ts.nanos = self.nanosecond() as i32;
         ts
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let timestamp = i128::from(pb.get_seconds() * 1_000_000_000 + i64::from(pb.get_nanos()));
+        let timestamp = i128::from(pb.seconds * 1_000_000_000 + i64::from(pb.nanos));
         OffsetDateTime::from_unix_timestamp_nanos(timestamp).map_err(Into::into)
     }
 }
@@ -152,7 +148,7 @@ where
 }
 
 impl ProtobufConvert for () {
-    type ProtoStruct = protobuf::well_known_types::Empty;
+    type ProtoStruct = well_known_types::empty::Empty;
 
     fn to_pb(&self) -> Self::ProtoStruct {
         Self::ProtoStruct::default()
@@ -205,9 +201,9 @@ impl ProtobufConvert for bit_vec::BitVec {
     }
 
     fn from_pb(pb: Self::ProtoStruct) -> Result<Self, Error> {
-        let data = pb.get_data();
+        let data = pb.data();
         let mut bit_vec = bit_vec::BitVec::from_bytes(data);
-        bit_vec.truncate(pb.get_len() as usize);
+        bit_vec.truncate(pb.len() as usize);
         Ok(bit_vec)
     }
 }
@@ -282,7 +278,7 @@ impl_protobuf_convert_fixed_byte_array! {
 ///
 /// ```
 /// use exonum_proto::ProtobufBase64;
-/// # use serde_derive::*;
+/// # use serde::{Deserialize, Serialize};
 /// # use serde_json::json;
 ///
 /// #[derive(Serialize, Deserialize)]

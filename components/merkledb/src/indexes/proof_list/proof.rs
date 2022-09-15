@@ -15,7 +15,7 @@
 pub use crate::ValidationError;
 
 use exonum_crypto::Hash;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use std::cmp::Ordering;

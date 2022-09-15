@@ -96,7 +96,6 @@ impl ApiBackend for ApiBuilder {
         self
     }
 
-    #[allow(clippy::redundant_closure)]
     fn wire(&self, mut output: Self::Backend) -> Self::Backend {
         for handler in &self.handlers {
             let inner = handler.inner.clone();

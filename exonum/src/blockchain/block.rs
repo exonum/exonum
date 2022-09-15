@@ -19,9 +19,9 @@ use exonum_merkledb::{
     proof_map::MapProofError, BinaryValue, MapProof, ObjectHash, ValidationError,
 };
 use exonum_proto::ProtobufConvert;
-use thiserror::Error;
-
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use thiserror::Error;
 
 use crate::{
     blockchain::CallInBlock,
@@ -457,7 +457,7 @@ impl ProtobufConvert for CallProof {
         inner.set_error_description(self.error_description.clone().unwrap_or_default());
         if let Some(ref backtrace) = self.error_backtrace {
             let backtrace: Vec<_> = backtrace.iter().map(ProtobufConvert::to_pb).collect();
-            inner.set_error_backtrace(backtrace.into());
+            inner.set_error_backtrace(backtrace);
         }
         inner
     }
@@ -576,6 +576,7 @@ mod tests {
         access::CopyAccessExt, Database, HashTag, ObjectHash, SystemSchema, TemporaryDB,
     };
     use pretty_assertions::{assert_eq, assert_ne};
+    use serde::{Deserialize, Serialize};
     use time::OffsetDateTime;
 
     use super::{

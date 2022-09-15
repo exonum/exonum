@@ -37,7 +37,7 @@ use exonum_rust_runtime::{
 };
 use futures::{FutureExt, TryFutureExt};
 use log::trace;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
 
@@ -170,7 +170,6 @@ impl CounterApi {
         Ok(TransactionResponse::new(tx_hash))
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn count(snapshot: impl Access) -> api::Result<u64> {
         let schema = CounterSchema::new(snapshot);
         Ok(schema.counter.get().unwrap_or_default())

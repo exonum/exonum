@@ -616,7 +616,7 @@ use exonum_rust_runtime::{
     api::{self, ServiceApiBuilder, ServiceApiState},
     Broadcaster,
 };
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::convert::TryFrom;
 

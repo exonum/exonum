@@ -2,7 +2,7 @@
 name = "exonum-cryptocurrency-advanced"
 version = "0.2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 authors = ["The Exonum Team <contact@exonum.com>"]
 homepage = "https://exonum.com/"
 repository = "https://github.com/exonum/exonum"
@@ -23,10 +23,9 @@ exonum-proto = { version = "1.0.0", path = "../../../components/proto" }
 exonum-cli = { version = "1.0.0", path = "../../../cli" }
 exonum-rust-runtime = { version = "1.0.0", path = "../../../runtimes/rust" }
 
-anyhow = "1.0"
-protobuf = "2"
-serde = "1.0"
-serde_derive = "1.0"
+anyhow = "1"
+protobuf = "3"
+serde = { version = "1", features = [ "derive" ] }
 
 [dependencies.tokio]
 version = "1"

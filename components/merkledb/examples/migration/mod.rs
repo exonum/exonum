@@ -27,7 +27,7 @@
 use exonum_crypto::{Hash, PublicKey, HASH_SIZE, PUBLIC_KEY_LENGTH};
 use exonum_derive::{BinaryValue, FromAccess, ObjectHash};
 use rand::{seq::SliceRandom, thread_rng, Rng};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use std::sync::Arc;
 

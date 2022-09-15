@@ -57,8 +57,8 @@ use exonum::{
     messages::{AnyTx, Precommit, Verified},
     runtime::{ExecutionError, ExecutionStatus},
 };
+use serde::Deserialize;
 use serde::{Serialize, Serializer};
-use serde_derive::Deserialize;
 use std::{
     cell::{Ref, RefCell},
     collections::BTreeMap,
@@ -527,7 +527,7 @@ impl CommittedTransaction {
 /// use exonum_explorer::TransactionInfo;
 /// use exonum::{crypto::KeyPair, runtime::InstanceId};
 /// # use exonum_derive::*;
-/// # use serde_derive::*;
+/// # use serde::*;
 /// # use serde_json::json;
 ///
 /// /// Service interface.

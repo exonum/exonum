@@ -15,7 +15,7 @@
 use exonum_derive::{BinaryValue, ServiceDispatcher, ServiceFactory};
 use exonum_proto::ProtobufConvert;
 use exonum_rust_runtime::{api::ServiceApiBuilder, DefaultInstance, Service};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Define the service.
 #[derive(Debug, ServiceDispatcher, ServiceFactory)]
