@@ -54,7 +54,7 @@ impl CallErrorFlag<'_> {
     fn reborrow(&mut self) -> CallErrorFlag<'_> {
         match self {
             Self::Owned(ref mut flag) => CallErrorFlag::Borrowed(flag),
-            Self::Borrowed(flag) => CallErrorFlag::Borrowed(*flag),
+            Self::Borrowed(flag) => CallErrorFlag::Borrowed(flag),
         }
     }
 }

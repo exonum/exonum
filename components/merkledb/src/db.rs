@@ -146,7 +146,7 @@ impl Deref for ChangesRef<'_> {
     type Target = ViewChanges;
 
     fn deref(&self) -> &ViewChanges {
-        &*self.inner
+        &self.inner
     }
 }
 
@@ -969,7 +969,7 @@ impl<'a> AsReadonly for &'a Fork {
     type Readonly = ReadonlyFork<'a>;
 
     fn as_readonly(&self) -> Self::Readonly {
-        ReadonlyFork(*self)
+        ReadonlyFork(self)
     }
 }
 

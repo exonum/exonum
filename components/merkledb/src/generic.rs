@@ -235,6 +235,7 @@ impl ChangeSet for GenericChanges<'_> {
 impl<'a> RawAccess for GenericRawAccess<'a> {
     type Changes = GenericChanges<'a>;
 
+    #[allow(clippy::explicit_auto_deref)]
     fn snapshot(&self) -> &dyn Snapshot {
         match self {
             GenericRawAccess::Snapshot(snapshot) => *snapshot,

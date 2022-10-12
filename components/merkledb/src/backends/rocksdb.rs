@@ -147,7 +147,6 @@ impl RocksDB {
 
     fn do_merge(&self, patch: Patch, w_opts: &RocksDBWriteOptions) -> crate::Result<()> {
         let mut batch = WriteBatch::default();
-        let mut cfs_to_flush = vec![];
 
         for (resolved, changes) in patch.into_changes() {
             if !self.cf_exists(&resolved.name) {
@@ -158,7 +157,6 @@ impl RocksDB {
 
             if changes.is_cleared() {
                 self.clear_prefix(&mut batch, &cf, &resolved);
-                cfs_to_flush.push(cf.clone());
             }
 
             if let Some(id_bytes) = resolved.id_to_bytes() {
@@ -189,13 +187,7 @@ impl RocksDB {
             }
         }
 
-        self.db.write_opt(batch, w_opts)?;
-        for cf in cfs_to_flush {
-            // We need to flush cfs after range deletion to prevent performance regression.
-            self.db.flush_cf(&cf)?;
-        }
-
-        Ok(())
+        self.db.write_opt(batch, w_opts).map_err(Into::into)
     }
 
     /// Removes all keys with the specified prefix from a column family.
