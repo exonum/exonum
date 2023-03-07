@@ -106,9 +106,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Dependencies
-        run: |
-          sudo add-apt-repository -y ppa:exonum/rocksdb
-          sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb6.8
+        run: sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb-dev
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust }}
@@ -123,9 +121,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Install Dependencies
-        run: |
-          sudo add-apt-repository -y ppa:exonum/rocksdb
-          sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb6.8
+        run: sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb-dev
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ env.rust }}
@@ -156,9 +152,7 @@ jobs:
           profile: minimal
           override: true
       - name: Install Dependencies
-        run: |
-          sudo add-apt-repository -y ppa:exonum/rocksdb
-          sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb6.8
+        run: sudo apt-get install protobuf-compiler libprotobuf-dev librocksdb-dev
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
