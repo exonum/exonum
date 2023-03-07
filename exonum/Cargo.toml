@@ -23,7 +23,7 @@ log = "0.4"
 hex = "0.4"
 serde = { version = "1", features = [ "derive" ] }
 serde_str = "0.1"
-env_logger = "0.9"
+env_logger = "0.10"
 futures = "0.3"
 os_info = "3"
 protobuf = "3"
