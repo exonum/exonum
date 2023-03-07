@@ -34,4 +34,4 @@ features = ["io-util", "macros", "rt-multi-thread", "net", "time"]
 
 [dev-dependencies]
 pretty_assertions = "1"
-toml = "0.5"
+toml = "0.7"
