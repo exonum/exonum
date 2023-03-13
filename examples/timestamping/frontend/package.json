@@ -25,7 +25,7 @@
     "bootstrap": "^4.4.1",
     "crypto-js": "^4.0.0",
     "exonum-client": "^0.18.3",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "http-proxy-middleware": "^1.0.5",
     "jquery": "^3.5.0",
     "moment": "^2.24.0",
