@@ -25,7 +25,7 @@ im = "15"
 leb128 = "0.2"
 num-traits = "0.2"
 protobuf = { version = "3", optional = true }
-rocksdb = { version = "0.19", default-features = false, features = [ "multi-threaded-cf" ] }
+rocksdb = { version = "0.20", default-features = false, features = [ "multi-threaded-cf" ] }
 rust_decimal = "1.0"
 serde = "1.0"
 serde_derive = "1.0"
