@@ -24,7 +24,7 @@
     "big-integer": "^1.6.48",
     "bootstrap": "^4.4.1",
     "exonum-client": "^0.18.4",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "http-proxy-middleware": "^1.0.5",
     "jquery": "^3.5.0",
     "noty": "^3.2.0-beta",
