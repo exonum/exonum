@@ -26,7 +26,7 @@ rpassword = "7"
 serde = { version = "1.0", features = [ "derive" ] }
 structopt = "0.3"
 tempfile = "3.2"
-toml = "0.5"
+toml = "0.7"
 zeroize = "1"
 
 [dev-dependencies]
