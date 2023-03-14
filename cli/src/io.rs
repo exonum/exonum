@@ -16,11 +16,7 @@
 
 use anyhow::{Context, Error};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    fs::{self, File},
-    io::{Read, Write},
-    path::Path,
-};
+use std::{fs, path::Path};
 
 /// Loads TOML-encoded file.
 pub fn load_config_file<P, T>(path: P) -> Result<T, Error>
@@ -41,24 +37,21 @@ where
     T: Serialize,
     P: AsRef<Path>,
 {
-    let path = path.as_ref();
-    do_save(value, path).with_context(|| format!("saving config to {}", path.display()))?;
+    do_save(value, &path)
+        .with_context(|| format!("saving config to {}", path.as_ref().display()))?;
     Ok(())
 }
 
-fn do_load<T: DeserializeOwned>(path: &Path) -> Result<T, Error> {
-    let mut file = File::open(path)?;
-    let mut toml = String::new();
-    file.read_to_string(&mut toml)?;
-    Ok(toml::de::from_str(&toml)?)
+fn do_load<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T, Error> {
+    let toml = fs::read_to_string(path)?;
+    Ok(toml::from_str(&toml)?)
 }
 
-fn do_save<T: Serialize>(value: &T, path: &Path) -> Result<(), Error> {
-    if let Some(dir) = path.parent() {
+fn do_save<T: Serialize, P: AsRef<Path>>(value: &T, path: P) -> Result<(), Error> {
+    if let Some(dir) = path.as_ref().parent() {
         fs::create_dir_all(dir)?;
     }
-    let mut file = File::create(path)?;
-    let value_toml = toml::Value::try_from(value)?;
-    file.write_all(value_toml.to_string().as_bytes())?;
-    Ok(())
+
+    let contents = toml::to_string(value)?;
+    fs::write(path, contents).map_err(Into::into)
 }
