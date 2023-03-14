@@ -236,10 +236,10 @@ pub fn read_keys_from_file<P: AsRef<Path>, W: AsRef<[u8]>>(
     #[cfg(unix)]
     validate_file_mode(key_file.metadata()?.mode())?;
 
-    let mut file_content = vec![];
-    key_file.read_to_end(&mut file_content)?;
+    let mut file_content = String::new();
+    key_file.read_to_string(&mut file_content)?;
     let keys: EncryptedMasterKey =
-        toml::from_slice(file_content.as_slice()).map_err(|e| Error::new(ErrorKind::Other, e))?;
+        toml::from_str(&file_content).map_err(|e| Error::new(ErrorKind::Other, e))?;
     let seed = keys.decrypt(pass_phrase)?;
     let tree = SecretTree::from_slice(&seed)?;
 
