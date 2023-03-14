@@ -15,7 +15,7 @@ links = "exonum_protobuf_common"
 
 [dependencies]
 anyhow = "1"
-base64 = "0.13"
+base64 = "0.21"
 bit-vec = "0.6"
 protobuf = "3"
 protobuf-convert = "0.5"
