@@ -29,7 +29,7 @@ rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 snow = { version = "0.9", default-features = false }
-socket2 = { version = "0.4", features = [ "all" ] }
+socket2 = { version = "0.5", features = [ "all" ] }
 thiserror = "1.0"
 time = "0.3"
 tokio-stream = { version = "0.1", features = [ "signal" ] }
