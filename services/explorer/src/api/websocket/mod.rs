@@ -329,7 +329,7 @@ struct Broadcast {
 }
 
 #[derive(Debug, Message)]
-#[rtype("anyhow::Result<TransactionResponse>")]
+#[rtype(result = "anyhow::Result<TransactionResponse>")]
 struct Transaction(TransactionHex);
 
 pub(crate) struct Server {
